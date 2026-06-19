@@ -8,6 +8,7 @@ import { ApiProvider } from "./rpc/ApiProvider";
 import { defaultRpcUrl, makeAppRuntime } from "./rpc/client";
 import { applyStoredTheme } from "./theme/theme";
 
+import "react-diff-view/style/index.css";
 import "./styles.css";
 
 // Apply the persisted theme before first paint (NF-THEME-6, no flash).

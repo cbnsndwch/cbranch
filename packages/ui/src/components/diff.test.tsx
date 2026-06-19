@@ -11,6 +11,13 @@ import { useUiStore } from "../state/store";
 import { ChangedFileList } from "./ChangedFileList";
 import { DiffPanel } from "./DiffPanel";
 
+// Keep Shiki out of the unit tests: react-diff-view still renders the patch plainly, the
+// on-demand highlighter resolves to no tokens (offline, deterministic).
+vi.mock("../lib/shiki-highlighter", () => ({
+  languageForPath: () => "typescript",
+  loadShikiRefractor: async () => null,
+}));
+
 const repoId = RepoId.make("repo-1");
 const oid = Oid.make("0123456789abcdef0123456789abcdef01234567");
 
@@ -132,5 +139,17 @@ describe("DiffPanel (P1-DIFF-*)", () => {
     expect(await screen.findByText("Large diff deferred")).toBeTruthy();
     fireEvent.click(screen.getByText("Load anyway"));
     expect(await screen.findByText(/added line/)).toBeTruthy();
+  });
+
+  test("the layout toggle switches react-diff-view between unified and split", async () => {
+    const { container } = renderWithApi(
+      <DiffPanel repoId={repoId} oid={oid} />,
+      fakeApi([file({ newPath: "a.ts" })], []),
+    );
+    expect(await screen.findByText(/added line/)).toBeTruthy();
+    expect(container.querySelector(".diff-unified")).toBeTruthy();
+    fireEvent.click(screen.getByLabelText("Side-by-side diff"));
+    expect(await screen.findByText(/added line/)).toBeTruthy();
+    expect(container.querySelector(".diff-split")).toBeTruthy();
   });
 });

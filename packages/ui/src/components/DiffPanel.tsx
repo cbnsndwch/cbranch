@@ -1,13 +1,14 @@
-import { type DiffFile, type Oid, type RepoId } from "@cbranch/rpc-contract";
+import { type Oid, type RepoId } from "@cbranch/rpc-contract";
 import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
 
-import { cn } from "../lib/cn";
 import { buildDiffSpec, defaultDiffOptions, type DiffOptions, filePath, isLargeDiff, isSubmodule } from "../lib/diff";
 import { useCommitDetail, useCommitDiff } from "../rpc/hooks";
 import { useUiStore } from "../state/store";
 import { ChangedFileList } from "./ChangedFileList";
 import { DiffControls } from "./DiffControls";
 import { BinaryCard, LargeDiffCard, SubmoduleCard } from "./DiffPlaceholders";
+import { DiffView } from "./DiffView";
 import { Placeholder } from "./ui/placeholder";
 
 // Read-only diff (P1-DIFF-*): the changed-file list, the diff controls, and the selected
@@ -38,6 +39,11 @@ export function DiffPanel({ repoId, oid }: { readonly repoId: RepoId; readonly o
   const parents = detail?.parents ?? [];
 
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Surface load failures as a toast in addition to the in-panel alert (NF-ERR-2).
+  useEffect(() => {
+    if (isError) toast.error("Could not load the diff.");
+  }, [isError]);
 
   if (oid === null) return <Placeholder>Select a commit to see its changes.</Placeholder>;
   if (isLoading) return <Placeholder>Loading diff…</Placeholder>;
@@ -105,37 +111,10 @@ export function DiffPanel({ repoId, oid }: { readonly repoId: RepoId; readonly o
           ) : isLargeDiff(active) && !forced.has(filePath(active)) ? (
             <LargeDiffCard file={active} onLoad={() => setForced((prev) => new Set(prev).add(filePath(active)))} />
           ) : (
-            <FileDiff file={active} />
+            <DiffView file={active} diffView={diffView} />
           )}
         </div>
       </div>
-    </div>
-  );
-}
-
-function FileDiff({ file }: { readonly file: DiffFile }) {
-  // Binary/submodule/large diffs are intercepted by the caller's placeholder cards.
-  if (file.hunks.length === 0) return <Placeholder>No textual changes ({file.status}).</Placeholder>;
-  return (
-    <div className="font-mono text-xs">
-      {file.hunks.map((hunk, hi) => (
-        <div key={hi} id={`hunk-${hi}`}>
-          <div className="bg-muted text-muted-foreground px-2 py-0.5">{hunk.header}</div>
-          {hunk.lines.map((line, li) => (
-            <div
-              key={li}
-              className={cn(
-                "px-2 whitespace-pre",
-                line.kind === "add" ? "bg-diff-add text-diff-add-foreground" : "",
-                line.kind === "delete" ? "bg-diff-remove text-diff-remove-foreground" : "",
-              )}
-            >
-              {line.kind === "add" ? "+" : line.kind === "delete" ? "-" : " "}
-              {line.content}
-            </div>
-          ))}
-        </div>
-      ))}
     </div>
   );
 }

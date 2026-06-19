@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { Toaster } from "sonner";
 
 import { AppShell } from "./components/AppShell";
 import { CommandPalette } from "./components/CommandPalette";
@@ -18,10 +19,14 @@ export function App() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
 
+  // Theme the toasts to follow the resolved light/dark root (NF-ERR-2 / NF-THEME-2).
+  const theme = useUiStore((s) => s.theme);
+
   return (
     <>
       <AppShell />
       <CommandPalette />
+      <Toaster theme={theme} position="bottom-right" closeButton richColors />
     </>
   );
 }
