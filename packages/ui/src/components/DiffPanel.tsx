@@ -2,11 +2,12 @@ import { type DiffFile, type Oid, type RepoId } from "@cbranch/rpc-contract";
 import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
 
 import { cn } from "../lib/cn";
-import { buildDiffSpec, defaultDiffOptions, type DiffOptions, filePath, isSubmodule } from "../lib/diff";
+import { buildDiffSpec, defaultDiffOptions, type DiffOptions, filePath, isLargeDiff, isSubmodule } from "../lib/diff";
 import { useCommitDetail, useCommitDiff } from "../rpc/hooks";
 import { useUiStore } from "../state/store";
 import { ChangedFileList } from "./ChangedFileList";
 import { DiffControls } from "./DiffControls";
+import { BinaryCard, LargeDiffCard, SubmoduleCard } from "./DiffPlaceholders";
 import { Placeholder } from "./ui/placeholder";
 
 // Read-only diff (P1-DIFF-*): the changed-file list, the diff controls, and the selected
@@ -20,12 +21,15 @@ export function DiffPanel({ repoId, oid }: { readonly repoId: RepoId; readonly o
   const [options, setOptions] = useState<DiffOptions>(defaultDiffOptions);
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const [activeHunk, setActiveHunk] = useState(0);
+  // Paths the user chose to render despite the large-diff deferral (P1-DIFF-9).
+  const [forced, setForced] = useState<ReadonlySet<string>>(new Set());
 
   // Reset transient diff state when the selected commit changes (P1-X-4).
   useEffect(() => {
     setOptions(defaultDiffOptions);
     setSelectedPath(null);
     setActiveHunk(0);
+    setForced(new Set());
   }, [oid]);
 
   const spec = useMemo(() => (oid ? buildDiffSpec(repoId, oid, options) : null), [repoId, oid, options]);
@@ -94,7 +98,15 @@ export function DiffPanel({ repoId, oid }: { readonly repoId: RepoId; readonly o
           <ChangedFileList files={files} selectedPath={filePath(active)} onSelect={setSelectedPath} />
         </div>
         <div ref={scrollRef} tabIndex={0} onKeyDown={onKeyDown} className="flex-1 overflow-auto outline-none">
-          <FileDiff file={active} />
+          {active.isBinary ? (
+            <BinaryCard file={active} />
+          ) : isSubmodule(active) ? (
+            <SubmoduleCard file={active} />
+          ) : isLargeDiff(active) && !forced.has(filePath(active)) ? (
+            <LargeDiffCard file={active} onLoad={() => setForced((prev) => new Set(prev).add(filePath(active)))} />
+          ) : (
+            <FileDiff file={active} />
+          )}
         </div>
       </div>
     </div>
@@ -102,13 +114,7 @@ export function DiffPanel({ repoId, oid }: { readonly repoId: RepoId; readonly o
 }
 
 function FileDiff({ file }: { readonly file: DiffFile }) {
-  if (file.isBinary) return <Placeholder>Binary file ({file.status}).</Placeholder>;
-  if (isSubmodule(file))
-    return (
-      <Placeholder>
-        Submodule {filePath(file)} ({file.status}).
-      </Placeholder>
-    );
+  // Binary/submodule/large diffs are intercepted by the caller's placeholder cards.
   if (file.hunks.length === 0) return <Placeholder>No textual changes ({file.status}).</Placeholder>;
   return (
     <div className="font-mono text-xs">

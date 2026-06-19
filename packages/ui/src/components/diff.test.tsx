@@ -119,4 +119,18 @@ describe("DiffPanel (P1-DIFF-*)", () => {
     renderWithApi(<DiffPanel repoId={repoId} oid={oid} />, api);
     expect(await screen.findByText(/Submodule/)).toBeTruthy();
   });
+
+  test("binary changes render the binary card (P1-DIFF-8)", async () => {
+    const api = fakeApi([file({ newPath: "logo.png", isBinary: true, hunks: [] })], []);
+    renderWithApi(<DiffPanel repoId={repoId} oid={oid} />, api);
+    expect(await screen.findByText("Binary file")).toBeTruthy();
+  });
+
+  test("large diffs are deferred behind Load anyway (P1-DIFF-9)", async () => {
+    const big = file({ newPath: "big.ts", additions: 3000, deletions: 100 });
+    renderWithApi(<DiffPanel repoId={repoId} oid={oid} />, fakeApi([big], []));
+    expect(await screen.findByText("Large diff deferred")).toBeTruthy();
+    fireEvent.click(screen.getByText("Load anyway"));
+    expect(await screen.findByText(/added line/)).toBeTruthy();
+  });
 });
