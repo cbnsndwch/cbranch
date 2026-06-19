@@ -1,0 +1,32 @@
+{
+  "name": "cbranch",
+  "version": "0.0.0",
+  "private": true,
+  "description": "A cross-platform, browser-based Git GUI (MIT). Monorepo root.",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "lint": "oxlint",
+    "format": "oxfmt",
+    "format:check": "oxfmt --check",
+    "typecheck": "tsc -b tsconfig.json && pnpm --filter @cbranch/ui typecheck",
+    "build": "pnpm -r build",
+    "test": "vitest run",
+    "license-audit": "node scripts/license-audit.mjs",
+    "depcheck": "node scripts/check-deps.mjs",
+    "check:primitives": "pnpm --filter @cbranch/ui check:primitives",
+    "gate": "pnpm license-audit && pnpm lint && pnpm format:check && pnpm typecheck && pnpm build && pnpm test && pnpm depcheck"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "oxfmt": "0.55.0",
+    "oxlint": "1.70.0",
+    "typescript": "^5.9.0",
+    "vitest": "^4.1.9"
+  },
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=9"
+  },
+  "packageManager": "pnpm@10.32.1"
+}

@@ -1,0 +1,158 @@
+@import "tailwindcss";
+
+/* Tailwind v4 dark-mode driven by a `.dark` class on the root element
+   (REQ-STACK-UX-002). No tailwind.config.js, no PostCSS — @tailwindcss/vite only. */
+@custom-variant dark (&:is(.dark *));
+
+/* shadcn (base-lyra on Base UI) CSS-variable token block.
+   PLACEHOLDER oklch values — exact brand palette is a design decision (BRANDING.md).
+   base-lyra is the square-edged style, so --radius is 0. */
+:root {
+  --radius: 0rem;
+
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.62 0.12 165);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: oklch(0.985 0 0);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.62 0.12 165);
+
+  /* Git domain tokens (BRANDING.md) — placeholders. */
+  --diff-add: oklch(0.92 0.06 150);
+  --diff-add-foreground: oklch(0.3 0.08 150);
+  --diff-remove: oklch(0.92 0.07 25);
+  --diff-remove-foreground: oklch(0.35 0.12 25);
+  --diff-context: oklch(0.97 0 0);
+  --diff-word-add: oklch(0.85 0.1 150);
+  --diff-word-remove: oklch(0.85 0.11 25);
+
+  --status-ahead: oklch(0.62 0.12 165);
+  --status-behind: oklch(0.6 0.13 50);
+  --status-conflict: oklch(0.577 0.245 27.325);
+  --status-staged: oklch(0.62 0.12 165);
+  --status-unstaged: oklch(0.6 0.13 50);
+  --status-untracked: oklch(0.556 0 0);
+  --status-ignored: oklch(0.7 0 0);
+
+  --graph-1: oklch(0.62 0.12 165);
+  --graph-2: oklch(0.6 0.13 50);
+  --graph-3: oklch(0.55 0.16 265);
+  --graph-4: oklch(0.6 0.16 330);
+  --graph-5: oklch(0.65 0.15 95);
+  --graph-6: oklch(0.6 0.14 200);
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.7 0.13 165);
+  --primary-foreground: oklch(0.145 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --destructive-foreground: oklch(0.985 0 0);
+  --border: oklch(1 0 0 / 12%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.7 0.13 165);
+
+  --diff-add: oklch(0.3 0.06 150);
+  --diff-add-foreground: oklch(0.9 0.08 150);
+  --diff-remove: oklch(0.32 0.09 25);
+  --diff-remove-foreground: oklch(0.9 0.1 25);
+  --diff-context: oklch(0.205 0 0);
+  --diff-word-add: oklch(0.45 0.1 150);
+  --diff-word-remove: oklch(0.45 0.12 25);
+
+  --status-ahead: oklch(0.7 0.13 165);
+  --status-behind: oklch(0.72 0.14 50);
+  --status-conflict: oklch(0.704 0.191 22.216);
+  --status-staged: oklch(0.7 0.13 165);
+  --status-unstaged: oklch(0.72 0.14 50);
+  --status-untracked: oklch(0.708 0 0);
+  --status-ignored: oklch(0.5 0 0);
+
+  --graph-1: oklch(0.7 0.13 165);
+  --graph-2: oklch(0.72 0.14 50);
+  --graph-3: oklch(0.68 0.16 265);
+  --graph-4: oklch(0.7 0.16 330);
+  --graph-5: oklch(0.78 0.15 95);
+  --graph-6: oklch(0.7 0.14 200);
+}
+
+/* Map the CSS variables onto Tailwind's token namespace so utilities like
+   `bg-primary`, `text-muted-foreground`, `ring-ring`, `border-input` resolve. */
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-diff-add: var(--diff-add);
+  --color-diff-add-foreground: var(--diff-add-foreground);
+  --color-diff-remove: var(--diff-remove);
+  --color-diff-remove-foreground: var(--diff-remove-foreground);
+  --color-diff-context: var(--diff-context);
+
+  --color-status-ahead: var(--status-ahead);
+  --color-status-behind: var(--status-behind);
+  --color-status-conflict: var(--status-conflict);
+
+  --color-graph-1: var(--graph-1);
+  --color-graph-2: var(--graph-2);
+  --color-graph-3: var(--graph-3);
+  --color-graph-4: var(--graph-4);
+  --color-graph-5: var(--graph-5);
+  --color-graph-6: var(--graph-6);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+  }
+}

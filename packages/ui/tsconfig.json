@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "_comment": "App project (Vite-built, not part of the `tsc -b` reference graph). Non-composite + noEmit: Vite/Rolldown owns the bundle, tsc only typechecks. `types` is left to auto-discovery so @types/react and @types/react-dom are picked up.",
+  "compilerOptions": {
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "noEmit": true,
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx"
+  },
+  "include": ["src/**/*"],
+  "exclude": ["src/**/*.test.ts", "dist", "node_modules"]
+}

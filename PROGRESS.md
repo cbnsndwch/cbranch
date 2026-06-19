@@ -12,17 +12,20 @@ Running checklist for the clean-room build. Legend: ✅ done · 🔄 in-flight �
 ## Milestone 0 — bootstrap docs
 - ✅ Feature branch created.
 - ✅ `LICENSE` (MIT), `PROVENANCE.md`, `PROGRESS.md`.
-- 🔄 Spec digestion (parallel readers → `docs/_impl-notes/`).
+- ✅ Spec digestion (8 parallel readers → `docs/_impl-notes/` 03/02/14/15/04/05/10/12).
+- ✅ `docs/_impl-notes/DECISIONS.md` — locked all implementer-gap resolutions (D1–D10): method tags, repoId hash, NDJSON via lib, side-channel routes, stale-AC reconciliations, authored P1 success Schemas.
 
-## P0 — Repository scaffold
-- ⬜ pnpm monorepo: `packages/{core,rpc-contract,ui}` + `apps/{web-server,vscode-ext}`, `workspace:*`.
-- ⬜ Shared `tsconfig` (strict); oxlint + oxfmt; Vite 8; Tailwind v4; vendored `base-lyra` on Base UI (+ primitive-existence check, REQ-STACK-014).
-- ⬜ Pinned pre-stable deps EXACTLY (effect@4.0.0-beta.84, oxfmt beta, oxlint type-aware alpha advisory-only).
-- ⬜ CI: `install --frozen-lockfile` + license audit + lint/format + `pnpm -r build` + dependency-direction check (REQ-ARCH-007).
-- ⬜ Gate green on empty skeleton.
+## P0 — Repository scaffold ✅ (gate verified green independently)
+- ✅ pnpm monorepo: `packages/{core,rpc-contract,ui}` + `apps/{web-server,vscode-ext}`, `workspace:*`, one root lockfile.
+- ✅ Shared `tsconfig.base.json` (strict, `module: Preserve` + `moduleResolution: Bundler`, project refs); oxlint + oxfmt; Vite 8 / Rolldown (`output.codeSplitting.groups[]`); Tailwind v4 via `@tailwindcss/vite`; Base UI `1.0.0-rc.0` (all 12 needed primitives present; HoverCard→PreviewCard, DropdownMenu→Menu); base-lyra placeholder Button (full registry vendoring deferred to P1).
+- ✅ Pinned EXACTLY: `effect@4.0.0-beta.84`, `oxfmt@0.55.0`, `oxlint@1.70.0`. tsgolint not wired (advisory).
+- ✅ CI (`.github/workflows/ci.yml`) + `pnpm gate` = license-audit → lint → format:check → typecheck → build → test → depcheck. License audit: prod strict-permissive, dev allows build-time MPL-2.0 (lightningcss, documented), strong copyleft denied. Dep-direction check enforces D10 + socket rule.
+- ✅ Gate green on empty skeleton (5 pkgs build; 5 tests pass).
+- Flags: Base UI rc.0 is npm-deprecated prerelease (pinned exact, re-evaluate); TS pinned `^5.9` (5.9.3) over 6.0.3.
 
-## P0.5 — Effect v4 ⚠-symbol verification
-- ⬜ Verify every `⚠` symbol in `14` against installed `effect@4.0.0-beta.84` types; build the single adapter `packages/rpc-contract/src/effect-rpc-adapter.ts`.
+## P0.5 — Effect v4 ⚠-symbol verification 🔄
+- ✅ Symbol PRESENCE verified at the pin (adapter re-exports Rpc/RpcClient/RpcGroup/RpcSerialization/RpcServer, Socket, Http; `Schema.TaggedErrorClass` present, `Schema.TaggedError` absent).
+- ⬜ Verify the actual API SHAPES (RpcGroup.make / Rpc.make signatures, layer wiring) by building a tiny end-to-end in-memory RPC round-trip against the installed types before authoring the full P1 contract.
 
 ## P1 — Read-only walking skeleton
 - ⬜ `rpc-contract`: RpcGroup + Schemas for P1 methods (`repo.open/recentList/recentRemove/state/subscribe`, `log.stream`, `commit.detail/diff`, `file.contentAtRev`), GitError union (§4), InvalidationEvent/Domain (§5).

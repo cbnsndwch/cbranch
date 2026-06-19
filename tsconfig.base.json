@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "_comment": "Shared strict base for every package. Module strategy: module=Preserve + moduleResolution=Bundler. This single setting serves BOTH the Vite-bundled browser libs (packages/ui) and the Node-ESM server (apps/web-server): Preserve keeps import/export syntax verbatim and lets a bundler (Rolldown via Vite) or a modern Node ESM build (tsup/esbuild, REQ-STACK-010) own final module resolution, while Bundler resolution reads package.json \"exports\" without requiring file extensions. Project references (composite) let `tsc -b` build the graph in dependency order.",
+  "compilerOptions": {
+    "target": "ES2023",
+    "lib": ["ES2023"],
+    "module": "Preserve",
+    "moduleResolution": "Bundler",
+    "moduleDetection": "force",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitOverride": true,
+    "composite": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true
+  }
+}

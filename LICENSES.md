@@ -72,6 +72,21 @@ get bundled are the small runtime libraries those components import:
 > bundle aggregating each license. Apache-2.0 additionally requires preserving any
 > upstream `NOTICE` file contents when one is provided.
 
+### Build-time tooling note — `lightningcss` (MPL-2.0)
+
+The Tailwind v4 Vite plugin (`@tailwindcss/vite`, mandated by REQ-STACK-013) and
+Vite both pull in **`lightningcss`** transitively, which is **MPL-2.0** (weak,
+file-level copyleft). `lightningcss` is a **build-time-only** CSS transformer: it
+runs during `vite build` and is **not** linked into, embedded in, or emitted as
+part of the shipped browser bundle. MPL-2.0's file-level copyleft therefore does
+not reach cbranch's MIT-licensed artifacts (no MPL-covered source is modified or
+redistributed). It is consequently treated as an allowed **dev/build** license
+(REQ-STACK-033), not a bundled one — the bundled-dependency verdict above is
+unaffected. The license-audit gate (`scripts/license-audit.mjs`) enforces this
+split: the strict permissive allow-list applies to the **production** tree, while
+the **dev** allow-list adds only MPL-2.0 for this build-time tool. Strong copyleft
+(GPL/LGPL/AGPL/SSPL) is rejected everywhere.
+
 ---
 
 ## External processes (arm's-length, NOT bundled)
