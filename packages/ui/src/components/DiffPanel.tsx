@@ -1,62 +1,101 @@
-import { type ChangeCode, type DiffFile, type Oid, type RepoId } from "@cbranch/rpc-contract";
-import { useState } from "react";
+import { type DiffFile, type Oid, type RepoId } from "@cbranch/rpc-contract";
+import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
 
 import { cn } from "../lib/cn";
-import { useCommitDiff } from "../rpc/hooks";
+import { buildDiffSpec, defaultDiffOptions, type DiffOptions, filePath, isSubmodule } from "../lib/diff";
+import { useCommitDetail, useCommitDiff } from "../rpc/hooks";
+import { useUiStore } from "../state/store";
+import { ChangedFileList } from "./ChangedFileList";
+import { DiffControls } from "./DiffControls";
 import { Placeholder } from "./ui/placeholder";
 
-// Read-only diff (P1-DIFF-1/2/8 + P1-UI-DIFF-1): the changed-file list plus a unified
-// view of the selected file. Inline/side-by-side, syntax highlighting (Shiki), the
-// tree view, and large-diff deferral arrive with the diff-viewer milestone (ui-D).
-
-const STATUS_GLYPH: Record<ChangeCode, string> = {
-  added: "A",
-  modified: "M",
-  deleted: "D",
-  renamed: "R",
-  copied: "C",
-  typeChanged: "T",
-  updatedButUnmerged: "U",
-  untracked: "?",
-  ignored: "!",
-  unmodified: " ",
-};
-
+// Read-only diff (P1-DIFF-*): the changed-file list, the diff controls, and the selected
+// file's patch. Whitespace/context/base/combined drive the server DiffSpec; inline/split is
+// a client preference. Next/prev change steps hunks within the file and crosses to the
+// adjacent changed file (P1-DIFF-6). The rendered patch (react-diff-view + Shiki) and the
+// binary/submodule/large-diff cards land in the next diff-viewer slice.
 export function DiffPanel({ repoId, oid }: { readonly repoId: RepoId; readonly oid: Oid | null }) {
-  const { data: files, isLoading, isError } = useCommitDiff(repoId, oid);
+  const diffView = useUiStore((s) => s.diffView);
+  const setDiffView = useUiStore((s) => s.setDiffView);
+  const [options, setOptions] = useState<DiffOptions>(defaultDiffOptions);
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
+  const [activeHunk, setActiveHunk] = useState(0);
+
+  // Reset transient diff state when the selected commit changes (P1-X-4).
+  useEffect(() => {
+    setOptions(defaultDiffOptions);
+    setSelectedPath(null);
+    setActiveHunk(0);
+  }, [oid]);
+
+  const spec = useMemo(() => (oid ? buildDiffSpec(repoId, oid, options) : null), [repoId, oid, options]);
+  const { data: files, isLoading, isError } = useCommitDiff(spec);
+  const { data: detail } = useCommitDetail(repoId, oid);
+  const parents = detail?.parents ?? [];
+
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   if (oid === null) return <Placeholder>Select a commit to see its changes.</Placeholder>;
   if (isLoading) return <Placeholder>Loading diff…</Placeholder>;
   if (isError || !files) return <Placeholder tone="danger">Could not load the diff.</Placeholder>;
   if (files.length === 0) return <Placeholder>No changes in this commit.</Placeholder>;
 
-  const active = files.find((f) => f.newPath === selectedPath) ?? files[0]!;
+  const activeIndex = Math.max(
+    0,
+    files.findIndex((f) => filePath(f) === selectedPath),
+  );
+  const active = files[activeIndex]!;
+
+  const goToHunk = (fileIndex: number, hunkIndex: number) => {
+    const file = files[fileIndex]!;
+    if (filePath(file) !== filePath(active)) setSelectedPath(filePath(file));
+    setActiveHunk(hunkIndex);
+    requestAnimationFrame(() => {
+      document.getElementById(`hunk-${hunkIndex}`)?.scrollIntoView({ block: "nearest" });
+    });
+  };
+
+  // Next/prev change: step hunks within the file, then cross to the adjacent changed file.
+  const step = (direction: 1 | -1) => {
+    const next = activeHunk + direction;
+    if (next >= 0 && next < active.hunks.length) {
+      goToHunk(activeIndex, next);
+      return;
+    }
+    const nextFile = activeIndex + direction;
+    if (nextFile < 0 || nextFile >= files.length) return;
+    const target = files[nextFile]!;
+    goToHunk(nextFile, direction === 1 ? 0 : Math.max(0, target.hunks.length - 1));
+  };
+
+  const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === "n" || event.key === "j") {
+      event.preventDefault();
+      step(1);
+    } else if (event.key === "p" || event.key === "k") {
+      event.preventDefault();
+      step(-1);
+    }
+  };
 
   return (
-    <div className="flex h-full">
-      <ul className="w-1/3 min-w-40 overflow-auto border-r text-xs">
-        {files.map((file) => {
-          const path = file.newPath || file.oldPath;
-          return (
-            <li key={path}>
-              <button
-                type="button"
-                onClick={() => setSelectedPath(file.newPath)}
-                className={cn(
-                  "hover:bg-accent flex w-full items-center gap-2 px-2 py-1 text-left",
-                  active === file ? "bg-accent" : "",
-                )}
-              >
-                <span className="text-muted-foreground w-3 font-mono">{STATUS_GLYPH[file.status]}</span>
-                <span className="truncate">{path}</span>
-              </button>
-            </li>
-          );
-        })}
-      </ul>
-      <div className="flex-1 overflow-auto">
-        <FileDiff file={active} />
+    <div className="flex h-full flex-col">
+      <DiffControls
+        diffView={diffView}
+        onDiffViewChange={setDiffView}
+        options={options}
+        onOptionsChange={setOptions}
+        parents={parents}
+        onPrevChange={() => step(-1)}
+        onNextChange={() => step(1)}
+      />
+      <div className="flex min-h-0 flex-1">
+        <div className="w-1/3 min-w-44">
+          <ChangedFileList files={files} selectedPath={filePath(active)} onSelect={setSelectedPath} />
+        </div>
+        <div ref={scrollRef} tabIndex={0} onKeyDown={onKeyDown} className="flex-1 overflow-auto outline-none">
+          <FileDiff file={active} />
+        </div>
       </div>
     </div>
   );
@@ -64,11 +103,17 @@ export function DiffPanel({ repoId, oid }: { readonly repoId: RepoId; readonly o
 
 function FileDiff({ file }: { readonly file: DiffFile }) {
   if (file.isBinary) return <Placeholder>Binary file ({file.status}).</Placeholder>;
+  if (isSubmodule(file))
+    return (
+      <Placeholder>
+        Submodule {filePath(file)} ({file.status}).
+      </Placeholder>
+    );
   if (file.hunks.length === 0) return <Placeholder>No textual changes ({file.status}).</Placeholder>;
   return (
     <div className="font-mono text-xs">
       {file.hunks.map((hunk, hi) => (
-        <div key={hi}>
+        <div key={hi} id={`hunk-${hi}`}>
           <div className="bg-muted text-muted-foreground px-2 py-0.5">{hunk.header}</div>
           {hunk.lines.map((line, li) => (
             <div

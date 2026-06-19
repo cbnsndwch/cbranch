@@ -8,6 +8,7 @@
 import { type Oid, type RepoId } from "@cbranch/rpc-contract";
 import { create } from "zustand";
 
+import { type DiffView, readDiffView, writeDiffView } from "../lib/diff";
 import { emptyFilters, type LogFilters } from "../lib/filters";
 import { type DateMode, readDateMode, writeDateMode } from "../lib/format";
 import { applyTheme, readThemePref, type ThemePref } from "../theme/theme";
@@ -25,12 +26,15 @@ export interface UiState {
   readonly filters: LogFilters;
   /** Relative/absolute date display preference (P1-HIST-8). */
   readonly dateMode: DateMode;
+  /** Inline/side-by-side diff presentation preference (P1-DIFF-3). */
+  readonly diffView: DiffView;
   readonly setActiveRepoId: (id: RepoId | null) => void;
   readonly setSelectedOid: (oid: Oid | null) => void;
   readonly setPaletteOpen: (open: boolean) => void;
   readonly setTheme: (theme: ThemePref) => void;
   readonly setFilters: (filters: LogFilters) => void;
   readonly setDateMode: (mode: DateMode) => void;
+  readonly setDiffView: (view: DiffView) => void;
 }
 
 export const useUiStore = create<UiState>((set) => ({
@@ -40,6 +44,7 @@ export const useUiStore = create<UiState>((set) => ({
   theme: readThemePref(),
   filters: emptyFilters,
   dateMode: readDateMode(),
+  diffView: readDiffView(),
   // Switching repositories supersedes the old selection and filters (P1-OPEN-4 / P1-X-4).
   setActiveRepoId: (activeRepoId) => set({ activeRepoId, selectedOid: null, filters: emptyFilters }),
   setSelectedOid: (selectedOid) => set({ selectedOid }),
@@ -52,5 +57,9 @@ export const useUiStore = create<UiState>((set) => ({
   setDateMode: (dateMode) => {
     writeDateMode(dateMode);
     set({ dateMode });
+  },
+  setDiffView: (diffView) => {
+    writeDiffView(diffView);
+    set({ diffView });
   },
 }));

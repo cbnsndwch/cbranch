@@ -7,7 +7,7 @@
 // are NEVER invalidated (spec 15 §8). On reconnect the whole `[repoId]` subtree is
 // invalidated (spec 15 §5 / NF-ERR-6).
 
-import { type Domain, type LogQuery, type Oid, type RepoId } from "@cbranch/rpc-contract";
+import { type DiffSpec, type Domain, type LogQuery, type Oid, type RepoId } from "@cbranch/rpc-contract";
 
 /** Everything for a repo — the reconnect "resnapshot" invalidation target (spec 15 §5). */
 export const repoScopeKey = (repoId: RepoId) => [repoId] as const;
@@ -23,9 +23,19 @@ export const queryKeys = {
   log: (query: LogQuery) => [query.repoId, "commits", "log", query] as const,
   /** `commit.detail` — immutable, content-addressed by oid (never invalidated). */
   commitDetail: (repoId: RepoId, oid: Oid) => [repoId, "commit", oid, "detail"] as const,
-  /** `commit.diff` — immutable, content-addressed by target/base (never invalidated). */
-  commitDiff: (repoId: RepoId, target: string, base?: string) =>
-    [repoId, "commit", target, "diff", base ?? "^1"] as const,
+  /**
+   * `commit.diff` — immutable, content-addressed by target plus the options that change the
+   * computed patch (base/whitespace/context/combined), so toggling a control caches
+   * independently. Never invalidated (spec 15 §8).
+   */
+  commitDiff: (spec: DiffSpec) =>
+    [
+      spec.repoId,
+      "commit",
+      spec.target,
+      "diff",
+      { base: spec.base ?? "^1", whitespace: spec.whitespace, context: spec.context, combined: spec.combined },
+    ] as const,
   /** `file.contentAtRev` — immutable blob at a fixed rev (never invalidated). */
   fileContentAtRev: (repoId: RepoId, rev: string, path: string) => [repoId, "blob", rev, path] as const,
   /** `repo.recentList` — the persisted switcher list (not repo-scoped). */

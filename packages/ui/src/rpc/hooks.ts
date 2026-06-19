@@ -10,9 +10,9 @@ import {
   type CommitDetail,
   type CommitSummary,
   type DiffFile,
-  DiffSpec,
+  type DiffSpec,
   type FileContentResult,
-  LogQuery,
+  type LogQuery,
   type Oid,
   type RecentRepo,
   type RepoHandle,
@@ -24,18 +24,6 @@ import { useEffect, useState } from "react";
 
 import { useApi } from "./ApiProvider";
 import { queryKeys } from "./query-keys";
-
-/** Default commit-vs-first-parent diff request for the selected commit (P1-HIST-5). */
-export const defaultDiffSpec = (repoId: RepoId, target: string): DiffSpec =>
-  new DiffSpec({
-    repoId,
-    target,
-    cached: false,
-    whitespace: "show",
-    context: 3,
-    renames: true,
-    combined: false,
-  });
 
 export const useRecentList = (): UseQueryResult<ReadonlyArray<RecentRepo>> => {
   const api = useApi();
@@ -60,12 +48,12 @@ export const useCommitDetail = (repoId: RepoId | null, oid: Oid | null): UseQuer
   });
 };
 
-export const useCommitDiff = (repoId: RepoId | null, oid: Oid | null): UseQueryResult<ReadonlyArray<DiffFile>> => {
+export const useCommitDiff = (spec: DiffSpec | null): UseQueryResult<ReadonlyArray<DiffFile>> => {
   const api = useApi();
   return useQuery({
-    queryKey: repoId && oid ? queryKeys.commitDiff(repoId, oid) : ["inactive"],
-    queryFn: () => api.commitDiff(defaultDiffSpec(repoId as RepoId, oid as Oid)),
-    enabled: repoId !== null && oid !== null,
+    queryKey: spec ? queryKeys.commitDiff(spec) : ["inactive"],
+    queryFn: () => api.commitDiff(spec as DiffSpec),
+    enabled: spec !== null,
   });
 };
 

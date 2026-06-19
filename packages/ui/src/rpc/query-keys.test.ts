@@ -1,4 +1,4 @@
-import { LogQuery, Oid, RepoId } from "@cbranch/rpc-contract";
+import { DiffSpec, LogQuery, Oid, RepoId } from "@cbranch/rpc-contract";
 import { describe, expect, test } from "vitest";
 
 import { domainKey, queryKeys, repoScopeKey } from "./query-keys";
@@ -29,7 +29,22 @@ describe("query keys (D9 / spec 15 §2)", () => {
   test("commit detail/diff and blobs are content-addressed (non-domain, never invalidated)", () => {
     const oid = Oid.make("abc123");
     expect(queryKeys.commitDetail(repoId, oid)).toEqual([repoId, "commit", oid, "detail"]);
-    expect(queryKeys.commitDiff(repoId, "abc123")).toEqual([repoId, "commit", "abc123", "diff", "^1"]);
+    const spec = new DiffSpec({
+      repoId,
+      target: "abc123",
+      cached: false,
+      whitespace: "show",
+      context: 3,
+      renames: true,
+      combined: false,
+    });
+    expect(queryKeys.commitDiff(spec)).toEqual([
+      repoId,
+      "commit",
+      "abc123",
+      "diff",
+      { base: "^1", whitespace: "show", context: 3, combined: false },
+    ]);
     expect(queryKeys.fileContentAtRev(repoId, "abc123", "src/a.ts")).toEqual([repoId, "blob", "abc123", "src/a.ts"]);
   });
 });

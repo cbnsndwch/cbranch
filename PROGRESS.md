@@ -86,7 +86,13 @@ returns a plain `Array` at this pin.
      docblock; `MIT-0` added to license allow-list (jsdom dep). **RUNS:** `pnpm -r build` then
      `CBRANCH_CLIENT_DIR=$PWD/packages/ui/dist pnpm --filter @cbranch/web-server start` → http://127.0.0.1:7420 (see
      `RUNNING.md`). Web-server now **bundled** (esbuild, DECISIONS **D12**) so the built artifact runs under Node ESM.
-   - ⬜ **ui-C** history polish — commit graph (spec 10), ref-label chips, filters (P1-FILT-*), quick-find, full keyboard nav, date-format pref.
+   - ✅ **ui-C** history polish — incremental append-only commit graph (spec 10: lanes/edges/colors,
+     open-ended boundary edges) in an SVG graph cell; ref-label chips by kind (HEAD/local/remote/tag) with
+     +N overflow; server-side filters (refScope/path/author/grep/since/until → `LogQuery`, removable chips,
+     stream restart + scroll reset on change, no-match empty state); relative/absolute date preference
+     (persisted, history + details); full keyboard nav (arrows/PgUp-Dn/Home/End); quick-find over the loaded
+     window (Ctrl/Cmd-F, subject/hash, next/prev + counter; backs jump-to-hash within the window).
+     3 gate-green commits; 232 tests.
    - ⬜ **ui-D** diff + file-at-rev — react-diff-view + Shiki, inline/split toggle, whitespace/context; CodeMirror 6 file-at-rev; binary/submodule/large-diff placeholders; sonner toasts; remaining base-lyra primitives.
    RPC CLIENT via the adapter subpath `@cbranch/rpc-contract/effect-rpc-adapter`. GOTCHA: `Stream.runCollect`→Array (see [[cbranch-effect-v4-gotchas]] in memory).
 3. 🔄 **Invalidation bus end-to-end** — ✅ CLIENT wired: `useInvalidationBus` (`src/rpc/use-invalidation-bus.ts`,
