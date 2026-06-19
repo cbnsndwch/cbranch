@@ -29,7 +29,10 @@ const ALLOWED_INTERNAL = {
 };
 
 // Server / listening-socket libraries. Only @cbranch/web-server may declare these.
+// `@effect/platform-node` provides the Node HTTP/WS listener (NodeHttpServer) the
+// web-server binds (DECISIONS D11), so it is the socket-owning dependency too.
 const SERVER_SOCKET_LIBS = new Set([
+  "@effect/platform-node",
   "ws",
   "uWebSockets.js",
   "socket.io",

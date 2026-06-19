@@ -5,7 +5,8 @@
   "description": "Node host service + static bundle server. The ONLY package allowed to open a listening socket.",
   "license": "MIT",
   "files": [
-    "dist"
+    "dist",
+    "public"
   ],
   "type": "module",
   "main": "./dist/index.js",
@@ -18,11 +19,13 @@
   },
   "scripts": {
     "build": "tsc -b tsconfig.json",
-    "typecheck": "tsc -b tsconfig.json"
+    "typecheck": "tsc -b tsconfig.json",
+    "start": "node dist/main.js"
   },
   "dependencies": {
     "@cbranch/core": "workspace:*",
     "@cbranch/rpc-contract": "workspace:*",
+    "@effect/platform-node": "4.0.0-beta.84",
     "effect": "4.0.0-beta.84"
   },
   "devDependencies": {

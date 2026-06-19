@@ -1,19 +1,23 @@
 // @cbranch/web-server — Node host service + static bundle server.
 //
-// P0 scaffold only. This is the ONLY package permitted to open a listening socket
-// (REQ-ARCH-005 / depcheck). In P1 it assembles the Effect platform HTTP/WebSocket
-// layers (one multiplexed NDJSON socket), serves the Vite client bundle + the HTTP
-// side-channel, enforces the Origin/Host allowlist on the WS upgrade, and binds
-// loopback (127.0.0.1) by default.
+// The single deployable host unit (NF-PKG-1) and the ONLY package permitted to open a
+// listening socket (REQ-ARCH-005 / DECISIONS D10). It assembles the Effect platform
+// HTTP/WebSocket layers into one multiplexed NDJSON socket (`/rpc`), serves the static
+// SPA + the large-blob HTTP side-channel, enforces the `Origin`/`Host` allowlist, and
+// binds loopback by default. The runnable entry point is `./main`; this module exports
+// the composable building blocks (used by the integration tests and any embedder).
 
-import type { GitEnginePlaceholder } from "@cbranch/core";
-import type { RpcContractPlaceholder } from "@cbranch/rpc-contract";
-
-export const version = "0.0.0" as const;
-
-/** Placeholder host entry; the Effect platform server lands in P1. */
-export type WebServerPlaceholder = {
-  readonly version: typeof version;
-  readonly engine: GitEnginePlaceholder["version"];
-  readonly contract: RpcContractPlaceholder["version"];
-};
+export { buildServerLive, RPC_PATH } from "./server";
+export {
+  DEFAULT_HOST,
+  DEFAULT_PORT,
+  defaultClientDir,
+  ensureClientDir,
+  isLoopbackHost,
+  type LogLevel,
+  resolveServerConfig,
+  type ServerConfig,
+} from "./config";
+export { isAllowedRequest, makeOriginGuard } from "./origin-guard";
+export { handlersLayer } from "./rpc-handlers";
+export { containBlobPath, guessContentType, safeRev, SIDE_CHANNEL_PATH, sideChannelRoute } from "./side-channel";
