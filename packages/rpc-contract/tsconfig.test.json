@@ -1,0 +1,13 @@
+{
+  "_comment": "Type-checks the contract TEST files together with src (the package build tsconfig.json EXCLUDES *.test.ts so its emitted dist stays test-free). noEmit + composite:false because this is a pure type-assertion gate, not a build input. Wired into the root `typecheck`/`gate` so the contract tests' type-level assertions are actually enforced (resolves the P0.5 flag).",
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": false,
+    "rootDir": "src"
+  },
+  "include": ["src/**/*"]
+}

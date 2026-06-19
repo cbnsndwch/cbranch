@@ -23,9 +23,10 @@ Running checklist for the clean-room build. Legend: ✅ done · 🔄 in-flight �
 - ✅ Gate green on empty skeleton (5 pkgs build; 5 tests pass).
 - Flags: Base UI rc.0 is npm-deprecated prerelease (pinned exact, re-evaluate); TS pinned `^5.9` (5.9.3) over 6.0.3.
 
-## P0.5 — Effect v4 ⚠-symbol verification 🔄
-- ✅ Symbol PRESENCE verified at the pin (adapter re-exports Rpc/RpcClient/RpcGroup/RpcSerialization/RpcServer, Socket, Http; `Schema.TaggedErrorClass` present, `Schema.TaggedError` absent).
-- ⬜ Verify the actual API SHAPES (RpcGroup.make / Rpc.make signatures, layer wiring) by building a tiny end-to-end in-memory RPC round-trip against the installed types before authoring the full P1 contract.
+## P0.5 — Effect v4 ⚠-symbol verification ✅
+- ✅ All `⚠` symbols verified accurate at the pin via a RUNNING in-memory round-trip. Playbook locked: `Rpc.make(tag, {payload, success, error, stream})` (payload = bare fields ok; success/error MUST be Schemas; `stream:true` ⇒ top-level error `Never`); `RpcGroup.make(...)` variadic; server `group.toLayer({Tag: handler})`; client object keyed by tag; `Stream.runCollect`→Array.
+- ✅ In-memory contract-test transport found: `RpcTest.makeClient(group)` (NF-TEST-6). Adapter now re-exports `RpcTest`. Smoke test kept at `packages/rpc-contract/src/_contract-smoke.test.ts`.
+- Flag carried to contract author: test files are excluded from `tsc -b`; contract type-assertions need a dedicated test typecheck config.
 
 ## P1 — Read-only walking skeleton
 - ⬜ `rpc-contract`: RpcGroup + Schemas for P1 methods (`repo.open/recentList/recentRemove/state/subscribe`, `log.stream`, `commit.detail/diff`, `file.contentAtRev`), GitError union (§4), InvalidationEvent/Domain (§5).

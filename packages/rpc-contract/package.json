@@ -22,7 +22,8 @@
   },
   "scripts": {
     "build": "tsc -b tsconfig.json",
-    "typecheck": "tsc -b tsconfig.json"
+    "typecheck": "tsc -b tsconfig.json",
+    "typecheck:test": "tsc -p tsconfig.test.json"
   },
   "dependencies": {
     "effect": "4.0.0-beta.84"
