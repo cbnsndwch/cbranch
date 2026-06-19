@@ -4,6 +4,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-libra
 import { type ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
+import { buildLogQuery, emptyFilters } from "../lib/filters";
 import { type CbranchApi, type StreamHandlers } from "../rpc/api";
 import { ApiProvider } from "../rpc/ApiProvider";
 import { GraphCell } from "./GraphCell";
@@ -11,6 +12,7 @@ import { HistoryList } from "./HistoryList";
 import { RefChips } from "./RefChips";
 
 const repoId = RepoId.make("repo-1");
+const defaultQuery = buildLogQuery(repoId, emptyFilters);
 const oid = (hex: string) => Oid.make(hex.padEnd(40, "0"));
 
 const summary = (id: string, parents: string[], refs: string[] = []) =>
@@ -97,7 +99,16 @@ describe("HistoryList (P1-HIST-1/2/3; spec 10)", () => {
   test("streams rows, renders the graph cell, and selects on click", async () => {
     const onSelect = vi.fn();
     const api = fakeApi([summary("a", ["b"], ["HEAD -> main"]), summary("b", ["c"]), summary("c", [])]);
-    const { container } = renderWithApi(<HistoryList repoId={repoId} selectedOid={null} onSelectOid={onSelect} />, api);
+    const { container } = renderWithApi(
+      <HistoryList
+        query={defaultQuery}
+        dateMode="relative"
+        filtersActive={false}
+        selectedOid={null}
+        onSelectOid={onSelect}
+      />,
+      api,
+    );
     expect(await screen.findByText("commit a")).toBeTruthy();
     // One graph SVG per visible row, with the HEAD branch chip on the first.
     await waitFor(() => expect(container.querySelectorAll("svg").length).toBeGreaterThan(0));

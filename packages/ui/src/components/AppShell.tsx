@@ -4,7 +4,7 @@ import { useInvalidationBus } from "../rpc/use-invalidation-bus";
 import { useUiStore } from "../state/store";
 import { DetailsPanel } from "./DetailsPanel";
 import { DiffPanel } from "./DiffPanel";
-import { HistoryList } from "./HistoryList";
+import { HistoryPane } from "./HistoryPane";
 import { StatusSummary } from "./StatusSummary";
 import { ThemeToggle } from "./ThemeToggle";
 import { Button } from "./ui/button";
@@ -42,7 +42,7 @@ export function AppShell() {
         {repoId ? (
           <Group orientation="horizontal" className="h-full">
             <Panel defaultSize="55%" minSize="30%">
-              <HistoryList repoId={repoId} selectedOid={selectedOid} onSelectOid={setSelectedOid} />
+              <HistoryPane repoId={repoId} selectedOid={selectedOid} onSelectOid={setSelectedOid} />
             </Panel>
             <Separator className="bg-border w-px" />
             <Panel defaultSize="45%" minSize="25%">

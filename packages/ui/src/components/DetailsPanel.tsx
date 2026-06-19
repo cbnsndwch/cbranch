@@ -1,7 +1,8 @@
 import { type Oid, type RepoId } from "@cbranch/rpc-contract";
 
-import { formatEpoch, shortOid } from "../lib/format";
+import { formatEpoch, formatInstant, shortOid } from "../lib/format";
 import { useCommitDetail } from "../rpc/hooks";
+import { useUiStore } from "../state/store";
 import { Placeholder } from "./ui/placeholder";
 
 // Commit details (P1-DET-1/3 + P1-UI-DET-1): identity, author/committer, full message,
@@ -16,6 +17,7 @@ export function DetailsPanel({
   readonly onSelectOid: (oid: Oid) => void;
 }) {
   const { data, isLoading, isError } = useCommitDetail(repoId, oid);
+  const dateMode = useUiStore((s) => s.dateMode);
 
   if (oid === null) return <Placeholder>Select a commit to see its details.</Placeholder>;
   if (isLoading) return <Placeholder>Loading commit…</Placeholder>;
@@ -30,11 +32,17 @@ export function DetailsPanel({
       <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
         <dt className="text-muted-foreground">author</dt>
         <dd>
-          {data.author.name} &lt;{data.author.email}&gt; · {formatEpoch(data.author.when.epochSeconds)}
+          {data.author.name} &lt;{data.author.email}&gt; ·{" "}
+          <span title={formatEpoch(data.author.when.epochSeconds)}>
+            {formatInstant(data.author.when.epochSeconds, dateMode)}
+          </span>
         </dd>
         <dt className="text-muted-foreground">committer</dt>
         <dd>
-          {data.committer.name} · {formatEpoch(data.committer.when.epochSeconds)}
+          {data.committer.name} ·{" "}
+          <span title={formatEpoch(data.committer.when.epochSeconds)}>
+            {formatInstant(data.committer.when.epochSeconds, dateMode)}
+          </span>
         </dd>
       </dl>
       {data.body ? <pre className="text-xs whitespace-pre-wrap">{data.body}</pre> : null}

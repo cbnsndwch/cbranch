@@ -8,6 +8,8 @@
 import { type Oid, type RepoId } from "@cbranch/rpc-contract";
 import { create } from "zustand";
 
+import { emptyFilters, type LogFilters } from "../lib/filters";
+import { type DateMode, readDateMode, writeDateMode } from "../lib/format";
 import { applyTheme, readThemePref, type ThemePref } from "../theme/theme";
 
 export interface UiState {
@@ -19,10 +21,16 @@ export interface UiState {
   readonly paletteOpen: boolean;
   /** Light/dark/system preference (NF-THEME-2). */
   readonly theme: ThemePref;
+  /** Active history filters (P1-FILT-*); reset when the repository changes. */
+  readonly filters: LogFilters;
+  /** Relative/absolute date display preference (P1-HIST-8). */
+  readonly dateMode: DateMode;
   readonly setActiveRepoId: (id: RepoId | null) => void;
   readonly setSelectedOid: (oid: Oid | null) => void;
   readonly setPaletteOpen: (open: boolean) => void;
   readonly setTheme: (theme: ThemePref) => void;
+  readonly setFilters: (filters: LogFilters) => void;
+  readonly setDateMode: (mode: DateMode) => void;
 }
 
 export const useUiStore = create<UiState>((set) => ({
@@ -30,12 +38,19 @@ export const useUiStore = create<UiState>((set) => ({
   selectedOid: null,
   paletteOpen: false,
   theme: readThemePref(),
-  // Switching repositories supersedes the old selection (P1-OPEN-4 / P1-X-4).
-  setActiveRepoId: (activeRepoId) => set({ activeRepoId, selectedOid: null }),
+  filters: emptyFilters,
+  dateMode: readDateMode(),
+  // Switching repositories supersedes the old selection and filters (P1-OPEN-4 / P1-X-4).
+  setActiveRepoId: (activeRepoId) => set({ activeRepoId, selectedOid: null, filters: emptyFilters }),
   setSelectedOid: (selectedOid) => set({ selectedOid }),
   setPaletteOpen: (paletteOpen) => set({ paletteOpen }),
   setTheme: (theme) => {
     applyTheme(theme);
     set({ theme });
+  },
+  setFilters: (filters) => set({ filters }),
+  setDateMode: (dateMode) => {
+    writeDateMode(dateMode);
+    set({ dateMode });
   },
 }));

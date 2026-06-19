@@ -25,9 +25,6 @@ import { useEffect, useState } from "react";
 import { useApi } from "./ApiProvider";
 import { queryKeys } from "./query-keys";
 
-/** Default head-window log query for a repo: current branch, server-bounded to 500 (NF-LIMIT-5). */
-export const defaultLogQuery = (repoId: RepoId): LogQuery => new LogQuery({ repoId, limit: 500, refScope: "current" });
-
 /** Default commit-vs-first-parent diff request for the selected commit (P1-HIST-5). */
 export const defaultDiffSpec = (repoId: RepoId, target: string): DiffSpec =>
   new DiffSpec({
@@ -106,18 +103,21 @@ export interface LogStreamResult {
 }
 
 /**
- * Subscribe to the streaming history feed for a repo, accumulating the window
+ * Subscribe to the streaming history feed for `query`, accumulating the window
  * (P1-HIST-3). Rows are buffered and flushed per microtask so a fast stream causes a
- * bounded number of renders. Switching repos cancels the prior subscription (P1-OPEN-4).
+ * bounded number of renders. Changing the query (repo switch or any filter, P1-FILT-8)
+ * cancels the superseded subscription and restarts from the top of the new result set.
  */
-export const useLogStream = (repoId: RepoId | null): LogStreamResult => {
+export const useLogStream = (query: LogQuery | null): LogStreamResult => {
   const api = useApi();
   const [rows, setRows] = useState<ReadonlyArray<CommitSummary>>([]);
   const [status, setStatus] = useState<LogStreamStatus>("idle");
   const [error, setError] = useState<unknown>(null);
+  // Restart only when a meaningful query field changes, not on every render's new object.
+  const queryKey = query === null ? null : JSON.stringify(query);
 
   useEffect(() => {
-    if (repoId === null) {
+    if (query === null) {
       setRows([]);
       setStatus("idle");
       setError(null);
@@ -139,7 +139,7 @@ export const useLogStream = (repoId: RepoId | null): LogStreamResult => {
       queueMicrotask(flush);
     };
 
-    const unsubscribe = api.logStream(defaultLogQuery(repoId), {
+    const unsubscribe = api.logStream(query, {
       onItem: (row) => {
         buffer.push(row);
         setStatus("streaming");
@@ -155,7 +155,9 @@ export const useLogStream = (repoId: RepoId | null): LogStreamResult => {
       },
     });
     return unsubscribe;
-  }, [api, repoId]);
+    // `queryKey` captures the meaningful query fields; `query` is intentionally read inside.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [api, queryKey]);
 
   return { rows, status, error };
 };
