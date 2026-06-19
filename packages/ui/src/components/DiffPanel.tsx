@@ -9,6 +9,7 @@ import { ChangedFileList } from "./ChangedFileList";
 import { DiffControls } from "./DiffControls";
 import { BinaryCard, LargeDiffCard, SubmoduleCard } from "./DiffPlaceholders";
 import { DiffView } from "./DiffView";
+import { FileAtRevision } from "./FileAtRevision";
 import { Placeholder } from "./ui/placeholder";
 
 // Read-only diff (P1-DIFF-*): the changed-file list, the diff controls, and the selected
@@ -24,6 +25,8 @@ export function DiffPanel({ repoId, oid }: { readonly repoId: RepoId; readonly o
   const [activeHunk, setActiveHunk] = useState(0);
   // Paths the user chose to render despite the large-diff deferral (P1-DIFF-9).
   const [forced, setForced] = useState<ReadonlySet<string>>(new Set());
+  // "View file at revision" mode for the active file (P1-DIFF-7).
+  const [viewingFile, setViewingFile] = useState(false);
 
   // Reset transient diff state when the selected commit changes (P1-X-4).
   useEffect(() => {
@@ -31,6 +34,7 @@ export function DiffPanel({ repoId, oid }: { readonly repoId: RepoId; readonly o
     setSelectedPath(null);
     setActiveHunk(0);
     setForced(new Set());
+    setViewingFile(false);
   }, [oid]);
 
   const spec = useMemo(() => (oid ? buildDiffSpec(repoId, oid, options) : null), [repoId, oid, options]);
@@ -90,29 +94,45 @@ export function DiffPanel({ repoId, oid }: { readonly repoId: RepoId; readonly o
 
   return (
     <div className="flex h-full flex-col">
-      <DiffControls
-        diffView={diffView}
-        onDiffViewChange={setDiffView}
-        options={options}
-        onOptionsChange={setOptions}
-        parents={parents}
-        onPrevChange={() => step(-1)}
-        onNextChange={() => step(1)}
-      />
+      {viewingFile ? null : (
+        <DiffControls
+          diffView={diffView}
+          onDiffViewChange={setDiffView}
+          options={options}
+          onOptionsChange={setOptions}
+          parents={parents}
+          onPrevChange={() => step(-1)}
+          onNextChange={() => step(1)}
+        />
+      )}
       <div className="flex min-h-0 flex-1">
         <div className="w-1/3 min-w-44">
           <ChangedFileList files={files} selectedPath={filePath(active)} onSelect={setSelectedPath} />
         </div>
-        <div ref={scrollRef} tabIndex={0} onKeyDown={onKeyDown} className="flex-1 overflow-auto outline-none">
-          {active.isBinary ? (
-            <BinaryCard file={active} />
-          ) : isSubmodule(active) ? (
-            <SubmoduleCard file={active} />
-          ) : isLargeDiff(active) && !forced.has(filePath(active)) ? (
-            <LargeDiffCard file={active} onLoad={() => setForced((prev) => new Set(prev).add(filePath(active)))} />
-          ) : (
-            <DiffView file={active} diffView={diffView} />
-          )}
+        <div className="flex min-h-0 flex-1 flex-col">
+          <div className="text-muted-foreground flex items-center gap-2 border-b px-2 py-0.5 text-[11px]">
+            <span className="truncate font-mono">{filePath(active)}</span>
+            <button
+              type="button"
+              onClick={() => setViewingFile((v) => !v)}
+              className="hover:bg-accent ml-auto shrink-0 border px-1.5"
+            >
+              {viewingFile ? "Back to diff" : "View at revision"}
+            </button>
+          </div>
+          <div ref={scrollRef} tabIndex={0} onKeyDown={onKeyDown} className="min-h-0 flex-1 overflow-auto outline-none">
+            {viewingFile ? (
+              <FileAtRevision repoId={repoId} rev={oid} path={filePath(active)} />
+            ) : active.isBinary ? (
+              <BinaryCard file={active} />
+            ) : isSubmodule(active) ? (
+              <SubmoduleCard file={active} />
+            ) : isLargeDiff(active) && !forced.has(filePath(active)) ? (
+              <LargeDiffCard file={active} onLoad={() => setForced((prev) => new Set(prev).add(filePath(active)))} />
+            ) : (
+              <DiffView file={active} diffView={diffView} />
+            )}
+          </div>
         </div>
       </div>
     </div>

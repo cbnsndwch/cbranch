@@ -70,7 +70,7 @@ export const languageForPath = (path: string): string | null => {
 };
 
 // One lazily-created highlighter, with languages loaded on demand as files are viewed.
-interface ShikiToken {
+export interface ShikiToken {
   readonly content: string;
   readonly color?: string;
 }
@@ -104,6 +104,31 @@ const getHighlighter = async (lang: string): Promise<ShikiHighlighter> => {
     }
   }
   return highlighter;
+};
+
+/**
+ * Tokenize `code` into per-line Shiki tokens (content + color) for the CodeMirror
+ * file-at-revision view (P1-UI-DIFF-3), or null when the language is unavailable / Shiki
+ * fails (the view then shows plain, unhighlighted text). Reuses the same on-demand
+ * highlighter as the diff surface (REQ-STACK-019/022).
+ */
+export const loadShikiLines = async ({
+  code,
+  language,
+  dark,
+}: {
+  readonly code: string;
+  readonly language: string;
+  readonly dark: boolean;
+}): Promise<ReadonlyArray<ReadonlyArray<ShikiToken>> | null> => {
+  try {
+    const highlighter = await getHighlighter(language);
+    if (!highlighter.getLoadedLanguages().includes(language)) return null;
+    const theme = dark ? DARK_THEME : LIGHT_THEME;
+    return highlighter.codeToTokens(code, { lang: language, theme }).tokens;
+  } catch {
+    return null;
+  }
 };
 
 /** A refractor-compatible highlighter that react-diff-view's `tokenize` can consume. */
