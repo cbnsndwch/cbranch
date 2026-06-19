@@ -1,21 +1,26 @@
 import { type LogQuery, type Oid } from "@cbranch/rpc-contract";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { type KeyboardEvent, useEffect, useMemo, useRef } from "react";
+import { type KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { layoutCommits, maxLaneCount } from "../graph/layout";
 import { cn } from "../lib/cn";
 import { type DateMode, formatDate, formatIso, formatRelativeMs, shortOid } from "../lib/format";
+import { findMatches, stepMatch } from "../lib/quick-find";
 import { useLogStream } from "../rpc/hooks";
+import { FindBar } from "./FindBar";
 import { GraphCell } from "./GraphCell";
 import { RefChips } from "./RefChips";
 import { Placeholder } from "./ui/placeholder";
 
 const ROW_HEIGHT = 40;
+const DEFAULT_PAGE = 10;
 
 // Virtualized streaming history (P1-HIST-1/2/3 + P1-UI-HIST-1): only visible rows render
 // (NF-PERF-3); rows append as the feed streams in. The lane/edge commit graph (spec 10) is
 // laid out incrementally from parent data and rendered per row in the graph cell. Dates
 // honor the relative/absolute preference with the alternate available on hover (P1-HIST-8).
+// Full keyboard navigation (P1-HIST-6) and a quick incremental find (P1-FILT-7) operate
+// over the loaded window.
 export function HistoryList({
   query,
   dateMode,
@@ -42,80 +47,180 @@ export function HistoryList({
     overscan: 12,
   });
 
+  const [findOpen, setFindOpen] = useState(false);
+  const [findQuery, setFindQuery] = useState("");
+  const [findPos, setFindPos] = useState(-1);
+  const matches = useMemo(() => findMatches(rows, findQuery), [rows, findQuery]);
+  const matchOids = useMemo(() => new Set(matches.map((i) => rows[i]!.oid)), [matches, rows]);
+  const currentMatchOid = findPos >= 0 && findPos < matches.length ? rows[matches[findPos]!]?.oid : undefined;
+
+  const selectIndex = useCallback(
+    (index: number) => {
+      const row = rows[index];
+      if (!row) return;
+      onSelectOid(row.oid);
+      virtualizer.scrollToIndex(index);
+    },
+    [rows, onSelectOid, virtualizer],
+  );
+
   // Changing any filter resets virtualization/scroll to the top of the new results (P1-FILT-8).
   const queryKey = query === null ? null : JSON.stringify(query);
   useEffect(() => {
     parentRef.current?.scrollTo({ top: 0 });
   }, [queryKey]);
 
-  const moveSelection = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
-    event.preventDefault();
-    const current = selectedOid === null ? -1 : rows.findIndex((r) => r.oid === selectedOid);
-    const delta = event.key === "ArrowDown" ? 1 : -1;
-    const nextIndex = Math.max(0, Math.min(current < 0 ? 0 : current + delta, rows.length - 1));
-    const nextRow = rows[nextIndex];
-    if (nextRow) {
-      onSelectOid(nextRow.oid);
-      virtualizer.scrollToIndex(nextIndex);
+  // Open quick-find on the conventional shortcut, even when the list is not focused (P1-UI-FILT-2).
+  useEffect(() => {
+    const onKey = (event: globalThis.KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "f") {
+        event.preventDefault();
+        setFindOpen(true);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  // As the find query changes, jump to the first match (responsive find, P1-FILT-7).
+  const firstMatch = matches[0];
+  useEffect(() => {
+    if (findQuery.trim() === "" || matches.length === 0) {
+      setFindPos(-1);
+      return;
     }
+    setFindPos(0);
+    if (firstMatch !== undefined) selectIndex(firstMatch);
+    // selectIndex is stable per rows; intentionally keyed on the query + match set only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [findQuery, matches.length]);
+
+  const stepFind = (direction: 1 | -1) => {
+    const next = stepMatch(matches.length, findPos, direction);
+    setFindPos(next);
+    if (next >= 0) selectIndex(matches[next]!);
+  };
+
+  const closeFind = () => {
+    setFindOpen(false);
+    setFindQuery("");
+    setFindPos(-1);
+  };
+
+  // Full keyboard navigation over the list (P1-HIST-6): arrows, page up/down, home/end.
+  const onListKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    const page = Math.max(1, Math.floor((parentRef.current?.clientHeight ?? 0) / ROW_HEIGHT) || DEFAULT_PAGE);
+    const current = selectedOid === null ? -1 : rows.findIndex((r) => r.oid === selectedOid);
+    const last = rows.length - 1;
+    let next: number | null = null;
+    switch (event.key) {
+      case "ArrowDown":
+        next = current < 0 ? 0 : Math.min(current + 1, last);
+        break;
+      case "ArrowUp":
+        next = current < 0 ? 0 : Math.max(current - 1, 0);
+        break;
+      case "PageDown":
+        next = current < 0 ? 0 : Math.min(current + page, last);
+        break;
+      case "PageUp":
+        next = current < 0 ? 0 : Math.max(current - page, 0);
+        break;
+      case "Home":
+        next = 0;
+        break;
+      case "End":
+        next = last;
+        break;
+      default:
+        return;
+    }
+    event.preventDefault();
+    if (next !== null) selectIndex(next);
   };
 
   if (status === "error") return <Placeholder tone="danger">Could not load history.</Placeholder>;
+
+  const findBar = findOpen ? (
+    <FindBar
+      query={findQuery}
+      matchCount={matches.length}
+      current={findPos}
+      onQueryChange={setFindQuery}
+      onStep={stepFind}
+      onClose={closeFind}
+    />
+  ) : null;
+
   if (rows.length === 0) {
     const loading = status === "loading" || status === "streaming";
-    if (loading) return <Placeholder>Loading history…</Placeholder>;
-    // Distinguish a real empty repo from a no-match filter result (P1-FILT-9).
-    return <Placeholder>{filtersActive ? "No commits match the current filters." : "No commits yet."}</Placeholder>;
+    const message = loading
+      ? "Loading history…"
+      : filtersActive
+        ? "No commits match the current filters."
+        : "No commits yet.";
+    return (
+      <div className="flex h-full flex-col">
+        {findBar}
+        <Placeholder>{message}</Placeholder>
+      </div>
+    );
   }
 
   return (
-    <div
-      ref={parentRef}
-      tabIndex={0}
-      onKeyDown={moveSelection}
-      role="listbox"
-      aria-label="Commit history"
-      className="h-full overflow-auto outline-none"
-    >
-      <div style={{ height: virtualizer.getTotalSize(), position: "relative", width: "100%" }}>
-        {virtualizer.getVirtualItems().map((item) => {
-          const row = rows[item.index]!;
-          const selected = row.oid === selectedOid;
-          const date = new Date(row.authorDate);
-          const valid = !Number.isNaN(date.getTime());
-          const alternate = !valid
-            ? row.authorDate
-            : dateMode === "relative"
-              ? formatIso(row.authorDate)
-              : formatRelativeMs(date.getTime());
-          return (
-            <div
-              key={row.oid}
-              role="option"
-              aria-selected={selected}
-              onClick={() => onSelectOid(row.oid)}
-              className={cn(
-                "hover:bg-accent absolute top-0 left-0 flex w-full cursor-pointer items-center gap-2 border-b pr-2 text-xs",
-                selected ? "bg-accent" : "",
-              )}
-              style={{ height: item.size, transform: `translateY(${item.start}px)` }}
-            >
-              <GraphCell row={graphRows[item.index]!} columns={columns} height={item.size} selected={selected} />
-              {row.refs.length > 0 ? <RefChips refs={row.refs} /> : null}
-              <span className="flex-1 truncate">{row.subject}</span>
-              <span className="text-muted-foreground w-28 truncate">{row.authorName}</span>
-              <span className="text-muted-foreground w-36 truncate" title={alternate}>
-                {formatDate(row.authorDate, dateMode)}
-              </span>
-              <span className="text-muted-foreground w-16 font-mono">{shortOid(row.oid)}</span>
-            </div>
-          );
-        })}
+    <div className="flex h-full flex-col">
+      {findBar}
+      <div
+        ref={parentRef}
+        tabIndex={0}
+        onKeyDown={onListKeyDown}
+        role="listbox"
+        aria-label="Commit history"
+        className="min-h-0 flex-1 overflow-auto outline-none"
+      >
+        <div style={{ height: virtualizer.getTotalSize(), position: "relative", width: "100%" }}>
+          {virtualizer.getVirtualItems().map((item) => {
+            const row = rows[item.index]!;
+            const selected = row.oid === selectedOid;
+            const matched = matchOids.has(row.oid);
+            const isCurrentMatch = row.oid === currentMatchOid;
+            const date = new Date(row.authorDate);
+            const valid = !Number.isNaN(date.getTime());
+            const alternate = !valid
+              ? row.authorDate
+              : dateMode === "relative"
+                ? formatIso(row.authorDate)
+                : formatRelativeMs(date.getTime());
+            return (
+              <div
+                key={row.oid}
+                role="option"
+                aria-selected={selected}
+                onClick={() => onSelectOid(row.oid)}
+                className={cn(
+                  "hover:bg-accent absolute top-0 left-0 flex w-full cursor-pointer items-center gap-2 border-b pr-2 text-xs",
+                  selected ? "bg-accent" : "",
+                  matched ? "bg-status-ahead/10" : "",
+                  isCurrentMatch ? "ring-ring ring-1 ring-inset" : "",
+                )}
+                style={{ height: item.size, transform: `translateY(${item.start}px)` }}
+              >
+                <GraphCell row={graphRows[item.index]!} columns={columns} height={item.size} selected={selected} />
+                {row.refs.length > 0 ? <RefChips refs={row.refs} /> : null}
+                <span className="flex-1 truncate">{row.subject}</span>
+                <span className="text-muted-foreground w-28 truncate">{row.authorName}</span>
+                <span className="text-muted-foreground w-36 truncate" title={alternate}>
+                  {formatDate(row.authorDate, dateMode)}
+                </span>
+                <span className="text-muted-foreground w-16 font-mono">{shortOid(row.oid)}</span>
+              </div>
+            );
+          })}
+        </div>
+        {status === "streaming" || status === "loading" ? (
+          <div className="text-muted-foreground p-2 text-center text-xs">Loading more…</div>
+        ) : null}
       </div>
-      {status === "streaming" || status === "loading" ? (
-        <div className="text-muted-foreground p-2 text-center text-xs">Loading more…</div>
-      ) : null}
     </div>
   );
 }

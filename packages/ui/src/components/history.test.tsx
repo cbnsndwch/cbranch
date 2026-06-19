@@ -116,4 +116,43 @@ describe("HistoryList (P1-HIST-1/2/3; spec 10)", () => {
     act(() => fireEvent.click(screen.getByText("commit a")));
     expect(onSelect).toHaveBeenCalled();
   });
+
+  test("keyboard navigation jumps to the last row on End (P1-HIST-6)", async () => {
+    const onSelect = vi.fn();
+    const api = fakeApi([summary("a", ["b"]), summary("b", ["c"]), summary("c", [])]);
+    renderWithApi(
+      <HistoryList
+        query={defaultQuery}
+        dateMode="relative"
+        filtersActive={false}
+        selectedOid={null}
+        onSelectOid={onSelect}
+      />,
+      api,
+    );
+    expect(await screen.findByText("commit a")).toBeTruthy();
+    act(() => fireEvent.keyDown(screen.getByRole("listbox"), { key: "End" }));
+    expect(onSelect).toHaveBeenCalledWith(oid("c"));
+  });
+
+  test("quick-find opens on Ctrl+F and selects the first match (P1-FILT-7)", async () => {
+    const onSelect = vi.fn();
+    const api = fakeApi([summary("a", ["b"]), summary("b", ["c"]), summary("c", [])]);
+    renderWithApi(
+      <HistoryList
+        query={defaultQuery}
+        dateMode="relative"
+        filtersActive={false}
+        selectedOid={null}
+        onSelectOid={onSelect}
+      />,
+      api,
+    );
+    expect(await screen.findByText("commit a")).toBeTruthy();
+    act(() => fireEvent.keyDown(window, { key: "f", ctrlKey: true }));
+    const input = screen.getByLabelText("Find in loaded history");
+    act(() => fireEvent.change(input, { target: { value: "commit c" } }));
+    expect(onSelect).toHaveBeenCalledWith(oid("c"));
+    expect(screen.getByText("1 / 1")).toBeTruthy();
+  });
 });
