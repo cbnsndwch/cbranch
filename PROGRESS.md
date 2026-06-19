@@ -78,18 +78,22 @@ returns a plain `Array` at this pin.
      React Query keys `[repoId, domain, …]` (D9, `src/rpc/query-keys.ts`); ephemeral Zustand store
      (`src/state/store.ts`); theme light/dark/system + no-flash (`src/theme/theme.ts`); providers wired in
      `main.tsx`. Deps added: `effect`(exact), `@tanstack/react-query`, `zustand`, `lucide-react`. 14 tests.
-   - ⬜ **ui-B vertical slice** — Resizable shell + cmdk repo switcher (RepoOpen/RecentList) + status summary +
-     streaming history list (LogStream) + select → details + read-only diff. Make it RUNNABLE (server+UI vs a
-     throwaway repo) with a short "how to drive it" note → **user-test checkpoint**. Adds react-resizable-panels,
-     cmdk, sonner + (dev) jsdom/@testing-library for component tests (NF-TEST-7; wire `.test.tsx`+jsdom in vitest).
-   - ⬜ **ui-C** history polish — commit graph (spec 10), ref labels, filters, virtualization (@tanstack/react-virtual), keyboard nav.
-   - ⬜ **ui-D** diff + file-at-rev — react-diff-view + Shiki; CodeMirror 6 file-at-rev; binary/submodule/large placeholders.
+   - ✅ **ui-B vertical slice (RUNNABLE — user-test checkpoint)** — Resizable shell (`AppShell`, react-resizable-panels
+     v4 `Group`/`Panel`/`Separator`) + cmdk repo switcher (`CommandPalette`: RepoOpen + recent list, ⌘/Ctrl-K) +
+     status summary (`StatusSummary` from `repo.state`) + virtualized streaming history (`HistoryList` + `useLogStream`
+     + @tanstack/react-virtual) + details (`DetailsPanel`/`commit.detail`) + basic unified diff (`DiffPanel`/`commit.diff`).
+     Data hooks in `src/rpc/hooks.ts`. Component tests (jsdom, mocked RPC, NF-TEST-7) via `.test.tsx` + per-file jsdom
+     docblock; `MIT-0` added to license allow-list (jsdom dep). **RUNS:** `pnpm -r build` then
+     `CBRANCH_CLIENT_DIR=$PWD/packages/ui/dist pnpm --filter @cbranch/web-server start` → http://127.0.0.1:7420 (see
+     `RUNNING.md`). Web-server now **bundled** (esbuild, DECISIONS **D12**) so the built artifact runs under Node ESM.
+   - ⬜ **ui-C** history polish — commit graph (spec 10), ref-label chips, filters (P1-FILT-*), quick-find, full keyboard nav, date-format pref.
+   - ⬜ **ui-D** diff + file-at-rev — react-diff-view + Shiki, inline/split toggle, whitespace/context; CodeMirror 6 file-at-rev; binary/submodule/large-diff placeholders; sonner toasts; remaining base-lyra primitives.
    RPC CLIENT via the adapter subpath `@cbranch/rpc-contract/effect-rpc-adapter`. GOTCHA: `Stream.runCollect`→Array (see [[cbranch-effect-v4-gotchas]] in memory).
 3. **Invalidation bus end-to-end** — wire `repo.subscribe` stream → client React Query invalidation (15); reconnect invalidates `[repoId]` (NF-ERR-6).
 4. **e2e happy-path** (NF-TEST-8): start real server vs throwaway repo, open repo, browse log/graph/details/diffs read-only.
 5. **P1 verification gate**: all `05` AC-1…AC-15; add `@vitest/coverage-v8` + NF-TEST-11 80% coverage (core+rpc-contract); measure NF-PERF-1/2/3 on a reference repo. Then **STOP for user review** (per kickoff first-run note) before P2.
 
-**Key context files (gitignored working notes):** `docs/_impl-notes/DECISIONS.md` (D1–D11 locked decisions) + the 8 spec digests. **Verify command:** `pnpm gate`. **Clean-room:** never read `.local/SPEC-AGENT-BRIEF.md`; build only from `docs/spec/`+`LICENSES.md`+`BRANDING.md`+git/lib public docs. Undercover: no AI/model mentions in commits.
+**Key context files (gitignored working notes):** `docs/_impl-notes/DECISIONS.md` (D1–D12 locked decisions) + the 8 spec digests. **Verify command:** `pnpm gate`. **Clean-room:** never read `.local/SPEC-AGENT-BRIEF.md`; build only from `docs/spec/`+`LICENSES.md`+`BRANDING.md`+git/lib public docs. Undercover: no AI/model mentions in commits.
 
 ## Log
 - 2026-06-18 — Recon: Node 24.17, pnpm 10.32, git 2.54, registry reachable (effect beta, oxfmt, oxlint). Branch + bootstrap docs created. Spec digestion launched.

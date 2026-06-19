@@ -18,7 +18,7 @@
     }
   },
   "scripts": {
-    "build": "tsc -b tsconfig.json",
+    "build": "tsc -b tsconfig.json && node build.mjs",
     "typecheck": "tsc -b tsconfig.json",
     "start": "node dist/main.js"
   },
@@ -29,6 +29,7 @@
     "effect": "4.0.0-beta.84"
   },
   "devDependencies": {
-    "@types/node": "^24.0.0"
+    "@types/node": "^24.0.0",
+    "esbuild": "^0.28.1"
   }
 }

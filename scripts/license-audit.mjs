@@ -24,6 +24,7 @@ import { execSync } from "node:child_process";
 
 const PROD_ALLOWLIST = new Set([
   "MIT",
+  "MIT-0",
   "ISC",
   "Apache-2.0",
   "BSD-2-Clause",

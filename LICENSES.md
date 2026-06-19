@@ -87,6 +87,17 @@ split: the strict permissive allow-list applies to the **production** tree, whil
 the **dev** allow-list adds only MPL-2.0 for this build-time tool. Strong copyleft
 (GPL/LGPL/AGPL/SSPL) is rejected everywhere.
 
+### Test-time tooling note — `MIT-0` (jsdom transitive CSS deps)
+
+The component-test environment (`jsdom`, a **devDependency** used only by Vitest)
+pulls in `@csstools/color-helpers` and `@csstools/css-syntax-patches-for-csstree`
+transitively, both licensed **`MIT-0`** ("MIT No Attribution" — an OSI-approved
+permissive license, strictly *more* permissive than MIT: it waives even the
+attribution requirement). These run only in the test runner and are never bundled
+into the shipped browser artifact. `MIT-0` is added to the permissive allow-list in
+`scripts/license-audit.mjs` (it is non-copyleft and MIT-compatible); the bundled
+verdict above is unaffected.
+
 ---
 
 ## External processes (arm's-length, NOT bundled)

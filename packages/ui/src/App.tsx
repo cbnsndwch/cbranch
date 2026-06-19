@@ -1,16 +1,27 @@
+import { useEffect } from "react";
+
+import { AppShell } from "./components/AppShell";
+import { CommandPalette } from "./components/CommandPalette";
 import { useUiStore } from "./state/store";
 
-// ui-A shell placeholder: providers (React Query + host API + theme) are wired in
-// `main.tsx`; this renders a minimal themed surface to confirm the data/theme infra is
-// live. The real Resizable layout, cmdk switcher, history/graph, details, and diff
-// surfaces land in the ui-B/C/D milestones.
+// Root view: the browse shell plus the global command palette. A global shortcut
+// (⌘/Ctrl-K) opens the switcher anywhere (P1-UI-OPEN-1 / NF-A11Y-6).
 export function App() {
-  const theme = useUiStore((s) => s.theme);
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        useUiStore.getState().setPaletteOpen(true);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
   return (
-    <main className="bg-background text-foreground flex min-h-dvh flex-col items-center justify-center gap-3">
-      <h1 className="text-2xl font-semibold">cbranch</h1>
-      <p className="text-muted-foreground text-sm">Connecting to the host service…</p>
-      <p className="text-muted-foreground text-xs">theme: {theme}</p>
-    </main>
+    <>
+      <AppShell />
+      <CommandPalette />
+    </>
   );
 }
