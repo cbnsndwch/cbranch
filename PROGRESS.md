@@ -93,7 +93,14 @@ returns a plain `Array` at this pin.
      (persisted, history + details); full keyboard nav (arrows/PgUp-Dn/Home/End); quick-find over the loaded
      window (Ctrl/Cmd-F, subject/hash, next/prev + counter; backs jump-to-hash within the window).
      3 gate-green commits; 232 tests.
-   - ⬜ **ui-D** diff + file-at-rev — react-diff-view + Shiki, inline/split toggle, whitespace/context; CodeMirror 6 file-at-rev; binary/submodule/large-diff placeholders; sonner toasts; remaining base-lyra primitives.
+   - ✅ **ui-D** diff + file-at-rev — changed-file list (flat/tree, virtualized, status icons, rename old→new,
+     totals); diff controls → `DiffSpec` (inline/split persisted, whitespace, context stepper, merge-parent/combined
+     selector); next/prev change nav (hunks + cross-file) w/ keyboard; binary/submodule/large-diff placeholder
+     cards w/ Load-anyway; **rendered diff via react-diff-view fed by reconstructed unified-diff text + on-demand
+     Shiki tokenize bridge** (REQ-STACK-019/020/022); **sonner** toasts (NF-ERR-2); **CodeMirror 6 file-at-rev**
+     (read-only, line numbers, on-demand lazy chunk, Shiki decorations, side-channel link for large blobs,
+     binary placeholder). 4 gate-green commits; **253 tests**. NOTE: ui-D2b/D3 built via context-inheriting forks.
+     ⬜ Deferred: vendor remaining base-lyra primitives (P0 placeholder Button still in place).
    RPC CLIENT via the adapter subpath `@cbranch/rpc-contract/effect-rpc-adapter`. GOTCHA: `Stream.runCollect`→Array (see [[cbranch-effect-v4-gotchas]] in memory).
 3. 🔄 **Invalidation bus end-to-end** — ✅ CLIENT wired: `useInvalidationBus` (`src/rpc/use-invalidation-bus.ts`,
    called in `AppShell`) subscribes `repo.subscribe` → `invalidateQueries([repoId, domain])`; on drop it
@@ -106,6 +113,14 @@ returns a plain `Array` at this pin.
 **Key context files (gitignored working notes):** `docs/_impl-notes/DECISIONS.md` (D1–D12 locked decisions) + the 8 spec digests. **Verify command:** `pnpm gate`. **Clean-room:** never read `.local/SPEC-AGENT-BRIEF.md`; build only from `docs/spec/`+`LICENSES.md`+`BRANDING.md`+git/lib public docs. Undercover: no AI/model mentions in commits.
 
 ## Log
+- 2026-06-19 — **ui-C + ui-D complete** (8 gate-green commits, 185→253 tests). ui-C: commit graph (incremental
+  append-only lanes/edges, SVG cell), ref chips, server filters, date pref, keyboard nav, quick-find. ui-D:
+  changed-file list (flat/tree), diff controls (inline/split, ws, context, merge-parent/combined), next/prev nav,
+  binary/submodule/large-diff cards, react-diff-view + on-demand Shiki, sonner toasts, CodeMirror 6 file-at-rev.
+  ui-D2b (react-diff-view+Shiki+sonner) and ui-D3 (CodeMirror) were built by context-inheriting forks, each
+  verified independently green. `@shikijs/codemirror` is NOT in the registry (404) → Shiki tokens bridged into
+  CodeMirror as decorations directly. **Remaining for P1:** base-lyra Button vendoring (deferred), e2e happy-path
+  (NF-TEST-8) + watcher→refetch (NF-TEST-10), verification gate (AC-1..15, coverage 80%, perf), then STOP.
 - 2026-06-18 — Recon: Node 24.17, pnpm 10.32, git 2.54, registry reachable (effect beta, oxfmt, oxlint). Branch + bootstrap docs created. Spec digestion launched.
 - 2026-06-19 — `apps/web-server` built: verified (running round-trip) that `effect@4.0.0-beta.84` ships no Node
   HTTP/WS listener; adopted `@effect/platform-node@4.0.0-beta.84` (DECISIONS D11) for the spec-literal wiring.
