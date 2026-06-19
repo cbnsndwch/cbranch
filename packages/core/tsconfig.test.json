@@ -1,0 +1,15 @@
+{
+  "_comment": "Type-checks core's TEST files together with src (the package build tsconfig.json EXCLUDES *.test.ts so its emitted dist stays test-free). noEmit + composite:false because this is a pure type-assertion gate, not a build input. Run via `pnpm --filter @cbranch/core typecheck:test`. Mirrors packages/rpc-contract/tsconfig.test.json.",
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": false,
+    "rootDir": "src",
+    "types": ["node"]
+  },
+  "references": [{ "path": "../rpc-contract" }],
+  "include": ["src/**/*"]
+}

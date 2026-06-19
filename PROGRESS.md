@@ -29,8 +29,12 @@ Running checklist for the clean-room build. Legend: ✅ done · 🔄 in-flight �
 - Flag carried to contract author: test files are excluded from `tsc -b`; contract type-assertions need a dedicated test typecheck config.
 
 ## P1 — Read-only walking skeleton
-- ⬜ `rpc-contract`: RpcGroup + Schemas for P1 methods (`repo.open/recentList/recentRemove/state/subscribe`, `log.stream`, `commit.detail/diff`, `file.contentAtRev`), GitError union (§4), InvalidationEvent/Domain (§5).
-- ⬜ `core`: GitEngine + host-git backend (exact `05` commands); `cat-file --batch` pool; `--no-optional-locks`; repoId = hash of common git dir; non-interactive git env; scaffold per-repoId `Effect.Semaphore(1)`.
+- ✅ `rpc-contract`: `CbranchRpcs` (10 P1 methods), GitError (23 codes), Domain/InvalidationEvent, LogQuery/DiffSpec, authored success Schemas; in-memory contract tests (NF-TEST-5/6); test typecheck wired. (commit 4e08d00)
+- 🔄 `core`: GitEngine + host-git backend (exact `05` commands); `cat-file --batch` pool; `--no-optional-locks`; repoId = SHA-256 of common git dir (D2); non-interactive git env; per-repoId `Effect.Semaphore(1)` scaffold.
+  - 🔄 core-A: host-git infra (runGit/env/error-classify, cat-file pool, repoId, version gate ≥2.37, semaphore scaffold, path safety) + config store (NF-CFG-7) + `repo.open/state/recentList/recentRemove` + fixture harness (NF-TEST-3/4) + unit tests.
+  - ⬜ core-B: `log.stream`, `commit.detail`, `commit.diff`, `diff.workingFile`, `file.contentAtRev`, `repo.subscribe` (chokidar→InvalidationEvent per 15) + parsers + tests.
+
+> Backbone built sequentially in main tree (core → web-server → ui) to keep one clean lockfile/gate per step; parallel fan-out reserved for install-free intra-package work (e.g. UI view panels).
 - ⬜ `web-server`: Effect platform HTTP/WS (one multiplexed NDJSON socket) + static serve + HTTP side-channel; Origin/Host allowlist on WS upgrade; default loopback bind + warning; chokidar → invalidation bus (last).
 - ⬜ `ui`: shell (Resizable, cmdk), status summary, virtualized streaming history + graph (`10`), details panel, read-only diff (react-diff-view + Shiki) + file-at-rev (CodeMirror 6); React Query sole synced feeder + Zustand ephemeral.
 

@@ -51,6 +51,9 @@ importers:
       '@cbranch/rpc-contract':
         specifier: workspace:*
         version: link:../rpc-contract
+      chokidar:
+        specifier: ^5.0.0
+        version: 5.0.0
       effect:
         specifier: 4.0.0-beta.84
         version: 4.0.0-beta.84
@@ -728,6 +731,10 @@ packages:
     resolution: {integrity: sha512-NUPRluOfOiTKBKvWPtSD4PhFvWCqOi0BGStNWs57X9js7XGTprSmFoz5F0tWhR4WPjNeR9jXqdC7/UpSJTnlRg==}
     engines: {node: '>=18'}
 
+  chokidar@5.0.0:
+    resolution: {integrity: sha512-TQMmc3w+5AxjpL8iIiwebF73dRDF4fBIieAqGn9RGCWaEVwQ6Fb2cGe31Yns0RRIzii5goJ1Y7xbMwo1TxMplw==}
+    engines: {node: '>= 20.19.0'}
+
   class-variance-authority@0.7.1:
     resolution: {integrity: sha512-Ka+9Trutv7G8M6WT6SeiRWz792K5qEqIGEGzXKhAE6xOWAY6pPH8U+9IY3oCMv6kqTmLsv7Xh/2w2RigkePMsg==}
 
@@ -948,6 +955,10 @@ packages:
   react@19.2.7:
     resolution: {integrity: sha512-HNe9WslTbXmFK8o8cmwgAeJFSBvt1bPdHCVKtaaV+WlAN36mpT4hcRpwbf3fY56ar2oIXzsBpOAiIRHAdY0OlQ==}
     engines: {node: '>=0.10.0'}
+
+  readdirp@5.0.0:
+    resolution: {integrity: sha512-9u/XQ1pvrQtYyMpZe7DXKv2p5CNvyVwzUB6uhLAnQwHMSgKMBR62lc7AHljaeteeHXn11XTAaLLUVZYVZyuRBQ==}
+    engines: {node: '>= 20.19.0'}
 
   reselect@5.2.0:
     resolution: {integrity: sha512-AgZ3UOZm3YndfrJ4OYjgrT7bmCm/1iqkjvEfH/oYjzh6PD2qw4QuT3jjnXIrpdt4MTpMXclMT3lXbmRY+XRakw==}
@@ -1542,6 +1553,10 @@ snapshots:
 
   chai@6.2.2: {}
 
+  chokidar@5.0.0:
+    dependencies:
+      readdirp: 5.0.0
+
   class-variance-authority@0.7.1:
     dependencies:
       clsx: 2.1.1
@@ -1747,6 +1762,8 @@ snapshots:
       scheduler: 0.27.0
 
   react@19.2.7: {}
+
+  readdirp@5.0.0: {}
 
   reselect@5.2.0: {}
 

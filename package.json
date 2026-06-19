@@ -9,7 +9,7 @@
     "lint": "oxlint",
     "format": "oxfmt",
     "format:check": "oxfmt --check",
-    "typecheck": "tsc -b tsconfig.json && pnpm --filter @cbranch/ui typecheck && pnpm --filter @cbranch/rpc-contract typecheck:test",
+    "typecheck": "tsc -b tsconfig.json && pnpm --filter @cbranch/ui typecheck && pnpm --filter @cbranch/rpc-contract typecheck:test && pnpm --filter @cbranch/core typecheck:test",
     "build": "pnpm -r build",
     "test": "vitest run",
     "license-audit": "node scripts/license-audit.mjs",
