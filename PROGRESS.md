@@ -71,7 +71,20 @@ returns a plain `Array` at this pin.
 
 **Remaining for P1 (do in this order, main tree, gate-green + commit each):**
 1. ✅ **`apps/web-server`** — DONE (see above + DECISIONS D11). Migrated off the P0 bridge.
-2. **`packages/ui`** — shell (react-resizable-panels, cmdk switcher), theme (BRANDING tokens, no-flash), React Query (SOLE synced feeder, keys `[repoId, domain, …]` D9) + Zustand ephemeral; RPC CLIENT via the adapter subpath `@cbranch/rpc-contract/effect-rpc-adapter` (`RpcClient.layerProtocolSocket()`+`Socket.layerWebSocket`), single `ManagedRuntime`. Views: virtualized streaming history + commit graph (10), details panel, read-only diff (react-diff-view+Shiki), file-at-rev (CodeMirror 6). Vendor remaining base-lyra components (P0 left placeholder Button). Component tests w/ mocked RPC (NF-TEST-7). Adds many deps → runs `pnpm install` (do alone, no concurrent agent). Consider: one agent builds shell+infra+hooks+1 view, then fan out view panels (install-free) via parallel agents.
+2. 🔄 **`packages/ui`** — building in sub-milestones (gate-green + commit each), **vertical-slice-first** so the
+   interaction model is user-testable early, then fan out the rest:
+   - ✅ **ui-A infra** — single Effect RPC client over the WS bus (`makeAppRuntime`/`RpcClientService`) + a
+     mockable Promise/subscription facade `CbranchApi` (`src/rpc/api.ts`, the NF-TEST-7 seam) + `ApiProvider`;
+     React Query keys `[repoId, domain, …]` (D9, `src/rpc/query-keys.ts`); ephemeral Zustand store
+     (`src/state/store.ts`); theme light/dark/system + no-flash (`src/theme/theme.ts`); providers wired in
+     `main.tsx`. Deps added: `effect`(exact), `@tanstack/react-query`, `zustand`, `lucide-react`. 14 tests.
+   - ⬜ **ui-B vertical slice** — Resizable shell + cmdk repo switcher (RepoOpen/RecentList) + status summary +
+     streaming history list (LogStream) + select → details + read-only diff. Make it RUNNABLE (server+UI vs a
+     throwaway repo) with a short "how to drive it" note → **user-test checkpoint**. Adds react-resizable-panels,
+     cmdk, sonner + (dev) jsdom/@testing-library for component tests (NF-TEST-7; wire `.test.tsx`+jsdom in vitest).
+   - ⬜ **ui-C** history polish — commit graph (spec 10), ref labels, filters, virtualization (@tanstack/react-virtual), keyboard nav.
+   - ⬜ **ui-D** diff + file-at-rev — react-diff-view + Shiki; CodeMirror 6 file-at-rev; binary/submodule/large placeholders.
+   RPC CLIENT via the adapter subpath `@cbranch/rpc-contract/effect-rpc-adapter`. GOTCHA: `Stream.runCollect`→Array (see [[cbranch-effect-v4-gotchas]] in memory).
 3. **Invalidation bus end-to-end** — wire `repo.subscribe` stream → client React Query invalidation (15); reconnect invalidates `[repoId]` (NF-ERR-6).
 4. **e2e happy-path** (NF-TEST-8): start real server vs throwaway repo, open repo, browse log/graph/details/diffs read-only.
 5. **P1 verification gate**: all `05` AC-1…AC-15; add `@vitest/coverage-v8` + NF-TEST-11 80% coverage (core+rpc-contract); measure NF-PERF-1/2/3 on a reference repo. Then **STOP for user review** (per kickoff first-run note) before P2.
