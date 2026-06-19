@@ -51,5 +51,17 @@ Running checklist for the clean-room build. Legend: ✅ done · 🔄 in-flight �
 ## Blocked / decisions to surface
 - _(none yet)_
 
+## ▶ RESUME HERE (state as of commit 08c71c9)
+**Done & committed (gate green at each):** P0 scaffold (26f22af) · P0.5 effect-rpc spike (bdcef02) · rpc-contract P1 (4e08d00) · core-A infra+repo.* (9074957) · core-B history/diff/content+watcher (08c71c9). **The `core` engine is COMPLETE for P1** (132 tests green). Branch `feat/p0-p1-walking-skeleton`.
+
+**Remaining for P1 (do in this order, main tree, gate-green + commit each):**
+1. **`apps/web-server`** — Effect platform HTTP/WS (one multiplexed NDJSON socket via `RpcServer.layerProtocolWebsocket({path:"/rpc"})` + `RpcSerialization.layerNdjson`), serve static UI bundle, the HTTP side-channel route `GET /sidechannel/blob` (D4). Enforce Origin/Host allowlist on WS upgrade AND side-channel BEFORE any engine call (NF-SEC-3); default loopback 127.0.0.1:7420 + non-loopback warning (NF-PKG-2/9). Adapt the `GitEngine` (from `@cbranch/core` `live` layer) to `CbranchRpcs.toLayer({...})`. Migrate off the P0 bridge (`version`/`GitEnginePlaceholder`). Uses effect (installed); likely no new deps. Server runtime: `Effect.runFork(Layer.launch(MainLive))`.
+2. **`packages/ui`** — shell (react-resizable-panels, cmdk switcher), theme (BRANDING tokens, no-flash), React Query (SOLE synced feeder, keys `[repoId, domain, …]` D9) + Zustand ephemeral; RPC CLIENT via the adapter subpath `@cbranch/rpc-contract/effect-rpc-adapter` (`RpcClient.layerProtocolSocket()`+`Socket.layerWebSocket`), single `ManagedRuntime`. Views: virtualized streaming history + commit graph (10), details panel, read-only diff (react-diff-view+Shiki), file-at-rev (CodeMirror 6). Vendor remaining base-lyra components (P0 left placeholder Button). Component tests w/ mocked RPC (NF-TEST-7). Adds many deps → runs `pnpm install` (do alone, no concurrent agent). Consider: one agent builds shell+infra+hooks+1 view, then fan out view panels (install-free) via parallel agents.
+3. **Invalidation bus end-to-end** — wire `repo.subscribe` stream → client React Query invalidation (15); reconnect invalidates `[repoId]` (NF-ERR-6).
+4. **e2e happy-path** (NF-TEST-8): start real server vs throwaway repo, open repo, browse log/graph/details/diffs read-only.
+5. **P1 verification gate**: all `05` AC-1…AC-15; add `@vitest/coverage-v8` + NF-TEST-11 80% coverage (core+rpc-contract); measure NF-PERF-1/2/3 on a reference repo. Then **STOP for user review** (per kickoff first-run note) before P2.
+
+**Key context files (gitignored working notes):** `docs/_impl-notes/DECISIONS.md` (D1–D10 locked decisions) + the 8 spec digests. **Verify command:** `pnpm gate`. **Clean-room:** never read `.local/SPEC-AGENT-BRIEF.md`; build only from `docs/spec/`+`LICENSES.md`+`BRANDING.md`+git/lib public docs. Undercover: no AI/model mentions in commits.
+
 ## Log
 - 2026-06-18 — Recon: Node 24.17, pnpm 10.32, git 2.54, registry reachable (effect beta, oxfmt, oxlint). Branch + bootstrap docs created. Spec digestion launched.
