@@ -1,17 +1,20 @@
 import { type Oid, type RepoId } from "@cbranch/rpc-contract";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { type KeyboardEvent, useRef } from "react";
+import { type KeyboardEvent, useMemo, useRef } from "react";
 
+import { layoutCommits, maxLaneCount } from "../graph/layout";
 import { cn } from "../lib/cn";
 import { formatIso, shortOid } from "../lib/format";
 import { useLogStream } from "../rpc/hooks";
+import { GraphCell } from "./GraphCell";
+import { RefChips } from "./RefChips";
 import { Placeholder } from "./ui/placeholder";
 
 const ROW_HEIGHT = 40;
 
 // Virtualized streaming history (P1-HIST-1/2/3 + P1-UI-HIST-1): only visible rows render
-// (NF-PERF-3); rows append as the feed streams in. The graph cell is a placeholder dot
-// here — the lane/edge commit graph (spec 10) lands in the history-polish milestone.
+// (NF-PERF-3); rows append as the feed streams in. The lane/edge commit graph (spec 10) is
+// laid out incrementally from parent data and rendered per row in the graph cell.
 export function HistoryList({
   repoId,
   selectedOid,
@@ -22,6 +25,10 @@ export function HistoryList({
   readonly onSelectOid: (oid: Oid) => void;
 }) {
   const { rows, status } = useLogStream(repoId);
+  // Lane layout is append-only and viewport-independent, so recomputing from the streamed
+  // window stays stable across scrolling (spec 10 REQ-GRAPH-008/020).
+  const graphRows = useMemo(() => layoutCommits(rows.map((r) => ({ oid: r.oid, parents: r.parents }))), [rows]);
+  const columns = useMemo(() => Math.max(1, maxLaneCount(graphRows)), [graphRows]);
   const parentRef = useRef<HTMLDivElement>(null);
   const virtualizer = useVirtualizer({
     count: rows.length,
@@ -69,20 +76,14 @@ export function HistoryList({
               aria-selected={selected}
               onClick={() => onSelectOid(row.oid)}
               className={cn(
-                "hover:bg-accent absolute top-0 left-0 flex w-full cursor-pointer items-center gap-2 border-b px-2 text-xs",
+                "hover:bg-accent absolute top-0 left-0 flex w-full cursor-pointer items-center gap-2 border-b pr-2 text-xs",
                 selected ? "bg-accent" : "",
               )}
               style={{ height: item.size, transform: `translateY(${item.start}px)` }}
             >
-              <span className="text-graph-1" aria-hidden="true">
-                ●
-              </span>
+              <GraphCell row={graphRows[item.index]!} columns={columns} height={item.size} selected={selected} />
+              {row.refs.length > 0 ? <RefChips refs={row.refs} /> : null}
               <span className="flex-1 truncate">{row.subject}</span>
-              {row.refs.map((ref) => (
-                <span key={ref} className="text-muted-foreground border px-1 text-[10px]">
-                  {ref}
-                </span>
-              ))}
               <span className="text-muted-foreground w-28 truncate">{row.authorName}</span>
               <span className="text-muted-foreground w-36 truncate">{formatIso(row.authorDate)}</span>
               <span className="text-muted-foreground w-16 font-mono">{shortOid(row.oid)}</span>
