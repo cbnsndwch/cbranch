@@ -11,14 +11,19 @@
 
 import { basename } from "node:path";
 
-import { type GitError, type RepoId } from "@cbranch/rpc-contract";
+import { type GitError, type InvalidationEvent, type RepoId } from "@cbranch/rpc-contract";
 import { RepoHandle } from "@cbranch/rpc-contract";
-import { Effect, Layer, Scope, Stream } from "effect";
+import { type Cause, Effect, Layer, Queue, Scope, Stream } from "effect";
 
 import { type ConfigStore, makeConfigStore } from "../config/config-store";
 import { type CatFilePool, makeCatFilePool } from "../git/cat-file-pool";
+import { commitDetail } from "../git/commit";
+import { fileContentAtRev } from "../git/content";
+import { commitDiff, diffWorkingFile } from "../git/diff";
 import { gitError } from "../git/errors";
+import { makeLogStream } from "../git/history";
 import { detectGitVersion } from "../git/version";
+import { WatcherRegistry } from "../git/watcher";
 import { type ResolvedRepo, repoCwd, resolveRepo } from "../repo/resolve";
 import { readRepoState } from "../repo/state";
 import { GitEngine, type GitEngineApi } from "./git-engine";
@@ -31,8 +36,6 @@ export interface MakeGitEngineOptions {
   /** Working directory for the one-time `git --version` probe (default `process.cwd()`). */
   readonly versionProbeCwd?: string;
 }
-
-const coreB = (method: string): GitError => gitError("gitFailed", `${method} is not implemented yet (core-B)`);
 
 /**
  * Build a live {@link GitEngineApi}. Requires a `Scope`: the version probe runs once,
@@ -49,6 +52,11 @@ export const makeGitEngine = (opts?: MakeGitEngineOptions): Effect.Effect<GitEng
     const scope = yield* Effect.scope;
     const locations = new Map<string, ResolvedRepo>();
     const pools = new Map<string, CatFilePool>();
+
+    // The shared per-`repoId` fs-watcher registry; all watchers die on engine teardown
+    // (NF-WATCH-2 / REQ-ARCH-042).
+    const watchers = new WatcherRegistry();
+    yield* Effect.addFinalizer(() => Effect.sync(() => watchers.closeAll()));
 
     const resolveById = (repoId: RepoId): Effect.Effect<ResolvedRepo, GitError> =>
       Effect.gen(function* () {
@@ -98,13 +106,30 @@ export const makeGitEngine = (opts?: MakeGitEngineOptions): Effect.Effect<GitEng
       recentRemove: (repoId) => configStore.removeRecent(repoId),
       state: (repoId) => Effect.flatMap(resolveById(repoId), readRepoState),
 
-      // core-B stubs (typed; complete interface; bodies filled by core-B).
-      subscribe: () => Stream.fail(coreB("repo.subscribe")),
-      logStream: () => Stream.fail(coreB("log.stream")),
-      commitDetail: () => Effect.fail(coreB("commit.detail")),
-      commitDiff: () => Effect.fail(coreB("commit.diff")),
-      diffWorkingFile: () => Effect.fail(coreB("diff.workingFile")),
-      fileContentAtRev: () => Effect.fail(coreB("file.contentAtRev")),
+      // ── history & diff & content (P1, core-B) ──────────────────────────────
+      subscribe: (repoId) =>
+        Stream.unwrap(
+          Effect.map(resolveById(repoId), (repo) =>
+            Stream.callback<InvalidationEvent, GitError>(
+              (queue: Queue.Queue<InvalidationEvent, GitError | Cause.Done>) =>
+                Effect.acquireRelease(
+                  Effect.sync(() => watchers.addListener(repo, (event) => Queue.offerUnsafe(queue, event))),
+                  (dispose) => Effect.sync(() => dispose()),
+                ),
+            ),
+          ),
+        ),
+      logStream: (query) =>
+        Stream.unwrap(Effect.map(resolveById(query.repoId), (repo) => makeLogStream(repoCwd(repo), query, env))),
+      commitDetail: (repoId, oid) =>
+        Effect.flatMap(resolveById(repoId), (repo) => commitDetail(repoCwd(repo), oid, env)),
+      commitDiff: (spec) => Effect.flatMap(resolveById(spec.repoId), (repo) => commitDiff(repoCwd(repo), spec, env)),
+      diffWorkingFile: (repoId, path, staged) =>
+        Effect.flatMap(resolveById(repoId), (repo) => diffWorkingFile(repoCwd(repo), path, staged, env)),
+      fileContentAtRev: (repoId, path, rev) =>
+        Effect.flatMap(resolveById(repoId), (repo) =>
+          Effect.flatMap(poolFor(repo), (pool) => fileContentAtRev(pool, repoId, path, rev)),
+        ),
 
       // Object-read infra (implemented now; consumed by core-B's history/diff/content).
       readObject: (repoId, rev) =>

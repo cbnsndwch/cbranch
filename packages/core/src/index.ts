@@ -44,6 +44,35 @@ export { computeRepoId, isRepoId, normalizeAbsolute } from "./git/repo-id";
 export { makeRepoLockRegistry, type RepoLockRegistry } from "./git/locks";
 export { type CatFilePool, makeCatFilePool, type ObjectData, type ObjectInfo } from "./git/cat-file-pool";
 
+// ── history / diff / content / watcher (P1, core-B) ─────────────────────────────
+export {
+  buildLogArgs,
+  cappedLimit,
+  decodeLogCursor,
+  encodeLogCursor,
+  LOG_FORMAT,
+  LOG_WINDOW_CAP,
+  type LogCursor,
+  makeLogStream,
+  nextLogCursor,
+  parseCommitSummaries,
+} from "./git/history";
+export { commitDetail, parseTzOffsetMinutes } from "./git/commit";
+export {
+  buildDiffFiles,
+  commitDiff,
+  diffWorkingFile,
+  mapStatusLetter,
+  type NameStatusEntry,
+  type NumstatEntry,
+  parseNameStatus,
+  parseNumstat,
+  parsePatch,
+  type PatchFile,
+} from "./git/diff";
+export { fileContentAtRev, INLINE_CONTENT_CAP, looksBinary, sidechannelBlobUrl } from "./git/content";
+export { classifyChange, COALESCE_MS, type WatchTarget, WatcherRegistry } from "./git/watcher";
+
 // ── config store ───────────────────────────────────────────────────────────────
 export {
   type Config,

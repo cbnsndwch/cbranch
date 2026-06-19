@@ -1,8 +1,8 @@
 import { join } from "node:path";
 
 import { type RepoId } from "@cbranch/rpc-contract";
-import { Oid as OidBrand, RepoId as RepoIdBrand } from "@cbranch/rpc-contract";
-import { Effect, Exit, Stream } from "effect";
+import { RepoId as RepoIdBrand } from "@cbranch/rpc-contract";
+import { Effect, Exit } from "effect";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 
 import { type GitEngineApi, makeGitEngine } from "../index";
@@ -136,26 +136,5 @@ describe("GitEngine repo.* (P1, core-A)", () => {
       }),
     );
     expect(blob?.data.toString("utf8")).toBe("hello\n");
-  });
-});
-
-describe("GitEngine core-B stubs are typed and present", () => {
-  test("streaming + unary stubs fail with a clear not-implemented error", async () => {
-    const repo = await ws.createRepo("stubs");
-    await repo.commit({ message: "init" });
-    const cfg = newCfg();
-
-    const codes = await withEngine(cfg, (e) =>
-      Effect.gen(function* () {
-        const handle = yield* e.open(repo.dir);
-        const logErr = yield* Effect.flip(Stream.runCollect(e.logStream({ repoId: handle.repoId, limit: 10 })));
-        const detailErr = yield* Effect.flip(
-          e.commitDetail(handle.repoId, handle.state.headOid ?? OidBrand.make("0".repeat(40))),
-        );
-        return { logErr: logErr.code, detailErr: detailErr.code };
-      }),
-    );
-    expect(codes.logErr).toBe("gitFailed");
-    expect(codes.detailErr).toBe("gitFailed");
   });
 });
