@@ -1,5 +1,6 @@
 import { Group, Panel, Separator } from "react-resizable-panels";
 
+import { useInvalidationBus } from "../rpc/use-invalidation-bus";
 import { useUiStore } from "../state/store";
 import { DetailsPanel } from "./DetailsPanel";
 import { DiffPanel } from "./DiffPanel";
@@ -16,6 +17,9 @@ export function AppShell() {
   const selectedOid = useUiStore((s) => s.selectedOid);
   const setSelectedOid = useUiStore((s) => s.setSelectedOid);
   const openPalette = useUiStore((s) => s.setPaletteOpen);
+
+  // Live updates: subscribe to the host invalidation bus for the active repo (spec 15).
+  useInvalidationBus(repoId);
 
   return (
     <div className="flex h-dvh flex-col">

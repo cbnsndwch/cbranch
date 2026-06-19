@@ -89,7 +89,11 @@ returns a plain `Array` at this pin.
    - ⬜ **ui-C** history polish — commit graph (spec 10), ref-label chips, filters (P1-FILT-*), quick-find, full keyboard nav, date-format pref.
    - ⬜ **ui-D** diff + file-at-rev — react-diff-view + Shiki, inline/split toggle, whitespace/context; CodeMirror 6 file-at-rev; binary/submodule/large-diff placeholders; sonner toasts; remaining base-lyra primitives.
    RPC CLIENT via the adapter subpath `@cbranch/rpc-contract/effect-rpc-adapter`. GOTCHA: `Stream.runCollect`→Array (see [[cbranch-effect-v4-gotchas]] in memory).
-3. **Invalidation bus end-to-end** — wire `repo.subscribe` stream → client React Query invalidation (15); reconnect invalidates `[repoId]` (NF-ERR-6).
+3. 🔄 **Invalidation bus end-to-end** — ✅ CLIENT wired: `useInvalidationBus` (`src/rpc/use-invalidation-bus.ts`,
+   called in `AppShell`) subscribes `repo.subscribe` → `invalidateQueries([repoId, domain])`; on drop it
+   resnapshots `[repoId]` + reconnects with backoff (NF-ERR-6). Unit-tested with a mocked event. ⬜ Remaining:
+   the full watcher→refetch proof (NF-TEST-10: external `git` change → `InvalidationEvent` → fresh read) lands
+   in the e2e/verification phase against the real server.
 4. **e2e happy-path** (NF-TEST-8): start real server vs throwaway repo, open repo, browse log/graph/details/diffs read-only.
 5. **P1 verification gate**: all `05` AC-1…AC-15; add `@vitest/coverage-v8` + NF-TEST-11 80% coverage (core+rpc-contract); measure NF-PERF-1/2/3 on a reference repo. Then **STOP for user review** (per kickoff first-run note) before P2.
 

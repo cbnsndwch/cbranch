@@ -2,6 +2,7 @@
 import {
   CommitDetail,
   FileContent,
+  InvalidationEvent,
   Oid,
   RecentRepo,
   RepoHandle,
@@ -10,12 +11,13 @@ import {
   Signature,
 } from "@cbranch/rpc-contract";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { type ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
-import { type CbranchApi } from "../rpc/api";
+import { type CbranchApi, type StreamHandlers } from "../rpc/api";
 import { ApiProvider } from "../rpc/ApiProvider";
+import { useInvalidationBus } from "../rpc/use-invalidation-bus";
 import { useUiStore } from "../state/store";
 import { CommandPalette } from "./CommandPalette";
 import { DetailsPanel } from "./DetailsPanel";
@@ -113,5 +115,33 @@ describe("CommandPalette (NF-TEST-7 / P1-UI-OPEN-1)", () => {
     const item = await screen.findByText("demo");
     fireEvent.click(item);
     await waitFor(() => expect(api.repoOpen).toHaveBeenCalledWith("/repos/demo"));
+  });
+});
+
+describe("useInvalidationBus (spec 15 §2 / NF-ERR-6)", () => {
+  test("invalidates [repoId, domain] queries on an InvalidationEvent", () => {
+    let captured: StreamHandlers<InvalidationEvent> | undefined;
+    const api = makeFakeApi({
+      subscribe: vi.fn((_id: RepoId, handlers: StreamHandlers<InvalidationEvent>) => {
+        captured = handlers;
+        return () => undefined;
+      }),
+    });
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const spy = vi.spyOn(queryClient, "invalidateQueries");
+    function Probe() {
+      useInvalidationBus(repoId);
+      return null;
+    }
+    render(
+      <QueryClientProvider client={queryClient}>
+        <ApiProvider api={api}>
+          <Probe />
+        </ApiProvider>
+      </QueryClientProvider>,
+    );
+    act(() => captured?.onItem(new InvalidationEvent({ repoId, domains: ["status", "commits"] })));
+    expect(spy).toHaveBeenCalledWith({ queryKey: [repoId, "status"] });
+    expect(spy).toHaveBeenCalledWith({ queryKey: [repoId, "commits"] });
   });
 });
