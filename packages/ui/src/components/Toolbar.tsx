@@ -35,6 +35,16 @@ import {
 import { useUiStore } from "../state/store";
 import { ThemeToggle } from "./ThemeToggle";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogClose,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "./ui/alert-dialog";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -44,16 +54,32 @@ import {
 
 type PullMode = "ff-only" | "rebase" | "merge";
 type SyncKind = "fetch" | "pull" | "push";
+type PushOpts = {
+  setUpstream?: boolean;
+  forceWithLease?: boolean;
+  tags?: boolean;
+};
 
 // force-with-lease overwrites remote history, so its error path stays distinct from a
-// plain rejection (SY-022). The non-fast-forward retry dialog is intentionally still a
-// toast here — Group 7 owns UI-007.
-const pushErrorMessage = (err: unknown) => {
-  const msg = String(err);
-  if (msg.includes("nonFastForward") || msg.includes("non-fast-forward")) {
-    return "Push rejected (non-fast-forward). Pull first, then retry.";
+// plain rejection (SY-022). A non-fast-forward rejection is intercepted before this and
+// routed to the retry dialog (UI-007); this stays the fallback for other push failures.
+const pushErrorMessage = (err: unknown) => "Push failed: " + String(err);
+
+// The push rejection reaching `onError` is `unknown`: it may be the decoded `GitError`
+// (an object carrying `code === "nonFastForward"`) or a transport error whose string form
+// mentions it. Detect both so the retry dialog (UI-007) opens for a genuine non-ff reject
+// while every other push error keeps the plain toast.
+const isNonFastForward = (err: unknown): boolean => {
+  if (
+    typeof err === "object" &&
+    err !== null &&
+    "code" in err &&
+    (err as { code: unknown }).code === "nonFastForward"
+  ) {
+    return true;
   }
-  return "Push failed: " + msg;
+  const s = String(err);
+  return s.includes("nonFastForward") || s.includes("non-fast-forward");
 };
 
 // A single streaming sync handler shape (mirrors `StreamHandlers<SyncEvent>` but with
@@ -100,8 +126,21 @@ export function Toolbar() {
   )?.upstream;
 
   const syncUnsubRef = useRef<(() => void) | null>(null);
+  // Mirror of `syncRunning` for the synchronous guard: a chained retry (pull → push)
+  // starts the next sync from inside the prior op's `onComplete`, where the captured
+  // `syncRunning` state is stale. The ref always reflects the live value.
+  const syncRunningRef = useRef<SyncKind | null>(null);
   const [syncRunning, setSyncRunning] = useState<SyncKind | null>(null);
   const [pullMode, setPullMode] = useState<PullMode>("ff-only");
+  // Non-fast-forward push retry dialog (UI-007): holds the rejected push's options so the
+  // chosen pull (rebase/merge) can re-run the identical push on success.
+  const [nonFfOpen, setNonFfOpen] = useState(false);
+  const [nonFfPushOpts, setNonFfPushOpts] = useState<PushOpts>({});
+
+  const setRunning = (kind: SyncKind | null) => {
+    syncRunningRef.current = kind;
+    setSyncRunning(kind);
+  };
 
   useEffect(() => {
     return () => {
@@ -110,17 +149,23 @@ export function Toolbar() {
   }, []);
 
   // Shared streaming-sync core: one in-flight op at a time, progress mirrored into a
-  // single toast, the unsubscribe stored so Cancel can tear it down.
+  // single toast, the unsubscribe stored so Cancel can tear it down. `onCompleted` runs
+  // after the success toast (used to chain a retry); `onErrorOverride` may claim an error
+  // (returning true) to suppress the default toast — the non-ff dialog uses it.
   const startSync = (
     kind: SyncKind,
     label: string,
     start: (handlers: SyncCallbacks) => () => void,
-    errorMessage?: (err: unknown) => string,
+    opts?: {
+      errorMessage?: (err: unknown) => string;
+      onCompleted?: () => void;
+      onErrorOverride?: (err: unknown) => boolean;
+    },
   ) => {
-    if (!repoId || syncRunning) return;
+    if (!repoId || syncRunningRef.current) return;
     syncUnsubRef.current?.();
     syncUnsubRef.current = null;
-    setSyncRunning(kind);
+    setRunning(kind);
     const toastId = "sync-" + kind;
     toast.loading(label + "…", { id: toastId });
     syncUnsubRef.current = start({
@@ -131,15 +176,22 @@ export function Toolbar() {
         }
       },
       onComplete: () => {
-        setSyncRunning(null);
+        setRunning(null);
         syncUnsubRef.current = null;
         toast.success(label + " complete", { id: toastId });
+        opts?.onCompleted?.();
       },
       onError: (err) => {
-        setSyncRunning(null);
+        setRunning(null);
         syncUnsubRef.current = null;
+        if (opts?.onErrorOverride?.(err)) {
+          toast.dismiss(toastId);
+          return;
+        }
         toast.error(
-          errorMessage ? errorMessage(err) : label + " failed: " + String(err),
+          opts?.errorMessage
+            ? opts.errorMessage(err)
+            : label + " failed: " + String(err),
           { id: toastId },
         );
       },
@@ -163,19 +215,41 @@ export function Toolbar() {
     startSync("pull", "Pulling", (h) => api.pullStream(rid, mode, {}, h));
   };
 
-  const handlePush = (opts: {
-    setUpstream?: boolean;
-    forceWithLease?: boolean;
-    tags?: boolean;
-  }) => {
+  const handlePush = (opts: PushOpts) => {
     if (!repoId) return;
     const rid = repoId;
     startSync(
       "push",
       "Pushing",
       (h) => api.pushStream(rid, defaultRemote, opts, h),
-      pushErrorMessage,
+      {
+        errorMessage: pushErrorMessage,
+        // A non-ff rejection opens the retry dialog (UI-007) instead of a dead-end
+        // toast; the rejected push's options are stashed so the post-pull retry replays
+        // the identical push. Every other push failure keeps the plain toast.
+        onErrorOverride: (err) => {
+          if (!isNonFastForward(err)) return false;
+          setNonFfPushOpts(opts);
+          setNonFfOpen(true);
+          return true;
+        },
+      },
     );
+  };
+
+  // Resolve a non-ff push (UI-007): pull with the chosen mode, then — only on a clean
+  // pull — replay the original push (chained via `onCompleted`, after `setRunning(null)`,
+  // so the synchronous in-flight guard sees the slot free). A failed or conflicted pull
+  // surfaces its own error and never reaches the retry.
+  const handleNonFfRetry = (mode: "rebase" | "merge") => {
+    setNonFfOpen(false);
+    if (!repoId) return;
+    const rid = repoId;
+    const pushOpts = nonFfPushOpts;
+    setPullMode(mode);
+    startSync("pull", "Pulling", (h) => api.pullStream(rid, mode, {}, h), {
+      onCompleted: () => handlePush(pushOpts),
+    });
   };
 
   const handleCancel = () => {
@@ -432,6 +506,44 @@ export function Toolbar() {
           </button>
         </form>
       </div>
+
+      {/* Non-fast-forward push retry dialog (UI-007). */}
+      <AlertDialog
+        open={nonFfOpen}
+        onOpenChange={(open) => {
+          if (!open) setNonFfOpen(false);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Push rejected — non-fast-forward
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              The remote has commits you don&apos;t have locally, so the push
+              was rejected. Integrate the remote changes first, then retry the
+              push. A conflicting pull stops here without pushing.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogClose onClick={() => setNonFfOpen(false)}>
+              Cancel
+            </AlertDialogClose>
+            <AlertDialogAction
+              className="bg-primary text-primary-foreground hover:bg-primary/90"
+              onClick={() => handleNonFfRetry("rebase")}
+            >
+              Pull (rebase) &amp; retry
+            </AlertDialogAction>
+            <AlertDialogAction
+              className="bg-primary text-primary-foreground hover:bg-primary/90"
+              onClick={() => handleNonFfRetry("merge")}
+            >
+              Pull (merge) &amp; retry
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

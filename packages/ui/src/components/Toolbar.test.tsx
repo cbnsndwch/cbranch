@@ -166,3 +166,73 @@ describe("Toolbar (D7 / UI-005 / UI-006)", () => {
     );
   });
 });
+
+describe("Toolbar non-fast-forward push retry (UI-007)", () => {
+  const NON_FF = { code: "nonFastForward" };
+
+  test("a non-fast-forward rejection opens the retry dialog", async () => {
+    const pushStream = vi.fn((_r, _rem, _opts, h) => {
+      h.onError(NON_FF);
+      return () => undefined;
+    });
+    renderToolbar(makeFakeApi({ pushStream }));
+    act(() => fireEvent.click(screen.getByLabelText("Push")));
+    expect(
+      await screen.findByText("Push rejected — non-fast-forward"),
+    ).toBeTruthy();
+  });
+
+  test("a generic push failure keeps the toast and shows no dialog", async () => {
+    const pushStream = vi.fn((_r, _rem, _opts, h) => {
+      h.onError(new Error("connection reset"));
+      return () => undefined;
+    });
+    renderToolbar(makeFakeApi({ pushStream }));
+    act(() => fireEvent.click(screen.getByLabelText("Push")));
+    await waitFor(() => expect(pushStream).toHaveBeenCalledTimes(1));
+    expect(screen.queryByText("Push rejected — non-fast-forward")).toBeNull();
+  });
+
+  test("choosing a retry pulls with that mode, then replays the original push", async () => {
+    let pushCalls = 0;
+    // First push is rejected non-ff; after a clean pull the identical push retries
+    // and succeeds. The push is set-upstream so we can assert the opts are replayed.
+    const pushStream = vi.fn((_r, _rem, _opts, h) => {
+      pushCalls += 1;
+      if (pushCalls === 1) h.onError(NON_FF);
+      else h.onComplete();
+      return () => undefined;
+    });
+    const pullStream = vi.fn((_r, _mode, _opts, h) => {
+      h.onComplete();
+      return () => undefined;
+    });
+    renderToolbar(makeFakeApi({ pushStream, pullStream }));
+
+    // Use the set-upstream variant so the replayed opts are observable.
+    act(() => fireEvent.click(screen.getByLabelText("Push options")));
+    const setUpstreamItem = await screen.findByText("Push and set upstream");
+    act(() => fireEvent.click(setUpstreamItem));
+
+    const retryItem = await screen.findByText("Pull (rebase) & retry");
+    act(() => fireEvent.click(retryItem));
+
+    await waitFor(() =>
+      expect(pullStream).toHaveBeenCalledWith(
+        repoId,
+        "rebase",
+        {},
+        expect.anything(),
+      ),
+    );
+    // Two push attempts: the rejected original and the post-pull retry, both with
+    // the same set-upstream opts.
+    expect(pushStream).toHaveBeenCalledTimes(2);
+    expect(pushStream).toHaveBeenLastCalledWith(
+      repoId,
+      "origin",
+      { setUpstream: true },
+      expect.anything(),
+    );
+  });
+});
