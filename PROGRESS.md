@@ -101,6 +101,12 @@ verification gate (this commit). Branch `feat/p0-p1-walking-skeleton`.
 **Key context files (gitignored working notes):** `docs/_impl-notes/DECISIONS.md` (D1–D12 locked decisions) + the 8 spec digests. **Verify command:** `pnpm gate`. **Clean-room:** never read `.local/SPEC-AGENT-BRIEF.md`; build only from `docs/spec/`+`LICENSES.md`+`BRANDING.md`+git/lib public docs. Undercover: no AI/model mentions in commits.
 
 ## Log
+- 2026-06-20 — **P2 started — slice S1 landed (D15).** RPC write-path contract + full method plumbing as
+  typed stubs (`360845b`): `schemas/working-tree.ts` (8 Schema.Class types) + 11 group methods (StatusGet,
+  Stage/Unstage/Discard/DeleteUntracked/ResetTo, Stage/Unstage/DiscardHunks, CommitCreate, CommitLastMessage)
+  + GitEngineApi/live.ts stubs + web-server handlers + UI api/query-keys. Gate green: 276 tests. Plan at
+  `docs/_impl-notes/P2-PLAN.md`; D15 records selection-over-patch + DeleteUntracked-split decisions. Next: S2
+  (porcelain-v2 status parser).
 - 2026-06-20 — **Base UI migration + desktop menu chrome (D14).** Migrated the deprecated
   `@base-ui-components/react@1.0.0-rc.0` → stable `@base-ui/react@^1.6.0` (renamed package; `check:primitives`
   green on 12/12). Wired the shadcn `@/* → src` alias across tsconfig/vite/root-vitest/components.json so
