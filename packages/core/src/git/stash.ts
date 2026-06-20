@@ -122,32 +122,81 @@ export const stashPush = (
 
 // ── stashShow ─────────────────────────────────────────────────────────────────
 
-export const stashShow = (
+/**
+ * Run the three aligned diff outputs (name-status, numstat, patch) over a single
+ * rev-pair and assemble them into ordered {@link DiffFileType}s. Mirrors the triple
+ * used by every other {@link buildDiffFiles} caller so all three stay
+ * one-entry-per-file aligned (DM-060).
+ */
+const showDiffFiles = (
   cwd: string,
-  ref: string,
-  env?: NodeJS.ProcessEnv,
+  diffArgs: ReadonlyArray<string>,
+  rev: ReadonlyArray<string>,
+  env: NodeJS.ProcessEnv | undefined,
 ): Effect.Effect<readonly DiffFileType[], GitError> =>
   Effect.gen(function* () {
-    // Compare stash@{N}^1 (the commit HEAD was at when stashing) to stash@{N}
-    const parent = `${ref}^1`;
     const [ns, num, patch] = yield* Effect.all([
       runGitOk({
         cwd,
-        args: ["diff", "-z", "--name-status", "--no-renames", parent, ref],
+        args: [...diffArgs, "-z", "--name-status", "--no-renames", ...rev],
         env,
       }),
       runGitOk({
         cwd,
-        args: ["diff", "-z", "--numstat", "--no-renames", parent, ref],
+        args: [...diffArgs, "-z", "--numstat", "--no-renames", ...rev],
         env,
       }),
-      runGitOk({ cwd, args: ["diff", "-p", "--no-renames", parent, ref], env }),
+      runGitOk({ cwd, args: [...diffArgs, "-p", "--no-renames", ...rev], env }),
     ]);
     return buildDiffFiles(
       parseNameStatus(ns.stdout),
       parseNumstat(num.stdout),
       parsePatch(decodeUtf8(patch.stdout)),
     );
+  });
+
+export const stashShow = (
+  cwd: string,
+  ref: string,
+  env?: NodeJS.ProcessEnv,
+): Effect.Effect<readonly DiffFileType[], GitError> =>
+  Effect.gen(function* () {
+    // Tracked changes: stash@{N}^1 (the commit HEAD was at when stashing) vs
+    // stash@{N} (the WIP tree). git keeps untracked files OUT of the WIP tree, so
+    // this pair alone omits anything captured with `-u` (REQ-P3-ST-003).
+    const tracked = yield* showDiffFiles(cwd, ["diff"], [`${ref}^1`, ref], env);
+
+    // A stash created with `-u` records the captured untracked files as a
+    // PARENTLESS third parent commit (stash@{N}^3). An ordinary stash has no such
+    // parent, so `rev-parse --verify` exits non-zero — that is DATA ("no untracked
+    // content"), not a failure, hence runGit + an exit-code branch rather than
+    // runGitOk.
+    const untrackedRef = `${ref}^3`;
+    const probe = yield* runGit({
+      cwd,
+      args: ["rev-parse", "--verify", "--quiet", untrackedRef],
+      env,
+    });
+    if (probe.exitCode !== 0) return tracked;
+
+    // Diff the empty tree against the untracked commit (`diff-tree --root` on a
+    // parentless commit): every captured untracked file surfaces as Added.
+    const untracked = yield* showDiffFiles(
+      cwd,
+      ["diff-tree", "-r", "--no-commit-id"],
+      ["--root", untrackedRef],
+      env,
+    );
+
+    // Tracked entries first, then untracked; drop any untracked path already
+    // present among the tracked entries. git keeps the two sets disjoint, so this
+    // dedup is defensive — it only guarantees a sane, stable, one-per-path order.
+    const seen = new Set(tracked.map((f) => f.newPath));
+    const merged: DiffFileType[] = [...tracked];
+    for (const f of untracked) {
+      if (!seen.has(f.newPath)) merged.push(f);
+    }
+    return merged;
   });
 
 // ── stashApply / stashPop ─────────────────────────────────────────────────────

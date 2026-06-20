@@ -84,6 +84,58 @@ describe("stash", () => {
     expect(diff[0]?.newPath).toBe("a.txt");
   });
 
+  test("stashShow — includes untracked files captured with -u (ST-003)", async () => {
+    const repo = await ws.createRepo("st-show-untracked");
+    await repo.commit({ message: "init", files: { "a.txt": "line1\n" } });
+    // A tracked, staged modification...
+    await repo.writeFile("a.txt", "line1\nline2\n");
+    await repo.stage("a.txt");
+    // ...plus a brand-new untracked file (left unstaged).
+    await repo.writeFile("untracked.txt", "brand new\n");
+
+    await Effect.runPromise(stashPush(repo.dir, { includeUntracked: true }));
+
+    const diff = await Effect.runPromise(stashShow(repo.dir, "stash@{0}"));
+    const paths = diff.map((f) => f.newPath);
+    expect(paths).toContain("a.txt");
+    expect(paths).toContain("untracked.txt");
+    const u = diff.find((f) => f.newPath === "untracked.txt");
+    expect(u?.status).toBe("added");
+    expect(u?.additions).toBe(1);
+  });
+
+  test("stashShow — a plain stash (no -u) returns only tracked changes and never errors on the missing ^3 parent", async () => {
+    const repo = await ws.createRepo("st-show-plain");
+    await repo.commit({ message: "init", files: { "a.txt": "line1\n" } });
+    await repo.writeFile("a.txt", "line1\nchanged\n");
+    await repo.stage("a.txt");
+    // An untracked file left in the working tree — NOT captured by a plain stash.
+    await repo.writeFile("ignored-untracked.txt", "not stashed\n");
+
+    await Effect.runPromise(stashPush(repo.dir, { message: "plain" }));
+
+    const diff = await Effect.runPromise(stashShow(repo.dir, "stash@{0}"));
+    const paths = diff.map((f) => f.newPath);
+    expect(paths).toContain("a.txt");
+    expect(paths).not.toContain("ignored-untracked.txt");
+  });
+
+  test("stashShow — an untracked-only stash surfaces untracked files as Added", async () => {
+    const repo = await ws.createRepo("st-show-untracked-only");
+    await repo.commit({ message: "init", files: { "a.txt": "a\n" } });
+    // No tracked change — only a fresh untracked file.
+    await repo.writeFile("fresh.txt", "fresh\n");
+
+    await Effect.runPromise(stashPush(repo.dir, { includeUntracked: true }));
+
+    const diff = await Effect.runPromise(stashShow(repo.dir, "stash@{0}"));
+    expect(diff.map((f) => f.newPath)).toContain("fresh.txt");
+    const fresh = diff.find((f) => f.newPath === "fresh.txt");
+    expect(fresh?.status).toBe("added");
+    expect(fresh?.additions).toBe(1);
+    expect(fresh?.hunks.length).toBeGreaterThan(0);
+  });
+
   test("stashApply — restores changes without removing stash entry", async () => {
     const repo = await ws.createRepo("st-apply");
     await repo.commit({ message: "init", files: { "a.txt": "original\n" } });
