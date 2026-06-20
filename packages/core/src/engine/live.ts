@@ -14,7 +14,6 @@ import { basename } from "node:path";
 import {
   type GitError,
   type InvalidationEvent,
-  type MergeResult,
   type RemoteInfo,
   type RepoId,
   type StashEntry,
@@ -42,6 +41,7 @@ import { commitDiff, diffWorkingFile } from "../git/diff";
 import { gitError } from "../git/errors";
 import { makeLogStream } from "../git/history";
 import { makeRepoLockRegistry } from "../git/locks";
+import { mergeAbort as mergeAbortGit, mergeCreate as mergeCreateGit } from "../git/merge";
 import {
   discardHunks as discardHunksGit,
   stageHunks as stageHunksGit,
@@ -235,15 +235,13 @@ export const makeGitEngine = (opts?: MakeGitEngineOptions): Effect.Effect<GitEng
           locks.withRepoLock(repoId)(branchSetUpstreamGit(repoCwd(repo), name, upstream, env)),
         ),
 
-      // ── merge (P3, stubs) ─────────────────────────────────────────────────
-      mergeCreate: (repoId, _ref, _strategy) =>
-        Effect.flatMap(resolveById(repoId), (_repo) =>
-          Effect.fail(gitError("gitFailed", "P3: mergeCreate not implemented")),
-        ) as Effect.Effect<MergeResult, GitError>,
-      mergeAbort: (repoId) =>
-        Effect.flatMap(resolveById(repoId), (_repo) =>
-          Effect.fail(gitError("gitFailed", "P3: mergeAbort not implemented")),
+      // ── merge (P3) ────────────────────────────────────────────────────────
+      mergeCreate: (repoId, ref, strategy) =>
+        Effect.flatMap(resolveById(repoId), (repo) =>
+          locks.withRepoLock(repoId)(mergeCreateGit(repoCwd(repo), ref, strategy, env)),
         ),
+      mergeAbort: (repoId) =>
+        Effect.flatMap(resolveById(repoId), (repo) => locks.withRepoLock(repoId)(mergeAbortGit(repoCwd(repo), env))),
 
       // ── sync (P3, stubs) ──────────────────────────────────────────────────
       fetchStream: (repoId, _remote, _all, _prune, _tags) =>
