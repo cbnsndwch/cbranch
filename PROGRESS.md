@@ -84,17 +84,24 @@ surfaces. It is not a separate milestone but a prerequisite for all future work.
 ## Blocked / decisions to surface
 - _(none yet)_
 
-## ▶ RESUME HERE (P3 in-flight — S1–S6 landed)
+## ▶ RESUME HERE (P3 core complete — UI work next)
 
-**P3-S1 through S6 COMPLETE. Gate green: 453 tests, 80.17% branches.**
+**P3-S1 through S9 COMPLETE. Gate green: 505 tests, 80.59% branches.**
 
-Committed: S1 contract+stubs (5d31d47) · S2 branch listing (79c81a4) · S3 branch lifecycle (5b38e4a) · S4 merge (7fdd625) · S5 sync streaming (693c513) · S6 remotes CRUD (this commit).
+Committed: S1 contract+stubs (5d31d47) · S2 branch listing (79c81a4) · S3 branch lifecycle (5b38e4a) · S4 merge (7fdd625) · S5 sync streaming (693c513) · S6 remotes (c0d36e9) · S7 worktrees (9273602) · S8 stash (63902b7) · S9 tags (0aabe44).
 
-**P3 plan:** `docs/_impl-notes/P3-PLAN.md`. 33 new RPC methods across 8 domains.
+**All 33 P3 RPC methods are fully implemented in core.** Engine stubs replaced with real git invocations.
 
-**Remaining core slices:** S7 worktrees · S8 stash · S9 tags. Then UI-A–UI-G panels + AppShell integration.
+**Remaining: P3 UI slices (UI-A through UI-G)**
+- UI-A: BranchesPanel (virtualized local+remote groups, context menus, BranchCreateDialog, BranchRenameDialog, DirtyTreeDialog)
+- UI-B: SyncToolbar (Fetch/Pull/Push split buttons, progress toasts, non-FF AlertDialog)
+- UI-C: RemotesManagerDialog (table + add/edit/rename/remove)
+- UI-D: WorktreesPanel (list + Add/Remove/Prune + Switch context)
+- UI-E: StashPanel (list + Apply/Pop/Drop/Clear + new-stash dialog + diff preview)
+- UI-F: TagsPanel (list + new-tag dialog + delete/push actions)
+- UI-G: AppShell integration + command palette entries
 
-**Next: P3-S7 — core worktrees** (`git worktree list --porcelain` parser + add/remove/prune, fill live.ts stubs).
+**Next: P3-UI-A — Branches panel** (main new view; add "Branches" tab to AppShell).
 
 **The app runs end-to-end with stage+commit.** Open the "Changes" tab to see staged/unstaged file list, click a file to diff it, stage/unstage hunks, write a commit message, and commit.
 
