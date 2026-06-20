@@ -5,6 +5,7 @@ import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import {
   createFixtureWorkspace,
   type FixtureWorkspace,
+  fixtureDate,
 } from "../testing/fixtures";
 import {
   fetchStream,
@@ -214,6 +215,58 @@ describe("sync streaming", () => {
       Stream.runCollect(fetchStream(repo.dir, "no-such-remote")),
     );
     expect(exit._tag).toBe("Failure");
+  });
+
+  test("pushStream — set-upstream records the tracking ref locally (SY-021)", async () => {
+    const origin = await ws.createRepo("sync-setup-origin", { bare: true });
+
+    const work = await ws.createRepo("sync-setup-work");
+    await work.addRemote("origin", origin.dir);
+    await work.commit({ message: "init", files: { "a.txt": "a" } });
+
+    await collect(pushStream(work.dir, "origin", "main", true));
+
+    // The local branch now tracks origin/main.
+    const upstream = await work.git([
+      "rev-parse",
+      "--abbrev-ref",
+      "main@{upstream}",
+    ]);
+    expect(upstream.stdout.trim()).toBe("origin/main");
+  });
+
+  test("pushStream — force-with-lease overwrites the remote after a rewrite (SY-022)", async () => {
+    const origin = await ws.createRepo("sync-lease-origin", { bare: true });
+
+    const work = await ws.createRepo("sync-lease-work");
+    await work.addRemote("origin", origin.dir);
+    await work.commit({ message: "init", files: { "a.txt": "a" } });
+    await work.git(["push", "-u", "origin", "main"]);
+
+    // Rewrite the already-pushed commit so history diverges from origin/main.
+    // The lease still holds (work's remote-tracking ref matches the real remote),
+    // so a force-with-lease push is accepted where a plain push would be rejected.
+    await work.writeFile("a.txt", "rewritten");
+    await work.stage("a.txt");
+    await work.git(["commit", "--amend", "-m", "rewritten"], {
+      env: {
+        GIT_AUTHOR_DATE: fixtureDate(5),
+        GIT_COMMITTER_DATE: fixtureDate(5),
+      },
+    });
+
+    const events = await collect(
+      pushStream(work.dir, "origin", "main", false, true),
+    );
+    expect(
+      refUpdates(events).some(
+        (e) => e._tag === "refUpdate" && e.remoteRef === "refs/heads/main",
+      ),
+    ).toBe(true);
+
+    const localTip = await work.revParse("HEAD");
+    const remote = await work.git(["ls-remote", "origin", "refs/heads/main"]);
+    expect(remote.stdout).toContain(localTip);
   });
 
   test("pushDeleteRemoteRef — deletes a branch on the remote", async () => {

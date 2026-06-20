@@ -244,6 +244,33 @@ describe("stash", () => {
     expect(entry.branch).toBe("main");
   });
 
+  test("stashPop — retains the stash entry when the pop conflicts (ST-005)", async () => {
+    const repo = await ws.createRepo("st-pop-conflict");
+    await repo.commit({
+      message: "init",
+      files: { "f.txt": "line1\nline2\n" },
+    });
+
+    // Stash a change to line1, then commit a divergent change to the same line
+    // so re-applying the stash must conflict.
+    await repo.writeFile("f.txt", "stashed\nline2\n");
+    await repo.stage("f.txt");
+    await Effect.runPromise(stashPush(repo.dir, { message: "pop-conflict" }));
+    await repo.commit({
+      message: "diverge",
+      files: { "f.txt": "committed\nline2\n" },
+    });
+
+    const err = await Effect.runPromise(
+      Effect.flip(stashPop(repo.dir, "stash@{0}")),
+    );
+    expect(err.code).toBe("mergeConflict");
+
+    // A conflicting pop MUST keep the entry (unlike a clean pop, which drops it).
+    const list = await Effect.runPromise(stashList(repo.dir));
+    expect(list).toHaveLength(1);
+  });
+
   test("stashApply on invalid ref — fails with gitFailed", async () => {
     const repo = await ws.createRepo("st-badref");
     await repo.commit({ message: "init", files: { "a.txt": "a" } });

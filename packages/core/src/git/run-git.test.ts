@@ -2,14 +2,16 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { Exit } from "effect";
+import { Effect, Exit, Fiber, Stream } from "effect";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 
 import { run, runExit } from "../testing/effect-run";
 import {
   createFixtureWorkspace,
   type FixtureWorkspace,
+  seedLinear,
 } from "../testing/fixtures";
+import { gitError } from "./errors";
 import {
   assertNoLeadingDash,
   decodeUtf8,
@@ -17,6 +19,7 @@ import {
   nonInteractiveEnv,
   runGit,
   runGitOk,
+  streamGit,
 } from "./run-git";
 
 let ws: FixtureWorkspace;
@@ -78,6 +81,72 @@ describe("runGitOk", () => {
       runGitOk({ cwd: plain, args: ["rev-parse", "--git-dir"] }),
     );
     expect(Exit.isFailure(exit)).toBe(true);
+  });
+});
+
+describe("streamGit (REQ-P3-XC-004 — real-time streaming + cancel)", () => {
+  test("emits stdout output as line-tagged GitLine events", async () => {
+    const repo = await ws.createRepo("stream-lines");
+    await seedLinear(repo);
+
+    const lines = await run(
+      Stream.runCollect(
+        streamGit({ cwd: repo.dir, args: ["log", "--format=%s"], read: false }),
+      ),
+    ).then((c) => [...c]);
+
+    const subjects = lines
+      .filter((l) => l.source === "stdout")
+      .map((l) => l.text);
+    expect(subjects).toContain("a");
+    expect(subjects).toContain("b");
+    expect(subjects).toContain("c");
+  });
+
+  test("fails via the classifyFailure callback on a non-zero exit", async () => {
+    const repo = await ws.createRepo("stream-fail");
+    await repo.commit({ message: "init", files: { "a.txt": "a" } });
+
+    const err = await run(
+      Effect.flip(
+        Stream.runCollect(
+          streamGit({
+            cwd: repo.dir,
+            args: ["rev-parse", "--verify", "does-not-exist"],
+            read: false,
+            classifyFailure: () => gitError("invalidRefName", "bad ref"),
+          }),
+        ),
+      ),
+    );
+    expect(err.code).toBe("invalidRefName");
+  });
+
+  test("is cancelable — interrupting a blocked stream terminates promptly (XC-004)", async () => {
+    const repo = await ws.createRepo("stream-cancel");
+    await repo.commit({ message: "init", files: { "a.txt": "a" } });
+
+    // `cat-file --batch` blocks reading stdin forever, so the stream never ends on
+    // its own; interrupting the fiber must run the scope's SIGKILL cleanup and
+    // return rather than hang. If cancellation were broken this test would time out.
+    const exit = await runExit(
+      Effect.gen(function* () {
+        const fiber = yield* Effect.forkChild(
+          Stream.runDrain(
+            streamGit({
+              cwd: repo.dir,
+              args: ["cat-file", "--batch"],
+              read: false,
+            }),
+          ),
+        );
+        yield* Effect.sleep("150 millis");
+        // Interrupting returns once the scope's SIGKILL cleanup has run; if the
+        // stream were uninterruptible this would never resolve.
+        return yield* Fiber.interrupt(fiber);
+      }).pipe(Effect.timeout("5 seconds")),
+    );
+    expect(exit._tag).toBe("Success");
   });
 });
 
