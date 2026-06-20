@@ -22,6 +22,14 @@ import { fileContentAtRev } from "../git/content";
 import { commitDiff, diffWorkingFile } from "../git/diff";
 import { gitError } from "../git/errors";
 import { makeLogStream } from "../git/history";
+import { makeRepoLockRegistry } from "../git/locks";
+import {
+  deleteUntracked as deleteUntrackedGit,
+  discardFiles as discardFilesGit,
+  resetTo as resetToGit,
+  stageFiles as stageFilesGit,
+  unstageFiles as unstageFilesGit,
+} from "../git/stage";
 import { statusGet } from "../git/status";
 import { detectGitVersion } from "../git/version";
 import { WatcherRegistry } from "../git/watcher";
@@ -51,6 +59,7 @@ export const makeGitEngine = (opts?: MakeGitEngineOptions): Effect.Effect<GitEng
 
     const configStore: ConfigStore = makeConfigStore({ configPath: opts?.configPath, env });
     const scope = yield* Effect.scope;
+    const locks = makeRepoLockRegistry();
     const locations = new Map<string, ResolvedRepo>();
     const pools = new Map<string, CatFilePool>();
 
@@ -132,24 +141,29 @@ export const makeGitEngine = (opts?: MakeGitEngineOptions): Effect.Effect<GitEng
           Effect.flatMap(poolFor(repo), (pool) => fileContentAtRev(pool, repoId, path, rev)),
         ),
 
-      // ── stage & commit (P2, S1 stubs) ──────────────────────────────────────
-      // Typed `not implemented` stubs so the contract → handler → UI plumbing lands
-      // gate-green ahead of the real bodies. Each resolves the repo by id (same
-      // id→cwd mapping the reads use) so an unknown `repoId` already fails correctly,
-      // then fails `gitFailed`. The per-repo mutation lock (`makeRepoLockRegistry`) is
-      // instantiated in S3 when the first ✎ body needs `withRepoLock`.
+      // ── stage & commit (P2) ────────────────────────────────────────────────
       statusGet: (repoId, includeIgnored) =>
         Effect.flatMap(resolveById(repoId), (repo) => statusGet(repoCwd(repo), includeIgnored)),
-      stageFiles: (repoId) =>
-        Effect.flatMap(resolveById(repoId), () => Effect.fail(gitError("gitFailed", "not implemented"))),
-      unstageFiles: (repoId) =>
-        Effect.flatMap(resolveById(repoId), () => Effect.fail(gitError("gitFailed", "not implemented"))),
-      discardFiles: (repoId) =>
-        Effect.flatMap(resolveById(repoId), () => Effect.fail(gitError("gitFailed", "not implemented"))),
-      deleteUntracked: (repoId) =>
-        Effect.flatMap(resolveById(repoId), () => Effect.fail(gitError("gitFailed", "not implemented"))),
-      resetTo: (repoId) =>
-        Effect.flatMap(resolveById(repoId), () => Effect.fail(gitError("gitFailed", "not implemented"))),
+      stageFiles: (repoId, paths, all) =>
+        Effect.flatMap(resolveById(repoId), (repo) =>
+          locks.withRepoLock(repoId)(stageFilesGit(repoCwd(repo), paths, all ?? false)),
+        ),
+      unstageFiles: (repoId, paths, all) =>
+        Effect.flatMap(resolveById(repoId), (repo) =>
+          locks.withRepoLock(repoId)(unstageFilesGit(repoCwd(repo), paths, all ?? false)),
+        ),
+      discardFiles: (repoId, paths) =>
+        Effect.flatMap(resolveById(repoId), (repo) =>
+          locks.withRepoLock(repoId)(discardFilesGit(repoCwd(repo), paths)),
+        ),
+      deleteUntracked: (repoId, paths) =>
+        Effect.flatMap(resolveById(repoId), (repo) =>
+          locks.withRepoLock(repoId)(deleteUntrackedGit(repoCwd(repo), paths)),
+        ),
+      resetTo: (repoId, mode, target) =>
+        Effect.flatMap(resolveById(repoId), (repo) =>
+          locks.withRepoLock(repoId)(resetToGit(repoCwd(repo), mode, target)),
+        ),
       stageHunks: (selection) =>
         Effect.flatMap(resolveById(selection.repoId), () => Effect.fail(gitError("gitFailed", "not implemented"))),
       unstageHunks: (selection) =>

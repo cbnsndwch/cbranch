@@ -37,6 +37,8 @@ export interface RunGitOptions {
   readonly env?: NodeJS.ProcessEnv;
   /** When true (default) prepend the read-mode flags (no-color, quotePath, no-optional-locks). */
   readonly read?: boolean;
+  /** Optional data to write to the child's stdin before closing it (used by `git commit -F -`, `git apply -`). */
+  readonly stdin?: Buffer;
 }
 
 /** Decode a captured buffer as UTF-8, replacing invalid sequences (ENC-002). */
@@ -88,6 +90,11 @@ export const runGit = (opts: RunGitOptions): Effect.Effect<GitResult, GitError> 
     } catch (err) {
       resume(Effect.fail(classifyGitSpawnError(err)));
       return;
+    }
+
+    if (opts.stdin !== undefined) {
+      child.stdin.write(opts.stdin);
+      child.stdin.end();
     }
 
     const stdout: Buffer[] = [];
