@@ -21,6 +21,7 @@ import { type Cause, Effect, Layer, Queue, Scope, Stream } from "effect";
 
 import { type ConfigStore, makeConfigStore } from "../config/config-store";
 import {
+  branchCheckoutDetached as branchCheckoutDetachedGit,
   branchCreate as branchCreateGit,
   branchDelete as branchDeleteGit,
   branchRename as branchRenameGit,
@@ -332,10 +333,22 @@ export const makeGitEngine = (
             ),
           ),
         ),
-      branchSwitch: (repoId, target, strategy, _stashAndReapply) =>
+      branchSwitch: (repoId, target, strategy, stashAndReapply) =>
         Effect.flatMap(resolveById(repoId), (repo) =>
           locks.withRepoLock(repoId)(
-            branchSwitchGit(repoCwd(repo), target, strategy, env),
+            branchSwitchGit(
+              repoCwd(repo),
+              target,
+              strategy,
+              stashAndReapply,
+              env,
+            ),
+          ),
+        ),
+      branchCheckoutDetached: (repoId, ref) =>
+        Effect.flatMap(resolveById(repoId), (repo) =>
+          locks.withRepoLock(repoId)(
+            branchCheckoutDetachedGit(repoCwd(repo), ref, env),
           ),
         ),
       branchRename: (repoId, oldName, newName) =>

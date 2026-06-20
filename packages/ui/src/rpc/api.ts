@@ -126,6 +126,7 @@ export interface CbranchApi {
     strategy?: BranchSwitchStrategy,
     stashAndReapply?: boolean,
   ): Promise<void>;
+  branchCheckoutDetached(repoId: RepoId, ref: string): Promise<void>;
   branchRename(repoId: RepoId, oldName: string, newName: string): Promise<void>;
   branchDelete(repoId: RepoId, name: string, force: boolean): Promise<void>;
   branchSetUpstream(
@@ -340,6 +341,10 @@ export const makeApi = (runtime: AppRuntime): CbranchApi => {
             stashAndReapply,
           }),
         ),
+      ),
+    branchCheckoutDetached: (repoId, ref) =>
+      runtime.runPromise(
+        withClient((c) => c.BranchCheckoutDetached({ repoId, ref })),
       ),
     branchRename: (repoId, oldName, newName) =>
       runtime.runPromise(

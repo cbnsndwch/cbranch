@@ -85,6 +85,10 @@ export const handlersLayer = CbranchRpcs.toLayer({
     Effect.flatMap(GitEngine, (engine) =>
       engine.branchSwitch(repoId, target, strategy, stashAndReapply),
     ),
+  BranchCheckoutDetached: ({ repoId, ref }) =>
+    Effect.flatMap(GitEngine, (engine) =>
+      engine.branchCheckoutDetached(repoId, ref),
+    ),
   BranchRename: ({ repoId, oldName, newName }) =>
     Effect.flatMap(GitEngine, (engine) =>
       engine.branchRename(repoId, oldName, newName),

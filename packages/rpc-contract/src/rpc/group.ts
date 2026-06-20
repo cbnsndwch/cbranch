@@ -224,6 +224,12 @@ export const CbranchRpcs = RpcGroup.make(
     success: Schema.Void,
     error: GitError,
   }),
+  // branch.checkoutDetached ✎ — check out a commit/tag into a detached HEAD (BR-022).
+  Rpc.make("BranchCheckoutDetached", {
+    payload: { repoId: RepoId, ref: Schema.String },
+    success: Schema.Void,
+    error: GitError,
+  }),
   // branch.rename ✎
   Rpc.make("BranchRename", {
     payload: { repoId: RepoId, oldName: Schema.String, newName: Schema.String },

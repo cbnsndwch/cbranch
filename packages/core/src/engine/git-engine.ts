@@ -170,6 +170,11 @@ export interface GitEngineApi {
     strategy?: BranchSwitchStrategy,
     stashAndReapply?: boolean,
   ) => Effect.Effect<void, GitError>;
+  /** branch.checkoutDetached ✎ — detached HEAD at a commit/tag (BR-022). */
+  readonly branchCheckoutDetached: (
+    repoId: RepoId,
+    ref: string,
+  ) => Effect.Effect<void, GitError>;
   /** branch.rename ✎ */
   readonly branchRename: (
     repoId: RepoId,

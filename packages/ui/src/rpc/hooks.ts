@@ -504,6 +504,19 @@ export const useBranchSwitch = (repoId: RepoId) => {
   });
 };
 
+export const useBranchCheckoutDetached = (repoId: RepoId) => {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation<void, unknown, { ref: string }>({
+    mutationFn: ({ ref }) => api.branchCheckoutDetached(repoId, ref),
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: [repoId, "refs"] });
+      void qc.invalidateQueries({ queryKey: [repoId, "status"] });
+      void qc.invalidateQueries({ queryKey: [repoId, "inProgress"] });
+    },
+  });
+};
+
 export const useBranchRename = (repoId: RepoId) => {
   const api = useApi();
   const qc = useQueryClient();

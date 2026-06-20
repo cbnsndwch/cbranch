@@ -7,6 +7,7 @@ import {
   type FixtureWorkspace,
 } from "../testing/fixtures";
 import {
+  branchCheckoutDetached,
   branchCreate,
   branchDelete,
   branchRename,
@@ -112,6 +113,87 @@ describe("branch lifecycle", () => {
 
     const listing = await Effect.runPromise(branchList(repo.dir));
     expect(listing.currentBranch).toBe("feat/discard");
+  });
+
+  test("branchSwitch — stash without reapply leaves the stash on the stack (BR-023)", async () => {
+    const repo = await ws.createRepo("bops-sw-no-reapply");
+    await repo.commit({ message: "init", files: { "a.txt": "a" } });
+    await repo.branch("feat/keep");
+    await repo.writeFile("dirty.txt", "dirty");
+
+    await Effect.runPromise(
+      branchSwitch(repo.dir, "feat/keep", "stash", false),
+    );
+
+    const listing = await Effect.runPromise(branchList(repo.dir));
+    expect(listing.currentBranch).toBe("feat/keep");
+    // The stash was NOT popped — it remains for the user to apply later.
+    const stashes = await repo.git(["stash", "list"]);
+    expect(stashes.stdout).toContain("cbranch-auto-stash");
+    // ...and the dirty file is not in the working tree.
+    const status = await repo.git(["status", "--porcelain"]);
+    expect(status.stdout).not.toContain("dirty.txt");
+  });
+
+  test("branchSwitch — stash with reapply restores the working tree (BR-023)", async () => {
+    const repo = await ws.createRepo("bops-sw-reapply");
+    await repo.commit({ message: "init", files: { "a.txt": "a" } });
+    await repo.branch("feat/reapply");
+    await repo.writeFile("dirty.txt", "dirty");
+
+    await Effect.runPromise(
+      branchSwitch(repo.dir, "feat/reapply", "stash", true),
+    );
+
+    const status = await repo.git(["status", "--porcelain"]);
+    expect(status.stdout).toContain("dirty.txt");
+    const stashes = await repo.git(["stash", "list"]);
+    expect(stashes.stdout.trim()).toBe("");
+  });
+
+  test("branchSwitch — stash reapply conflict is classified as mergeConflict (BR-023)", async () => {
+    const repo = await ws.createRepo("bops-sw-reapply-conflict");
+    await repo.commit({ message: "init", files: { "a.txt": "base\n" } });
+    // A divergent change to the same file on the target branch.
+    await repo.git(["switch", "-c", "other"]);
+    await repo.commit({
+      message: "other",
+      files: { "a.txt": "other-change\n" },
+    });
+    await repo.git(["switch", "main"]);
+    // Dirty the same file on main so re-applying the stash onto `other` conflicts.
+    await repo.writeFile("a.txt", "wd-change\n");
+
+    const err = await Effect.runPromise(
+      Effect.flip(branchSwitch(repo.dir, "other", "stash", true)),
+    );
+    expect(err.code).toBe("mergeConflict");
+  });
+
+  // ── detached checkout (BR-022) ────────────────────────────────────────────────
+
+  test("branchCheckoutDetached — checks out a commit into a detached HEAD", async () => {
+    const repo = await ws.createRepo("bops-detach");
+    await repo.commit({ message: "init", files: { "a.txt": "a" } });
+    const firstRaw = await repo.git(["rev-parse", "HEAD"]);
+    const firstOid = firstRaw.stdout.trim();
+    await repo.commit({ message: "second", files: { "b.txt": "b" } });
+
+    await Effect.runPromise(branchCheckoutDetached(repo.dir, firstOid));
+
+    const head = await repo.git(["rev-parse", "HEAD"]);
+    expect(head.stdout.trim()).toBe(firstOid);
+    const listing = await Effect.runPromise(branchList(repo.dir));
+    expect(listing.detachedHead).toBe(firstOid);
+    expect(listing.currentBranch).toBeUndefined();
+  });
+
+  test("branchCheckoutDetached — rejects a target beginning with '-'", async () => {
+    const repo = await ws.createRepo("bops-detach-dash");
+    await repo.commit({ message: "init", files: { "a.txt": "a" } });
+
+    const exit = await runExit(branchCheckoutDetached(repo.dir, "--evil"));
+    expect(exit._tag).toBe("Failure");
   });
 
   // ── rename ──────────────────────────────────────────────────────────────────

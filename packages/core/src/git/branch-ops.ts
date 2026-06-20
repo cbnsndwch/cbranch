@@ -9,7 +9,8 @@ import {
 import { Effect } from "effect";
 
 import { branchList } from "./branches";
-import { assertNoLeadingDash, runGitOk } from "./run-git";
+import { gitError } from "./errors";
+import { assertNoLeadingDash, decodeUtf8, runGit, runGitOk } from "./run-git";
 
 // Return the BranchInfo for the named branch from a fresh listing.
 function lookupBranch(
@@ -56,17 +57,20 @@ export const branchCreate = (
     return yield* lookupBranch(cwd, safeName, env);
   });
 
-// REQ-P3-BR-020/021/022/023/024
+// REQ-P3-BR-020/021/023/024
 export const branchSwitch = (
   cwd: string,
   target: string,
   strategy?: BranchSwitchStrategy,
+  reapply?: boolean,
   env?: NodeJS.ProcessEnv,
 ): Effect.Effect<void, GitError> =>
   Effect.gen(function* () {
     const safeTarget = yield* assertNoLeadingDash(target, "switch target");
 
     if (strategy === "stash") {
+      // (a) stash the WD, switch, and OPTIONALLY re-apply afterward (BR-023). When
+      // `reapply` is false the stash is left on the stack for the user to apply later.
       yield* runGitOk({
         cwd,
         args: [
@@ -80,7 +84,33 @@ export const branchSwitch = (
         read: false,
       });
       yield* runGitOk({ cwd, args: ["switch", safeTarget], env, read: false });
-      yield* runGitOk({ cwd, args: ["stash", "pop"], env, read: false });
+      if (reapply !== false) {
+        // A failing `stash pop` after switch is a conflict — classify it so the
+        // in-progress state can be routed to the conflict flow (mirrors stash.ts).
+        const popped = yield* runGit({
+          cwd,
+          args: ["stash", "pop"],
+          env,
+          read: false,
+        });
+        if (popped.exitCode !== 0) {
+          const stderr = decodeUtf8(popped.stderr);
+          if (
+            stderr.includes("CONFLICT") ||
+            decodeUtf8(popped.stdout).includes("CONFLICT")
+          ) {
+            return yield* Effect.fail(
+              gitError(
+                "mergeConflict",
+                "re-applying the stash produced conflicts",
+              ),
+            );
+          }
+          return yield* Effect.fail(
+            gitError("gitFailed", "stash pop failed after switch", { stderr }),
+          );
+        }
+      }
       return;
     }
 
@@ -96,6 +126,23 @@ export const branchSwitch = (
 
     // "carry" (default / undefined): try a clean switch; git carries the WD changes if safe.
     yield* runGitOk({ cwd, args: ["switch", safeTarget], env, read: false });
+  });
+
+// REQ-P3-BR-022: check out an arbitrary commit/tag into a detached HEAD. The
+// caller is responsible for warning the user that the resulting state is detached.
+export const branchCheckoutDetached = (
+  cwd: string,
+  ref: string,
+  env?: NodeJS.ProcessEnv,
+): Effect.Effect<void, GitError> =>
+  Effect.gen(function* () {
+    const safeRef = yield* assertNoLeadingDash(ref, "detach target");
+    yield* runGitOk({
+      cwd,
+      args: ["switch", "--detach", safeRef],
+      env,
+      read: false,
+    });
   });
 
 // REQ-P3-BR-030/031
