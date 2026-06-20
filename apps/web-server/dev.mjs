@@ -5,6 +5,7 @@
 // Usage: node dev.mjs   (or via `pnpm dev` in this package)
 // The UI dev server (Vite) runs separately on :5173 and proxies /rpc + /sidechannel to :7420.
 import { spawn } from "node:child_process";
+
 import * as esbuild from "esbuild";
 
 let server = null;
