@@ -18,6 +18,7 @@ import { type Cause, Effect, Layer, Queue, Scope, Stream } from "effect";
 import { type ConfigStore, makeConfigStore } from "../config/config-store";
 import { type CatFilePool, makeCatFilePool } from "../git/cat-file-pool";
 import { commitDetail } from "../git/commit";
+import { commitCreate as commitCreateGit, commitLastMessage as commitLastMessageGit } from "../git/commit-write";
 import { fileContentAtRev } from "../git/content";
 import { commitDiff, diffWorkingFile } from "../git/diff";
 import { gitError } from "../git/errors";
@@ -171,9 +172,10 @@ export const makeGitEngine = (opts?: MakeGitEngineOptions): Effect.Effect<GitEng
       discardHunks: (selection) =>
         Effect.flatMap(resolveById(selection.repoId), () => Effect.fail(gitError("gitFailed", "not implemented"))),
       commitCreate: (input) =>
-        Effect.flatMap(resolveById(input.repoId), () => Effect.fail(gitError("gitFailed", "not implemented"))),
-      commitLastMessage: (repoId) =>
-        Effect.flatMap(resolveById(repoId), () => Effect.fail(gitError("gitFailed", "not implemented"))),
+        Effect.flatMap(resolveById(input.repoId), (repo) =>
+          locks.withRepoLock(input.repoId)(commitCreateGit(repoCwd(repo), input)),
+        ),
+      commitLastMessage: (repoId) => Effect.flatMap(resolveById(repoId), (repo) => commitLastMessageGit(repoCwd(repo))),
 
       // Object-read infra (implemented now; consumed by core-B's history/diff/content).
       readObject: (repoId, rev) =>
