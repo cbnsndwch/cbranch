@@ -101,6 +101,14 @@ verification gate (this commit). Branch `feat/p0-p1-walking-skeleton`.
 **Key context files (gitignored working notes):** `docs/_impl-notes/DECISIONS.md` (D1–D12 locked decisions) + the 8 spec digests. **Verify command:** `pnpm gate`. **Clean-room:** never read `.local/SPEC-AGENT-BRIEF.md`; build only from `docs/spec/`+`LICENSES.md`+`BRANDING.md`+git/lib public docs. Undercover: no AI/model mentions in commits.
 
 ## Log
+- 2026-06-20 — **Base UI migration + desktop menu chrome (D14).** Migrated the deprecated
+  `@base-ui-components/react@1.0.0-rc.0` → stable `@base-ui/react@^1.6.0` (renamed package; `check:primitives`
+  green on 12/12). Wired the shadcn `@/* → src` alias across tsconfig/vite/root-vitest/components.json so
+  `shadcn add` resolves and emits working imports (verified with a throwaway `tooltip` add). Vendored the
+  base-lyra `dropdown-menu` + `menubar` (copied source, REQ-STACK-014; only icon-placeholder swapped for
+  lucide). Rebuilt `MenuBar` to render the full nine-menu chrome from `menu/menu-model.ts` (transcribed from
+  docs/design/menu-hierarchy.md) with unwired items greyed via the `use-menu-actions` capability layer; wired
+  Open/Recent/Refresh/Exit/Close/relative-date/About. Gate green: 256 tests. First real Base UI usage in the repo.
 - 2026-06-20 — **Client-side routing (D13) landed.** Added `react-router@8.0.1` to `packages/ui`. New
   `router.tsx` (`createBrowserRouter`): `/` → `<Landing>` (redirect to most-recent repo via `recentList`,
   else the shell's "Open a repository" empty state), `/repos/:repoId`, `/repos/:repoId/commits/:oid`, +

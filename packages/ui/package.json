@@ -12,7 +12,7 @@
     "check:primitives": "node scripts/check-primitives.mjs"
   },
   "dependencies": {
-    "@base-ui-components/react": "1.0.0-rc.0",
+    "@base-ui/react": "^1.6.0",
     "@cbranch/rpc-contract": "workspace:*",
     "@codemirror/state": "^6.6.0",
     "@codemirror/view": "^6.43.1",

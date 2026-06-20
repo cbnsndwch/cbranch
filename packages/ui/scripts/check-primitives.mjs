@@ -2,16 +2,15 @@
 // Build-time primitive-existence check (REQ-STACK-014).
 //
 // Verifies that the specific Base UI primitives the cbranch UI depends on actually
-// exist on the pinned @base-ui-components/react version, and FAILS with a clear
-// error if a required primitive is missing — so a Base-UI gap is caught at setup,
-// not at runtime.
+// exist on the pinned @base-ui/react version, and FAILS with a clear error if a
+// required primitive is missing — so a Base-UI gap is caught at setup, not at runtime.
 //
 // NOTE on what is NOT a Base UI primitive (sourced elsewhere, reported but never a
 // failure here): the resizable layout uses `react-resizable-panels`, the command
 // palette uses `cmdk`, transient toasts use `sonner` (REQ-STACK-UX-001), and
 // "Sheet" is a styled wrapper over Base UI's Dialog rather than its own primitive.
 
-import * as BaseUI from "@base-ui-components/react";
+import * as BaseUI from "@base-ui/react";
 
 // Required Base UI primitives -> { role, alias? } where `alias` records a Base UI
 // rename relative to the conventional shadcn/Radix name the spec uses.

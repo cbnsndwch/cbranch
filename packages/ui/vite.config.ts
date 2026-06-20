@@ -1,3 +1,5 @@
+import { fileURLToPath } from "node:url";
+
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
@@ -6,6 +8,11 @@ import { defineConfig } from "vite";
 // (no PostCSS, no tailwind.config.js). React 19 via @vitejs/plugin-react.
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  // `@/*` → src is the shadcn `base-lyra` import alias (components.json); keep it in sync
+  // with tsconfig `paths` and the root vitest config so vendored/generated UI resolves.
+  resolve: {
+    alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) },
+  },
   server: {
     // In dev the UI runs on Vite's port (:5173) while the backend occupies :7420.
     // Proxy /rpc (WebSocket) and /sidechannel (HTTP) to the backend so the client's

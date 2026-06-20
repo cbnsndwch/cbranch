@@ -12,10 +12,10 @@
   },
   "iconLibrary": "lucide",
   "aliases": {
-    "components": "@cbranch/ui/components",
-    "ui": "@cbranch/ui/components/ui",
-    "lib": "@cbranch/ui/lib",
-    "utils": "@cbranch/ui/lib/cn",
-    "hooks": "@cbranch/ui/hooks"
+    "components": "@/components",
+    "ui": "@/components/ui",
+    "lib": "@/lib",
+    "utils": "@/lib/cn",
+    "hooks": "@/hooks"
   }
 }
