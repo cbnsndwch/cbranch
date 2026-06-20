@@ -36,6 +36,12 @@ import {
   commitLastMessage as commitLastMessageGit,
 } from "../git/commit-write";
 import {
+  conflictMarkResolved as conflictMarkResolvedGit,
+  conflictMarkUnresolved as conflictMarkUnresolvedGit,
+  conflictResolve as conflictResolveGit,
+  conflictSaveMerged as conflictSaveMergedGit,
+} from "../git/conflict-ops";
+import {
   conflictList as conflictListGit,
   conflictSides as conflictSidesGit,
 } from "../git/conflicts";
@@ -609,10 +615,32 @@ export const makeGitEngine = (
             conflictSidesGit(repoCwd(repo), path, pool, env),
           ),
         ),
-      conflictResolve: () => p4Stub(),
-      conflictSaveMerged: () => p4Stub(),
-      conflictMarkResolved: () => p4Stub(),
-      conflictMarkUnresolved: () => p4Stub(),
+      conflictResolve: (repoId, paths, resolution) =>
+        Effect.flatMap(resolveById(repoId), (repo) =>
+          locks.withRepoLock(repoId)(
+            Effect.flatMap(poolFor(repo), (pool) =>
+              conflictResolveGit(repoCwd(repo), paths, resolution, pool, env),
+            ),
+          ),
+        ),
+      conflictSaveMerged: (repoId, path, content, encoding) =>
+        Effect.flatMap(resolveById(repoId), (repo) =>
+          locks.withRepoLock(repoId)(
+            conflictSaveMergedGit(repoCwd(repo), path, content, encoding, env),
+          ),
+        ),
+      conflictMarkResolved: (repoId, paths) =>
+        Effect.flatMap(resolveById(repoId), (repo) =>
+          locks.withRepoLock(repoId)(
+            conflictMarkResolvedGit(repoCwd(repo), paths, env),
+          ),
+        ),
+      conflictMarkUnresolved: (repoId, paths) =>
+        Effect.flatMap(resolveById(repoId), (repo) =>
+          locks.withRepoLock(repoId)(
+            conflictMarkUnresolvedGit(repoCwd(repo), paths, env),
+          ),
+        ),
       cherryPick: () => p4Stub(),
       revert: () => p4Stub(),
       opContinue: () => p4Stub(),
