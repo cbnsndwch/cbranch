@@ -84,19 +84,16 @@ surfaces. It is not a separate milestone but a prerequisite for all future work.
 ## Blocked / decisions to surface
 - _(none yet)_
 
-## ▶ RESUME HERE (P1 COMPLETE — awaiting user review)
-**P1 is COMPLETE. All items done and gate green (253 tests, 96.27% lines / 82.13% branches coverage).**
+## ▶ RESUME HERE (P2 S2–S10 COMPLETE — awaiting user review)
+**P2 core+UI slices are COMPLETE. Gate green: 378 tests, 80.48% branches / 91.85% statements coverage.**
 
-**What was built (P0→P1):** P0 scaffold (26f22af) · P0.5 effect-rpc spike (bdcef02) · rpc-contract (4e08d00) ·
-core-A infra+repo.* (9074957) · core-B history/diff/content+watcher (08c71c9) · web-server (04a3c72) ·
-ui-A infra (35863ed) · ui-B vertical slice (88124a0) · invalidation bus client (0e3e88d) ·
-ui-C history polish (3 commits: 319212f/48ab190/c13713b) · ui-D diff+file-at-rev (4 commits: d968f78/786ab02/de3ec7c/95db1e2) ·
-verification gate (this commit). Branch `feat/p0-p1-walking-skeleton`.
+**What was built (P2 so far):** S1 RPC contract (360845b) · S2 porcelain-v2 status (b3183af) · S3 stage/unstage/discard/resetTo (9df6f0f) · S4 partial-stage patch builder (2f1f213) · S5 commitCreate+commitLastMessage (4a5c13e) · S6 UI status helpers+store slices+hooks (dc175a9) · S10 DestructiveConfirmDialog+AlertDialog+menu commands (6fa20be) · S7 StatusPanel (7bd43c9) · watcher coalesce fix (f59d9d4) · S8 WorkingDiffPanel (3d6a0ad) · S9 CommitPanel (eb3bf5f).
 
-**To run:** `pnpm -r build` then `CBRANCH_CLIENT_DIR=$PWD/packages/ui/dist pnpm --filter @cbranch/web-server start` → http://127.0.0.1:7420.
-**Perf measurement (once reference hardware available):** `node scripts/measure-perf.mjs /path/to/large/repo`.
+**NOT YET WIRED:** StatusPanel / WorkingDiffPanel / CommitPanel exist as components but are not yet integrated into the AppShell. The user cannot see the P2 UI from the running app yet.
 
-**Next:** User review of P1, then P2 (`06` stage+commit), P3 (`07` branches+sync), P4 (`08`+`11`), P5 (`09`), VSCode extension (`13`).
+**Next step:** AppShell integration — add a "Changes" tab (or sidebar pane) to `packages/ui/src/components/AppShell.tsx` that renders `<StatusPanel>`, `<WorkingDiffPanel>`, and `<CommitPanel>` for the active repo. This is the final wiring step to make P2 functional end-to-end.
+
+**To run current build:** `pnpm -r build` then `CBRANCH_CLIENT_DIR=$PWD/packages/ui/dist pnpm --filter @cbranch/web-server start` → http://127.0.0.1:7420.
 
 **Key context files (gitignored working notes):** `docs/_impl-notes/DECISIONS.md` (D1–D12 locked decisions) + the 8 spec digests. **Verify command:** `pnpm gate`. **Clean-room:** never read `.local/SPEC-AGENT-BRIEF.md`; build only from `docs/spec/`+`LICENSES.md`+`BRANDING.md`+git/lib public docs. Undercover: no AI/model mentions in commits.
 
