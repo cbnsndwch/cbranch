@@ -138,6 +138,7 @@ export interface CbranchApi {
     repoId: RepoId,
     ref: string,
     strategy: MergeMode,
+    message?: string,
   ): Promise<MergeResult>;
   mergeAbort(repoId: RepoId): Promise<void>;
   // ── sync streaming (P3) ───────────────────────────────────────────────────
@@ -353,9 +354,9 @@ export const makeApi = (runtime: AppRuntime): CbranchApi => {
         withClient((c) => c.BranchSetUpstream({ repoId, name, upstream })),
       ),
     // ── merge (P3) ──────────────────────────────────────────────────────────
-    mergeCreate: (repoId, ref, strategy) =>
+    mergeCreate: (repoId, ref, strategy, message) =>
       runtime.runPromise(
-        withClient((c) => c.MergeCreate({ repoId, ref, strategy })),
+        withClient((c) => c.MergeCreate({ repoId, ref, strategy, message })),
       ),
     mergeAbort: (repoId) =>
       runtime.runPromise(withClient((c) => c.MergeAbort({ repoId }))),

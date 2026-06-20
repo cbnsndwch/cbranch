@@ -545,9 +545,10 @@ export const useMergeCreate = (repoId: RepoId) => {
   return useMutation<
     MergeResult,
     unknown,
-    { ref: string; strategy: MergeMode }
+    { ref: string; strategy: MergeMode; message?: string }
   >({
-    mutationFn: ({ ref, strategy }) => api.mergeCreate(repoId, ref, strategy),
+    mutationFn: ({ ref, strategy, message }) =>
+      api.mergeCreate(repoId, ref, strategy, message),
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: [repoId, "refs"] });
       void qc.invalidateQueries({ queryKey: [repoId, "inProgress"] });

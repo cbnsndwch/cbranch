@@ -250,7 +250,12 @@ export const CbranchRpcs = RpcGroup.make(
   // ── P3: merge ──────────────────────────────────────────────────────────────
   // merge.create ✎
   Rpc.make("MergeCreate", {
-    payload: { repoId: RepoId, ref: Schema.String, strategy: MergeMode },
+    payload: {
+      repoId: RepoId,
+      ref: Schema.String,
+      strategy: MergeMode,
+      message: Schema.optional(Schema.String),
+    },
     success: MergeResult,
     error: GitError,
   }),

@@ -99,9 +99,9 @@ export const handlersLayer = CbranchRpcs.toLayer({
     ),
 
   // ── merge (P3) ────────────────────────────────────────────────────────────
-  MergeCreate: ({ repoId, ref, strategy }) =>
+  MergeCreate: ({ repoId, ref, strategy, message }) =>
     Effect.flatMap(GitEngine, (engine) =>
-      engine.mergeCreate(repoId, ref, strategy),
+      engine.mergeCreate(repoId, ref, strategy, message),
     ),
   MergeAbort: ({ repoId }) =>
     Effect.flatMap(GitEngine, (engine) => engine.mergeAbort(repoId)),

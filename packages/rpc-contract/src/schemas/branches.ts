@@ -45,7 +45,7 @@ export type BranchSwitchStrategy = typeof BranchSwitchStrategy.Type;
 
 // ─── Merge ────────────────────────────────────────────────────────────────────
 
-export const MergeMode = Schema.Literals(["ff", "no-ff", "squash"]);
+export const MergeMode = Schema.Literals(["ff", "ff-only", "no-ff", "squash"]);
 export type MergeMode = typeof MergeMode.Type;
 
 export const MergeResultMode = Schema.Literals([

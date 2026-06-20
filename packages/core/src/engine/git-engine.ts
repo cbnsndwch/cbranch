@@ -195,6 +195,7 @@ export interface GitEngineApi {
     repoId: RepoId,
     ref: string,
     strategy: MergeMode,
+    message?: string,
   ) => Effect.Effect<MergeResult, GitError>;
   /** merge.abort ✎ */
   readonly mergeAbort: (repoId: RepoId) => Effect.Effect<void, GitError>;

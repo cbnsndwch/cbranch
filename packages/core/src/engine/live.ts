@@ -358,10 +358,10 @@ export const makeGitEngine = (
         ),
 
       // ── merge (P3) ────────────────────────────────────────────────────────
-      mergeCreate: (repoId, ref, strategy) =>
+      mergeCreate: (repoId, ref, strategy, message) =>
         Effect.flatMap(resolveById(repoId), (repo) =>
           locks.withRepoLock(repoId)(
-            mergeCreateGit(repoCwd(repo), ref, strategy, env),
+            mergeCreateGit(repoCwd(repo), ref, strategy, message, env),
           ),
         ),
       mergeAbort: (repoId) =>
