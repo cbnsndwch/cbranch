@@ -1,6 +1,6 @@
 import { type RepoId } from "@cbranch/rpc-contract";
 import { RepoId as RepoIdBrand } from "@cbranch/rpc-contract";
-import { Duration, Effect } from "effect";
+import { Deferred, Effect, Fiber, Stream } from "effect";
 import { describe, expect, test } from "vitest";
 
 import { run } from "../testing/effect-run";
@@ -8,49 +8,124 @@ import { makeRepoLockRegistry } from "./locks";
 
 const id = (s: string): RepoId => RepoIdBrand.make(s.padEnd(64, "0"));
 
-describe("makeRepoLockRegistry (NF-LOCK-1; scaffold for P2 mutations)", () => {
-  test("serializes operations sharing one repoId (max concurrency 1)", async () => {
-    const registry = makeRepoLockRegistry();
-    const state = { active: 0, maxActive: 0 };
-    const work = registry.withRepoLock(id("a"))(
+describe("makeRepoLockRegistry (NF-LOCK-1; REQ-P3-XC-001 fail-fast)", () => {
+  test("fails fast with repoLocked when the same repo is already locked", async () => {
+    await run(
       Effect.gen(function* () {
-        state.active += 1;
-        state.maxActive = Math.max(state.maxActive, state.active);
-        yield* Effect.sleep(Duration.millis(20));
-        state.active -= 1;
+        const registry = makeRepoLockRegistry();
+        const held = yield* Deferred.make<void>();
+        const release = yield* Deferred.make<void>();
+        // Hold the lock on repo "a" until we release it.
+        const holder = yield* Effect.forkChild(
+          registry.withRepoLock(id("a"))(
+            Effect.gen(function* () {
+              yield* Deferred.succeed(held, undefined);
+              yield* Deferred.await(release);
+            }),
+          ),
+        );
+        yield* Deferred.await(held);
+        // A concurrent mutation on the same repo must NOT queue — it fails fast.
+        const err = yield* Effect.flip(
+          registry.withRepoLock(id("a"))(Effect.void),
+        );
+        expect(err.code).toBe("repoLocked");
+        yield* Deferred.succeed(release, undefined);
+        yield* Fiber.join(holder);
       }),
     );
-    await run(Effect.all([work, work, work], { concurrency: "unbounded" }));
-    expect(state.maxActive).toBe(1);
   });
 
   test("allows operations on different repoIds to proceed concurrently", async () => {
-    const registry = makeRepoLockRegistry();
-    const state = { active: 0, maxActive: 0 };
-    const work = (repoId: RepoId) =>
-      registry.withRepoLock(repoId)(
-        Effect.gen(function* () {
-          state.active += 1;
-          state.maxActive = Math.max(state.maxActive, state.active);
-          yield* Effect.sleep(Duration.millis(20));
-          state.active -= 1;
-        }),
-      );
     await run(
-      Effect.all([work(id("a")), work(id("b")), work(id("c"))], {
-        concurrency: "unbounded",
+      Effect.gen(function* () {
+        const registry = makeRepoLockRegistry();
+        const heldA = yield* Deferred.make<void>();
+        const release = yield* Deferred.make<void>();
+        const holder = yield* Effect.forkChild(
+          registry.withRepoLock(id("a"))(
+            Effect.gen(function* () {
+              yield* Deferred.succeed(heldA, undefined);
+              yield* Deferred.await(release);
+            }),
+          ),
+        );
+        yield* Deferred.await(heldA);
+        // While "a" is held, a DIFFERENT repo still acquires (does not fail).
+        yield* registry.withRepoLock(id("b"))(Effect.void);
+        yield* Deferred.succeed(release, undefined);
+        yield* Fiber.join(holder);
+        expect(registry.size()).toBe(2);
       }),
     );
-    expect(state.maxActive).toBeGreaterThan(1);
-    expect(registry.size()).toBe(3);
   });
 
-  test("reuses existing semaphore when same repoId is locked a second time", async () => {
-    const registry = makeRepoLockRegistry();
-    // Calling withRepoLock twice for the same repoId exercises the semaphore-reuse path.
-    const e1 = registry.withRepoLock(id("x"))(Effect.void);
-    const e2 = registry.withRepoLock(id("x"))(Effect.void);
-    await run(Effect.all([e1, e2], { concurrency: "unbounded" }));
-    expect(registry.size()).toBe(1);
+  test("releasing the lock lets a later operation acquire it", async () => {
+    await run(
+      Effect.gen(function* () {
+        const registry = makeRepoLockRegistry();
+        yield* registry.withRepoLock(id("a"))(Effect.void);
+        // Lock is free again — a subsequent op succeeds rather than reporting locked.
+        yield* registry.withRepoLock(id("a"))(Effect.void);
+        expect(registry.size()).toBe(1);
+      }),
+    );
+  });
+
+  test("withRepoLockStream fails fast when the repo is already locked", async () => {
+    await run(
+      Effect.gen(function* () {
+        const registry = makeRepoLockRegistry();
+        const held = yield* Deferred.make<void>();
+        const release = yield* Deferred.make<void>();
+        const holder = yield* Effect.forkChild(
+          registry.withRepoLock(id("a"))(
+            Effect.gen(function* () {
+              yield* Deferred.succeed(held, undefined);
+              yield* Deferred.await(release);
+            }),
+          ),
+        );
+        yield* Deferred.await(held);
+        const locked = registry.withRepoLockStream(id("a"))(
+          Stream.fromIterable([1, 2, 3]),
+        );
+        const err = yield* Effect.flip(Stream.runCollect(locked));
+        expect(err.code).toBe("repoLocked");
+        yield* Deferred.succeed(release, undefined);
+        yield* Fiber.join(holder);
+      }),
+    );
+  });
+
+  test("withRepoLockStream holds the lock for the stream's whole lifetime", async () => {
+    await run(
+      Effect.gen(function* () {
+        const registry = makeRepoLockRegistry();
+        const started = yield* Deferred.make<void>();
+        const release = yield* Deferred.make<void>();
+        // A gated stream: it signals once the lock is held, then waits to finish.
+        const gated = Stream.fromEffect(
+          Effect.gen(function* () {
+            yield* Deferred.succeed(started, undefined);
+            yield* Deferred.await(release);
+            return 1;
+          }),
+        );
+        const fiber = yield* Effect.forkChild(
+          Stream.runCollect(registry.withRepoLockStream(id("a"))(gated)),
+        );
+        yield* Deferred.await(started);
+        // The lock is held for the duration of the stream — a concurrent op fails.
+        const err = yield* Effect.flip(
+          registry.withRepoLock(id("a"))(Effect.void),
+        );
+        expect(err.code).toBe("repoLocked");
+        yield* Deferred.succeed(release, undefined);
+        yield* Fiber.join(fiber);
+        // Once the stream completes the lock is released again.
+        yield* registry.withRepoLock(id("a"))(Effect.void);
+      }),
+    );
   });
 });

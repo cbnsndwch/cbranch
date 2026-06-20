@@ -16,7 +16,7 @@
 import { type ChildProcessWithoutNullStreams, spawn } from "node:child_process";
 
 import { type GitError } from "@cbranch/rpc-contract";
-import { Effect } from "effect";
+import { Cause, Effect, Queue, Stream } from "effect";
 
 import { classifyExit, classifyGitSpawnError, gitError } from "./errors";
 
@@ -160,6 +160,132 @@ export const runGitOk = (
     result.exitCode === 0
       ? Effect.succeed(result)
       : Effect.fail(classifyExit(result.exitCode, decodeUtf8(result.stderr))),
+  );
+
+// ── streaming runner (REQ-P3-XC-004 — real-time progress + cancel) ───────────
+
+/** One line of host-`git` output, tagged by the stream it arrived on. */
+export interface GitLine {
+  readonly source: "stdout" | "stderr";
+  readonly text: string;
+}
+
+export interface StreamGitOptions extends RunGitOptions {
+  /**
+   * Classify a non-zero exit into a `GitError`, given the FULL captured output
+   * (so sync can detect non-fast-forward / conflict from the accumulated text).
+   * Defaults to {@link classifyExit} over stderr.
+   */
+  readonly classifyFailure?: (
+    exitCode: number | null,
+    stdout: string,
+    stderr: string,
+  ) => GitError;
+}
+
+/**
+ * Spawn `git` and emit its stdout/stderr as a line-buffered {@link GitLine} stream
+ * in REAL TIME (each complete line is pushed as git produces it — REQ-P3-XC-004),
+ * instead of buffering everything until close. On a zero exit the stream ends; on a
+ * non-zero exit it fails via `classifyFailure` (default {@link classifyExit}). The
+ * child is bound to the stream's scope: completing OR interrupting the stream
+ * SIGKILLs and reaps the process (mirrors {@link runGit}'s interruption safety).
+ */
+export const streamGit = (
+  opts: StreamGitOptions,
+): Stream.Stream<GitLine, GitError> =>
+  Stream.callback<GitLine, GitError>((queue) =>
+    Effect.acquireRelease(
+      Effect.sync(() => {
+        const args =
+          opts.read === false ? [...opts.args] : [...READ_FLAGS, ...opts.args];
+        const classify =
+          opts.classifyFailure ??
+          ((code, _stdout, stderr) => classifyExit(code, stderr));
+
+        const handle: {
+          settled: boolean;
+          child: ChildProcessWithoutNullStreams | undefined;
+        } = { settled: false, child: undefined };
+
+        let child: ChildProcessWithoutNullStreams;
+        try {
+          child = spawn("git", args, {
+            cwd: opts.cwd,
+            env: nonInteractiveEnv(opts.env),
+            windowsHide: true,
+          });
+        } catch (err) {
+          handle.settled = true;
+          Queue.failCauseUnsafe(queue, Cause.fail(classifyGitSpawnError(err)));
+          return handle;
+        }
+        handle.child = child;
+
+        if (opts.stdin !== undefined) {
+          child.stdin.write(opts.stdin);
+          child.stdin.end();
+        }
+
+        // Full accumulators feed the terminal failure classifier; the line buffers
+        // split incoming chunks on CR/LF so progress redraws (\r) surface as events.
+        let outText = "";
+        let errText = "";
+        let outBuf = "";
+        let errBuf = "";
+
+        const pump = (source: "stdout" | "stderr", chunk: Buffer): void => {
+          const text = decodeUtf8(chunk);
+          if (source === "stdout") outText += text;
+          else errText += text;
+          const carry = (source === "stdout" ? outBuf : errBuf) + text;
+          const parts = carry.split(/\r\n|[\r\n]/);
+          const rest = parts.pop() ?? "";
+          if (source === "stdout") outBuf = rest;
+          else errBuf = rest;
+          for (const line of parts) {
+            if (line.length > 0)
+              Queue.offerUnsafe(queue, { source, text: line });
+          }
+        };
+
+        child.stdout.on("data", (chunk: Buffer) => pump("stdout", chunk));
+        child.stderr.on("data", (chunk: Buffer) => pump("stderr", chunk));
+
+        child.on("error", (err) => {
+          if (handle.settled) return;
+          handle.settled = true;
+          Queue.failCauseUnsafe(queue, Cause.fail(classifyGitSpawnError(err)));
+        });
+
+        child.on("close", (code) => {
+          if (handle.settled) return;
+          handle.settled = true;
+          // Flush any trailing unterminated line on each source.
+          if (outBuf.length > 0)
+            Queue.offerUnsafe(queue, { source: "stdout", text: outBuf });
+          if (errBuf.length > 0)
+            Queue.offerUnsafe(queue, { source: "stderr", text: errBuf });
+          if (code === 0) {
+            Queue.endUnsafe(queue);
+          } else {
+            Queue.failCauseUnsafe(
+              queue,
+              Cause.fail(classify(code, outText, errText)),
+            );
+          }
+        });
+
+        return handle;
+      }),
+      (handle) =>
+        Effect.sync(() => {
+          if (!handle.settled && handle.child !== undefined) {
+            handle.settled = true;
+            handle.child.kill("SIGKILL");
+          }
+        }),
+    ),
   );
 
 // ── argument-safety helpers (NF-SEC-5/6) ────────────────────────────────────

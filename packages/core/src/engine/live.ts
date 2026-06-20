@@ -379,20 +379,26 @@ export const makeGitEngine = (
       pullStream: (repoId, mode, autostash) =>
         Stream.unwrap(
           Effect.map(resolveById(repoId), (repo) =>
-            pullStreamGit(repoCwd(repo), mode, autostash, env),
+            // Mutating + cancelable: hold the per-repo lock for the stream's life
+            // (REQ-P3-XC-001/XC-004).
+            locks.withRepoLockStream(repoId)(
+              pullStreamGit(repoCwd(repo), mode, autostash, env),
+            ),
           ),
         ),
       pushStream: (repoId, remote, branch, setUpstream, forceWithLease, tags) =>
         Stream.unwrap(
           Effect.map(resolveById(repoId), (repo) =>
-            pushStreamGit(
-              repoCwd(repo),
-              remote,
-              branch,
-              setUpstream,
-              forceWithLease,
-              tags,
-              env,
+            locks.withRepoLockStream(repoId)(
+              pushStreamGit(
+                repoCwd(repo),
+                remote,
+                branch,
+                setUpstream,
+                forceWithLease,
+                tags,
+                env,
+              ),
             ),
           ),
         ),

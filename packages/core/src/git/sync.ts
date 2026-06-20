@@ -1,8 +1,12 @@
 // Streaming sync: fetch, pull, push, and push-delete (docs/spec/07 REQ-P3-SY-*).
 //
-// Each sync operation runs git as a child process (batch mode) and parses stdout/stderr
-// into SyncEvent items emitted as an Effect Stream. Real-time streaming is deferred; this
-// MVP collects all output then emits parsed events.
+// Each sync operation runs git as a child process and emits SyncEvent items in REAL
+// TIME via {@link streamGit}: progress and ref-update events surface AS git produces
+// output, and the operation is cancelable (interrupting the stream SIGKILLs the host
+// process — REQ-P3-XC-004). Error classification keys off the git exit status plus
+// STABLE machine output (push `--porcelain` flag chars; the literal `CONFLICT` /
+// "Not possible to fast-forward" tokens git emits under LC_ALL=C), never localized
+// prose (NF-ERR-1 / NF-GIT-3).
 
 import {
   type GitError,
@@ -13,62 +17,124 @@ import {
 import { type SyncEvent } from "@cbranch/rpc-contract";
 import { Effect, Stream } from "effect";
 
-import { classifyExit } from "./errors";
-import { assertNoLeadingDash, decodeUtf8, runGit, runGitOk } from "./run-git";
+import { classifyExit, gitError } from "./errors";
+import {
+  assertNoLeadingDash,
+  type GitLine,
+  runGitOk,
+  streamGit,
+} from "./run-git";
 
-// ─── ref-update line parser ───────────────────────────────────────────────────
-// Matches lines like:
+// ─── line parsers ───────────────────────────────────────────────────────────
+// fetch/pull ref-update lines (on stderr), e.g.
 //   " * [new branch]      main -> origin/main"
 //   "   a1b2c3..e5f6g7  feat -> origin/feat"
-//   " - [deleted]         origin/gone"
 const REF_UPDATE_RE =
   /^\s*(?:[+ *t!=-])\s+(.+?)\s{2,}([\w./-]+)\s+->\s+([\w./-]+)\s*(?:\((.*?)\))?$/;
-// Matches a sha range in summary: "abc1234..def5678"
+// A sha range in a summary: "abc1234..def5678".
 const OID_RANGE_RE = /^([0-9a-f]{7,40})\.\.([0-9a-f]{7,40})$/;
+// push `--porcelain` status line: "<flag>\t<from>:<to>\t<summary>".
+const PORCELAIN_RE = /^([ +\-*!=])\t([^\t]+)\t(.*)$/;
 
-function parseEvents(stdout: Buffer, stderr: Buffer): SyncEvent[] {
-  const events: SyncEvent[] = [];
-  const combined = decodeUtf8(stdout) + decodeUtf8(stderr);
+const refUpdateFrom = (
+  summary: string,
+  localRef: string,
+  remoteRef: string,
+): SyncRefUpdate => {
+  const range = OID_RANGE_RE.exec(summary);
+  return new SyncRefUpdate({
+    _tag: "refUpdate",
+    summary,
+    localRef,
+    remoteRef,
+    fromOid: range ? (range[1] as Oid) : undefined,
+    toOid: range ? (range[2] as Oid) : undefined,
+  });
+};
 
-  for (const raw of combined.split("\n")) {
-    const line = raw.replace(/\r$/, "");
-    if (!line.trim()) continue;
+/** Classify a single fetch/pull line into 0-or-1 SyncEvent. */
+const classifyFetchPullLine = (line: GitLine): SyncEvent[] => {
+  const text = line.text;
+  const m = REF_UPDATE_RE.exec(text);
+  if (m) {
+    return [refUpdateFrom((m[1] ?? "").trim(), m[2] ?? "", m[3] ?? "")];
+  }
+  // Skip git header lines like "From <url>" / "To <url>".
+  if (/^(?:From|To)\s+\S/.test(text)) return [];
+  return [new SyncProgressEvent({ _tag: "progress", text })];
+};
 
-    const m = REF_UPDATE_RE.exec(line);
+/** Classify a single push line. Ref status comes from `--porcelain` stdout. */
+const classifyPushLine = (line: GitLine): SyncEvent[] => {
+  if (line.source === "stdout") {
+    const m = PORCELAIN_RE.exec(line.text);
     if (m) {
-      const summary = (m[1] ?? "").trim();
-      const localRef = m[2] ?? "";
-      const remoteRef = m[3] ?? "";
-      const rangeMatch = OID_RANGE_RE.exec(summary);
-      const fromOid = rangeMatch ? (rangeMatch[1] as Oid) : undefined;
-      const toOid = rangeMatch ? (rangeMatch[2] as Oid) : undefined;
-      events.push(
-        new SyncRefUpdate({
-          _tag: "refUpdate",
-          summary,
-          localRef,
-          remoteRef,
-          fromOid,
-          toOid,
-        }),
+      const flag = m[1] ?? "";
+      // A rejected ref ("!") drives the terminal failure (classifyPushFailure); it
+      // is not a successful update, so emit no refUpdate for it.
+      if (flag === "!") return [];
+      const fromTo = m[2] ?? "";
+      const summary = m[3] ?? "";
+      const colon = fromTo.indexOf(":");
+      const from = colon >= 0 ? fromTo.slice(0, colon) : fromTo;
+      const to = colon >= 0 ? fromTo.slice(colon + 1) : fromTo;
+      return [refUpdateFrom(summary, from, to)];
+    }
+    // "To <url>" / "Done" porcelain headers carry no event.
+    if (/^(?:To\s+\S|Done$)/.test(line.text)) return [];
+    return [new SyncProgressEvent({ _tag: "progress", text: line.text })];
+  }
+  // Progress (Counting/Compressing/Writing objects …) arrives on stderr.
+  return [new SyncProgressEvent({ _tag: "progress", text: line.text })];
+};
+
+// ─── terminal failure classifiers (deterministic; exit status + stable tokens) ─
+
+/** A push rejected as non-fast-forward → `nonFastForward`; else generic. */
+const classifyPushFailure = (
+  exitCode: number | null,
+  stdout: string,
+  stderr: string,
+): GitError => {
+  for (const raw of stdout.split("\n")) {
+    if (
+      raw.startsWith("!") &&
+      (raw.includes("(non-fast-forward)") || raw.includes("(fetch first)"))
+    ) {
+      return gitError(
+        "nonFastForward",
+        "push rejected: the remote has commits the local branch lacks (non-fast-forward)",
       );
-    } else {
-      // Skip git header lines like "From <url>" and "To <url>"
-      if (/^(?:From|To)\s+\S/.test(line)) continue;
-      events.push(new SyncProgressEvent({ _tag: "progress", text: line }));
     }
   }
+  return classifyExit(exitCode, stderr);
+};
 
-  return events;
-}
+/** Pull failures: conflicts → `mergeConflict`; ff-only divergence → `nonFastForward`. */
+const classifyPullFailure =
+  (mode: "ff-only" | "rebase" | "merge") =>
+  (exitCode: number | null, stdout: string, stderr: string): GitError => {
+    const combined = stdout + stderr;
+    // SY-013: merge/rebase conflicts — mirror the stash/merge CONFLICT-token style,
+    // leaving the in-progress state for the Phase-4 conflict flow (no auto-abort).
+    if (combined.includes("CONFLICT")) {
+      return gitError("mergeConflict", "pull produced conflicts");
+    }
+    // SY-012: an --ff-only pull that cannot fast-forward (divergence). git prints
+    // the stable "Not possible to fast-forward" under LC_ALL=C.
+    if (
+      mode === "ff-only" &&
+      combined.includes("Not possible to fast-forward")
+    ) {
+      return gitError(
+        "nonFastForward",
+        "cannot fast-forward: the branch has diverged from its upstream",
+      );
+    }
+    return classifyExit(exitCode, stderr);
+  };
 
-function makeStream(
-  eff: Effect.Effect<SyncEvent[], GitError>,
-): Stream.Stream<SyncEvent, GitError> {
-  return Stream.unwrap(
-    Effect.map(eff, (events) => Stream.fromIterable(events)),
-  );
-}
+// ─── streams ──────────────────────────────────────────────────────────────────
 
 // REQ-P3-SY-001/002/003
 export const fetchStream = (
@@ -79,7 +145,7 @@ export const fetchStream = (
   tags?: boolean,
   env?: NodeJS.ProcessEnv,
 ): Stream.Stream<SyncEvent, GitError> =>
-  makeStream(
+  Stream.unwrap(
     Effect.gen(function* () {
       const args: string[] = ["fetch", "--progress"];
       if (all) {
@@ -91,42 +157,36 @@ export const fetchStream = (
       if (prune) args.push("--prune");
       if (tags) args.push("--tags");
 
-      const raw = yield* runGit({ cwd, args, env, read: false });
-      if (raw.exitCode !== 0) {
-        return yield* Effect.fail(
-          classifyExit(raw.exitCode, decodeUtf8(raw.stderr)),
-        );
-      }
-      return parseEvents(raw.stdout, raw.stderr);
+      return streamGit({ cwd, args, env, read: false }).pipe(
+        Stream.map(classifyFetchPullLine),
+        Stream.flattenIterable,
+      );
     }),
   );
 
-// REQ-P3-SY-010/011
+// REQ-P3-SY-010/011/012/013
 export const pullStream = (
   cwd: string,
   mode: "ff-only" | "rebase" | "merge",
   autostash?: boolean,
   env?: NodeJS.ProcessEnv,
-): Stream.Stream<SyncEvent, GitError> =>
-  makeStream(
-    Effect.gen(function* () {
-      const args: string[] = ["pull", "--progress"];
-      if (mode === "ff-only") args.push("--ff-only");
-      else if (mode === "rebase") args.push("--rebase");
-      else args.push("--no-rebase");
-      if (autostash) args.push("--autostash");
+): Stream.Stream<SyncEvent, GitError> => {
+  const args: string[] = ["pull", "--progress"];
+  if (mode === "ff-only") args.push("--ff-only");
+  else if (mode === "rebase") args.push("--rebase");
+  else args.push("--no-rebase");
+  if (autostash) args.push("--autostash");
 
-      const raw = yield* runGit({ cwd, args, env, read: false });
-      if (raw.exitCode !== 0) {
-        return yield* Effect.fail(
-          classifyExit(raw.exitCode, decodeUtf8(raw.stderr)),
-        );
-      }
-      return parseEvents(raw.stdout, raw.stderr);
-    }),
-  );
+  return streamGit({
+    cwd,
+    args,
+    env,
+    read: false,
+    classifyFailure: classifyPullFailure(mode),
+  }).pipe(Stream.map(classifyFetchPullLine), Stream.flattenIterable);
+};
 
-// REQ-P3-SY-020/021/022/023
+// REQ-P3-SY-020/021/022/023/025/026
 export const pushStream = (
   cwd: string,
   remote: string,
@@ -136,10 +196,12 @@ export const pushStream = (
   tags?: boolean,
   env?: NodeJS.ProcessEnv,
 ): Stream.Stream<SyncEvent, GitError> =>
-  makeStream(
+  Stream.unwrap(
     Effect.gen(function* () {
       const safeRemote = yield* assertNoLeadingDash(remote, "remote");
-      const args: string[] = ["push", "--progress", safeRemote];
+      // `--porcelain` gives a STABLE, machine-readable per-ref status (flag + range)
+      // so non-fast-forward detection never depends on localized prose (SY-025/026).
+      const args: string[] = ["push", "--porcelain", "--progress", safeRemote];
       if (branch) {
         const safeBranch = yield* assertNoLeadingDash(branch, "branch");
         args.push(safeBranch);
@@ -148,13 +210,13 @@ export const pushStream = (
       if (forceWithLease) args.push("--force-with-lease");
       if (tags) args.push("--tags");
 
-      const raw = yield* runGit({ cwd, args, env, read: false });
-      if (raw.exitCode !== 0) {
-        return yield* Effect.fail(
-          classifyExit(raw.exitCode, decodeUtf8(raw.stderr)),
-        );
-      }
-      return parseEvents(raw.stdout, raw.stderr);
+      return streamGit({
+        cwd,
+        args,
+        env,
+        read: false,
+        classifyFailure: classifyPushFailure,
+      }).pipe(Stream.map(classifyPushLine), Stream.flattenIterable);
     }),
   );
 
