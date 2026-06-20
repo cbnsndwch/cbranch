@@ -20,7 +20,8 @@
   "scripts": {
     "build": "tsc -b tsconfig.json && node build.mjs",
     "typecheck": "tsc -b tsconfig.json",
-    "start": "node dist/main.js"
+    "start": "node dist/main.js",
+    "dev": "node dev.mjs"
   },
   "dependencies": {
     "@cbranch/core": "workspace:*",
