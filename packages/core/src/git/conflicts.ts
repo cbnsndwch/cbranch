@@ -15,6 +15,8 @@ import {
   type ConflictClassification,
   ConflictFile,
   ConflictListing,
+  ConflictSides,
+  ConflictStage,
   type GitError,
   type OperationKind,
   OperationProgress,
@@ -22,12 +24,16 @@ import {
 import { Effect } from "effect";
 
 import { type CatFilePool } from "./cat-file-pool";
+import { gitError } from "./errors";
 import { decodeUtf8, runGitOk } from "./run-git";
 
 const GITLINK_MODE = "160000";
 // Sniff window: a NUL within the first chunk of a blob marks it binary (matches
 // git's own "is this a binary file" heuristic closely enough for the editor gate).
 const BINARY_SNIFF_BYTES = 8000;
+// Above this size the in-browser 3-way editor is disabled (REQ-MERGE-020); whole-file
+// resolution is still offered.
+const MAX_EDITABLE_BYTES = 5 * 1024 * 1024;
 
 /** Per-path unmerged stages parsed from `git ls-files -u -z`. */
 interface UnmergedStage {
@@ -187,3 +193,118 @@ export const conflictList = (
       canSkip: operation === "rebase",
     });
   });
+
+const ABSENT_STAGE = new ConflictStage({
+  present: false,
+  isBinary: false,
+  encoding: "utf8",
+  content: "",
+  size: 0,
+});
+
+/** Turn raw blob/working-tree bytes into a present {@link ConflictStage}. */
+const bytesToStage = (data: Buffer): ConflictStage => {
+  const isBinary = data.subarray(0, BINARY_SNIFF_BYTES).includes(0);
+  return new ConflictStage({
+    present: true,
+    isBinary,
+    encoding: isBinary ? "base64" : "utf8",
+    content: isBinary ? data.toString("base64") : data.toString("utf8"),
+    size: data.length,
+  });
+};
+
+/** Read an index stage by its blob OID through the pool; absent OID → absent stage. */
+const readStage = (
+  pool: CatFilePool,
+  stage: UnmergedStage | undefined,
+): Effect.Effect<ConflictStage, GitError> => {
+  if (stage === undefined) return Effect.succeed(ABSENT_STAGE);
+  return Effect.map(pool.readObject(stage.oid), (obj) =>
+    obj === null ? ABSENT_STAGE : bytesToStage(obj.data),
+  );
+};
+
+/** The working-tree bytes git wrote (the marker-laden Result seed); absent if no file. */
+const readMergedSeed = (cwd: string, path: string): ConflictStage => {
+  try {
+    return bytesToStage(readFileSync(join(cwd, path)));
+  } catch {
+    return ABSENT_STAGE;
+  }
+};
+
+/**
+ * conflict.sides — the three contributing versions (base/ours/theirs, read BY OID
+ * through the cat-file pool) plus the working-tree `merged` seed for one conflicted
+ * path, in a single round trip. An absent stage is `present:false`, never empty
+ * content (REQ-CN-003). `mergeable` is false for submodule/binary/oversize, with the
+ * `reason` surfaced so the UI can disable the text editor (REQ-MERGE-020). READ.
+ */
+export const conflictSides = (
+  cwd: string,
+  path: string,
+  pool: CatFilePool,
+  env?: NodeJS.ProcessEnv,
+): Effect.Effect<ConflictSides, GitError> =>
+  Effect.gen(function* () {
+    const unmerged = yield* Effect.map(
+      runGitOk({ cwd, args: ["ls-files", "-u", "-z", "--", path], env }),
+      parseStagesFor(path),
+    );
+    if (unmerged === undefined) {
+      return yield* Effect.fail(
+        gitError(
+          "gitFailed",
+          "path has no unmerged entries (already resolved or not conflicted)",
+          { path },
+        ),
+      );
+    }
+
+    const base = yield* readStage(pool, unmerged.base);
+    const ours = yield* readStage(pool, unmerged.ours);
+    const theirs = yield* readStage(pool, unmerged.theirs);
+    const merged = readMergedSeed(cwd, path);
+
+    const isSubmodule =
+      unmerged.base?.mode === GITLINK_MODE ||
+      unmerged.ours?.mode === GITLINK_MODE ||
+      unmerged.theirs?.mode === GITLINK_MODE;
+    const anyBinary =
+      base.isBinary || ours.isBinary || theirs.isBinary || merged.isBinary;
+    const anyOversize = [base, ours, theirs, merged].some(
+      (s) => s.size > MAX_EDITABLE_BYTES,
+    );
+
+    const reason = isSubmodule
+      ? "submodule"
+      : anyBinary
+        ? "binary"
+        : anyOversize
+          ? "oversize"
+          : undefined;
+
+    return new ConflictSides({
+      path,
+      classification: classifyConflict(
+        unmerged.base !== undefined,
+        unmerged.ours !== undefined,
+        unmerged.theirs !== undefined,
+      ),
+      isBinary: anyBinary,
+      isSubmodule,
+      base,
+      ours,
+      theirs,
+      merged,
+      mergeable: reason === undefined,
+      reason,
+    });
+  });
+
+/** Parse `ls-files -u -z` scoped to one path, returning its stages (or undefined). */
+const parseStagesFor =
+  (path: string) =>
+  (r: { stdout: Buffer }): UnmergedEntry | undefined =>
+    parseLsFilesUnmerged(r.stdout).get(path);

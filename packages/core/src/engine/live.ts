@@ -35,7 +35,10 @@ import {
   commitCreate as commitCreateGit,
   commitLastMessage as commitLastMessageGit,
 } from "../git/commit-write";
-import { conflictList as conflictListGit } from "../git/conflicts";
+import {
+  conflictList as conflictListGit,
+  conflictSides as conflictSidesGit,
+} from "../git/conflicts";
 import { fileContentAtRev } from "../git/content";
 import { commitDiff, diffWorkingFile } from "../git/diff";
 import { gitError } from "../git/errors";
@@ -600,7 +603,12 @@ export const makeGitEngine = (
             ),
           ),
         ),
-      conflictSides: () => p4Stub(),
+      conflictSides: (repoId, path) =>
+        Effect.flatMap(resolveById(repoId), (repo) =>
+          Effect.flatMap(poolFor(repo), (pool) =>
+            conflictSidesGit(repoCwd(repo), path, pool, env),
+          ),
+        ),
       conflictResolve: () => p4Stub(),
       conflictSaveMerged: () => p4Stub(),
       conflictMarkResolved: () => p4Stub(),
