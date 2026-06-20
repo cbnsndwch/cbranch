@@ -2,57 +2,65 @@
 
 _Read by the assistant at the start of every resumed autonomous session._
 
-## State as of 2026-06-20 (P2 S2–S10 complete)
+## State as of 2026-06-20 (P3 fully complete)
 
-Branch: `feat/p0-p1-walking-skeleton`  
-Gate: **GREEN — 378 tests, 80.48% branches / 91.85% statements**
+Branch: `feat/p0-p1-walking-skeleton`
+Gate: **GREEN — 505 tests, 80.69% branches**
 
-### What was built in P2
+### What was built in P3
+
+**Core (S1-S9)** — 33 new RPC methods across refs, config, worktrees, stash, tags domains:
 
 | Slice | Commit | What |
 |-------|--------|------|
-| S1    | 360845b | RPC write-path contract (8 schemas, 11 methods) |
-| S2    | b3183af | porcelain-v2 status parser + `statusGet` |
-| S3    | 9df6f0f | stage/unstage/discard/deleteUntracked/resetTo + per-repo mutex |
-| S4    | 2f1f213 | `buildPatch` partial-stage + `stageHunks`/`unstageHunks`/`discardHunks` |
-| S5    | 4a5c13e | `commitCreate` + `commitLastMessage` |
-| S6    | dc175a9 | UI status helpers, store slices (commitDraft/selections), 9 mutation hooks |
-| S7    | 7bd43c9 | `StatusPanel` (ChangeListToolbar + StatusChangeList + Checkbox/Separator) |
-| S8    | 3d6a0ad | `WorkingDiffPanel` (hunk viewer, Stage/Unstage/Discard Hunk buttons) |
-| S9    | eb3bf5f | `CommitPanel` (ConventionalCommitBar + CommitMessageEditor + Switch/Select/Tooltip) |
-| S10   | 6fa20be | `DestructiveConfirmDialog` + `AlertDialog` primitive + stageAll/unstageAll menu cmds |
+| S1    | 5d31d47 | RPC contract (33 methods: branches/merge/sync/remotes/worktrees/stash/tags) |
+| S2    | 79c81a4 | Branch listing via `git for-each-ref` (ahead/behind, upstream, detached HEAD) |
+| S3    | 5b38e4a | Branch lifecycle: create, switch (carry/stash/discard), rename, delete, set-upstream |
+| S4    | 7fdd625 | Merge: ff / no-ff / squash + abort; conflict detection |
+| S5    | 693c513 | Sync streaming: fetch / pull / push (Stream<SyncEvent>), pushDeleteRemoteRef |
+| S6    | c0d36e9 | Remotes CRUD: list / add / set-url / rename / remove |
+| S7    | 9273602 | Worktrees: list (porcelain parser) / add / remove / prune |
+| S8    | 63902b7 | Stash: push / list / show / apply / pop / drop / clear |
+| S9    | 0aabe44 | Tags: list / create (lw/annotated/signed) / delete / push / delete-remote |
 
-Also landed: `f59d9d4` — watcher coalesce widened to 300 ms (Windows NTFS reliability).
+**UI (UI-A + UI-B)**:
 
-### What is NOT yet done
+| Commit | What |
+|--------|------|
+| 4c28f5c | P3 query+mutation hooks (28 new hooks) · `activeView` Zustand state · AppShell view nav tabs (History/Branches/Worktrees/Stash/Tags) · BranchesPanel (local/remote groups, create/rename/delete/dirty-tree dialogs, dropdown menus) |
+| 1b5ba77 | Fetch/Pull/Push streaming buttons in Toolbar (Sonner progress toasts) · RemotesManagerDialog (CRUD table) · WorktreesPanel (list + add/remove/prune) · StashPanel (list + new-stash/apply/pop/drop/clear) · TagsPanel (list + create/delete/push actions) |
 
-The three P2 UI components (StatusPanel, WorkingDiffPanel, CommitPanel) are implemented but **not wired into the AppShell**. The running app shows no P2 UI.
+### ▶ NEXT TASK: P4 — Diff & Conflict Resolution
 
-### ▶ NEXT TASK: AppShell integration
+**STOP — await user review/approval of P3 before starting P4.**
 
-Wire the P2 panels into `packages/ui/src/components/AppShell.tsx` (or wherever the app layout lives). Goal: add a "Changes" tab/pane that shows:
-- Left column: `<StatusPanel repoId={activeRepoId} />`
-- Centre/right: `<WorkingDiffPanel repoId={activeRepoId} />` (shows diff for `selectedDiffFile`)
-- Bottom: `<CommitPanel repoId={activeRepoId} />`
+When the user approves, read `docs/spec/08-phase4-diff-conflict.md` and plan P4.
 
-After integration:
-1. Run `pnpm gate` — must stay green (378 tests, ≥80% branches)
-2. Commit with a conventional message (no AI/model mentions, no co-authored-by)
-3. Update PROGRESS.md log entry
-4. STOP — report to user that P2 is fully functional end-to-end
+P4 key areas (from spec):
+- Three-way merge conflict editor
+- Conflict marker detection and inline resolution UI
+- Rebase support (interactive and non-interactive)
+- Cherry-pick and revert
 
-### Key files
+### Key files added in P3
 
 | Purpose | Path |
 |---------|------|
-| App layout | `packages/ui/src/components/AppShell.tsx` |
-| Router | `packages/ui/src/router.tsx` |
-| Store | `packages/ui/src/state/store.ts` |
-| StatusPanel | `packages/ui/src/components/StatusPanel.tsx` |
-| WorkingDiffPanel | `packages/ui/src/components/WorkingDiffPanel.tsx` |
-| CommitPanel | `packages/ui/src/components/CommitPanel.tsx` |
-| Status lib | `packages/ui/src/lib/status.ts` |
-| RPC hooks | `packages/ui/src/rpc/hooks.ts` |
+| P3 UI hooks | `packages/ui/src/rpc/hooks.ts` (P3 section at bottom) |
+| Store (activeView) | `packages/ui/src/state/store.ts` |
+| AppShell (view nav) | `packages/ui/src/components/AppShell.tsx` |
+| BranchesPanel | `packages/ui/src/components/BranchesPanel.tsx` |
+| WorktreesPanel | `packages/ui/src/components/WorktreesPanel.tsx` |
+| StashPanel | `packages/ui/src/components/StashPanel.tsx` |
+| TagsPanel | `packages/ui/src/components/TagsPanel.tsx` |
+| RemotesManagerDialog | `packages/ui/src/components/RemotesManagerDialog.tsx` |
+| P3 core (branches) | `packages/core/src/git/branches.ts`, `branch-ops.ts` |
+| P3 core (merge/sync) | `packages/core/src/git/merge.ts`, `sync.ts` |
+| P3 core (remotes) | `packages/core/src/git/remotes.ts` |
+| P3 core (worktrees) | `packages/core/src/git/worktrees.ts` |
+| P3 core (stash) | `packages/core/src/git/stash.ts` |
+| P3 core (tags) | `packages/core/src/git/tags.ts` |
+| P3 implementation plan | `docs/_impl-notes/P3-PLAN.md` |
 
 ### Operating constraints
 
@@ -66,6 +74,6 @@ After integration:
 ### Resume protocol
 
 1. Read this file.
-2. Read `PROGRESS.md` → find ▶ RESUME HERE section.
-3. Run `pnpm gate` to confirm baseline (expected: green, 378+ tests).
+2. Read `PROGRESS.md` → find the ▶ RESUME HERE section.
+3. Run `pnpm gate` to confirm baseline (expected: green, 505+ tests, ≥80% branches).
 4. Continue from the NEXT TASK above.
