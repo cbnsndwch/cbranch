@@ -44,4 +44,71 @@ export const handlersLayer = CbranchRpcs.toLayer({
   DiscardHunks: (selection) => Effect.flatMap(GitEngine, (engine) => engine.discardHunks(selection)),
   CommitCreate: (input) => Effect.flatMap(GitEngine, (engine) => engine.commitCreate(input)),
   CommitLastMessage: ({ repoId }) => Effect.flatMap(GitEngine, (engine) => engine.commitLastMessage(repoId)),
+
+  // ── branches (P3) ─────────────────────────────────────────────────────────
+  BranchList: ({ repoId }) => Effect.flatMap(GitEngine, (engine) => engine.branchList(repoId)),
+  BranchCreate: ({ repoId, name, startPoint, setUpstream, switchAfter }) =>
+    Effect.flatMap(GitEngine, (engine) => engine.branchCreate(repoId, name, startPoint, setUpstream, switchAfter)),
+  BranchSwitch: ({ repoId, target, strategy, stashAndReapply }) =>
+    Effect.flatMap(GitEngine, (engine) => engine.branchSwitch(repoId, target, strategy, stashAndReapply)),
+  BranchRename: ({ repoId, oldName, newName }) =>
+    Effect.flatMap(GitEngine, (engine) => engine.branchRename(repoId, oldName, newName)),
+  BranchDelete: ({ repoId, name, force }) =>
+    Effect.flatMap(GitEngine, (engine) => engine.branchDelete(repoId, name, force)),
+  BranchSetUpstream: ({ repoId, name, upstream }) =>
+    Effect.flatMap(GitEngine, (engine) => engine.branchSetUpstream(repoId, name, upstream)),
+
+  // ── merge (P3) ────────────────────────────────────────────────────────────
+  MergeCreate: ({ repoId, ref, strategy }) =>
+    Effect.flatMap(GitEngine, (engine) => engine.mergeCreate(repoId, ref, strategy)),
+  MergeAbort: ({ repoId }) => Effect.flatMap(GitEngine, (engine) => engine.mergeAbort(repoId)),
+
+  // ── sync (P3) ─────────────────────────────────────────────────────────────
+  FetchStream: ({ repoId, remote, all, prune, tags }) =>
+    Stream.unwrap(Effect.map(GitEngine, (engine) => engine.fetchStream(repoId, remote, all, prune, tags))),
+  PullStream: ({ repoId, mode, autostash }) =>
+    Stream.unwrap(Effect.map(GitEngine, (engine) => engine.pullStream(repoId, mode, autostash))),
+  PushStream: ({ repoId, remote, branch, setUpstream, forceWithLease, tags }) =>
+    Stream.unwrap(
+      Effect.map(GitEngine, (engine) => engine.pushStream(repoId, remote, branch, setUpstream, forceWithLease, tags)),
+    ),
+  PushDeleteRemoteRef: ({ repoId, remote, ref, refType }) =>
+    Effect.flatMap(GitEngine, (engine) => engine.pushDeleteRemoteRef(repoId, remote, ref, refType)),
+
+  // ── remotes (P3) ──────────────────────────────────────────────────────────
+  RemoteList: ({ repoId }) => Effect.flatMap(GitEngine, (engine) => engine.remoteList(repoId)),
+  RemoteAdd: ({ repoId, name, url }) => Effect.flatMap(GitEngine, (engine) => engine.remoteAdd(repoId, name, url)),
+  RemoteSetUrl: ({ repoId, name, url, push }) =>
+    Effect.flatMap(GitEngine, (engine) => engine.remoteSetUrl(repoId, name, url, push)),
+  RemoteRename: ({ repoId, oldName, newName }) =>
+    Effect.flatMap(GitEngine, (engine) => engine.remoteRename(repoId, oldName, newName)),
+  RemoteRemove: ({ repoId, name }) => Effect.flatMap(GitEngine, (engine) => engine.remoteRemove(repoId, name)),
+
+  // ── worktrees (P3) ────────────────────────────────────────────────────────
+  WorktreeList: ({ repoId }) => Effect.flatMap(GitEngine, (engine) => engine.worktreeList(repoId)),
+  WorktreeAdd: ({ repoId, path, branch, newBranch, startPoint }) =>
+    Effect.flatMap(GitEngine, (engine) => engine.worktreeAdd(repoId, path, branch, newBranch, startPoint)),
+  WorktreeRemove: ({ repoId, path, force }) =>
+    Effect.flatMap(GitEngine, (engine) => engine.worktreeRemove(repoId, path, force)),
+  WorktreePrune: ({ repoId }) => Effect.flatMap(GitEngine, (engine) => engine.worktreePrune(repoId)),
+
+  // ── stash (P3) ────────────────────────────────────────────────────────────
+  StashPush: ({ repoId, message, includeUntracked, keepIndex, stagedOnly }) =>
+    Effect.flatMap(GitEngine, (engine) => engine.stashPush(repoId, message, includeUntracked, keepIndex, stagedOnly)),
+  StashList: ({ repoId }) => Effect.flatMap(GitEngine, (engine) => engine.stashList(repoId)),
+  StashShow: ({ repoId, ref }) => Effect.flatMap(GitEngine, (engine) => engine.stashShow(repoId, ref)),
+  StashApply: ({ repoId, ref }) => Effect.flatMap(GitEngine, (engine) => engine.stashApply(repoId, ref)),
+  StashPop: ({ repoId, ref }) => Effect.flatMap(GitEngine, (engine) => engine.stashPop(repoId, ref)),
+  StashDrop: ({ repoId, ref }) => Effect.flatMap(GitEngine, (engine) => engine.stashDrop(repoId, ref)),
+  StashClear: ({ repoId }) => Effect.flatMap(GitEngine, (engine) => engine.stashClear(repoId)),
+
+  // ── tags (P3) ─────────────────────────────────────────────────────────────
+  TagList: ({ repoId }) => Effect.flatMap(GitEngine, (engine) => engine.tagList(repoId)),
+  TagCreate: ({ repoId, name, target, tagType, message, force }) =>
+    Effect.flatMap(GitEngine, (engine) => engine.tagCreate(repoId, name, target, tagType, message, force)),
+  TagDelete: ({ repoId, name }) => Effect.flatMap(GitEngine, (engine) => engine.tagDelete(repoId, name)),
+  TagPush: ({ repoId, remote, name, all }) =>
+    Effect.flatMap(GitEngine, (engine) => engine.tagPush(repoId, remote, name, all)),
+  TagDeleteRemote: ({ repoId, remote, name }) =>
+    Effect.flatMap(GitEngine, (engine) => engine.tagDeleteRemote(repoId, remote, name)),
 });

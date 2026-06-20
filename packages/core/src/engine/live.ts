@@ -11,7 +11,19 @@
 
 import { basename } from "node:path";
 
-import { type GitError, type InvalidationEvent, type RepoId } from "@cbranch/rpc-contract";
+import {
+  type BranchInfo,
+  type BranchListing,
+  type GitError,
+  type InvalidationEvent,
+  type MergeResult,
+  type RemoteInfo,
+  type RepoId,
+  type StashEntry,
+  type SyncEvent,
+  type TagInfo,
+  type WorktreeInfo,
+} from "@cbranch/rpc-contract";
 import { RepoHandle } from "@cbranch/rpc-contract";
 import { type Cause, Effect, Layer, Queue, Scope, Stream } from "effect";
 
@@ -193,6 +205,158 @@ export const makeGitEngine = (opts?: MakeGitEngineOptions): Effect.Effect<GitEng
         Effect.flatMap(resolveById(repoId), (repo) => Effect.flatMap(poolFor(repo), (p) => p.readObject(rev))),
       objectInfo: (repoId, rev) =>
         Effect.flatMap(resolveById(repoId), (repo) => Effect.flatMap(poolFor(repo), (p) => p.objectInfo(rev))),
+
+      // ── branches (P3, stubs) ───────────────────────────────────────────────
+      branchList: (repoId) =>
+        Effect.flatMap(resolveById(repoId), (_repo) =>
+          Effect.fail(gitError("gitFailed", "P3: branchList not implemented")),
+        ) as Effect.Effect<BranchListing, GitError>,
+      branchCreate: (repoId, _name, _startPoint, _setUpstream, _switchAfter) =>
+        Effect.flatMap(resolveById(repoId), (_repo) =>
+          Effect.fail(gitError("gitFailed", "P3: branchCreate not implemented")),
+        ) as Effect.Effect<BranchInfo, GitError>,
+      branchSwitch: (repoId, _target, _strategy, _stashAndReapply) =>
+        Effect.flatMap(resolveById(repoId), (_repo) =>
+          Effect.fail(gitError("gitFailed", "P3: branchSwitch not implemented")),
+        ),
+      branchRename: (repoId, _oldName, _newName) =>
+        Effect.flatMap(resolveById(repoId), (_repo) =>
+          Effect.fail(gitError("gitFailed", "P3: branchRename not implemented")),
+        ),
+      branchDelete: (repoId, _name, _force) =>
+        Effect.flatMap(resolveById(repoId), (_repo) =>
+          Effect.fail(gitError("gitFailed", "P3: branchDelete not implemented")),
+        ),
+      branchSetUpstream: (repoId, _name, _upstream) =>
+        Effect.flatMap(resolveById(repoId), (_repo) =>
+          Effect.fail(gitError("gitFailed", "P3: branchSetUpstream not implemented")),
+        ),
+
+      // ── merge (P3, stubs) ─────────────────────────────────────────────────
+      mergeCreate: (repoId, _ref, _strategy) =>
+        Effect.flatMap(resolveById(repoId), (_repo) =>
+          Effect.fail(gitError("gitFailed", "P3: mergeCreate not implemented")),
+        ) as Effect.Effect<MergeResult, GitError>,
+      mergeAbort: (repoId) =>
+        Effect.flatMap(resolveById(repoId), (_repo) =>
+          Effect.fail(gitError("gitFailed", "P3: mergeAbort not implemented")),
+        ),
+
+      // ── sync (P3, stubs) ──────────────────────────────────────────────────
+      fetchStream: (repoId, _remote, _all, _prune, _tags) =>
+        Stream.unwrap(
+          Effect.flatMap(resolveById(repoId), (_repo) =>
+            Effect.fail(gitError("gitFailed", "P3: fetchStream not implemented")),
+          ),
+        ) as Stream.Stream<SyncEvent, GitError>,
+      pullStream: (repoId, _mode, _autostash) =>
+        Stream.unwrap(
+          Effect.flatMap(resolveById(repoId), (_repo) =>
+            Effect.fail(gitError("gitFailed", "P3: pullStream not implemented")),
+          ),
+        ) as Stream.Stream<SyncEvent, GitError>,
+      pushStream: (repoId, _remote, _branch, _setUpstream, _forceWithLease, _tags) =>
+        Stream.unwrap(
+          Effect.flatMap(resolveById(repoId), (_repo) =>
+            Effect.fail(gitError("gitFailed", "P3: pushStream not implemented")),
+          ),
+        ) as Stream.Stream<SyncEvent, GitError>,
+      pushDeleteRemoteRef: (repoId, _remote, _ref, _refType) =>
+        Effect.flatMap(resolveById(repoId), (_repo) =>
+          Effect.fail(gitError("gitFailed", "P3: pushDeleteRemoteRef not implemented")),
+        ),
+
+      // ── remotes (P3, stubs) ───────────────────────────────────────────────
+      remoteList: (repoId) =>
+        Effect.flatMap(resolveById(repoId), (_repo) =>
+          Effect.fail(gitError("gitFailed", "P3: remoteList not implemented")),
+        ) as Effect.Effect<ReadonlyArray<RemoteInfo>, GitError>,
+      remoteAdd: (repoId, _name, _url) =>
+        Effect.flatMap(resolveById(repoId), (_repo) =>
+          Effect.fail(gitError("gitFailed", "P3: remoteAdd not implemented")),
+        ),
+      remoteSetUrl: (repoId, _name, _url, _push) =>
+        Effect.flatMap(resolveById(repoId), (_repo) =>
+          Effect.fail(gitError("gitFailed", "P3: remoteSetUrl not implemented")),
+        ),
+      remoteRename: (repoId, _oldName, _newName) =>
+        Effect.flatMap(resolveById(repoId), (_repo) =>
+          Effect.fail(gitError("gitFailed", "P3: remoteRename not implemented")),
+        ),
+      remoteRemove: (repoId, _name) =>
+        Effect.flatMap(resolveById(repoId), (_repo) =>
+          Effect.fail(gitError("gitFailed", "P3: remoteRemove not implemented")),
+        ),
+
+      // ── worktrees (P3, stubs) ─────────────────────────────────────────────
+      worktreeList: (repoId) =>
+        Effect.flatMap(resolveById(repoId), (_repo) =>
+          Effect.fail(gitError("gitFailed", "P3: worktreeList not implemented")),
+        ) as Effect.Effect<ReadonlyArray<WorktreeInfo>, GitError>,
+      worktreeAdd: (repoId, _path, _branch, _newBranch, _startPoint) =>
+        Effect.flatMap(resolveById(repoId), (_repo) =>
+          Effect.fail(gitError("gitFailed", "P3: worktreeAdd not implemented")),
+        ) as Effect.Effect<WorktreeInfo, GitError>,
+      worktreeRemove: (repoId, _path, _force) =>
+        Effect.flatMap(resolveById(repoId), (_repo) =>
+          Effect.fail(gitError("gitFailed", "P3: worktreeRemove not implemented")),
+        ),
+      worktreePrune: (repoId) =>
+        Effect.flatMap(resolveById(repoId), (_repo) =>
+          Effect.fail(gitError("gitFailed", "P3: worktreePrune not implemented")),
+        ),
+
+      // ── stash (P3, stubs) ─────────────────────────────────────────────────
+      stashPush: (repoId, _message, _includeUntracked, _keepIndex, _stagedOnly) =>
+        Effect.flatMap(resolveById(repoId), (_repo) =>
+          Effect.fail(gitError("gitFailed", "P3: stashPush not implemented")),
+        ) as Effect.Effect<StashEntry, GitError>,
+      stashList: (repoId) =>
+        Effect.flatMap(resolveById(repoId), (_repo) =>
+          Effect.fail(gitError("gitFailed", "P3: stashList not implemented")),
+        ) as Effect.Effect<ReadonlyArray<StashEntry>, GitError>,
+      stashShow: (repoId, _ref) =>
+        Effect.flatMap(resolveById(repoId), (_repo) =>
+          Effect.fail(gitError("gitFailed", "P3: stashShow not implemented")),
+        ),
+      stashApply: (repoId, _ref) =>
+        Effect.flatMap(resolveById(repoId), (_repo) =>
+          Effect.fail(gitError("gitFailed", "P3: stashApply not implemented")),
+        ),
+      stashPop: (repoId, _ref) =>
+        Effect.flatMap(resolveById(repoId), (_repo) =>
+          Effect.fail(gitError("gitFailed", "P3: stashPop not implemented")),
+        ),
+      stashDrop: (repoId, _ref) =>
+        Effect.flatMap(resolveById(repoId), (_repo) =>
+          Effect.fail(gitError("gitFailed", "P3: stashDrop not implemented")),
+        ),
+      stashClear: (repoId) =>
+        Effect.flatMap(resolveById(repoId), (_repo) =>
+          Effect.fail(gitError("gitFailed", "P3: stashClear not implemented")),
+        ),
+
+      // ── tags (P3, stubs) ──────────────────────────────────────────────────
+      tagList: (repoId) =>
+        Effect.flatMap(resolveById(repoId), (_repo) =>
+          Effect.fail(gitError("gitFailed", "P3: tagList not implemented")),
+        ) as Effect.Effect<ReadonlyArray<TagInfo>, GitError>,
+      tagCreate: (repoId, _name, _target, _tagType, _message, _force) =>
+        Effect.flatMap(resolveById(repoId), (_repo) =>
+          Effect.fail(gitError("gitFailed", "P3: tagCreate not implemented")),
+        ) as Effect.Effect<TagInfo, GitError>,
+      tagDelete: (repoId, _name) =>
+        Effect.flatMap(resolveById(repoId), (_repo) =>
+          Effect.fail(gitError("gitFailed", "P3: tagDelete not implemented")),
+        ),
+      tagPush: (repoId, _remote, _name, _all) =>
+        Effect.flatMap(resolveById(repoId), (_repo) =>
+          Effect.fail(gitError("gitFailed", "P3: tagPush not implemented")),
+        ),
+      tagDeleteRemote: (repoId, _remote, _name) =>
+        Effect.flatMap(resolveById(repoId), (_repo) =>
+          Effect.fail(gitError("gitFailed", "P3: tagDeleteRemote not implemented")),
+        ),
     };
     return api;
   });

@@ -1,5 +1,4 @@
-// The P1 method catalog (docs/spec/14-rpc-contract.md §7 — "Repository & live state"
-// and "History & diff", both tagged P1).
+// The P1+P2+P3 method catalog (docs/spec/14-rpc-contract.md §7).
 //
 // One `RpcGroup` (the single contract) imported unchanged by both server and client
 // (14 §2). On-wire tags are PascalCase (DECISIONS D1); the human/doc `<domain>.<verb>`
@@ -13,6 +12,19 @@
 import { Schema } from "effect";
 
 import { Rpc, RpcGroup } from "../effect-rpc-adapter";
+import {
+  BranchInfo,
+  BranchListing,
+  BranchSwitchStrategy,
+  MergeMode,
+  MergeResult,
+  RemoteInfo,
+  StashEntry,
+  SyncEvent,
+  TagInfo,
+  TagType,
+  WorktreeInfo,
+} from "../schemas/branches";
 import {
   CommitDetail,
   CommitSummary,
@@ -158,6 +170,257 @@ export const CbranchRpcs = RpcGroup.make(
   Rpc.make("CommitLastMessage", {
     payload: { repoId: RepoId },
     success: CommitMessage,
+    error: GitError,
+  }),
+
+  // ── P3: branches (docs/spec/07) ────────────────────────────────────────────
+  // branch.list — all local + remote-tracking branches with upstream/ahead-behind.
+  Rpc.make("BranchList", {
+    payload: { repoId: RepoId },
+    success: BranchListing,
+    error: GitError,
+  }),
+  // branch.create ✎
+  Rpc.make("BranchCreate", {
+    payload: {
+      repoId: RepoId,
+      name: Schema.String,
+      startPoint: Schema.optional(Schema.String),
+      setUpstream: Schema.optional(Schema.Boolean),
+      switchAfter: Schema.Boolean,
+    },
+    success: BranchInfo,
+    error: GitError,
+  }),
+  // branch.switch ✎ — strategy only needed when WD is dirty (retry after dirtyWorkingTree error).
+  Rpc.make("BranchSwitch", {
+    payload: {
+      repoId: RepoId,
+      target: Schema.String,
+      strategy: Schema.optional(BranchSwitchStrategy),
+      stashAndReapply: Schema.optional(Schema.Boolean),
+    },
+    success: Schema.Void,
+    error: GitError,
+  }),
+  // branch.rename ✎
+  Rpc.make("BranchRename", {
+    payload: { repoId: RepoId, oldName: Schema.String, newName: Schema.String },
+    success: Schema.Void,
+    error: GitError,
+  }),
+  // branch.delete ✎ — force=false = safe delete (fails if unmerged); force=true = -D (after user confirm).
+  Rpc.make("BranchDelete", {
+    payload: { repoId: RepoId, name: Schema.String, force: Schema.Boolean },
+    success: Schema.Void,
+    error: GitError,
+  }),
+  // branch.setUpstream ✎ — upstream=absent/undefined = unset upstream.
+  Rpc.make("BranchSetUpstream", {
+    payload: { repoId: RepoId, name: Schema.String, upstream: Schema.optional(Schema.String) },
+    success: Schema.Void,
+    error: GitError,
+  }),
+
+  // ── P3: merge ──────────────────────────────────────────────────────────────
+  // merge.create ✎
+  Rpc.make("MergeCreate", {
+    payload: { repoId: RepoId, ref: Schema.String, strategy: MergeMode },
+    success: MergeResult,
+    error: GitError,
+  }),
+  // merge.abort ✎
+  Rpc.make("MergeAbort", {
+    payload: { repoId: RepoId },
+    success: Schema.Void,
+    error: GitError,
+  }),
+
+  // ── P3: sync (streaming) ───────────────────────────────────────────────────
+  // fetch.stream — read-only (no lock); streams SyncEvent progress + refUpdates.
+  Rpc.make("FetchStream", {
+    payload: {
+      repoId: RepoId,
+      remote: Schema.optional(Schema.String),
+      all: Schema.optional(Schema.Boolean),
+      prune: Schema.optional(Schema.Boolean),
+      tags: Schema.optional(Schema.Boolean),
+    },
+    success: SyncEvent,
+    error: GitError,
+    stream: true,
+  }),
+  // pull.stream ✎
+  Rpc.make("PullStream", {
+    payload: {
+      repoId: RepoId,
+      mode: Schema.Literals(["ff-only", "rebase", "merge"]),
+      autostash: Schema.optional(Schema.Boolean),
+    },
+    success: SyncEvent,
+    error: GitError,
+    stream: true,
+  }),
+  // push.stream ✎
+  Rpc.make("PushStream", {
+    payload: {
+      repoId: RepoId,
+      remote: Schema.String,
+      branch: Schema.optional(Schema.String),
+      setUpstream: Schema.optional(Schema.Boolean),
+      forceWithLease: Schema.optional(Schema.Boolean),
+      tags: Schema.optional(Schema.Boolean),
+    },
+    success: SyncEvent,
+    error: GitError,
+    stream: true,
+  }),
+  // push.deleteRemoteRef ✎ — non-streaming delete of a remote branch or tag ref.
+  Rpc.make("PushDeleteRemoteRef", {
+    payload: {
+      repoId: RepoId,
+      remote: Schema.String,
+      ref: Schema.String,
+      refType: Schema.Literals(["branch", "tag"]),
+    },
+    success: Schema.Void,
+    error: GitError,
+  }),
+
+  // ── P3: remotes ────────────────────────────────────────────────────────────
+  Rpc.make("RemoteList", {
+    payload: { repoId: RepoId },
+    success: Schema.Array(RemoteInfo),
+    error: GitError,
+  }),
+  Rpc.make("RemoteAdd", {
+    payload: { repoId: RepoId, name: Schema.String, url: Schema.String },
+    success: Schema.Void,
+    error: GitError,
+  }),
+  Rpc.make("RemoteSetUrl", {
+    payload: { repoId: RepoId, name: Schema.String, url: Schema.String, push: Schema.optional(Schema.Boolean) },
+    success: Schema.Void,
+    error: GitError,
+  }),
+  Rpc.make("RemoteRename", {
+    payload: { repoId: RepoId, oldName: Schema.String, newName: Schema.String },
+    success: Schema.Void,
+    error: GitError,
+  }),
+  Rpc.make("RemoteRemove", {
+    payload: { repoId: RepoId, name: Schema.String },
+    success: Schema.Void,
+    error: GitError,
+  }),
+
+  // ── P3: worktrees ──────────────────────────────────────────────────────────
+  Rpc.make("WorktreeList", {
+    payload: { repoId: RepoId },
+    success: Schema.Array(WorktreeInfo),
+    error: GitError,
+  }),
+  Rpc.make("WorktreeAdd", {
+    payload: {
+      repoId: RepoId,
+      path: Schema.String,
+      branch: Schema.optional(Schema.String),
+      newBranch: Schema.optional(Schema.String),
+      startPoint: Schema.optional(Schema.String),
+    },
+    success: WorktreeInfo,
+    error: GitError,
+  }),
+  Rpc.make("WorktreeRemove", {
+    payload: { repoId: RepoId, path: Schema.String, force: Schema.optional(Schema.Boolean) },
+    success: Schema.Void,
+    error: GitError,
+  }),
+  Rpc.make("WorktreePrune", {
+    payload: { repoId: RepoId },
+    success: Schema.Void,
+    error: GitError,
+  }),
+
+  // ── P3: stash ──────────────────────────────────────────────────────────────
+  Rpc.make("StashPush", {
+    payload: {
+      repoId: RepoId,
+      message: Schema.optional(Schema.String),
+      includeUntracked: Schema.optional(Schema.Boolean),
+      keepIndex: Schema.optional(Schema.Boolean),
+      stagedOnly: Schema.optional(Schema.Boolean),
+    },
+    success: StashEntry,
+    error: GitError,
+  }),
+  Rpc.make("StashList", {
+    payload: { repoId: RepoId },
+    success: Schema.Array(StashEntry),
+    error: GitError,
+  }),
+  Rpc.make("StashShow", {
+    payload: { repoId: RepoId, ref: Schema.String },
+    success: Schema.Array(DiffFile),
+    error: GitError,
+  }),
+  Rpc.make("StashApply", {
+    payload: { repoId: RepoId, ref: Schema.String },
+    success: Schema.Void,
+    error: GitError,
+  }),
+  Rpc.make("StashPop", {
+    payload: { repoId: RepoId, ref: Schema.String },
+    success: Schema.Void,
+    error: GitError,
+  }),
+  Rpc.make("StashDrop", {
+    payload: { repoId: RepoId, ref: Schema.String },
+    success: Schema.Void,
+    error: GitError,
+  }),
+  Rpc.make("StashClear", {
+    payload: { repoId: RepoId },
+    success: Schema.Void,
+    error: GitError,
+  }),
+
+  // ── P3: tags ───────────────────────────────────────────────────────────────
+  Rpc.make("TagList", {
+    payload: { repoId: RepoId },
+    success: Schema.Array(TagInfo),
+    error: GitError,
+  }),
+  Rpc.make("TagCreate", {
+    payload: {
+      repoId: RepoId,
+      name: Schema.String,
+      target: Schema.optional(Schema.String),
+      tagType: TagType,
+      message: Schema.optional(Schema.String),
+      force: Schema.optional(Schema.Boolean),
+    },
+    success: TagInfo,
+    error: GitError,
+  }),
+  Rpc.make("TagDelete", {
+    payload: { repoId: RepoId, name: Schema.String },
+    success: Schema.Void,
+    error: GitError,
+  }),
+  Rpc.make("TagPush", {
+    payload: {
+      repoId: RepoId,
+      remote: Schema.String,
+      name: Schema.optional(Schema.String),
+      all: Schema.optional(Schema.Boolean),
+    },
+    success: Schema.Void,
+    error: GitError,
+  }),
+  Rpc.make("TagDeleteRemote", {
+    payload: { repoId: RepoId, remote: Schema.String, name: Schema.String },
+    success: Schema.Void,
     error: GitError,
   }),
 );

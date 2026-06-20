@@ -8,6 +8,9 @@
 // React Query error state); a stream's per-item error reaches `onError`.
 
 import {
+  type BranchInfo,
+  type BranchListing,
+  type BranchSwitchStrategy,
   type CommitCreated,
   type CommitDetail,
   type CommitInput,
@@ -18,13 +21,21 @@ import {
   type FileContentResult,
   type InvalidationEvent,
   type LogQuery,
+  type MergeMode,
+  type MergeResult,
   type Oid,
   type PatchSelection,
   type RecentRepo,
+  type RemoteInfo,
   type RepoHandle,
   type RepoId,
   type RepoState,
+  type StashEntry,
+  type SyncEvent,
+  type TagInfo,
+  type TagType,
   type WorkingTreeStatus,
+  type WorktreeInfo,
 } from "@cbranch/rpc-contract";
 import { Effect, Fiber, Stream } from "effect";
 
@@ -66,6 +77,82 @@ export interface CbranchApi {
   logStream(query: LogQuery, handlers: StreamHandlers<CommitSummary>): Unsubscribe;
   /** Subscribe to the WS invalidation bus for a repo; returns an unsubscribe. */
   subscribe(repoId: RepoId, handlers: StreamHandlers<InvalidationEvent>): Unsubscribe;
+  // ── branches (P3) ─────────────────────────────────────────────────────────
+  branchList(repoId: RepoId): Promise<BranchListing>;
+  branchCreate(
+    repoId: RepoId,
+    name: string,
+    startPoint?: string,
+    setUpstream?: boolean,
+    switchAfter?: boolean,
+  ): Promise<BranchInfo>;
+  branchSwitch(
+    repoId: RepoId,
+    target: string,
+    strategy?: BranchSwitchStrategy,
+    stashAndReapply?: boolean,
+  ): Promise<void>;
+  branchRename(repoId: RepoId, oldName: string, newName: string): Promise<void>;
+  branchDelete(repoId: RepoId, name: string, force: boolean): Promise<void>;
+  branchSetUpstream(repoId: RepoId, name: string, upstream?: string): Promise<void>;
+  // ── merge (P3) ────────────────────────────────────────────────────────────
+  mergeCreate(repoId: RepoId, ref: string, strategy: MergeMode): Promise<MergeResult>;
+  mergeAbort(repoId: RepoId): Promise<void>;
+  // ── sync streaming (P3) ───────────────────────────────────────────────────
+  fetchStream(
+    repoId: RepoId,
+    opts: { remote?: string; all?: boolean; prune?: boolean; tags?: boolean },
+    handlers: StreamHandlers<SyncEvent>,
+  ): Unsubscribe;
+  pullStream(
+    repoId: RepoId,
+    mode: "ff-only" | "rebase" | "merge",
+    opts: { autostash?: boolean },
+    handlers: StreamHandlers<SyncEvent>,
+  ): Unsubscribe;
+  pushStream(
+    repoId: RepoId,
+    remote: string,
+    opts: { branch?: string; setUpstream?: boolean; forceWithLease?: boolean; tags?: boolean },
+    handlers: StreamHandlers<SyncEvent>,
+  ): Unsubscribe;
+  pushDeleteRemoteRef(repoId: RepoId, remote: string, ref: string, refType: "branch" | "tag"): Promise<void>;
+  // ── remotes (P3) ──────────────────────────────────────────────────────────
+  remoteList(repoId: RepoId): Promise<ReadonlyArray<RemoteInfo>>;
+  remoteAdd(repoId: RepoId, name: string, url: string): Promise<void>;
+  remoteSetUrl(repoId: RepoId, name: string, url: string, push?: boolean): Promise<void>;
+  remoteRename(repoId: RepoId, oldName: string, newName: string): Promise<void>;
+  remoteRemove(repoId: RepoId, name: string): Promise<void>;
+  // ── worktrees (P3) ────────────────────────────────────────────────────────
+  worktreeList(repoId: RepoId): Promise<ReadonlyArray<WorktreeInfo>>;
+  worktreeAdd(
+    repoId: RepoId,
+    path: string,
+    opts?: { branch?: string; newBranch?: string; startPoint?: string },
+  ): Promise<WorktreeInfo>;
+  worktreeRemove(repoId: RepoId, path: string, force?: boolean): Promise<void>;
+  worktreePrune(repoId: RepoId): Promise<void>;
+  // ── stash (P3) ────────────────────────────────────────────────────────────
+  stashPush(
+    repoId: RepoId,
+    opts?: { message?: string; includeUntracked?: boolean; keepIndex?: boolean; stagedOnly?: boolean },
+  ): Promise<StashEntry>;
+  stashList(repoId: RepoId): Promise<ReadonlyArray<StashEntry>>;
+  stashShow(repoId: RepoId, ref: string): Promise<ReadonlyArray<DiffFile>>;
+  stashApply(repoId: RepoId, ref: string): Promise<void>;
+  stashPop(repoId: RepoId, ref: string): Promise<void>;
+  stashDrop(repoId: RepoId, ref: string): Promise<void>;
+  stashClear(repoId: RepoId): Promise<void>;
+  // ── tags (P3) ─────────────────────────────────────────────────────────────
+  tagList(repoId: RepoId): Promise<ReadonlyArray<TagInfo>>;
+  tagCreate(
+    repoId: RepoId,
+    name: string,
+    opts: { target?: string; tagType: TagType; message?: string; force?: boolean },
+  ): Promise<TagInfo>;
+  tagDelete(repoId: RepoId, name: string): Promise<void>;
+  tagPush(repoId: RepoId, remote: string, opts?: { name?: string; all?: boolean }): Promise<void>;
+  tagDeleteRemote(repoId: RepoId, remote: string, name: string): Promise<void>;
 }
 
 /** Back a {@link CbranchApi} with the single app runtime. */
@@ -118,5 +205,71 @@ export const makeApi = (runtime: AppRuntime): CbranchApi => {
         streamWithClient((c) => c.RepoSubscribe({ repoId })),
         handlers,
       ),
+    // ── branches (P3) ───────────────────────────────────────────────────────
+    branchList: (repoId) => runtime.runPromise(withClient((c) => c.BranchList({ repoId }))),
+    branchCreate: (repoId, name, startPoint, setUpstream, switchAfter) =>
+      runtime.runPromise(
+        withClient((c) => c.BranchCreate({ repoId, name, startPoint, setUpstream, switchAfter: switchAfter ?? false })),
+      ),
+    branchSwitch: (repoId, target, strategy, stashAndReapply) =>
+      runtime.runPromise(withClient((c) => c.BranchSwitch({ repoId, target, strategy, stashAndReapply }))),
+    branchRename: (repoId, oldName, newName) =>
+      runtime.runPromise(withClient((c) => c.BranchRename({ repoId, oldName, newName }))),
+    branchDelete: (repoId, name, force) =>
+      runtime.runPromise(withClient((c) => c.BranchDelete({ repoId, name, force }))),
+    branchSetUpstream: (repoId, name, upstream) =>
+      runtime.runPromise(withClient((c) => c.BranchSetUpstream({ repoId, name, upstream }))),
+    // ── merge (P3) ──────────────────────────────────────────────────────────
+    mergeCreate: (repoId, ref, strategy) =>
+      runtime.runPromise(withClient((c) => c.MergeCreate({ repoId, ref, strategy }))),
+    mergeAbort: (repoId) => runtime.runPromise(withClient((c) => c.MergeAbort({ repoId }))),
+    // ── sync streaming (P3) ─────────────────────────────────────────────────
+    fetchStream: (repoId, opts, handlers) =>
+      runStream(
+        streamWithClient((c) => c.FetchStream({ repoId, ...opts })),
+        handlers,
+      ),
+    pullStream: (repoId, mode, opts, handlers) =>
+      runStream(
+        streamWithClient((c) => c.PullStream({ repoId, mode, ...opts })),
+        handlers,
+      ),
+    pushStream: (repoId, remote, opts, handlers) =>
+      runStream(
+        streamWithClient((c) => c.PushStream({ repoId, remote, ...opts })),
+        handlers,
+      ),
+    pushDeleteRemoteRef: (repoId, remote, ref, refType) =>
+      runtime.runPromise(withClient((c) => c.PushDeleteRemoteRef({ repoId, remote, ref, refType }))),
+    // ── remotes (P3) ────────────────────────────────────────────────────────
+    remoteList: (repoId) => runtime.runPromise(withClient((c) => c.RemoteList({ repoId }))),
+    remoteAdd: (repoId, name, url) => runtime.runPromise(withClient((c) => c.RemoteAdd({ repoId, name, url }))),
+    remoteSetUrl: (repoId, name, url, push) =>
+      runtime.runPromise(withClient((c) => c.RemoteSetUrl({ repoId, name, url, push }))),
+    remoteRename: (repoId, oldName, newName) =>
+      runtime.runPromise(withClient((c) => c.RemoteRename({ repoId, oldName, newName }))),
+    remoteRemove: (repoId, name) => runtime.runPromise(withClient((c) => c.RemoteRemove({ repoId, name }))),
+    // ── worktrees (P3) ──────────────────────────────────────────────────────
+    worktreeList: (repoId) => runtime.runPromise(withClient((c) => c.WorktreeList({ repoId }))),
+    worktreeAdd: (repoId, path, opts) =>
+      runtime.runPromise(withClient((c) => c.WorktreeAdd({ repoId, path, ...opts }))),
+    worktreeRemove: (repoId, path, force) =>
+      runtime.runPromise(withClient((c) => c.WorktreeRemove({ repoId, path, force }))),
+    worktreePrune: (repoId) => runtime.runPromise(withClient((c) => c.WorktreePrune({ repoId }))),
+    // ── stash (P3) ──────────────────────────────────────────────────────────
+    stashPush: (repoId, opts) => runtime.runPromise(withClient((c) => c.StashPush({ repoId, ...opts }))),
+    stashList: (repoId) => runtime.runPromise(withClient((c) => c.StashList({ repoId }))),
+    stashShow: (repoId, ref) => runtime.runPromise(withClient((c) => c.StashShow({ repoId, ref }))),
+    stashApply: (repoId, ref) => runtime.runPromise(withClient((c) => c.StashApply({ repoId, ref }))),
+    stashPop: (repoId, ref) => runtime.runPromise(withClient((c) => c.StashPop({ repoId, ref }))),
+    stashDrop: (repoId, ref) => runtime.runPromise(withClient((c) => c.StashDrop({ repoId, ref }))),
+    stashClear: (repoId) => runtime.runPromise(withClient((c) => c.StashClear({ repoId }))),
+    // ── tags (P3) ───────────────────────────────────────────────────────────
+    tagList: (repoId) => runtime.runPromise(withClient((c) => c.TagList({ repoId }))),
+    tagCreate: (repoId, name, opts) => runtime.runPromise(withClient((c) => c.TagCreate({ repoId, name, ...opts }))),
+    tagDelete: (repoId, name) => runtime.runPromise(withClient((c) => c.TagDelete({ repoId, name }))),
+    tagPush: (repoId, remote, opts) => runtime.runPromise(withClient((c) => c.TagPush({ repoId, remote, ...opts }))),
+    tagDeleteRemote: (repoId, remote, name) =>
+      runtime.runPromise(withClient((c) => c.TagDeleteRemote({ repoId, remote, name }))),
   };
 };

@@ -11,6 +11,17 @@ import { describe, expect, test } from "vitest";
 
 import { RpcTest } from "../effect-rpc-adapter";
 import {
+  BranchInfo,
+  BranchListing,
+  BranchUpstream,
+  MergeResult,
+  RemoteInfo,
+  StashEntry,
+  SyncProgressEvent,
+  TagInfo,
+  WorktreeInfo,
+} from "../schemas/branches";
+import {
   CommitDetail,
   CommitSummary,
   DiffFile,
@@ -134,6 +145,52 @@ const fileContent = new FileContent({
   content: "hello",
 });
 
+// --- P3 sample data ---
+const branchUpstream = new BranchUpstream({
+  ref: "refs/remotes/origin/main",
+  name: "origin/main",
+  ahead: 0,
+  behind: 0,
+});
+const branchInfo = new BranchInfo({
+  name: "main",
+  fullRef: "refs/heads/main",
+  tipOid: oid1,
+  tipSubject: "init",
+  isCurrent: true,
+  upstream: branchUpstream,
+  isRemote: false,
+});
+const branchListing = new BranchListing({ localBranches: [branchInfo], remoteBranches: [], currentBranch: "main" });
+const mergeResult = new MergeResult({ mode: "fastForward", newTipOid: oid1 });
+const syncProgress = new SyncProgressEvent({ _tag: "progress", text: "Fetching origin" });
+const remoteInfo = new RemoteInfo({ name: "origin", fetchUrl: "https://example.com/repo.git" });
+const worktreeInfo = new WorktreeInfo({
+  path: "/srv/repo",
+  headOid: oid1,
+  branch: "main",
+  isMain: true,
+  isBare: false,
+  isDetached: false,
+  isLocked: false,
+  isPrunable: false,
+});
+const stashEntry = new StashEntry({
+  index: 0,
+  ref: "stash@{0}",
+  message: "WIP",
+  branch: "main",
+  headOid: oid1,
+  subject: "WIP on main",
+});
+const tagInfo = new TagInfo({
+  name: "v1.0.0",
+  fullRef: "refs/tags/v1.0.0",
+  objectOid: oid1,
+  targetOid: oid1,
+  isAnnotated: false,
+});
+
 // --- stub handlers: schema-valid data, plus payload-driven error injection ---
 const handlers = CbranchRpcs.toLayer({
   RepoOpen: ({ path }) =>
@@ -175,6 +232,53 @@ const handlers = CbranchRpcs.toLayer({
   DiscardHunks: () => Effect.void,
   CommitCreate: ({ subject }) => Effect.succeed(new CommitCreated({ oid: oid1, shortOid: "1111111", subject })),
   CommitLastMessage: () => Effect.succeed(new CommitMessage({ subject: "init", body: "", raw: "init" })),
+
+  // ── P3: branches ────────────────────────────────────────────────────────────
+  BranchList: () => Effect.succeed(branchListing),
+  BranchCreate: () => Effect.succeed(branchInfo),
+  BranchSwitch: () => Effect.void,
+  BranchRename: () => Effect.void,
+  BranchDelete: () => Effect.void,
+  BranchSetUpstream: () => Effect.void,
+
+  // ── P3: merge ───────────────────────────────────────────────────────────────
+  MergeCreate: () => Effect.succeed(mergeResult),
+  MergeAbort: () => Effect.void,
+
+  // ── P3: sync (streaming) ────────────────────────────────────────────────────
+  FetchStream: () => Stream.make(syncProgress),
+  PullStream: () => Stream.make(syncProgress),
+  PushStream: () => Stream.make(syncProgress),
+  PushDeleteRemoteRef: () => Effect.void,
+
+  // ── P3: remotes ─────────────────────────────────────────────────────────────
+  RemoteList: () => Effect.succeed([remoteInfo]),
+  RemoteAdd: () => Effect.void,
+  RemoteSetUrl: () => Effect.void,
+  RemoteRename: () => Effect.void,
+  RemoteRemove: () => Effect.void,
+
+  // ── P3: worktrees ───────────────────────────────────────────────────────────
+  WorktreeList: () => Effect.succeed([worktreeInfo]),
+  WorktreeAdd: () => Effect.succeed(worktreeInfo),
+  WorktreeRemove: () => Effect.void,
+  WorktreePrune: () => Effect.void,
+
+  // ── P3: stash ───────────────────────────────────────────────────────────────
+  StashPush: () => Effect.succeed(stashEntry),
+  StashList: () => Effect.succeed([stashEntry]),
+  StashShow: () => Effect.succeed([textDiffFile]),
+  StashApply: () => Effect.void,
+  StashPop: () => Effect.void,
+  StashDrop: () => Effect.void,
+  StashClear: () => Effect.void,
+
+  // ── P3: tags ─────────────────────────────────────────────────────────────────
+  TagList: () => Effect.succeed([tagInfo]),
+  TagCreate: () => Effect.succeed(tagInfo),
+  TagDelete: () => Effect.void,
+  TagPush: () => Effect.void,
+  TagDeleteRemote: () => Effect.void,
 });
 
 describe("CbranchRpcs P1 contract (in-memory RpcTest round-trip)", () => {
@@ -331,6 +435,53 @@ describe("CbranchRpcs P2 stage & commit method catalog (DECISIONS D1 wire tags)"
     "DiscardHunks",
     "CommitCreate",
     "CommitLastMessage",
+  ])("exposes the %s wire tag", (tag) => {
+    expect(CbranchRpcs.requests.has(tag)).toBe(true);
+  });
+});
+
+describe("CbranchRpcs P3 branches/sync/remotes/worktrees/stash/tags method catalog (DECISIONS D1 wire tags)", () => {
+  test.each([
+    // branches
+    "BranchList",
+    "BranchCreate",
+    "BranchSwitch",
+    "BranchRename",
+    "BranchDelete",
+    "BranchSetUpstream",
+    // merge
+    "MergeCreate",
+    "MergeAbort",
+    // sync
+    "FetchStream",
+    "PullStream",
+    "PushStream",
+    "PushDeleteRemoteRef",
+    // remotes
+    "RemoteList",
+    "RemoteAdd",
+    "RemoteSetUrl",
+    "RemoteRename",
+    "RemoteRemove",
+    // worktrees
+    "WorktreeList",
+    "WorktreeAdd",
+    "WorktreeRemove",
+    "WorktreePrune",
+    // stash
+    "StashPush",
+    "StashList",
+    "StashShow",
+    "StashApply",
+    "StashPop",
+    "StashDrop",
+    "StashClear",
+    // tags
+    "TagList",
+    "TagCreate",
+    "TagDelete",
+    "TagPush",
+    "TagDeleteRemote",
   ])("exposes the %s wire tag", (tag) => {
     expect(CbranchRpcs.requests.has(tag)).toBe(true);
   });

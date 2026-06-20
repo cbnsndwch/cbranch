@@ -50,4 +50,16 @@ export const queryKeys = {
   workingDiff: (repoId: RepoId, path: string, staged: boolean) => [repoId, "status", "diff", path, staged] as const,
   /** `commit.lastMessage` — the last commit's message, for reuse/amend (domain: `commit`). */
   lastMessage: (repoId: RepoId) => [repoId, "commit", "lastMessage"] as const,
+  /** `branch.list` (domain: `refs`). */
+  branches: (repoId: RepoId) => [repoId, "refs", "branches"] as const,
+  /** `remote.list` (domain: `config`). */
+  remotes: (repoId: RepoId) => [repoId, "config", "remotes"] as const,
+  /** `worktree.list` (domain: `worktrees`). */
+  worktrees: (repoId: RepoId) => [repoId, "worktrees", "list"] as const,
+  /** `stash.list` (domain: `stash`). */
+  stash: (repoId: RepoId) => [repoId, "stash", "list"] as const,
+  /** `stash.show` — immutable once the stash entry is dropped. */
+  stashShow: (repoId: RepoId, ref: string) => [repoId, "stash", ref, "diff"] as const,
+  /** `tag.list` (domain: `tags`). */
+  tags: (repoId: RepoId) => [repoId, "tags", "list"] as const,
 };

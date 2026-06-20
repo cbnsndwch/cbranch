@@ -31,6 +31,9 @@ export * from "./schemas/domain";
 // CommitMessage.
 export * from "./schemas/working-tree";
 
+// P3 branch/sync/remote/worktree/stash/tag Schemas.
+export * from "./schemas/branches";
+
 // The P1 method catalog.
 export * from "./rpc/group";
 
