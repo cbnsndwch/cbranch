@@ -76,6 +76,9 @@ export function useMenuActions(): MenuActions {
             }),
           )
           .catch(() => {});
+      // Commands → Commit… opens the dedicated commit dialog (commit-surface.md §9.4).
+      handlers["commands.commit"] = () =>
+        useUiStore.getState().setCommitDialogOpen(true);
     }
     // State-bound checkbox: the date column's relative/absolute mode (P1-HIST-8).
     const checkboxes: Record<string, boolean> = {

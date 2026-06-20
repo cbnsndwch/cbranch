@@ -105,7 +105,19 @@ beforeEach(() => {
       disconnect() {}
     };
   useUiStore.setState({
-    commitDraft: { subject: "", body: "", amend: false, signoff: false },
+    commitDraft: {
+      subject: "",
+      body: "",
+      amend: false,
+      signoff: false,
+      allowEmpty: false,
+      resetAuthor: false,
+      sign: false,
+      signFormat: "gpg",
+      authorOverride: false,
+      authorName: "",
+      authorEmail: "",
+    },
     activeRepoId: null,
   });
 });
@@ -247,7 +259,7 @@ describe("CommitPanel", () => {
     );
   });
 
-  test("shows 72-char limit warning when subject exceeds limit", async () => {
+  test("shows the soft ~50-char subject guide when the subject exceeds it", async () => {
     const api = makeApi({ statusGet: vi.fn(async () => makeStatus([])) });
     renderPanel(api);
     const subjectInput = screen.getByLabelText("Commit subject");
@@ -255,6 +267,6 @@ describe("CommitPanel", () => {
     await act(async () => {
       fireEvent.change(subjectInput, { target: { value: longSubject } });
     });
-    expect(screen.getByText("73/72")).toBeTruthy();
+    expect(screen.getByText("73/50")).toBeTruthy();
   });
 });

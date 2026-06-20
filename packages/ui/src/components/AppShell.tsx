@@ -1,3 +1,5 @@
+import { useEffect } from "react";
+
 import { cn } from "../lib/cn";
 import { useInvalidationBus } from "../rpc/use-invalidation-bus";
 import { useNavigation } from "../state/navigation";
@@ -5,6 +7,7 @@ import { type ActiveView, useUiStore } from "../state/store";
 import { BranchesPanel } from "./BranchesPanel";
 import { CommandPalette } from "./CommandPalette";
 import { CommitDetailsTabs } from "./CommitDetailsTabs";
+import { CommitDialog } from "./CommitDialog";
 import { CommitTab } from "./CommitTab";
 import { DiffPanel } from "./DiffPanel";
 import { DocumentTitle } from "./DocumentTitle";
@@ -12,7 +15,6 @@ import { HistoryPane } from "./HistoryPane";
 import { HistoryStatusStrip } from "./HistoryStatusStrip";
 import { MenuBar } from "./MenuBar";
 import { RepositorySidebar } from "./RepositorySidebar";
-import { StagingView } from "./StagingView";
 import { StashPanel } from "./StashPanel";
 import { TagsPanel } from "./TagsPanel";
 import { Toolbar } from "./Toolbar";
@@ -37,18 +39,31 @@ export function AppShell() {
   const activeView = useUiStore((s) => s.activeView);
   const setActiveView = useUiStore((s) => s.setActiveView);
   const openPalette = useUiStore((s) => s.setPaletteOpen);
+  const setCommitDialogOpen = useUiStore((s) => s.setCommitDialogOpen);
   // Commit selection writes the URL (D13); the store mirrors it via <SyncRouteToStore>.
   const { selectOid } = useNavigation();
 
   // Live updates: subscribe to the host invalidation bus for the active repo.
   useInvalidationBus(repoId);
 
+  // Global shortcut to open the commit dialog (docs/design/commit-surface.md §6:
+  // Ctrl/Cmd+Shift+Enter). Ctrl/Cmd+Enter is reserved for committing inside the dialog.
+  useEffect(() => {
+    if (!repoId) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === "Enter") {
+        e.preventDefault();
+        setCommitDialogOpen(true);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [repoId, setCommitDialogOpen]);
+
   const detailContent = (() => {
     if (!repoId)
       return <Placeholder>Select a commit to see its details.</Placeholder>;
     switch (detailTab) {
-      case "changes":
-        return <StagingView repoId={repoId} />;
       case "commit":
         return (
           <CommitTab
@@ -116,6 +131,7 @@ export function AppShell() {
   return (
     <>
       <CommandPalette />
+      <CommitDialog />
 
       {/* Headless: reflects the active branch in the browser window title (no in-app title bar). */}
       <DocumentTitle />

@@ -37,6 +37,9 @@ export function StatusPanel({ repoId }: StatusPanelProps) {
   }
 
   const { staged, unstaged } = groupStatusEntries(status?.entries ?? []);
+  const conflictCount = (status?.entries ?? []).filter(
+    (e) => e.isConflicted,
+  ).length;
 
   const allStagedSelected =
     staged.length > 0 && staged.every((e) => stagedSelection.has(e.path));
@@ -68,6 +71,19 @@ export function StatusPanel({ repoId }: StatusPanelProps) {
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
+      {/* Conflict banner (docs/design/commit-surface.md §7): commit is blocked while a
+          merge is unresolved; staging a file whose markers were removed marks it
+          resolved and is the escape hatch before the full resolver phase. */}
+      {conflictCount > 0 && (
+        <div
+          role="alert"
+          className="bg-destructive/10 text-destructive border-b px-2 py-1 text-[11px]"
+        >
+          {conflictCount} conflict{conflictCount === 1 ? "" : "s"} — resolve
+          markers, then stage the file to mark it resolved.
+        </div>
+      )}
+
       {/* Staged section */}
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <ChangeListToolbar

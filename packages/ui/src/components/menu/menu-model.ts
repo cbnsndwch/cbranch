@@ -545,7 +545,8 @@ export const MENUS: ReadonlyArray<TopMenu> = [
         id: "commands.commit",
         label: "Commit…",
         phase: "P2",
-        accelerator: "Ctrl+Enter",
+        // Opens the commit dialog (commit-surface.md §6); Ctrl+Enter commits *within* it.
+        accelerator: "Ctrl+Shift+Enter",
       },
       {
         kind: "command",

@@ -8,6 +8,12 @@
 import { type Oid, type RepoId } from "@cbranch/rpc-contract";
 import { create } from "zustand";
 
+import {
+  readCommitSplit,
+  readKeepOpen,
+  writeCommitSplit,
+  writeKeepOpen,
+} from "../lib/commit-ui";
 import { type DiffView, readDiffView, writeDiffView } from "../lib/diff";
 import { emptyFilters, type LogFilters } from "../lib/filters";
 import { type DateMode, readDateMode, writeDateMode } from "../lib/format";
@@ -34,6 +40,17 @@ export interface CommitDraft {
   body: string;
   amend: boolean;
   signoff: boolean;
+  /** Explicit opt-in to record an empty commit (no staged changes). */
+  allowEmpty: boolean;
+  /** Reset author to the committer on amend (`--reset-author`); only valid while amending. */
+  resetAuthor: boolean;
+  /** Cryptographically sign the commit; honors `gpg.format` (never silently unsigned). */
+  sign: boolean;
+  signFormat: "gpg" | "ssh";
+  /** Override the recorded author identity (collapsible "author override" control). */
+  authorOverride: boolean;
+  authorName: string;
+  authorEmail: string;
 }
 
 const DEFAULT_DRAFT: CommitDraft = {
@@ -41,6 +58,13 @@ const DEFAULT_DRAFT: CommitDraft = {
   body: "",
   amend: false,
   signoff: false,
+  allowEmpty: false,
+  resetAuthor: false,
+  sign: false,
+  signFormat: "gpg",
+  authorOverride: false,
+  authorName: "",
+  authorEmail: "",
 };
 
 export interface UiState {
@@ -73,6 +97,16 @@ export interface UiState {
   readonly commitDraft: CommitDraft;
   readonly updateCommitDraft: (patch: Partial<CommitDraft>) => void;
   readonly resetCommitDraft: () => void;
+  // ── P2: commit dialog surface (docs/design/commit-surface.md) ────────────────
+  /** Whether the dedicated stage-&-commit modal dialog is open (§2). */
+  readonly commitDialogOpen: boolean;
+  readonly setCommitDialogOpen: (open: boolean) => void;
+  /** "Keep open after commit" toggle — default ON, persisted per session (§5). */
+  readonly keepOpenAfterCommit: boolean;
+  readonly setKeepOpenAfterCommit: (value: boolean) => void;
+  /** The dialog body's changes|diff split fraction (0..1), persisted (§2/§3). */
+  readonly commitSplit: number;
+  readonly setCommitSplit: (fraction: number) => void;
   // ── P2: file selection (staged / unstaged panels) ───────────────────────────
   readonly stagedSelection: ReadonlySet<string>;
   readonly unstagedSelection: ReadonlySet<string>;
@@ -102,6 +136,9 @@ export const useUiStore = create<UiState>((set) => ({
   detailTab: "commit",
   knownRefStrings: [],
   commitDraft: DEFAULT_DRAFT,
+  commitDialogOpen: false,
+  keepOpenAfterCommit: readKeepOpen(),
+  commitSplit: readCommitSplit(),
   stagedSelection: new Set(),
   unstagedSelection: new Set(),
   selectedDiffFile: null,
@@ -136,6 +173,15 @@ export const useUiStore = create<UiState>((set) => ({
   updateCommitDraft: (patch) =>
     set((s) => ({ commitDraft: { ...s.commitDraft, ...patch } })),
   resetCommitDraft: () => set({ commitDraft: DEFAULT_DRAFT }),
+  setCommitDialogOpen: (commitDialogOpen) => set({ commitDialogOpen }),
+  setKeepOpenAfterCommit: (keepOpenAfterCommit) => {
+    writeKeepOpen(keepOpenAfterCommit);
+    set({ keepOpenAfterCommit });
+  },
+  setCommitSplit: (commitSplit) => {
+    writeCommitSplit(commitSplit);
+    set({ commitSplit });
+  },
   toggleStagedSelection: (path) =>
     set((s) => {
       const next = new Set(s.stagedSelection);

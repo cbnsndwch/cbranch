@@ -76,13 +76,16 @@ export function Toolbar() {
   const setFilters = useUiStore((s) => s.setFilters);
   const openPalette = useUiStore((s) => s.setPaletteOpen);
   const setActiveView = useUiStore((s) => s.setActiveView);
-  const setDetailTab = useUiStore((s) => s.setDetailTab);
+  const openCommitDialog = useUiStore((s) => s.setCommitDialogOpen);
   const { data: state } = useRepoState(repoId);
   const { data: remotes } = useRemoteList(repoId);
   const { data: branchListing } = useBranchList(repoId);
   const { data: status } = useStatus(repoId);
   const api = useApi();
   const queryClient = useQueryClient();
+
+  // Pending-change count badge on the Commit button (docs/design/commit-surface.md §2).
+  const changeCount = status?.entries.length ?? 0;
 
   const repoRoot = state?.repoRoot ?? "—";
   const currentBranch = state?.isDetached
@@ -95,8 +98,6 @@ export function Toolbar() {
   const upstream = branchListing?.localBranches.find(
     (b) => b.isCurrent,
   )?.upstream;
-  const stagedCount =
-    status?.entries.filter((e) => e.staged !== "unmodified").length ?? 0;
 
   const syncUnsubRef = useRef<(() => void) | null>(null);
   const [syncRunning, setSyncRunning] = useState<SyncKind | null>(null);
@@ -190,9 +191,9 @@ export function Toolbar() {
     if (repoId) void queryClient.invalidateQueries({ queryKey: [repoId] });
   };
 
+  // Open the dedicated stage-&-commit dialog (docs/design/commit-surface.md §2).
   const handleCommit = () => {
-    setActiveView("history");
-    setDetailTab("changes");
+    openCommitDialog(true);
   };
 
   // oxlint-disable-next-line unicorn/consistent-function-scoping
@@ -381,12 +382,12 @@ export function Toolbar() {
           type="button"
           onClick={handleCommit}
           disabled={!repoId}
-          title="Commit staged changes"
-          aria-label="Commit staged changes"
+          title="Stage & commit changes"
+          aria-label="Stage & commit changes"
           className="flex h-5.5 items-center gap-0.5 border px-1.5 text-[11px] disabled:opacity-40"
         >
           <GitCommitHorizontal className="size-3.5" aria-hidden="true" />
-          {"Commit (" + String(stagedCount) + ")"}
+          {"Commit (" + String(changeCount) + ")"}
         </button>
         {/* Stashes */}
         <SplitButton

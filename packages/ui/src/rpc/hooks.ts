@@ -384,6 +384,10 @@ export const useCommitCreate = (repoId: RepoId) => {
       void qc.invalidateQueries({ queryKey: [repoId, "commits"] });
       void qc.invalidateQueries({ queryKey: [repoId, "refs"] });
       void qc.invalidateQueries({ queryKey: [repoId, "inProgress"] });
+      // Refresh the reuse/amend message seed (HEAD's message just changed).
+      void qc.invalidateQueries({
+        queryKey: [repoId, "commit", "lastMessage"],
+      });
     },
   });
 };

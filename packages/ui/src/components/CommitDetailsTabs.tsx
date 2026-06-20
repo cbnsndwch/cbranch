@@ -1,8 +1,10 @@
 import { cn } from "../lib/cn";
 import { type DetailTab, useUiStore } from "../state/store";
 
+// Authoring a commit moved to the dedicated modal (docs/design/commit-surface.md §9.2);
+// these bottom tabs are for *viewing* the selected revision, so there is no inline
+// "Changes" (staging) tab here anymore.
 const TABS: ReadonlyArray<readonly [DetailTab, string]> = [
-  ["changes", "Changes"],
   ["commit", "Commit"],
   ["diff", "Diff"],
   ["filetree", "File tree"],
