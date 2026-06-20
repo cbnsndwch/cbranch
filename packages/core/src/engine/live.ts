@@ -49,6 +49,7 @@ import {
 import { fileContentAtRev } from "../git/content";
 import { commitDiff, diffWorkingFile } from "../git/diff";
 import { gitError } from "../git/errors";
+import { fileHistory as fileHistoryGit } from "../git/file-history";
 import { makeLogStream } from "../git/history";
 import { makeRepoLockRegistry } from "../git/locks";
 import {
@@ -115,14 +116,6 @@ import {
 import { type ResolvedRepo, repoCwd, resolveRepo } from "../repo/resolve";
 import { detectInProgress, readRepoState } from "../repo/state";
 import { GitEngine, type GitEngineApi } from "./git-engine";
-
-/**
- * S1 placeholder for the P4 engine methods. Each slice (S2–S7) replaces the
- * matching stub with its real body; until then the method fails fast rather than
- * faking success. `Effect<never, …>` is assignable to every method's success type.
- */
-const p4Stub = (): Effect.Effect<never, GitError> =>
-  Effect.fail(gitError("gitFailed", "P4 method not implemented yet"));
 
 export interface MakeGitEngineOptions {
   /** Override the settings file path (tests / `CBRANCH_CONFIG` semantics). */
@@ -726,7 +719,10 @@ export const makeGitEngine = (
             ),
           ),
         ),
-      fileHistory: () => p4Stub(),
+      fileHistory: (repoId, path, limit, cursor, startRev) =>
+        Effect.flatMap(resolveById(repoId), (repo) =>
+          fileHistoryGit(repoCwd(repo), path, { limit, cursor, startRev }, env),
+        ),
     };
     return api;
   });
