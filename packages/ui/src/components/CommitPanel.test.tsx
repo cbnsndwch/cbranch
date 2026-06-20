@@ -200,6 +200,38 @@ describe("CommitPanel", () => {
     );
   });
 
+  test("a commit error shows a persistent banner and keeps the draft", async () => {
+    const api = makeApi({
+      statusGet: vi.fn(async () => makeStatus([stagedEntry])),
+      commitCreate: vi.fn(async () => {
+        throw new Error("Expected CommitCreated, got {…}");
+      }),
+    });
+    renderPanel(api);
+    await waitFor(() => expect(api.statusGet).toHaveBeenCalled());
+    const subjectInput = screen.getByLabelText(
+      "Commit subject",
+    ) as HTMLInputElement;
+    await act(async () => {
+      fireEvent.change(subjectInput, { target: { value: "add feature" } });
+    });
+    const commitBtn = Array.from(document.querySelectorAll("button")).find(
+      (b) => b.textContent?.trim() === "Commit",
+    );
+    await act(async () => {
+      fireEvent.click(commitBtn!);
+    });
+    // The error persists in the dialog (not a transient toast)…
+    expect(await screen.findByText(/Expected CommitCreated/)).toBeTruthy();
+    // …and the draft is preserved so nothing is lost.
+    expect(subjectInput.value).toBe("add feature");
+    // Dismiss clears it.
+    await act(async () => {
+      fireEvent.click(screen.getByLabelText("Dismiss error"));
+    });
+    expect(screen.queryByText(/Expected CommitCreated/)).toBeNull();
+  });
+
   test("Reuse Last Message fills the subject from last commit", async () => {
     const msg = new CommitMessage({
       subject: "prev subject",

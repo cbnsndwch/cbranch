@@ -1,5 +1,5 @@
 import { type CommitInput, type RepoId } from "@cbranch/rpc-contract";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, X } from "lucide-react";
 import {
   forwardRef,
   useEffect,
@@ -73,6 +73,10 @@ export const CommitPanel = forwardRef<CommitPanelHandle, CommitPanelProps>(
     const [ccType, setCcType] = useState("");
     const [ccScope, setCcScope] = useState("");
     const [ccBreaking, setCcBreaking] = useState(false);
+    // A persistent, dismissible commit error (not a transient toast): commit errors are
+    // worth reading and copying — a toast disappears before you can. Cleared on the next
+    // attempt and on success.
+    const [commitError, setCommitError] = useState<string | null>(null);
 
     const status = statusQuery.data;
     const repoState = repoStateQuery.data;
@@ -135,6 +139,7 @@ export const CommitPanel = forwardRef<CommitPanelHandle, CommitPanelProps>(
 
     const handleCommit = () => {
       if (disabledReason !== null || commitCreate.isPending) return;
+      setCommitError(null);
       const input: CommitInput = {
         repoId,
         subject: commitDraft.subject.trim(),
@@ -156,6 +161,7 @@ export const CommitPanel = forwardRef<CommitPanelHandle, CommitPanelProps>(
       commitCreate.mutate(input, {
         onSuccess: (created) => {
           toast.success(`Committed ${created.shortOid} — ${created.subject}`);
+          setCommitError(null);
           resetCommitDraft();
           setCcType("");
           setCcScope("");
@@ -168,7 +174,9 @@ export const CommitPanel = forwardRef<CommitPanelHandle, CommitPanelProps>(
           }
         },
         onError: (err) => {
-          toast.error("Commit failed: " + String(err));
+          // Persist the error in the dialog (see `commitError`) rather than a toast
+          // that vanishes before it can be read.
+          setCommitError(String(err));
         },
       });
     };
@@ -332,6 +340,23 @@ export const CommitPanel = forwardRef<CommitPanelHandle, CommitPanelProps>(
                 aria-label="Author email"
                 className="border-input h-6 flex-1 rounded-none border bg-transparent px-1.5 text-[11px]"
               />
+            </div>
+          )}
+
+          {/* Persistent commit error (§7) — stays until dismissed or the next attempt. */}
+          {commitError && (
+            <div className="border-destructive/40 bg-destructive/10 text-destructive flex items-start gap-2 border-t px-2 py-1.5 text-[11px]">
+              <span className="min-w-0 flex-1 break-words whitespace-pre-wrap select-text">
+                {commitError}
+              </span>
+              <button
+                type="button"
+                onClick={() => setCommitError(null)}
+                aria-label="Dismiss error"
+                className="hover:text-foreground shrink-0"
+              >
+                <X className="size-3.5" aria-hidden="true" />
+              </button>
             </div>
           )}
 
