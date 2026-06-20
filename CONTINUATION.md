@@ -30,23 +30,41 @@ Gate: **GREEN — 505 tests, 80.69% branches**
 | 4c28f5c | P3 query+mutation hooks (28 new hooks) · `activeView` Zustand state · AppShell view nav tabs (History/Branches/Worktrees/Stash/Tags) · BranchesPanel (local/remote groups, create/rename/delete/dirty-tree dialogs, dropdown menus) |
 | 1b5ba77 | Fetch/Pull/Push streaming buttons in Toolbar (Sonner progress toasts) · RemotesManagerDialog (CRUD table) · WorktreesPanel (list + add/remove/prune) · StashPanel (list + new-stash/apply/pop/drop/clear) · TagsPanel (list + create/delete/push actions) |
 
-### ▶ NEXT TASK: P3 self-review (in progress), then P4
+### ▶ NEXT TASK: P3 spec-conformance fixes (Groups 1–9), then P4
 
-**STOP — await user review/approval of P3 before starting P4.**
+**P3 self-review is DONE** → full report at `docs/_impl-notes/P3-REVIEW.md` (gaps grouped
+A=4 critical bugs, B=8 missing behaviors, C=robustness [NOT in scope], D=9 UI gaps,
+E=tests). User approved fixing **A, B, D, E** in grouped gate-green commits; toolbar
+work must follow `docs/design/toolbar-quick-actions.md` (dense 2-row icon toolbar w/
+split-button dropdowns).
 
-At the STOP gate the user chose **"Review P3 first"**. A four-agent parallel audit of
-P3 core (branch / sync / worktree-stash-tag) + UI against
-`docs/spec/07-phase3-branches-sync.md` REQ-IDs is underway. On resume: collect/​re-run
-the audit, synthesize a P3 review report, present gaps to the user, and fix any
-agreed-upon issues (gate-green commit each) before P4.
+**Interlude (done 2026-06-20):** a concurrent react-router framework-mode migration
+landed mid-review. It + a global printWidth-120→80 reformat were committed as two clean
+commits: `960f31e` (style: reformat + pin oxfmt) and `fb32969` (refactor(ui): react-router).
+Formatter is now settled on **oxfmt 0.55.0 @ printWidth 80**; the VS Code oxc extension is
+pinned to the workspace binary (`oxc.path.oxfmt` + `oxc.useExecPath`). Gate green: 505+323
+tests, 80.69% branches.
 
-When the user approves, read `docs/spec/08-phase4-diff-conflict.md` and plan P4.
+**Resume protocol for the fixes:**
+1. `pnpm gate` to confirm baseline green on current `main`.
+2. **Group 1 (merge A2/B1/B2/B3) is implemented but STALE in `git stash@{0}`** (captured
+   pre-80-reformat at 120-width + a junk git-engine.ts reflow). **Do NOT pop it** — it would
+   conflict on every line. Instead **re-derive Group 1 fresh** on the current base (use the
+   stash as a spec reference; the agent prompt that worked is preserved in the transcript).
+   Then drop the stale stash.
+3. Work Groups 1–9 (session task list), one gate-green thematic commit each. Core groups
+   (1–4) share contract/`live.ts` → run sequentially. Groups:
+   1 merge (A2/B1/B2/B3) · 2 sync lock+non-ff+streaming (A1/A4/B4/B7/B8) ·
+   3 branch reapply+detached (A3/B5) · 4 worktree context switch (B6/D8) ·
+   5 UI branches panel (D1/D5/D6) · 6 UI toolbar redesign (D7) ·
+   7 UI palette+non-ff dialog (D2/D3) · 8 UI stash preview+confirmations (D4/D6/D9) ·
+   9 test sweep (E).
+   Delegation pattern that worked: 1 sub-agent per vertical slice (contract→core→engine→
+   server→UI hook + tests), get `pnpm gate` green, report concise summary; orchestrator
+   commits with an undercover message.
 
-P4 key areas (from spec):
-- Three-way merge conflict editor
-- Conflict marker detection and inline resolution UI
-- Rebase support (interactive and non-interactive)
-- Cherry-pick and revert
+When all groups land, read `docs/spec/08-phase4-diff-conflict.md` and plan P4 (three-way
+conflict editor, conflict-marker resolution UI, rebase, cherry-pick/revert).
 
 ### Key files added in P3
 
