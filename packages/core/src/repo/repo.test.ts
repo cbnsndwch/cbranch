@@ -6,7 +6,11 @@ import { Effect, Exit } from "effect";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 
 import { run, runExit } from "../testing/effect-run";
-import { createFixtureWorkspace, type FixtureWorkspace, seedConflict } from "../testing/fixtures";
+import {
+  createFixtureWorkspace,
+  type FixtureWorkspace,
+  seedConflict,
+} from "../testing/fixtures";
 import { resolveRepo } from "./resolve";
 import { detectInProgress, parseBranchHeader, readRepoState } from "./state";
 
@@ -25,11 +29,19 @@ describe("parseBranchHeader (porcelain v2 -z headers)", () => {
   });
 
   test("recognizes (initial) and (detached) sentinels", () => {
-    expect(parseBranchHeader(Buffer.from("# branch.oid (initial)\0# branch.head main\0"))).toEqual({
+    expect(
+      parseBranchHeader(
+        Buffer.from("# branch.oid (initial)\0# branch.head main\0"),
+      ),
+    ).toEqual({
       oid: "(initial)",
       head: "main",
     });
-    expect(parseBranchHeader(Buffer.from("# branch.oid abc\0# branch.head (detached)\0")).head).toBe("(detached)");
+    expect(
+      parseBranchHeader(
+        Buffer.from("# branch.oid abc\0# branch.head (detached)\0"),
+      ).head,
+    ).toBe("(detached)");
   });
 });
 
@@ -54,7 +66,9 @@ describe("detectInProgress (P1-OPEN-3 markers)", () => {
     expect(detectInProgress(gitDirWith("BISECT_LOG"))).toBe("bisect");
     expect(detectInProgress(gitDirWith(["rebase-merge", "x"]))).toBe("rebase");
     expect(detectInProgress(gitDirWith(["rebase-apply", "x"]))).toBe("rebase");
-    expect(detectInProgress(gitDirWith(["rebase-apply", "applying"]))).toBe("am");
+    expect(detectInProgress(gitDirWith(["rebase-apply", "applying"]))).toBe(
+      "am",
+    );
   });
 });
 
@@ -79,7 +93,9 @@ describe("resolveRepo (P1-OPEN-2)", () => {
   test("sibling worktrees collapse to one repoId (DECISIONS D2)", async () => {
     const repo = await ws.createRepo("wtmain");
     await repo.commit({ message: "init", files: { "a.txt": "a\n" } });
-    const linked = await repo.worktreeAdd("../wt-feature", { branch: "feature" });
+    const linked = await repo.worktreeAdd("../wt-feature", {
+      branch: "feature",
+    });
     const main = await run(resolveRepo(repo.dir));
     const wt = await run(resolveRepo(linked.dir));
     expect(wt.repoId).toBe(main.repoId);
@@ -101,7 +117,9 @@ describe("resolveRepo (P1-OPEN-2)", () => {
   });
 
   test("a missing path fails with repoNotFound", async () => {
-    const err = await run(Effect.flip(resolveRepo(join(ws.root, "does-not-exist"))));
+    const err = await run(
+      Effect.flip(resolveRepo(join(ws.root, "does-not-exist"))),
+    );
     expect(err.code).toBe("repoNotFound");
   });
 });
@@ -109,7 +127,9 @@ describe("resolveRepo (P1-OPEN-2)", () => {
 describe("readRepoState (DM-070 / P1-OPEN-3 / P1-STAT-3)", () => {
   test("empty repo: isEmpty, unborn branch, no head oid", async () => {
     const repo = await ws.createRepo("empty");
-    const state = await run(Effect.flatMap(resolveRepo(repo.dir), readRepoState));
+    const state = await run(
+      Effect.flatMap(resolveRepo(repo.dir), readRepoState),
+    );
     expect(state.isEmpty).toBe(true);
     expect(state.currentBranch).toBe("main");
     expect(state.headOid).toBeUndefined();
@@ -119,8 +139,13 @@ describe("readRepoState (DM-070 / P1-OPEN-3 / P1-STAT-3)", () => {
 
   test("after a commit: branch + head oid, not empty", async () => {
     const repo = await ws.createRepo("oneCommit");
-    const oid = await repo.commit({ message: "init", files: { "a.txt": "a\n" } });
-    const state = await run(Effect.flatMap(resolveRepo(repo.dir), readRepoState));
+    const oid = await repo.commit({
+      message: "init",
+      files: { "a.txt": "a\n" },
+    });
+    const state = await run(
+      Effect.flatMap(resolveRepo(repo.dir), readRepoState),
+    );
     expect(state.isEmpty).toBe(false);
     expect(state.currentBranch).toBe("main");
     expect(state.headOid).toBe(oid);
@@ -131,7 +156,9 @@ describe("readRepoState (DM-070 / P1-OPEN-3 / P1-STAT-3)", () => {
     await repo.commit({ message: "init", files: { "a.txt": "a\n" } });
     await repo.commit({ message: "second", files: { "b.txt": "b\n" } });
     await repo.checkout("HEAD", { detach: true });
-    const state = await run(Effect.flatMap(resolveRepo(repo.dir), readRepoState));
+    const state = await run(
+      Effect.flatMap(resolveRepo(repo.dir), readRepoState),
+    );
     expect(state.isDetached).toBe(true);
     expect(state.currentBranch).toBeUndefined();
     expect(state.headOid).toBeDefined();
@@ -140,13 +167,17 @@ describe("readRepoState (DM-070 / P1-OPEN-3 / P1-STAT-3)", () => {
   test("conflicted merge surfaces inProgress=merge (P1-OPEN-3)", async () => {
     const repo = await ws.createRepo("midmerge");
     await seedConflict(repo);
-    const state = await run(Effect.flatMap(resolveRepo(repo.dir), readRepoState));
+    const state = await run(
+      Effect.flatMap(resolveRepo(repo.dir), readRepoState),
+    );
     expect(state.inProgress).toBe("merge");
   });
 
   test("bare empty repo: isBare, branch from symbolic-ref", async () => {
     const bare = await ws.createRepo("bare2.git", { bare: true });
-    const state = await run(Effect.flatMap(resolveRepo(bare.dir), readRepoState));
+    const state = await run(
+      Effect.flatMap(resolveRepo(bare.dir), readRepoState),
+    );
     expect(state.isBare).toBe(true);
     expect(state.isEmpty).toBe(true);
     expect(state.currentBranch).toBe("main");

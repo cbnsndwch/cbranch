@@ -28,7 +28,12 @@ describe("query keys (D9 / spec 15 §2)", () => {
 
   test("commit detail/diff and blobs are content-addressed (non-domain, never invalidated)", () => {
     const oid = Oid.make("abc123");
-    expect(queryKeys.commitDetail(repoId, oid)).toEqual([repoId, "commit", oid, "detail"]);
+    expect(queryKeys.commitDetail(repoId, oid)).toEqual([
+      repoId,
+      "commit",
+      oid,
+      "detail",
+    ]);
     const spec = new DiffSpec({
       repoId,
       target: "abc123",
@@ -45,6 +50,11 @@ describe("query keys (D9 / spec 15 §2)", () => {
       "diff",
       { base: "^1", whitespace: "show", context: 3, combined: false },
     ]);
-    expect(queryKeys.fileContentAtRev(repoId, "abc123", "src/a.ts")).toEqual([repoId, "blob", "abc123", "src/a.ts"]);
+    expect(queryKeys.fileContentAtRev(repoId, "abc123", "src/a.ts")).toEqual([
+      repoId,
+      "blob",
+      "abc123",
+      "src/a.ts",
+    ]);
   });
 });

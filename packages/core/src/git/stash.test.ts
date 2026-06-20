@@ -1,8 +1,19 @@
 import { Effect } from "effect";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 
-import { createFixtureWorkspace, type FixtureWorkspace } from "../testing/fixtures";
-import { stashApply, stashClear, stashDrop, stashList, stashPop, stashPush, stashShow } from "./stash";
+import {
+  createFixtureWorkspace,
+  type FixtureWorkspace,
+} from "../testing/fixtures";
+import {
+  stashApply,
+  stashClear,
+  stashDrop,
+  stashList,
+  stashPop,
+  stashPush,
+  stashShow,
+} from "./stash";
 
 describe("stash", () => {
   let ws: FixtureWorkspace;
@@ -29,7 +40,9 @@ describe("stash", () => {
     await repo.writeFile("a.txt", "modified");
     await repo.stage("a.txt");
 
-    const entry = await Effect.runPromise(stashPush(repo.dir, { message: "my stash" }));
+    const entry = await Effect.runPromise(
+      stashPush(repo.dir, { message: "my stash" }),
+    );
 
     expect(entry.index).toBe(0);
     expect(entry.ref).toBe("stash@{0}");
@@ -147,7 +160,9 @@ describe("stash", () => {
     await repo.writeFile("new.txt", "untracked content");
 
     // Stash with untracked; without -u it would fail (no changes)
-    const entry = await Effect.runPromise(stashPush(repo.dir, { includeUntracked: true }));
+    const entry = await Effect.runPromise(
+      stashPush(repo.dir, { includeUntracked: true }),
+    );
     expect(entry.index).toBe(0);
 
     // Working tree should be clean now
@@ -164,7 +179,9 @@ describe("stash", () => {
     await repo.stage("a.txt");
     await repo.writeFile("a.txt", "line1\nline2\nline3\n");
 
-    const entry = await Effect.runPromise(stashPush(repo.dir, { keepIndex: true }));
+    const entry = await Effect.runPromise(
+      stashPush(repo.dir, { keepIndex: true }),
+    );
     expect(entry.index).toBe(0);
 
     // Index retains the staged change (line2 addition)
@@ -174,7 +191,10 @@ describe("stash", () => {
 
   test("stashApply — produces conflict error when apply conflicts with HEAD", async () => {
     const repo = await ws.createRepo("st-conflict");
-    await repo.commit({ message: "init", files: { "f.txt": "line1\nline2\n" } });
+    await repo.commit({
+      message: "init",
+      files: { "f.txt": "line1\nline2\n" },
+    });
 
     // Stash a change to line1
     await repo.writeFile("f.txt", "modified\nline2\n");
@@ -182,7 +202,10 @@ describe("stash", () => {
     await Effect.runPromise(stashPush(repo.dir, { message: "conflict stash" }));
 
     // Commit a conflicting change on the same line
-    await repo.commit({ message: "conflict commit", files: { "f.txt": "different\nline2\n" } });
+    await repo.commit({
+      message: "conflict commit",
+      files: { "f.txt": "different\nline2\n" },
+    });
 
     // Apply the stash — should produce a merge conflict
     const exit = await Effect.runPromiseExit(stashApply(repo.dir, "stash@{0}"));
@@ -191,14 +214,19 @@ describe("stash", () => {
 
   test("stashPush with stagedOnly — only staged changes are stashed", async () => {
     const repo = await ws.createRepo("st-staged");
-    await repo.commit({ message: "init", files: { "a.txt": "line1\n", "b.txt": "b\n" } });
+    await repo.commit({
+      message: "init",
+      files: { "a.txt": "line1\n", "b.txt": "b\n" },
+    });
 
     // Stage a change to a.txt but leave b.txt dirty (unstaged)
     await repo.writeFile("a.txt", "line1\nstaged\n");
     await repo.stage("a.txt");
     await repo.writeFile("b.txt", "unstaged change\n");
 
-    const entry = await Effect.runPromise(stashPush(repo.dir, { stagedOnly: true }));
+    const entry = await Effect.runPromise(
+      stashPush(repo.dir, { stagedOnly: true }),
+    );
     expect(entry.index).toBe(0);
 
     // b.txt should still be dirty (unstaged, not stashed)
@@ -220,7 +248,9 @@ describe("stash", () => {
     const repo = await ws.createRepo("st-badref");
     await repo.commit({ message: "init", files: { "a.txt": "a" } });
 
-    const exit = await Effect.runPromiseExit(stashApply(repo.dir, "stash@{99}"));
+    const exit = await Effect.runPromiseExit(
+      stashApply(repo.dir, "stash@{99}"),
+    );
     expect(exit._tag).toBe("Failure");
   });
 });

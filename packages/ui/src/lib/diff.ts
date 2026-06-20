@@ -27,7 +27,8 @@ export const readDiffView = (): DiffView => {
 /** Persist the inline/split preference. No-op when storage is unavailable (NF-CFG-3). */
 export const writeDiffView = (view: DiffView): void => {
   try {
-    if (typeof localStorage !== "undefined") localStorage.setItem(DIFF_VIEW_KEY, view);
+    if (typeof localStorage !== "undefined")
+      localStorage.setItem(DIFF_VIEW_KEY, view);
   } catch {
     // ignore unavailable/blocked storage
   }
@@ -47,10 +48,18 @@ export interface DiffOptions {
   readonly combined: boolean;
 }
 
-export const defaultDiffOptions: DiffOptions = { whitespace: "show", context: 3, combined: false };
+export const defaultDiffOptions: DiffOptions = {
+  whitespace: "show",
+  context: 3,
+  combined: false,
+};
 
 /** Build the server `DiffSpec` for a target commit and the active options. */
-export const buildDiffSpec = (repoId: RepoId, target: string, options: DiffOptions): DiffSpec =>
+export const buildDiffSpec = (
+  repoId: RepoId,
+  target: string,
+  options: DiffOptions,
+): DiffSpec =>
   new DiffSpec({
     repoId,
     target,
@@ -63,16 +72,24 @@ export const buildDiffSpec = (repoId: RepoId, target: string, options: DiffOptio
   });
 
 /** A gitlink (submodule) entry is recognized by its `160000` mode (P1-DIFF-10). */
-export const isSubmodule = (file: DiffFile): boolean => file.oldMode === "160000" || file.newMode === "160000";
+export const isSubmodule = (file: DiffFile): boolean =>
+  file.oldMode === "160000" || file.newMode === "160000";
 
 /** Changed-line count for a file (numstat sum, falling back to hunk lines for binaries). */
 export const changedLineCount = (file: DiffFile): number => {
-  if (file.additions !== null || file.deletions !== null) return (file.additions ?? 0) + (file.deletions ?? 0);
-  return file.hunks.reduce((sum, hunk) => sum + hunk.lines.filter((l) => l.kind !== "context").length, 0);
+  if (file.additions !== null || file.deletions !== null)
+    return (file.additions ?? 0) + (file.deletions ?? 0);
+  return file.hunks.reduce(
+    (sum, hunk) => sum + hunk.lines.filter((l) => l.kind !== "context").length,
+    0,
+  );
 };
 
 /** Whether a file's diff should be deferred behind a "load anyway" gate (P1-DIFF-9). */
-export const isLargeDiff = (file: DiffFile, threshold = DEFAULT_LARGE_DIFF_LINES): boolean =>
+export const isLargeDiff = (
+  file: DiffFile,
+  threshold = DEFAULT_LARGE_DIFF_LINES,
+): boolean =>
   !file.isBinary && !isSubmodule(file) && changedLineCount(file) > threshold;
 
 /** Aggregate totals for the changed-file list header (P1-UI-DIFF-1). */
@@ -85,7 +102,8 @@ export const diffTotals = (
 });
 
 /** The display path for a file (new path, falling back to the old path for deletions). */
-export const filePath = (file: DiffFile): string => file.newPath || file.oldPath;
+export const filePath = (file: DiffFile): string =>
+  file.newPath || file.oldPath;
 
 // --- Directory-tree view (P1-DIFF-2) ----------------------------------------------------
 
@@ -113,7 +131,9 @@ interface MutableDir {
 const emptyDir = (): MutableDir => ({ dirs: new Map(), files: [] });
 
 /** Build a directory tree from the flat changed-file list, dirs before files, both sorted. */
-export const buildFileTree = (files: ReadonlyArray<DiffFile>): ReadonlyArray<TreeNode> => {
+export const buildFileTree = (
+  files: ReadonlyArray<DiffFile>,
+): ReadonlyArray<TreeNode> => {
   const root = emptyDir();
   for (const file of files) {
     const path = filePath(file);
@@ -130,7 +150,12 @@ export const buildFileTree = (files: ReadonlyArray<DiffFile>): ReadonlyArray<Tre
       }
       dir = next;
     }
-    dir.files.push({ type: "file", name: segments[segments.length - 1]!, path, file });
+    dir.files.push({
+      type: "file",
+      name: segments[segments.length - 1]!,
+      path,
+      file,
+    });
   }
 
   const toNodes = (dir: MutableDir, prefix: string): TreeNode[] => {
@@ -140,7 +165,9 @@ export const buildFileTree = (files: ReadonlyArray<DiffFile>): ReadonlyArray<Tre
         const path = prefix === "" ? name : `${prefix}/${name}`;
         return { type: "dir", name, path, children: toNodes(child, path) };
       });
-    const fileNodes = dir.files.toSorted((a, b) => a.name.localeCompare(b.name));
+    const fileNodes = dir.files.toSorted((a, b) =>
+      a.name.localeCompare(b.name),
+    );
     return [...dirNodes, ...fileNodes];
   };
   return toNodes(root, "");
@@ -157,10 +184,18 @@ export interface FileListRow {
 }
 
 /** Flat-mode rows: one per file, no nesting. */
-export const flatRows = (files: ReadonlyArray<DiffFile>): ReadonlyArray<FileListRow> =>
+export const flatRows = (
+  files: ReadonlyArray<DiffFile>,
+): ReadonlyArray<FileListRow> =>
   [...files]
     .toSorted((a, b) => filePath(a).localeCompare(filePath(b)))
-    .map((file) => ({ kind: "file", depth: 0, name: filePath(file), path: filePath(file), file }));
+    .map((file) => ({
+      kind: "file",
+      depth: 0,
+      name: filePath(file),
+      path: filePath(file),
+      file,
+    }));
 
 /** Tree-mode rows: a DFS of the tree honoring `expanded` (collapsed dirs hide their subtree). */
 export const treeRows = (
@@ -172,16 +207,25 @@ export const treeRows = (
   for (const node of nodes) {
     if (node.type === "dir") {
       rows.push({ kind: "dir", depth, name: node.name, path: node.path });
-      if (expanded.has(node.path)) rows.push(...treeRows(node.children, expanded, depth + 1));
+      if (expanded.has(node.path))
+        rows.push(...treeRows(node.children, expanded, depth + 1));
     } else {
-      rows.push({ kind: "file", depth, name: node.name, path: node.path, file: node.file });
+      rows.push({
+        kind: "file",
+        depth,
+        name: node.name,
+        path: node.path,
+        file: node.file,
+      });
     }
   }
   return rows;
 };
 
 /** All directory paths in a tree, for the default fully-expanded state. */
-export const allDirPaths = (nodes: ReadonlyArray<TreeNode>): ReadonlyArray<string> => {
+export const allDirPaths = (
+  nodes: ReadonlyArray<TreeNode>,
+): ReadonlyArray<string> => {
   const paths: string[] = [];
   for (const node of nodes) {
     if (node.type === "dir") {

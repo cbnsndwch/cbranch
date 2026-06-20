@@ -20,16 +20,26 @@ import {
 // (menu-hierarchy.md); items without a wired handler render greyed/disabled, driven by the
 // capability layer in `useMenuActions` rather than per-item conditionals here.
 
-function renderEntry(entry: MenuEntry, key: string, actions: MenuActions): ReactNode {
+function renderEntry(
+  entry: MenuEntry,
+  key: string,
+  actions: MenuActions,
+): ReactNode {
   if (entry.kind === "separator") return <MenubarSeparator key={key} />;
 
   if (entry.kind === "submenu") {
     const dynamic =
-      entry.dynamic === "recent" ? actions.recent : entry.dynamic === "favorites" ? actions.favorites : null;
+      entry.dynamic === "recent"
+        ? actions.recent
+        : entry.dynamic === "favorites"
+          ? actions.favorites
+          : null;
     return (
       <MenubarSub key={key}>
         {/* Static submenus stay browsable; dynamic (recent/favorite) ones grey out when empty. */}
-        <MenubarSubTrigger disabled={dynamic !== null && dynamic.length === 0}>{entry.label}</MenubarSubTrigger>
+        <MenubarSubTrigger disabled={dynamic !== null && dynamic.length === 0}>
+          {entry.label}
+        </MenubarSubTrigger>
         <MenubarSubContent>
           {dynamic !== null ? (
             dynamic.length === 0 ? (
@@ -42,7 +52,9 @@ function renderEntry(entry: MenuEntry, key: string, actions: MenuActions): React
               ))
             )
           ) : (
-            entry.items.map((child, i) => renderEntry(child, `${key}.${i}`, actions))
+            entry.items.map((child, i) =>
+              renderEntry(child, `${key}.${i}`, actions),
+            )
           )}
         </MenubarSubContent>
       </MenubarSub>
@@ -50,7 +62,9 @@ function renderEntry(entry: MenuEntry, key: string, actions: MenuActions): React
   }
 
   const enabled = actions.isEnabled(entry.id);
-  const accel = entry.accelerator ? <MenubarShortcut>{entry.accelerator}</MenubarShortcut> : null;
+  const accel = entry.accelerator ? (
+    <MenubarShortcut>{entry.accelerator}</MenubarShortcut>
+  ) : null;
 
   if (entry.kind === "checkbox") {
     return (
@@ -68,7 +82,12 @@ function renderEntry(entry: MenuEntry, key: string, actions: MenuActions): React
 
   const Icon = entry.icon;
   return (
-    <MenubarItem key={key} disabled={!enabled} onClick={() => actions.run(entry.id)} icon={Icon ? <Icon /> : undefined}>
+    <MenubarItem
+      key={key}
+      disabled={!enabled}
+      onClick={() => actions.run(entry.id)}
+      icon={Icon ? <Icon /> : undefined}
+    >
       {entry.label}
       {accel}
     </MenubarItem>
@@ -85,7 +104,9 @@ export function MenuBar() {
             {menu.label}
           </MenubarTrigger>
           <MenubarContent>
-            {menu.items.map((entry, i) => renderEntry(entry, `${menu.id}.${i}`, actions))}
+            {menu.items.map((entry, i) =>
+              renderEntry(entry, `${menu.id}.${i}`, actions),
+            )}
           </MenubarContent>
         </MenubarMenu>
       ))}

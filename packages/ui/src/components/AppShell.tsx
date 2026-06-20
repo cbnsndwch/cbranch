@@ -43,18 +43,26 @@ export function AppShell() {
   useInvalidationBus(repoId);
 
   const detailContent = (() => {
-    if (!repoId) return <Placeholder>Select a commit to see its details.</Placeholder>;
+    if (!repoId)
+      return <Placeholder>Select a commit to see its details.</Placeholder>;
     switch (detailTab) {
       case "changes":
         return <StagingView repoId={repoId} />;
       case "commit":
-        return <CommitTab repoId={repoId} oid={selectedOid} onSelectOid={selectOid} />;
+        return (
+          <CommitTab
+            repoId={repoId}
+            oid={selectedOid}
+            onSelectOid={selectOid}
+          />
+        );
       case "diff":
         return <DiffPanel repoId={repoId} oid={selectedOid} />;
       default:
         return (
           <Placeholder>
-            {detailTab.charAt(0).toUpperCase() + detailTab.slice(1)} — coming in a later milestone.
+            {detailTab.charAt(0).toUpperCase() + detailTab.slice(1)} — coming in
+            a later milestone.
           </Placeholder>
         );
     }
@@ -64,7 +72,9 @@ export function AppShell() {
     if (!repoId) {
       return (
         <div className="flex h-full flex-col items-center justify-center gap-3">
-          <p className="text-muted-foreground text-sm">Open a repository to start browsing.</p>
+          <p className="text-muted-foreground text-sm">
+            Open a repository to start browsing.
+          </p>
           <Button onClick={() => openPalette(true)}>Open a repository</Button>
         </div>
       );
@@ -85,7 +95,11 @@ export function AppShell() {
             <HistoryStatusStrip repoId={repoId} />
             {/* History list */}
             <div className="min-h-0 overflow-hidden">
-              <HistoryPane repoId={repoId} selectedOid={selectedOid} onSelectOid={selectOid} />
+              <HistoryPane
+                repoId={repoId}
+                selectedOid={selectedOid}
+                onSelectOid={selectOid}
+              />
             </div>
             {/* Splitter visual */}
             <div className="border-t" />

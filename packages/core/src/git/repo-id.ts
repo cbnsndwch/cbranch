@@ -28,7 +28,12 @@ export const normalizeAbsolute = (base: string, p: string): string => {
 
 /** Compute the branded {@link RepoId} from a normalized absolute common-dir path. */
 export const computeRepoId = (normalizedCommonDir: string): RepoId =>
-  RepoIdBrand.make(createHash("sha256").update(Buffer.from(normalizedCommonDir, "utf8")).digest("hex"));
+  RepoIdBrand.make(
+    createHash("sha256")
+      .update(Buffer.from(normalizedCommonDir, "utf8"))
+      .digest("hex"),
+  );
 
 /** A repoId is a 64-char lowercase SHA-256 hex string. */
-export const isRepoId = (value: string): boolean => /^[0-9a-f]{64}$/.test(value);
+export const isRepoId = (value: string): boolean =>
+  /^[0-9a-f]{64}$/.test(value);

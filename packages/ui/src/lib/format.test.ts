@@ -1,6 +1,11 @@
 import { describe, expect, test } from "vitest";
 
-import { formatDate, formatInstant, formatRelativeMs, shortOid } from "./format";
+import {
+  formatDate,
+  formatInstant,
+  formatRelativeMs,
+  shortOid,
+} from "./format";
 
 const NOW = Date.UTC(2024, 0, 10, 0, 0, 0);
 

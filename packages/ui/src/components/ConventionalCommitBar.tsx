@@ -1,6 +1,18 @@
 import { Switch } from "./ui/switch";
 
-const COMMIT_TYPES = ["feat", "fix", "docs", "style", "refactor", "test", "chore", "ci", "perf", "build", "revert"];
+const COMMIT_TYPES = [
+  "feat",
+  "fix",
+  "docs",
+  "style",
+  "refactor",
+  "test",
+  "chore",
+  "ci",
+  "perf",
+  "build",
+  "revert",
+];
 
 interface ConventionalCommitBarProps {
   type: string;
@@ -9,7 +21,12 @@ interface ConventionalCommitBarProps {
   onChange: (type: string, scope: string, breaking: boolean) => void;
 }
 
-export function ConventionalCommitBar({ type, scope, breaking, onChange }: ConventionalCommitBarProps) {
+export function ConventionalCommitBar({
+  type,
+  scope,
+  breaking,
+  onChange,
+}: ConventionalCommitBarProps) {
   return (
     <div className="flex items-center gap-1.5 border-b px-2 py-1 text-xs">
       <select

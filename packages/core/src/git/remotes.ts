@@ -26,10 +26,16 @@ function parseRemoteVerbose(stdout: string): RemoteInfo[] {
     else if (kind === "push") entry.pushUrl = url;
     map.set(name, entry);
   }
-  return [...map.entries()].map(([name, { fetchUrl, pushUrl }]) => new RemoteInfo({ name, fetchUrl, pushUrl }));
+  return [...map.entries()].map(
+    ([name, { fetchUrl, pushUrl }]) =>
+      new RemoteInfo({ name, fetchUrl, pushUrl }),
+  );
 }
 
-export const remoteList = (cwd: string, env?: NodeJS.ProcessEnv): Effect.Effect<readonly RemoteInfo[], GitError> =>
+export const remoteList = (
+  cwd: string,
+  env?: NodeJS.ProcessEnv,
+): Effect.Effect<readonly RemoteInfo[], GitError> =>
   Effect.gen(function* () {
     const result = yield* runGitOk({ cwd, args: ["remote", "-v"], env });
     return parseRemoteVerbose(decodeUtf8(result.stdout));
@@ -43,7 +49,12 @@ export const remoteAdd = (
 ): Effect.Effect<void, GitError> =>
   Effect.gen(function* () {
     const safeName = yield* assertNoLeadingDash(name, "remote name");
-    yield* runGitOk({ cwd, args: ["remote", "add", safeName, url], env, read: false });
+    yield* runGitOk({
+      cwd,
+      args: ["remote", "add", safeName, url],
+      env,
+      read: false,
+    });
   });
 
 export const remoteSetUrl = (
@@ -69,11 +80,25 @@ export const remoteRename = (
   Effect.gen(function* () {
     const safeOld = yield* assertNoLeadingDash(oldName, "remote name");
     const safeNew = yield* assertNoLeadingDash(newName, "new remote name");
-    yield* runGitOk({ cwd, args: ["remote", "rename", safeOld, safeNew], env, read: false });
+    yield* runGitOk({
+      cwd,
+      args: ["remote", "rename", safeOld, safeNew],
+      env,
+      read: false,
+    });
   });
 
-export const remoteRemove = (cwd: string, name: string, env?: NodeJS.ProcessEnv): Effect.Effect<void, GitError> =>
+export const remoteRemove = (
+  cwd: string,
+  name: string,
+  env?: NodeJS.ProcessEnv,
+): Effect.Effect<void, GitError> =>
   Effect.gen(function* () {
     const safeName = yield* assertNoLeadingDash(name, "remote name");
-    yield* runGitOk({ cwd, args: ["remote", "remove", safeName], env, read: false });
+    yield* runGitOk({
+      cwd,
+      args: ["remote", "remove", safeName],
+      env,
+      read: false,
+    });
   });

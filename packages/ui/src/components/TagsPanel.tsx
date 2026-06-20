@@ -2,7 +2,13 @@ import { type TagInfo, type TagType, type RepoId } from "@cbranch/rpc-contract";
 import { useState } from "react";
 import { toast } from "sonner";
 
-import { useTagCreate, useTagDelete, useTagDeleteRemote, useTagList, useTagPush } from "../rpc/hooks";
+import {
+  useTagCreate,
+  useTagDelete,
+  useTagDeleteRemote,
+  useTagList,
+  useTagPush,
+} from "../rpc/hooks";
 import { DestructiveConfirmDialog } from "./DestructiveConfirmDialog";
 import {
   AlertDialog,
@@ -119,8 +125,16 @@ export function TagsPanel({ repoId }: TagsPanelProps) {
 
       {/* Tag list */}
       <div className="min-h-0 flex-1 overflow-auto">
-        {isLoading && <div className="text-muted-foreground px-3 py-4 text-sm">Loading tags…</div>}
-        {!isLoading && list.length === 0 && <div className="text-muted-foreground px-3 py-4 text-sm">No tags.</div>}
+        {isLoading && (
+          <div className="text-muted-foreground px-3 py-4 text-sm">
+            Loading tags…
+          </div>
+        )}
+        {!isLoading && list.length === 0 && (
+          <div className="text-muted-foreground px-3 py-4 text-sm">
+            No tags.
+          </div>
+        )}
         {list.map((tag) => (
           <TagRow
             key={tag.name}
@@ -137,7 +151,9 @@ export function TagsPanel({ repoId }: TagsPanelProps) {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Create tag</AlertDialogTitle>
-            <AlertDialogDescription>Create a new Git tag at the specified target.</AlertDialogDescription>
+            <AlertDialogDescription>
+              Create a new Git tag at the specified target.
+            </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="flex flex-col gap-3 py-2">
             <label className="flex flex-col gap-1">
@@ -186,12 +202,18 @@ export function TagsPanel({ repoId }: TagsPanelProps) {
               </label>
             )}
             <label className="flex items-center gap-2 text-sm">
-              <input type="checkbox" checked={tagForce} onChange={(e) => setTagForce(e.target.checked)} />
+              <input
+                type="checkbox"
+                checked={tagForce}
+                onChange={(e) => setTagForce(e.target.checked)}
+              />
               Force (overwrite existing tag)
             </label>
           </div>
           <AlertDialogFooter>
-            <AlertDialogClose onClick={() => setCreateOpen(false)}>Cancel</AlertDialogClose>
+            <AlertDialogClose onClick={() => setCreateOpen(false)}>
+              Cancel
+            </AlertDialogClose>
             <AlertDialogAction
               onClick={handleCreate}
               disabled={!tagName.trim() || createMut.isPending}
@@ -210,7 +232,11 @@ export function TagsPanel({ repoId }: TagsPanelProps) {
           if (!open) setDeleteTarget(null);
         }}
         title="Delete tag"
-        description={'Delete local tag "' + (deleteTarget ?? "") + '"? This cannot be undone.'}
+        description={
+          'Delete local tag "' +
+          (deleteTarget ?? "") +
+          '"? This cannot be undone.'
+        }
         confirmLabel="Delete"
         onConfirm={() => {
           if (deleteTarget) handleDeleteLocal(deleteTarget);
@@ -229,7 +255,10 @@ interface TagRowProps {
 
 function TagRow({ tag, onDeleteLocal, onPush, onDeleteRemote }: TagRowProps) {
   const shortOid = tag.targetOid ? String(tag.targetOid).slice(0, 7) : "—";
-  const dateStr = tag.taggerDate && tag.taggerDate > 0 ? new Date(tag.taggerDate * 1000).toLocaleDateString() : "";
+  const dateStr =
+    tag.taggerDate && tag.taggerDate > 0
+      ? new Date(tag.taggerDate * 1000).toLocaleDateString()
+      : "";
 
   return (
     <div className="group hover:bg-accent/50 flex items-center px-3 py-1.5">
@@ -254,12 +283,20 @@ function TagRow({ tag, onDeleteLocal, onPush, onDeleteRemote }: TagRowProps) {
           …
         </DropdownMenuTrigger>
         <DropdownMenuContent side="bottom" align="end">
-          <DropdownMenuItem onClick={() => onPush(tag.name)}>Push to origin</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => onPush(tag.name)}>
+            Push to origin
+          </DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem variant="destructive" onClick={() => onDeleteLocal(tag.name)}>
+          <DropdownMenuItem
+            variant="destructive"
+            onClick={() => onDeleteLocal(tag.name)}
+          >
             Delete local
           </DropdownMenuItem>
-          <DropdownMenuItem variant="destructive" onClick={() => onDeleteRemote(tag.name)}>
+          <DropdownMenuItem
+            variant="destructive"
+            onClick={() => onDeleteRemote(tag.name)}
+          >
             Delete from origin
           </DropdownMenuItem>
         </DropdownMenuContent>

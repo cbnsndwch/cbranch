@@ -4,7 +4,12 @@
 // push them. The Unit Separator (ASCII 31) is the field delimiter — it cannot
 // appear in ref names, so it is collision-safe.
 
-import { type GitError, Oid, TagInfo, type TagType } from "@cbranch/rpc-contract";
+import {
+  type GitError,
+  Oid,
+  TagInfo,
+  type TagType,
+} from "@cbranch/rpc-contract";
 import { Effect } from "effect";
 
 import { gitError } from "./errors";
@@ -67,7 +72,9 @@ function parseLine(line: string): TagInfo | null {
   // the objectname already IS the commit OID.
   const targetOid = (isAnnotated && peeledOid ? peeledOid : objectname) as Oid;
 
-  const name = fullRef.startsWith(REFS_TAGS_PREFIX) ? fullRef.slice(REFS_TAGS_PREFIX.length) : fullRef;
+  const name = fullRef.startsWith(REFS_TAGS_PREFIX)
+    ? fullRef.slice(REFS_TAGS_PREFIX.length)
+    : fullRef;
 
   const taggerDateParsed = taggerdateRaw ? parseInt(taggerdateRaw, 10) : 0;
   const taggerDate = taggerDateParsed > 0 ? taggerDateParsed : undefined;
@@ -86,7 +93,10 @@ function parseLine(line: string): TagInfo | null {
 }
 
 /** List all tags in the repository (REQ-P3-TG-001). */
-export const tagList = (cwd: string, env?: NodeJS.ProcessEnv): Effect.Effect<readonly TagInfo[], GitError> =>
+export const tagList = (
+  cwd: string,
+  env?: NodeJS.ProcessEnv,
+): Effect.Effect<readonly TagInfo[], GitError> =>
   Effect.gen(function* () {
     const result = yield* runGitOk({
       cwd,
@@ -138,22 +148,35 @@ export const tagCreate = (
     if (raw.exitCode !== 0) {
       const stderr = decodeUtf8(raw.stderr);
       if (stderr.includes("already exists")) {
-        return yield* Effect.fail(gitError("refExists", "tag '" + safeName + "' already exists"));
+        return yield* Effect.fail(
+          gitError("refExists", "tag '" + safeName + "' already exists"),
+        );
       }
-      return yield* Effect.fail(gitError("gitFailed", "git tag failed: " + stderr.trim()));
+      return yield* Effect.fail(
+        gitError("gitFailed", "git tag failed: " + stderr.trim()),
+      );
     }
 
     // Retrieve the newly created tag from the listing.
     const all = yield* tagList(cwd, env);
     const created = all.find((t) => t.name === safeName);
     if (!created) {
-      return yield* Effect.fail(gitError("gitFailed", "tag created but not found in listing: " + safeName));
+      return yield* Effect.fail(
+        gitError(
+          "gitFailed",
+          "tag created but not found in listing: " + safeName,
+        ),
+      );
     }
     return created;
   });
 
 /** Delete a local tag (REQ-P3-TG-003). */
-export const tagDelete = (cwd: string, name: string, env?: NodeJS.ProcessEnv): Effect.Effect<void, GitError> =>
+export const tagDelete = (
+  cwd: string,
+  name: string,
+  env?: NodeJS.ProcessEnv,
+): Effect.Effect<void, GitError> =>
   Effect.gen(function* () {
     const safeName = yield* assertNoLeadingDash(name, "tag name");
     yield* runGitOk({ cwd, args: ["tag", "-d", safeName], env, read: false });
@@ -197,5 +220,10 @@ export const tagDeleteRemote = (
   Effect.gen(function* () {
     const safeRemote = yield* assertNoLeadingDash(remote, "remote name");
     const safeName = yield* assertNoLeadingDash(name, "tag name");
-    yield* runGitOk({ cwd, args: ["push", safeRemote, "--delete", "refs/tags/" + safeName], env, read: false });
+    yield* runGitOk({
+      cwd,
+      args: ["push", safeRemote, "--delete", "refs/tags/" + safeName],
+      env,
+      read: false,
+    });
   });

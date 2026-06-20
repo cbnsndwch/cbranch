@@ -47,20 +47,28 @@ export function useMenuActions(): MenuActions {
       "start.open": () => useUiStore.getState().setPaletteOpen(true),
       "start.exit": () => navigate("/"),
       "repository.close": () => navigate("/"),
-      "help.about": () => toast("cbranch", { description: "A desktop-style git client. MIT licensed." }),
+      "help.about": () =>
+        toast("cbranch", {
+          description: "A desktop-style git client. MIT licensed.",
+        }),
     };
     // Repo-scoped commands need an open repository.
     if (repoId) {
-      handlers["repository.refresh"] = () => void queryClient.invalidateQueries({ queryKey: repoScopeKey(repoId) });
+      handlers["repository.refresh"] = () =>
+        void queryClient.invalidateQueries({ queryKey: repoScopeKey(repoId) });
       handlers["commands.stageAll"] = () =>
         void api
           .stageFiles(repoId, [], true)
-          .then(() => queryClient.invalidateQueries({ queryKey: [repoId, "status"] }))
+          .then(() =>
+            queryClient.invalidateQueries({ queryKey: [repoId, "status"] }),
+          )
           .catch(() => {});
       handlers["commands.unstageAll"] = () =>
         void api
           .unstageFiles(repoId, [], true)
-          .then(() => queryClient.invalidateQueries({ queryKey: [repoId, "status"] }))
+          .then(() =>
+            queryClient.invalidateQueries({ queryKey: [repoId, "status"] }),
+          )
           .catch(() => {});
     }
     // State-bound checkbox: the date column's relative/absolute mode (P1-HIST-8).
@@ -68,7 +76,9 @@ export function useMenuActions(): MenuActions {
       "view.showRelativeDate": dateMode === "relative",
     };
     handlers["view.showRelativeDate"] = () =>
-      useUiStore.getState().setDateMode(dateMode === "relative" ? "absolute" : "relative");
+      useUiStore
+        .getState()
+        .setDateMode(dateMode === "relative" ? "absolute" : "relative");
 
     const recent: DynamicItem[] = (recentQuery.data ?? []).map((r) => ({
       id: r.repoId,
@@ -83,5 +93,13 @@ export function useMenuActions(): MenuActions {
       recent,
       favorites: [],
     };
-  }, [navigate, openRepo, queryClient, repoId, dateMode, recentQuery.data, api]);
+  }, [
+    navigate,
+    openRepo,
+    queryClient,
+    repoId,
+    dateMode,
+    recentQuery.data,
+    api,
+  ]);
 }

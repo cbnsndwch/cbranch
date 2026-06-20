@@ -2,7 +2,12 @@ import { type WorktreeInfo, type RepoId } from "@cbranch/rpc-contract";
 import { useState } from "react";
 import { toast } from "sonner";
 
-import { useWorktreeAdd, useWorktreeList, useWorktreePrune, useWorktreeRemove } from "../rpc/hooks";
+import {
+  useWorktreeAdd,
+  useWorktreeList,
+  useWorktreePrune,
+  useWorktreeRemove,
+} from "../rpc/hooks";
 import { DestructiveConfirmDialog } from "./DestructiveConfirmDialog";
 import {
   AlertDialog,
@@ -13,7 +18,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "./ui/alert-dialog";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "./ui/dropdown-menu";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "./ui/dropdown-menu";
 
 interface WorktreesPanelProps {
   repoId: RepoId;
@@ -48,7 +58,10 @@ export function WorktreesPanel({ repoId }: WorktreesPanelProps) {
     if (!path) return;
     const opts =
       addMode === "new"
-        ? { newBranch: branch || undefined, startPoint: addStart.trim() || undefined }
+        ? {
+            newBranch: branch || undefined,
+            startPoint: addStart.trim() || undefined,
+          }
         : { branch: branch || undefined };
     addMut.mutate(
       { path, ...opts },
@@ -107,12 +120,22 @@ export function WorktreesPanel({ repoId }: WorktreesPanelProps) {
 
       {/* Worktree list */}
       <div className="min-h-0 flex-1 overflow-auto">
-        {isLoading && <div className="text-muted-foreground px-3 py-4 text-sm">Loading worktrees…</div>}
+        {isLoading && (
+          <div className="text-muted-foreground px-3 py-4 text-sm">
+            Loading worktrees…
+          </div>
+        )}
         {!isLoading && list.length === 0 && (
-          <div className="text-muted-foreground px-3 py-4 text-sm">No worktrees found.</div>
+          <div className="text-muted-foreground px-3 py-4 text-sm">
+            No worktrees found.
+          </div>
         )}
         {list.map((wt) => (
-          <WorktreeRow key={wt.path} wt={wt} onRemove={(path) => setRemoveTarget(path)} />
+          <WorktreeRow
+            key={wt.path}
+            wt={wt}
+            onRemove={(path) => setRemoveTarget(path)}
+          />
         ))}
       </div>
 
@@ -146,7 +169,9 @@ export function WorktreesPanel({ repoId }: WorktreesPanelProps) {
               </select>
             </label>
             <label className="flex flex-col gap-1">
-              <span className="text-xs font-medium">{addMode === "new" ? "New branch name" : "Branch name"}</span>
+              <span className="text-xs font-medium">
+                {addMode === "new" ? "New branch name" : "Branch name"}
+              </span>
               <input
                 type="text"
                 value={addBranch}
@@ -157,7 +182,9 @@ export function WorktreesPanel({ repoId }: WorktreesPanelProps) {
             </label>
             {addMode === "new" && (
               <label className="flex flex-col gap-1">
-                <span className="text-xs font-medium">Start point (optional)</span>
+                <span className="text-xs font-medium">
+                  Start point (optional)
+                </span>
                 <input
                   type="text"
                   value={addStart}
@@ -169,7 +196,9 @@ export function WorktreesPanel({ repoId }: WorktreesPanelProps) {
             )}
           </div>
           <AlertDialogFooter>
-            <AlertDialogClose onClick={() => setAddOpen(false)}>Cancel</AlertDialogClose>
+            <AlertDialogClose onClick={() => setAddOpen(false)}>
+              Cancel
+            </AlertDialogClose>
             <AlertDialogAction
               onClick={handleAdd}
               disabled={!addPath.trim() || addMut.isPending}
@@ -188,7 +217,11 @@ export function WorktreesPanel({ repoId }: WorktreesPanelProps) {
           if (!open) setRemoveTarget(null);
         }}
         title="Remove worktree"
-        description={"Remove worktree at " + (removeTarget ?? "") + "? The directory will be deleted."}
+        description={
+          "Remove worktree at " +
+          (removeTarget ?? "") +
+          "? The directory will be deleted."
+        }
         confirmLabel="Remove"
         onConfirm={handleRemove}
       />
@@ -203,7 +236,11 @@ interface WorktreeRowProps {
 
 function WorktreeRow({ wt, onRemove }: WorktreeRowProps) {
   const shortOid = wt.headOid ? wt.headOid.slice(0, 7) : "—";
-  const branchLabel = wt.isDetached ? "detached" : wt.branch ? wt.branch.replace("refs/heads/", "") : "—";
+  const branchLabel = wt.isDetached
+    ? "detached"
+    : wt.branch
+      ? wt.branch.replace("refs/heads/", "")
+      : "—";
   const badge = wt.isMain ? "main" : wt.isBare ? "bare" : "linked";
 
   const copyPath = () => {
@@ -218,7 +255,9 @@ function WorktreeRow({ wt, onRemove }: WorktreeRowProps) {
           <span className="truncate font-mono text-xs" title={wt.path}>
             {wt.path}
           </span>
-          <span className="text-muted-foreground shrink-0 rounded border px-1 text-[9px]">{badge}</span>
+          <span className="text-muted-foreground shrink-0 rounded border px-1 text-[9px]">
+            {badge}
+          </span>
           {wt.isLocked && (
             <span
               className="shrink-0 rounded border border-orange-400 px-1 text-[9px] text-orange-600"
@@ -243,7 +282,10 @@ function WorktreeRow({ wt, onRemove }: WorktreeRowProps) {
         <DropdownMenuContent side="bottom" align="end">
           <DropdownMenuItem onClick={copyPath}>Copy path</DropdownMenuItem>
           {!wt.isMain && (
-            <DropdownMenuItem variant="destructive" onClick={() => onRemove(wt.path)}>
+            <DropdownMenuItem
+              variant="destructive"
+              onClick={() => onRemove(wt.path)}
+            >
               Remove
             </DropdownMenuItem>
           )}

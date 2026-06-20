@@ -77,7 +77,8 @@ export class GraphLayout {
     // Lanes already reserved for this commit (its children reach it here). The leftmost is
     // the node's lane; the rest are merging children's lanes that terminate at the node.
     const myLanes: number[] = [];
-    for (let i = 0; i < before.length; i++) if (before[i] === commit.oid) myLanes.push(i);
+    for (let i = 0; i < before.length; i++)
+      if (before[i] === commit.oid) myLanes.push(i);
     const lane = myLanes.length > 0 ? myLanes[0]! : firstFree(before);
 
     // Build the lane state for the rows below (`after`): free this commit's lanes, then
@@ -113,9 +114,21 @@ export class GraphLayout {
     for (let i = 0; i < before.length; i++) {
       if (before[i] === null) continue;
       if (before[i] === commit.oid) {
-        segments.push({ fromLane: i, toLane: lane, fromY: 0, toY: 0.5, color: colorOf(i) });
+        segments.push({
+          fromLane: i,
+          toLane: lane,
+          fromY: 0,
+          toY: 0.5,
+          color: colorOf(i),
+        });
       } else {
-        segments.push({ fromLane: i, toLane: i, fromY: 0, toY: 0.5, color: colorOf(i) });
+        segments.push({
+          fromLane: i,
+          toLane: i,
+          fromY: 0,
+          toY: 0.5,
+          color: colorOf(i),
+        });
       }
     }
 
@@ -125,10 +138,22 @@ export class GraphLayout {
       if (after[j] === null) continue;
       const passthrough = before[j] === after[j];
       if (passthrough) {
-        segments.push({ fromLane: j, toLane: j, fromY: 0.5, toY: 1, color: colorOf(j) });
+        segments.push({
+          fromLane: j,
+          toLane: j,
+          fromY: 0.5,
+          toY: 1,
+          color: colorOf(j),
+        });
       }
       if (parentLaneSet.has(j) && !(passthrough && j === lane)) {
-        segments.push({ fromLane: lane, toLane: j, fromY: 0.5, toY: 1, color: colorOf(j) });
+        segments.push({
+          fromLane: lane,
+          toLane: j,
+          fromY: 0.5,
+          toY: 1,
+          color: colorOf(j),
+        });
       }
     }
 
@@ -142,7 +167,9 @@ export class GraphLayout {
 }
 
 /** Lay out a full (or partial) ordered commit list. Equivalent to feeding each via {@link GraphLayout.push}. */
-export const layoutCommits = (commits: ReadonlyArray<GraphInput>): GraphRow[] => {
+export const layoutCommits = (
+  commits: ReadonlyArray<GraphInput>,
+): GraphRow[] => {
   const engine = new GraphLayout();
   return commits.map((c) => engine.push(c));
 };

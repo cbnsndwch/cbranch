@@ -10,10 +10,15 @@ export default defineConfig({
   // `@/*` resolves to the UI package src — mirrors the shadcn `base-lyra` alias declared in
   // packages/ui/{components.json,tsconfig.json,vite.config.ts}. Only the UI package uses it.
   resolve: {
-    alias: { "@": fileURLToPath(new URL("./packages/ui/src", import.meta.url)) },
+    alias: {
+      "@": fileURLToPath(new URL("./packages/ui/src", import.meta.url)),
+    },
   },
   test: {
-    include: ["packages/*/src/**/*.test.{ts,tsx}", "apps/*/src/**/*.test.{ts,tsx}"],
+    include: [
+      "packages/*/src/**/*.test.{ts,tsx}",
+      "apps/*/src/**/*.test.{ts,tsx}",
+    ],
     environment: "node",
     testTimeout: 15_000,
   },

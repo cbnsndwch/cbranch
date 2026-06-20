@@ -2,7 +2,10 @@ import { Effect } from "effect";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 
 import { runExit } from "../testing/effect-run";
-import { createFixtureWorkspace, type FixtureWorkspace } from "../testing/fixtures";
+import {
+  createFixtureWorkspace,
+  type FixtureWorkspace,
+} from "../testing/fixtures";
 import { mergeCreate, mergeAbort } from "./merge";
 
 describe("mergeCreate / mergeAbort", () => {
@@ -50,7 +53,9 @@ describe("mergeCreate / mergeAbort", () => {
     // Add a commit on main so it diverges (forces a real merge, not a FF)
     await repo.commit({ message: "main progress", files: { "c.txt": "c" } });
 
-    const result = await Effect.runPromise(mergeCreate(repo.dir, "noff-feat", "no-ff"));
+    const result = await Effect.runPromise(
+      mergeCreate(repo.dir, "noff-feat", "no-ff"),
+    );
 
     expect(result.mode).toBe("merge");
     expect(result.commitOid).toMatch(/^[0-9a-f]{40}$/);
@@ -64,7 +69,9 @@ describe("mergeCreate / mergeAbort", () => {
     await repo.commit({ message: "feat", files: { "b.txt": "b" } });
     await repo.git(["switch", "main"]);
 
-    const result = await Effect.runPromise(mergeCreate(repo.dir, "sq-feat", "squash"));
+    const result = await Effect.runPromise(
+      mergeCreate(repo.dir, "sq-feat", "squash"),
+    );
 
     expect(result.mode).toBe("squash");
     expect(result.staged).toBe(true);
@@ -86,7 +93,9 @@ describe("mergeCreate / mergeAbort", () => {
     await Effect.runPromise(mergeAbort(repo.dir));
 
     // After abort, git should have no MERGE_HEAD
-    const raw = await repo.git(["rev-parse", "--verify", "MERGE_HEAD"], { allowFailure: true });
+    const raw = await repo.git(["rev-parse", "--verify", "MERGE_HEAD"], {
+      allowFailure: true,
+    });
     expect(raw.code).not.toBe(0);
   });
 });

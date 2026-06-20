@@ -7,13 +7,20 @@
 // are NEVER invalidated (spec 15 §8). On reconnect the whole `[repoId]` subtree is
 // invalidated (spec 15 §5 / NF-ERR-6).
 
-import { type DiffSpec, type Domain, type LogQuery, type Oid, type RepoId } from "@cbranch/rpc-contract";
+import {
+  type DiffSpec,
+  type Domain,
+  type LogQuery,
+  type Oid,
+  type RepoId,
+} from "@cbranch/rpc-contract";
 
 /** Everything for a repo — the reconnect "resnapshot" invalidation target (spec 15 §5). */
 export const repoScopeKey = (repoId: RepoId) => [repoId] as const;
 
 /** The invalidation target for a changed domain (spec 15 §2). */
-export const domainKey = (repoId: RepoId, domain: Domain) => [repoId, domain] as const;
+export const domainKey = (repoId: RepoId, domain: Domain) =>
+  [repoId, domain] as const;
 
 /** Query keys for the P1 read surface. Synced reads sit under a `Domain`; immutable reads don't. */
 export const queryKeys = {
@@ -22,7 +29,8 @@ export const queryKeys = {
   /** Head window of the streaming history feed (domain: `commits`); keyed by the full query. */
   log: (query: LogQuery) => [query.repoId, "commits", "log", query] as const,
   /** `commit.detail` — immutable, content-addressed by oid (never invalidated). */
-  commitDetail: (repoId: RepoId, oid: Oid) => [repoId, "commit", oid, "detail"] as const,
+  commitDetail: (repoId: RepoId, oid: Oid) =>
+    [repoId, "commit", oid, "detail"] as const,
   /**
    * `commit.diff` — immutable, content-addressed by target plus the options that change the
    * computed patch (base/whitespace/context/combined), so toggling a control caches
@@ -34,10 +42,16 @@ export const queryKeys = {
       "commit",
       spec.target,
       "diff",
-      { base: spec.base ?? "^1", whitespace: spec.whitespace, context: spec.context, combined: spec.combined },
+      {
+        base: spec.base ?? "^1",
+        whitespace: spec.whitespace,
+        context: spec.context,
+        combined: spec.combined,
+      },
     ] as const,
   /** `file.contentAtRev` — immutable blob at a fixed rev (never invalidated). */
-  fileContentAtRev: (repoId: RepoId, rev: string, path: string) => [repoId, "blob", rev, path] as const,
+  fileContentAtRev: (repoId: RepoId, rev: string, path: string) =>
+    [repoId, "blob", rev, path] as const,
   /** `repo.recentList` — the persisted switcher list (not repo-scoped). */
   recentList: () => ["recent"] as const,
   /** `status.get` — the working-tree status tree (domain: `status`). */
@@ -47,7 +61,8 @@ export const queryKeys = {
    * mixed-state file caches each side independently (under the `status` domain →
    * REQ-P2-HUNK-003).
    */
-  workingDiff: (repoId: RepoId, path: string, staged: boolean) => [repoId, "status", "diff", path, staged] as const,
+  workingDiff: (repoId: RepoId, path: string, staged: boolean) =>
+    [repoId, "status", "diff", path, staged] as const,
   /** `commit.lastMessage` — the last commit's message, for reuse/amend (domain: `commit`). */
   lastMessage: (repoId: RepoId) => [repoId, "commit", "lastMessage"] as const,
   /** `branch.list` (domain: `refs`). */
@@ -59,7 +74,8 @@ export const queryKeys = {
   /** `stash.list` (domain: `stash`). */
   stash: (repoId: RepoId) => [repoId, "stash", "list"] as const,
   /** `stash.show` — immutable once the stash entry is dropped. */
-  stashShow: (repoId: RepoId, ref: string) => [repoId, "stash", ref, "diff"] as const,
+  stashShow: (repoId: RepoId, ref: string) =>
+    [repoId, "stash", ref, "diff"] as const,
   /** `tag.list` (domain: `tags`). */
   tags: (repoId: RepoId) => [repoId, "tags", "list"] as const,
 };

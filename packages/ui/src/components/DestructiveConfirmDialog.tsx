@@ -34,7 +34,9 @@ export function DestructiveConfirmDialog({
           <AlertDialogDescription>{description}</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogClose onClick={() => onOpenChange(false)}>Cancel</AlertDialogClose>
+          <AlertDialogClose onClick={() => onOpenChange(false)}>
+            Cancel
+          </AlertDialogClose>
           <AlertDialogAction
             onClick={() => {
               onOpenChange(false);

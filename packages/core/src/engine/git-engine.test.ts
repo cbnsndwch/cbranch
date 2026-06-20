@@ -7,14 +7,19 @@ import { afterAll, beforeAll, describe, expect, test } from "vitest";
 
 import { type GitEngineApi, makeGitEngine } from "../index";
 import { runScoped } from "../testing/effect-run";
-import { createFixtureWorkspace, type FixtureWorkspace } from "../testing/fixtures";
+import {
+  createFixtureWorkspace,
+  type FixtureWorkspace,
+} from "../testing/fixtures";
 
 let ws: FixtureWorkspace;
 let cfgSeq = 0;
 const newCfg = (): string => join(ws.root, `engine-config-${cfgSeq++}.json`);
 
-const withEngine = <A, E>(configPath: string, f: (engine: GitEngineApi) => Effect.Effect<A, E>): Promise<A> =>
-  runScoped(Effect.flatMap(makeGitEngine({ configPath }), f));
+const withEngine = <A, E>(
+  configPath: string,
+  f: (engine: GitEngineApi) => Effect.Effect<A, E>,
+): Promise<A> => runScoped(Effect.flatMap(makeGitEngine({ configPath }), f));
 
 beforeAll(async () => {
   ws = await createFixtureWorkspace();
@@ -26,7 +31,10 @@ afterAll(async () => {
 describe("GitEngine repo.* (P1, core-A)", () => {
   test("open returns identity + state and records the repo in the recent list (AC-1)", async () => {
     const repo = await ws.createRepo("openme");
-    const oid = await repo.commit({ message: "init", files: { "a.txt": "a\n" } });
+    const oid = await repo.commit({
+      message: "init",
+      files: { "a.txt": "a\n" },
+    });
     const cfg = newCfg();
 
     const { handle, recents } = await withEngine(cfg, (e) =>
@@ -65,7 +73,10 @@ describe("GitEngine repo.* (P1, core-A)", () => {
 
     // Removal persists to the shared config; a fresh engine sees it gone.
     const bId = await withEngine(cfg, (e) =>
-      Effect.map(e.recentList(), (r) => r.find((x) => x.name === "repoB")?.repoId),
+      Effect.map(
+        e.recentList(),
+        (r) => r.find((x) => x.name === "repoB")?.repoId,
+      ),
     );
     const after = await withEngine(cfg, (e) =>
       Effect.gen(function* () {
@@ -104,7 +115,9 @@ describe("GitEngine repo.* (P1, core-A)", () => {
       Effect.gen(function* () {
         const handle = yield* e.open(repo.dir);
         const st = yield* e.state(handle.repoId);
-        const errUnknown = yield* Effect.flip(e.state(RepoIdBrand.make("f".repeat(64))));
+        const errUnknown = yield* Effect.flip(
+          e.state(RepoIdBrand.make("f".repeat(64))),
+        );
         return { state: st, unknownErr: errUnknown };
       }),
     );
@@ -117,7 +130,9 @@ describe("GitEngine repo.* (P1, core-A)", () => {
     await repo.commit({ message: "init", files: { "a.txt": "a\n" } });
     const cfg = newCfg();
 
-    const repoId = await withEngine(cfg, (e) => Effect.map(e.open(repo.dir), (h) => h.repoId));
+    const repoId = await withEngine(cfg, (e) =>
+      Effect.map(e.open(repo.dir), (h) => h.repoId),
+    );
     // Fresh engine, same config — never called open, must resolve via recent list.
     const state = await withEngine(cfg, (e) => e.state(repoId));
     expect(state.currentBranch).toBe("main");

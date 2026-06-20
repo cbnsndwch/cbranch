@@ -1,8 +1,17 @@
 import { Effect } from "effect";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 
-import { createFixtureWorkspace, type FixtureWorkspace } from "../testing/fixtures";
-import { remoteAdd, remoteList, remoteRemove, remoteRename, remoteSetUrl } from "./remotes";
+import {
+  createFixtureWorkspace,
+  type FixtureWorkspace,
+} from "../testing/fixtures";
+import {
+  remoteAdd,
+  remoteList,
+  remoteRemove,
+  remoteRename,
+  remoteSetUrl,
+} from "./remotes";
 
 describe("remote CRUD", () => {
   let ws: FixtureWorkspace;

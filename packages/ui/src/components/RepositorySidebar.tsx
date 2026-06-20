@@ -1,5 +1,13 @@
 import { type RepoId } from "@cbranch/rpc-contract";
-import { ChevronDown, ChevronRight, Cloud, GitBranch, RefreshCw, Search, Tag } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronRight,
+  Cloud,
+  GitBranch,
+  RefreshCw,
+  Search,
+  Tag,
+} from "lucide-react";
 import { type ReactNode, useState } from "react";
 
 import { cn } from "../lib/cn";
@@ -54,7 +62,11 @@ function TreeItem({
   );
 }
 
-export function RepositorySidebar({ repoId }: { readonly repoId: RepoId | null }) {
+export function RepositorySidebar({
+  repoId,
+}: {
+  readonly repoId: RepoId | null;
+}) {
   const { data: repoState } = useRepoState(repoId);
   const knownRefStrings = useUiStore((s) => s.knownRefStrings);
   const [search, setSearch] = useState("");
@@ -77,7 +89,8 @@ export function RepositorySidebar({ repoId }: { readonly repoId: RepoId | null }
     });
   };
 
-  const filterFn = (name: string) => !search || name.toLowerCase().includes(search.toLowerCase());
+  const filterFn = (name: string) =>
+    !search || name.toLowerCase().includes(search.toLowerCase());
 
   return (
     <div className="flex h-full flex-col overflow-hidden border-r bg-[var(--color-muted)]">
@@ -99,7 +112,11 @@ export function RepositorySidebar({ repoId }: { readonly repoId: RepoId | null }
       </div>
       {/* Tree */}
       <div className="flex-1 overflow-auto">
-        <SectionHeader label="BRANCHES" expanded={expanded.has("branches")} onToggle={() => toggle("branches")} />
+        <SectionHeader
+          label="BRANCHES"
+          expanded={expanded.has("branches")}
+          onToggle={() => toggle("branches")}
+        />
         {expanded.has("branches") &&
           localBranches
             .filter((l) => filterFn(l.name))
@@ -107,12 +124,18 @@ export function RepositorySidebar({ repoId }: { readonly repoId: RepoId | null }
               <TreeItem
                 key={label.raw}
                 label={label.name}
-                icon={<GitBranch className="size-3 shrink-0" aria-hidden="true" />}
+                icon={
+                  <GitBranch className="size-3 shrink-0" aria-hidden="true" />
+                }
                 level={1}
                 isCurrent={label.name === currentBranch || label.isHead}
               />
             ))}
-        <SectionHeader label="REMOTES" expanded={expanded.has("remotes")} onToggle={() => toggle("remotes")} />
+        <SectionHeader
+          label="REMOTES"
+          expanded={expanded.has("remotes")}
+          onToggle={() => toggle("remotes")}
+        />
         {expanded.has("remotes") &&
           remoteBranches
             .filter((l) => filterFn(l.name))
@@ -125,7 +148,11 @@ export function RepositorySidebar({ repoId }: { readonly repoId: RepoId | null }
                 isCurrent={false}
               />
             ))}
-        <SectionHeader label="TAGS" expanded={expanded.has("tags")} onToggle={() => toggle("tags")} />
+        <SectionHeader
+          label="TAGS"
+          expanded={expanded.has("tags")}
+          onToggle={() => toggle("tags")}
+        />
         {expanded.has("tags") &&
           tags
             .filter((l) => filterFn(l.name))
@@ -138,8 +165,16 @@ export function RepositorySidebar({ repoId }: { readonly repoId: RepoId | null }
                 isCurrent={false}
               />
             ))}
-        <SectionHeader label="SUBMODULES" expanded={expanded.has("submodules")} onToggle={() => toggle("submodules")} />
-        <SectionHeader label="STASHES" expanded={expanded.has("stashes")} onToggle={() => toggle("stashes")} />
+        <SectionHeader
+          label="SUBMODULES"
+          expanded={expanded.has("submodules")}
+          onToggle={() => toggle("submodules")}
+        />
+        <SectionHeader
+          label="STASHES"
+          expanded={expanded.has("stashes")}
+          onToggle={() => toggle("stashes")}
+        />
       </div>
     </div>
   );

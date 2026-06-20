@@ -12,9 +12,17 @@ const toneClass: Record<BadgeTone, string> = {
 };
 
 /** A compact status pill (P1-UI-STAT-1). Uses theme tokens, not hardcoded colors. */
-export function Badge({ tone = "default", children }: PropsWithChildren<{ readonly tone?: BadgeTone }>) {
+export function Badge({
+  tone = "default",
+  children,
+}: PropsWithChildren<{ readonly tone?: BadgeTone }>) {
   return (
-    <span className={cn("inline-flex items-center gap-1 border px-1.5 py-0.5 text-xs font-medium", toneClass[tone])}>
+    <span
+      className={cn(
+        "inline-flex items-center gap-1 border px-1.5 py-0.5 text-xs font-medium",
+        toneClass[tone],
+      )}
+    >
       {children}
     </span>
   );

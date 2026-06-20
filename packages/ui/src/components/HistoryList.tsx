@@ -1,10 +1,23 @@
 import { type LogQuery, type Oid } from "@cbranch/rpc-contract";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { type KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type KeyboardEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 import { layoutCommits, maxLaneCount } from "../graph/layout";
 import { cn } from "../lib/cn";
-import { type DateMode, formatDate, formatIso, formatRelativeMs, shortOid } from "../lib/format";
+import {
+  type DateMode,
+  formatDate,
+  formatIso,
+  formatRelativeMs,
+  shortOid,
+} from "../lib/format";
 import { findMatches, stepMatch } from "../lib/quick-find";
 import { useLogStream } from "../rpc/hooks";
 import { useUiStore } from "../state/store";
@@ -55,8 +68,14 @@ export function HistoryList({
 
   // Lane layout is append-only and viewport-independent, so recomputing from the streamed
   // window stays stable across scrolling (spec 10 REQ-GRAPH-008/020).
-  const graphRows = useMemo(() => layoutCommits(rows.map((r) => ({ oid: r.oid, parents: r.parents }))), [rows]);
-  const columns = useMemo(() => Math.max(1, maxLaneCount(graphRows)), [graphRows]);
+  const graphRows = useMemo(
+    () => layoutCommits(rows.map((r) => ({ oid: r.oid, parents: r.parents }))),
+    [rows],
+  );
+  const columns = useMemo(
+    () => Math.max(1, maxLaneCount(graphRows)),
+    [graphRows],
+  );
   const parentRef = useRef<HTMLDivElement>(null);
   const virtualizer = useVirtualizer({
     count: rows.length,
@@ -68,9 +87,18 @@ export function HistoryList({
   const [findOpen, setFindOpen] = useState(false);
   const [findQuery, setFindQuery] = useState("");
   const [findPos, setFindPos] = useState(-1);
-  const matches = useMemo(() => findMatches(rows, findQuery), [rows, findQuery]);
-  const matchOids = useMemo(() => new Set(matches.map((i) => rows[i]!.oid)), [matches, rows]);
-  const currentMatchOid = findPos >= 0 && findPos < matches.length ? rows[matches[findPos]!]?.oid : undefined;
+  const matches = useMemo(
+    () => findMatches(rows, findQuery),
+    [rows, findQuery],
+  );
+  const matchOids = useMemo(
+    () => new Set(matches.map((i) => rows[i]!.oid)),
+    [matches, rows],
+  );
+  const currentMatchOid =
+    findPos >= 0 && findPos < matches.length
+      ? rows[matches[findPos]!]?.oid
+      : undefined;
 
   const selectIndex = useCallback(
     (index: number) => {
@@ -127,8 +155,13 @@ export function HistoryList({
 
   // Full keyboard navigation over the list (P1-HIST-6): arrows, page up/down, home/end.
   const onListKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    const page = Math.max(1, Math.floor((parentRef.current?.clientHeight ?? 0) / ROW_HEIGHT) || DEFAULT_PAGE);
-    const current = selectedOid === null ? -1 : rows.findIndex((r) => r.oid === selectedOid);
+    const page = Math.max(
+      1,
+      Math.floor((parentRef.current?.clientHeight ?? 0) / ROW_HEIGHT) ||
+        DEFAULT_PAGE,
+    );
+    const current =
+      selectedOid === null ? -1 : rows.findIndex((r) => r.oid === selectedOid);
     const last = rows.length - 1;
     let next: number | null = null;
     switch (event.key) {
@@ -157,7 +190,8 @@ export function HistoryList({
     if (next !== null) selectIndex(next);
   };
 
-  if (status === "error") return <Placeholder tone="danger">Could not load history.</Placeholder>;
+  if (status === "error")
+    return <Placeholder tone="danger">Could not load history.</Placeholder>;
 
   const findBar = findOpen ? (
     <FindBar
@@ -196,7 +230,13 @@ export function HistoryList({
         aria-label="Commit history"
         className="min-h-0 flex-1 overflow-auto outline-none"
       >
-        <div style={{ height: virtualizer.getTotalSize(), position: "relative", width: "100%" }}>
+        <div
+          style={{
+            height: virtualizer.getTotalSize(),
+            position: "relative",
+            width: "100%",
+          }}
+        >
           {virtualizer.getVirtualItems().map((item) => {
             const row = rows[item.index]!;
             const selected = row.oid === selectedOid;
@@ -217,13 +257,23 @@ export function HistoryList({
                 onClick={() => onSelectOid(row.oid)}
                 className={cn(
                   "hover:bg-accent absolute top-0 left-0 flex w-full cursor-pointer items-center gap-2 border-b pr-2 text-xs",
-                  selected ? "bg-[var(--color-selection-bg)] text-[var(--color-selection-fg)]" : "",
+                  selected
+                    ? "bg-[var(--color-selection-bg)] text-[var(--color-selection-fg)]"
+                    : "",
                   matched ? "bg-status-ahead/10" : "",
                   isCurrentMatch ? "ring-ring ring-1 ring-inset" : "",
                 )}
-                style={{ height: item.size, transform: `translateY(${item.start}px)` }}
+                style={{
+                  height: item.size,
+                  transform: `translateY(${item.start}px)`,
+                }}
               >
-                <GraphCell row={graphRows[item.index]!} columns={columns} height={item.size} selected={selected} />
+                <GraphCell
+                  row={graphRows[item.index]!}
+                  columns={columns}
+                  height={item.size}
+                  selected={selected}
+                />
                 {row.refs.length > 0 ? <RefChips refs={row.refs} /> : null}
                 <span className="flex-1 truncate">{row.subject}</span>
                 <div
@@ -243,7 +293,9 @@ export function HistoryList({
           })}
         </div>
         {status === "streaming" || status === "loading" ? (
-          <div className="text-muted-foreground p-2 text-center text-xs">Loading more…</div>
+          <div className="text-muted-foreground p-2 text-center text-xs">
+            Loading more…
+          </div>
         ) : null}
       </div>
     </div>

@@ -13,9 +13,21 @@ import { emptyFilters, type LogFilters } from "../lib/filters";
 import { type DateMode, readDateMode, writeDateMode } from "../lib/format";
 import { applyTheme, readThemePref, type ThemePref } from "../theme/theme";
 
-export type DetailTab = "changes" | "commit" | "diff" | "filetree" | "gpg" | "console" | "output";
+export type DetailTab =
+  | "changes"
+  | "commit"
+  | "diff"
+  | "filetree"
+  | "gpg"
+  | "console"
+  | "output";
 
-export type ActiveView = "history" | "branches" | "worktrees" | "stash" | "tags";
+export type ActiveView =
+  | "history"
+  | "branches"
+  | "worktrees"
+  | "stash"
+  | "tags";
 
 export interface CommitDraft {
   subject: string;
@@ -24,7 +36,12 @@ export interface CommitDraft {
   signoff: boolean;
 }
 
-const DEFAULT_DRAFT: CommitDraft = { subject: "", body: "", amend: false, signoff: false };
+const DEFAULT_DRAFT: CommitDraft = {
+  subject: "",
+  body: "",
+  amend: false,
+  signoff: false,
+};
 
 export interface UiState {
   /** The single active repository (cbranch is one-repo-at-a-time, P1-OPEN-4). */
@@ -66,7 +83,9 @@ export interface UiState {
   readonly clearSelection: () => void;
   // ── P2: which file the WorkingDiffPanel shows ───────────────────────────────
   readonly selectedDiffFile: { path: string; staged: boolean } | null;
-  readonly setSelectedDiffFile: (f: { path: string; staged: boolean } | null) => void;
+  readonly setSelectedDiffFile: (
+    f: { path: string; staged: boolean } | null,
+  ) => void;
   // ── P3: main view switching ──────────────────────────────────────────────────
   readonly activeView: ActiveView;
   readonly setActiveView: (view: ActiveView) => void;
@@ -114,7 +133,8 @@ export const useUiStore = create<UiState>((set) => ({
   },
   setDetailTab: (detailTab) => set({ detailTab }),
   setKnownRefStrings: (knownRefStrings) => set({ knownRefStrings }),
-  updateCommitDraft: (patch) => set((s) => ({ commitDraft: { ...s.commitDraft, ...patch } })),
+  updateCommitDraft: (patch) =>
+    set((s) => ({ commitDraft: { ...s.commitDraft, ...patch } })),
   resetCommitDraft: () => set({ commitDraft: DEFAULT_DRAFT }),
   toggleStagedSelection: (path) =>
     set((s) => {
@@ -132,7 +152,8 @@ export const useUiStore = create<UiState>((set) => ({
     }),
   setStagedSelection: (paths) => set({ stagedSelection: new Set(paths) }),
   setUnstagedSelection: (paths) => set({ unstagedSelection: new Set(paths) }),
-  clearSelection: () => set({ stagedSelection: new Set(), unstagedSelection: new Set() }),
+  clearSelection: () =>
+    set({ stagedSelection: new Set(), unstagedSelection: new Set() }),
   setSelectedDiffFile: (selectedDiffFile) => set({ selectedDiffFile }),
   setActiveView: (activeView) => set({ activeView }),
 }));

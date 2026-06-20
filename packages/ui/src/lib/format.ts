@@ -15,7 +15,9 @@ const DATE_MODE_KEY = "cbranch.ui.dateMode";
 export const readDateMode = (): DateMode => {
   try {
     if (typeof localStorage === "undefined") return "relative";
-    return localStorage.getItem(DATE_MODE_KEY) === "absolute" ? "absolute" : "relative";
+    return localStorage.getItem(DATE_MODE_KEY) === "absolute"
+      ? "absolute"
+      : "relative";
   } catch {
     return "relative";
   }
@@ -24,13 +26,16 @@ export const readDateMode = (): DateMode => {
 /** Persist the date preference. No-op when storage is unavailable (NF-CFG-3). */
 export const writeDateMode = (mode: DateMode): void => {
   try {
-    if (typeof localStorage !== "undefined") localStorage.setItem(DATE_MODE_KEY, mode);
+    if (typeof localStorage !== "undefined")
+      localStorage.setItem(DATE_MODE_KEY, mode);
   } catch {
     // ignore unavailable/blocked storage
   }
 };
 
-const RELATIVE_UNITS: ReadonlyArray<readonly [Intl.RelativeTimeFormatUnit, number]> = [
+const RELATIVE_UNITS: ReadonlyArray<
+  readonly [Intl.RelativeTimeFormatUnit, number]
+> = [
   ["year", 31_536_000_000],
   ["month", 2_592_000_000],
   ["week", 604_800_000],
@@ -41,7 +46,10 @@ const RELATIVE_UNITS: ReadonlyArray<readonly [Intl.RelativeTimeFormatUnit, numbe
 ];
 
 /** Format an absolute instant (epoch ms) as a coarse relative time (e.g. "3 days ago"). */
-export const formatRelativeMs = (epochMs: number, nowMs: number = Date.now()): string => {
+export const formatRelativeMs = (
+  epochMs: number,
+  nowMs: number = Date.now(),
+): string => {
   if (!Number.isFinite(epochMs)) return "";
   const deltaMs = epochMs - nowMs;
   const abs = Math.abs(deltaMs);
@@ -60,15 +68,28 @@ export const formatIso = (iso: string): string => {
 };
 
 /** Format a raw git ISO date string per the chosen mode (P1-HIST-8). */
-export const formatDate = (iso: string, mode: DateMode, nowMs?: number): string => {
+export const formatDate = (
+  iso: string,
+  mode: DateMode,
+  nowMs?: number,
+): string => {
   if (mode === "absolute") return formatIso(iso);
   const date = new Date(iso);
-  return Number.isNaN(date.getTime()) ? iso : formatRelativeMs(date.getTime(), nowMs);
+  return Number.isNaN(date.getTime())
+    ? iso
+    : formatRelativeMs(date.getTime(), nowMs);
 };
 
 /** Format a committed instant (epoch seconds) for display. */
-export const formatEpoch = (epochSeconds: number): string => new Date(epochSeconds * 1000).toLocaleString();
+export const formatEpoch = (epochSeconds: number): string =>
+  new Date(epochSeconds * 1000).toLocaleString();
 
 /** Format a committed instant (epoch seconds) per the chosen mode (P1-HIST-8). */
-export const formatInstant = (epochSeconds: number, mode: DateMode, nowMs?: number): string =>
-  mode === "absolute" ? formatEpoch(epochSeconds) : formatRelativeMs(epochSeconds * 1000, nowMs);
+export const formatInstant = (
+  epochSeconds: number,
+  mode: DateMode,
+  nowMs?: number,
+): string =>
+  mode === "absolute"
+    ? formatEpoch(epochSeconds)
+    : formatRelativeMs(epochSeconds * 1000, nowMs);

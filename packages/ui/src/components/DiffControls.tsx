@@ -32,7 +32,9 @@ export function DiffControls({
   const isMerge = parents.length >= 2;
 
   // Selector value: a parent index, or "combined".
-  const baseValue = options.combined ? "combined" : String(parents.findIndex((p) => p === options.base));
+  const baseValue = options.combined
+    ? "combined"
+    : String(parents.findIndex((p) => p === options.base));
   const onBaseChange = (value: string) => {
     if (value === "combined") {
       onOptionsChange({ ...options, combined: true, base: undefined });
@@ -40,7 +42,11 @@ export function DiffControls({
     }
     const index = Number(value);
     // First parent is the default comparison: leave base unset so the server uses ^1.
-    onOptionsChange({ ...options, combined: false, base: index <= 0 ? undefined : parents[index] });
+    onOptionsChange({
+      ...options,
+      combined: false,
+      base: index <= 0 ? undefined : parents[index],
+    });
   };
 
   return (
@@ -51,7 +57,10 @@ export function DiffControls({
           onClick={() => onDiffViewChange("inline")}
           aria-pressed={diffView === "inline"}
           aria-label="Inline diff"
-          className={cn("border p-0.5", diffView === "inline" ? "bg-accent text-accent-foreground" : "")}
+          className={cn(
+            "border p-0.5",
+            diffView === "inline" ? "bg-accent text-accent-foreground" : "",
+          )}
         >
           <Rows3 className="size-3.5" aria-hidden="true" />
         </button>
@@ -60,7 +69,10 @@ export function DiffControls({
           onClick={() => onDiffViewChange("split")}
           aria-pressed={diffView === "split"}
           aria-label="Side-by-side diff"
-          className={cn("border p-0.5", diffView === "split" ? "bg-accent text-accent-foreground" : "")}
+          className={cn(
+            "border p-0.5",
+            diffView === "split" ? "bg-accent text-accent-foreground" : "",
+          )}
         >
           <Columns2 className="size-3.5" aria-hidden="true" />
         </button>
@@ -71,7 +83,10 @@ export function DiffControls({
           type="checkbox"
           checked={ignoreWs}
           onChange={(event) =>
-            onOptionsChange({ ...options, whitespace: event.target.checked ? "ignore-all" : "show" })
+            onOptionsChange({
+              ...options,
+              whitespace: event.target.checked ? "ignore-all" : "show",
+            })
           }
         />
         ignore whitespace
@@ -82,7 +97,12 @@ export function DiffControls({
         <button
           type="button"
           aria-label="Fewer context lines"
-          onClick={() => onOptionsChange({ ...options, context: Math.max(0, options.context - 1) })}
+          onClick={() =>
+            onOptionsChange({
+              ...options,
+              context: Math.max(0, options.context - 1),
+            })
+          }
           className="border px-1"
         >
           −
@@ -91,7 +111,12 @@ export function DiffControls({
         <button
           type="button"
           aria-label="More context lines"
-          onClick={() => onOptionsChange({ ...options, context: Math.min(MAX_CONTEXT, options.context + 1) })}
+          onClick={() =>
+            onOptionsChange({
+              ...options,
+              context: Math.min(MAX_CONTEXT, options.context + 1),
+            })
+          }
           className="border px-1"
         >
           +
@@ -118,10 +143,20 @@ export function DiffControls({
       ) : null}
 
       <div className="ml-auto flex items-center gap-1">
-        <button type="button" onClick={onPrevChange} aria-label="Previous change" className="border p-0.5">
+        <button
+          type="button"
+          onClick={onPrevChange}
+          aria-label="Previous change"
+          className="border p-0.5"
+        >
           <ChevronUp className="size-3.5" aria-hidden="true" />
         </button>
-        <button type="button" onClick={onNextChange} aria-label="Next change" className="border p-0.5">
+        <button
+          type="button"
+          onClick={onNextChange}
+          aria-label="Next change"
+          className="border p-0.5"
+        >
           <ChevronDown className="size-3.5" aria-hidden="true" />
         </button>
       </div>

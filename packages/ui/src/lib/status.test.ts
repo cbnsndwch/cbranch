@@ -42,7 +42,11 @@ describe("isUnstagedChange", () => {
     expect(isUnstagedChange(makeEntry({ unstaged: "modified" }))).toBe(true);
   });
   test("returns true for untracked even with unmodified unstaged", () => {
-    expect(isUnstagedChange(makeEntry({ unstaged: "unmodified", isUntracked: true }))).toBe(true);
+    expect(
+      isUnstagedChange(
+        makeEntry({ unstaged: "unmodified", isUntracked: true }),
+      ),
+    ).toBe(true);
   });
   test("returns false for clean entry", () => {
     expect(isUnstagedChange(makeEntry({}))).toBe(false);
@@ -90,20 +94,30 @@ describe("statusLabel", () => {
     expect(statusLabel(makeEntry({ unstaged: "deleted" }))).toBe("deleted");
   });
   test("renamed with origPath returns 'renamed → origPath'", () => {
-    expect(statusLabel(makeEntry({ staged: "renamed", origPath: "old.ts" }))).toBe("renamed → old.ts");
+    expect(
+      statusLabel(makeEntry({ staged: "renamed", origPath: "old.ts" })),
+    ).toBe("renamed → old.ts");
   });
   test("renamed without origPath falls back to path", () => {
-    expect(statusLabel(makeEntry({ staged: "renamed", path: "new.ts" }))).toBe("renamed → new.ts");
+    expect(statusLabel(makeEntry({ staged: "renamed", path: "new.ts" }))).toBe(
+      "renamed → new.ts",
+    );
   });
   test("conflict returns 'conflict'", () => {
-    expect(statusLabel(makeEntry({ staged: "updatedButUnmerged" }))).toBe("conflict");
+    expect(statusLabel(makeEntry({ staged: "updatedButUnmerged" }))).toBe(
+      "conflict",
+    );
   });
   test("untracked returns 'untracked'", () => {
-    expect(statusLabel(makeEntry({ unstaged: "untracked", isUntracked: true }))).toBe("untracked");
+    expect(
+      statusLabel(makeEntry({ unstaged: "untracked", isUntracked: true })),
+    ).toBe("untracked");
   });
   test("prefers staged side when staged change present", () => {
     // staged=added, unstaged=modified → should show "new file"
-    expect(statusLabel(makeEntry({ staged: "added", unstaged: "modified" }))).toBe("new file");
+    expect(
+      statusLabel(makeEntry({ staged: "added", unstaged: "modified" })),
+    ).toBe("new file");
   });
 });
 
@@ -117,7 +131,9 @@ describe("hasStagedChanges / hasUnstagedChanges", () => {
     expect(hasStagedChanges(status)).toBe(false);
   });
   test("hasUnstagedChanges is true for untracked", () => {
-    const status = makeStatus([makeEntry({ isUntracked: true, unstaged: "untracked" })]);
+    const status = makeStatus([
+      makeEntry({ isUntracked: true, unstaged: "untracked" }),
+    ]);
     expect(hasUnstagedChanges(status)).toBe(true);
   });
   test("hasUnstagedChanges is false for clean status", () => {

@@ -15,7 +15,9 @@ export const readThemePref = (): ThemePref => {
   try {
     if (typeof localStorage === "undefined") return "system";
     const value = localStorage.getItem(STORAGE_KEY);
-    return value === "light" || value === "dark" || value === "system" ? value : "system";
+    return value === "light" || value === "dark" || value === "system"
+      ? value
+      : "system";
   } catch {
     return "system";
   }
@@ -23,7 +25,8 @@ export const readThemePref = (): ThemePref => {
 
 const writeThemePref = (pref: ThemePref): void => {
   try {
-    if (typeof localStorage !== "undefined") localStorage.setItem(STORAGE_KEY, pref);
+    if (typeof localStorage !== "undefined")
+      localStorage.setItem(STORAGE_KEY, pref);
   } catch {
     // ignore unavailable/again-blocked storage (NF-CFG-3 degrade gracefully)
   }
@@ -32,7 +35,10 @@ const writeThemePref = (pref: ThemePref): void => {
 /** Whether the OS currently prefers a dark color scheme. */
 export const prefersDark = (): boolean => {
   try {
-    return typeof matchMedia === "function" && matchMedia("(prefers-color-scheme: dark)").matches;
+    return (
+      typeof matchMedia === "function" &&
+      matchMedia("(prefers-color-scheme: dark)").matches
+    );
   } catch {
     return false;
   }
@@ -46,11 +52,17 @@ export const resolveDark = (pref: ThemePref, systemDark: boolean): boolean =>
 export const applyTheme = (pref: ThemePref): void => {
   writeThemePref(pref);
   if (typeof document === "undefined") return;
-  document.documentElement.classList.toggle("dark", resolveDark(pref, prefersDark()));
+  document.documentElement.classList.toggle(
+    "dark",
+    resolveDark(pref, prefersDark()),
+  );
 };
 
 /** Apply the persisted theme to <html> before first paint (NF-THEME-6). */
 export const applyStoredTheme = (): void => {
   if (typeof document === "undefined") return;
-  document.documentElement.classList.toggle("dark", resolveDark(readThemePref(), prefersDark()));
+  document.documentElement.classList.toggle(
+    "dark",
+    resolveDark(readThemePref(), prefersDark()),
+  );
 };

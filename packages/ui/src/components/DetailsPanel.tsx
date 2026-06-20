@@ -19,14 +19,22 @@ export function DetailsPanel({
   const { data, isLoading, isError } = useCommitDetail(repoId, oid);
   const dateMode = useUiStore((s) => s.dateMode);
 
-  if (oid === null) return <Placeholder>Select a commit to see its details.</Placeholder>;
+  if (oid === null)
+    return <Placeholder>Select a commit to see its details.</Placeholder>;
   if (isLoading) return <Placeholder>Loading commit…</Placeholder>;
-  if (isError || !data) return <Placeholder tone="danger">Could not load commit {shortOid(oid)}.</Placeholder>;
+  if (isError || !data)
+    return (
+      <Placeholder tone="danger">
+        Could not load commit {shortOid(oid)}.
+      </Placeholder>
+    );
 
   return (
     <div className="flex h-full flex-col gap-3 overflow-auto p-3 text-sm">
       <div>
-        <div className="text-muted-foreground font-mono text-xs break-all">{data.oid}</div>
+        <div className="text-muted-foreground font-mono text-xs break-all">
+          {data.oid}
+        </div>
         <div className="mt-1 font-medium">{data.subject}</div>
       </div>
       <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
@@ -45,7 +53,9 @@ export function DetailsPanel({
           </span>
         </dd>
       </dl>
-      {data.body ? <pre className="text-xs whitespace-pre-wrap">{data.body}</pre> : null}
+      {data.body ? (
+        <pre className="text-xs whitespace-pre-wrap">{data.body}</pre>
+      ) : null}
       {data.parents.length > 0 ? (
         <div className="text-xs">
           <span className="text-muted-foreground">parents: </span>

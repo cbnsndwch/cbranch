@@ -36,7 +36,11 @@ describe("makeRepoLockRegistry (NF-LOCK-1; scaffold for P2 mutations)", () => {
           state.active -= 1;
         }),
       );
-    await run(Effect.all([work(id("a")), work(id("b")), work(id("c"))], { concurrency: "unbounded" }));
+    await run(
+      Effect.all([work(id("a")), work(id("b")), work(id("c"))], {
+        concurrency: "unbounded",
+      }),
+    );
     expect(state.maxActive).toBeGreaterThan(1);
     expect(registry.size()).toBe(3);
   });

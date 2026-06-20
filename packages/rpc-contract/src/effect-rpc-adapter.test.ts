@@ -9,7 +9,15 @@
 
 import { describe, expect, test } from "vitest";
 
-import { Rpc, RpcClient, RpcGroup, RpcSerialization, RpcServer, RpcTest, Socket } from "./effect-rpc-adapter";
+import {
+  Rpc,
+  RpcClient,
+  RpcGroup,
+  RpcSerialization,
+  RpcServer,
+  RpcTest,
+  Socket,
+} from "./effect-rpc-adapter";
 
 describe("effect-rpc-adapter quarantine surface @ effect@4.0.0-beta.84", () => {
   test("RPC catalog + test-transport symbols are present", () => {

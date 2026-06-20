@@ -5,7 +5,13 @@
 // The ASCII Unit Separator (0x1F) is used as the field delimiter so that branch
 // names (which cannot contain it) do not collide with the separator.
 
-import { BranchInfo, BranchListing, BranchUpstream, type GitError, Oid } from "@cbranch/rpc-contract";
+import {
+  BranchInfo,
+  BranchListing,
+  BranchUpstream,
+  type GitError,
+  Oid,
+} from "@cbranch/rpc-contract";
 import { Effect } from "effect";
 
 import { decodeUtf8, runGit, runGitOk } from "./run-git";
@@ -39,12 +45,17 @@ const FORMAT =
   SEP +
   "%(upstream:track)";
 
-function parseTrack(track: string): { ahead: number; behind: number } | undefined {
+function parseTrack(
+  track: string,
+): { ahead: number; behind: number } | undefined {
   if (!track || track === "[gone]") return undefined;
   const ahead = track.match(/ahead (\d+)/);
   const behind = track.match(/behind (\d+)/);
   if (!ahead && !behind) return undefined;
-  return { ahead: ahead ? parseInt(ahead[1] ?? "0", 10) : 0, behind: behind ? parseInt(behind[1] ?? "0", 10) : 0 };
+  return {
+    ahead: ahead ? parseInt(ahead[1] ?? "0", 10) : 0,
+    behind: behind ? parseInt(behind[1] ?? "0", 10) : 0,
+  };
 }
 
 function parseLine(line: string, isRemote: boolean): BranchInfo | null {
@@ -94,11 +105,19 @@ function parseLine(line: string, isRemote: boolean): BranchInfo | null {
   });
 }
 
-export const branchList = (cwd: string, env?: NodeJS.ProcessEnv): Effect.Effect<BranchListing, GitError> =>
+export const branchList = (
+  cwd: string,
+  env?: NodeJS.ProcessEnv,
+): Effect.Effect<BranchListing, GitError> =>
   Effect.gen(function* () {
     const result = yield* runGitOk({
       cwd,
-      args: ["for-each-ref", "--format=" + FORMAT, "refs/heads", "refs/remotes"],
+      args: [
+        "for-each-ref",
+        "--format=" + FORMAT,
+        "refs/heads",
+        "refs/remotes",
+      ],
       env,
     });
     const output = decodeUtf8(result.stdout);
@@ -129,5 +148,10 @@ export const branchList = (cwd: string, env?: NodeJS.ProcessEnv): Effect.Effect<
       if (h) detachedHead = h as Oid;
     }
 
-    return new BranchListing({ localBranches, remoteBranches, currentBranch, detachedHead });
+    return new BranchListing({
+      localBranches,
+      remoteBranches,
+      currentBranch,
+      detachedHead,
+    });
   });

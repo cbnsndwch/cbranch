@@ -36,7 +36,9 @@ const port = parseInt(flag("--port") ?? "7420", 10);
 const RUNS = parseInt(flag("--runs") ?? "5", 10);
 
 if (!repoPath) {
-  console.error("Usage: node scripts/measure-perf.mjs <repo-path> [--port 7420] [--runs 5]");
+  console.error(
+    "Usage: node scripts/measure-perf.mjs <repo-path> [--port 7420] [--runs 5]",
+  );
   process.exit(1);
 }
 
@@ -69,7 +71,13 @@ function probe() {
         }
 
         if (msg._tag === "RepoOpen" && msg.repoId) {
-          ws.send(JSON.stringify({ _tag: "LogStream", repoId: msg.repoId, limit: 100_000 }) + "\n");
+          ws.send(
+            JSON.stringify({
+              _tag: "LogStream",
+              repoId: msg.repoId,
+              limit: 100_000,
+            }) + "\n",
+          );
         } else if (msg._tag === "LogStream") {
           if (msg.oid) {
             if (firstRowMs === null) firstRowMs = performance.now() - t0;
@@ -78,7 +86,12 @@ function probe() {
           if (msg._end || msg._cause) {
             const totalMs = performance.now() - t0;
             ws.close();
-            resolve({ firstRowMs, rowCount, totalMs, incremental: firstRowMs !== null && firstRowMs < totalMs - 10 });
+            resolve({
+              firstRowMs,
+              rowCount,
+              totalMs,
+              incremental: firstRowMs !== null && firstRowMs < totalMs - 10,
+            });
           }
         } else if (msg._tag === "GitError" || msg._cause) {
           ws.close();
@@ -87,7 +100,9 @@ function probe() {
       }
     });
 
-    ws.addEventListener("error", (e) => reject(new Error(String(e.message ?? e))));
+    ws.addEventListener("error", (e) =>
+      reject(new Error(String(e.message ?? e))),
+    );
     setTimeout(() => {
       ws.close();
       reject(new Error("probe timeout after 60s"));
@@ -100,7 +115,9 @@ const ttfr = [];
 const throughput = [];
 let incrementalOk = true;
 
-console.log(`\nProbing ws://127.0.0.1:${port} against ${repoPath} (${RUNS} runs)…\n`);
+console.log(
+  `\nProbing ws://127.0.0.1:${port} against ${repoPath} (${RUNS} runs)…\n`,
+);
 
 for (let i = 0; i < RUNS; i++) {
   process.stdout.write(`  run ${i + 1}/${RUNS} … `);
@@ -111,8 +128,13 @@ for (let i = 0; i < RUNS; i++) {
     console.error(`FAILED: ${e.message}`);
     process.exit(1);
   }
-  const rps = r.rowCount > 0 && r.totalMs > 0 ? Math.round(r.rowCount / (r.totalMs / 1000)) : 0;
-  console.log(`ttfr=${Math.round(r.firstRowMs)}ms  rows=${r.rowCount}  ${rps} rows/s`);
+  const rps =
+    r.rowCount > 0 && r.totalMs > 0
+      ? Math.round(r.rowCount / (r.totalMs / 1000))
+      : 0;
+  console.log(
+    `ttfr=${Math.round(r.firstRowMs)}ms  rows=${r.rowCount}  ${rps} rows/s`,
+  );
   ttfr.push(r.firstRowMs);
   throughput.push(rps);
   if (!r.incremental) incrementalOk = false;
@@ -122,15 +144,23 @@ const ttfrP95 = Math.round(pct(ttfr, 0.95));
 const rpsMedian = Math.round(pct(throughput, 0.5));
 
 console.log("\n─── NF-PERF results ─────────────────────────────────────────");
-console.log(`NF-PERF-1  time-to-first-row  p95 = ${ttfrP95} ms    (budget ≤ 1500 ms)`);
-console.log(`NF-PERF-2  incremental?        ${incrementalOk ? "YES ✓" : "NO  ✗"}`);
-console.log(`NF-PERF-3  throughput (p50)    ${rpsMedian} rows/s  (budget ≥ 1000 rows/s)`);
+console.log(
+  `NF-PERF-1  time-to-first-row  p95 = ${ttfrP95} ms    (budget ≤ 1500 ms)`,
+);
+console.log(
+  `NF-PERF-2  incremental?        ${incrementalOk ? "YES ✓" : "NO  ✗"}`,
+);
+console.log(
+  `NF-PERF-3  throughput (p50)    ${rpsMedian} rows/s  (budget ≥ 1000 rows/s)`,
+);
 console.log("─────────────────────────────────────────────────────────────\n");
 
 const failures = [];
-if (ttfrP95 > 1500) failures.push(`NF-PERF-1: p95 ${ttfrP95} ms exceeds 1500 ms budget`);
+if (ttfrP95 > 1500)
+  failures.push(`NF-PERF-1: p95 ${ttfrP95} ms exceeds 1500 ms budget`);
 if (!incrementalOk) failures.push("NF-PERF-2: stream was not incremental");
-if (rpsMedian > 0 && rpsMedian < 1000) failures.push(`NF-PERF-3: ${rpsMedian} rows/s below 1000 rows/s budget`);
+if (rpsMedian > 0 && rpsMedian < 1000)
+  failures.push(`NF-PERF-3: ${rpsMedian} rows/s below 1000 rows/s budget`);
 
 if (failures.length) {
   console.error("BUDGET FAILURES:");

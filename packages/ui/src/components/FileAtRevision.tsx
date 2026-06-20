@@ -1,4 +1,8 @@
-import { type DownloadDescriptor, type FileContentResult, type RepoId } from "@cbranch/rpc-contract";
+import {
+  type DownloadDescriptor,
+  type FileContentResult,
+  type RepoId,
+} from "@cbranch/rpc-contract";
 import { useEffect, useRef } from "react";
 import { toast } from "sonner";
 
@@ -15,7 +19,8 @@ import { Placeholder } from "./ui/placeholder";
 // this registry, so the token→decoration bridge is done directly). Read-only only — no
 // staging/editing affordances (P1-DIFF-12).
 
-const isDownload = (result: FileContentResult): result is DownloadDescriptor => "url" in result;
+const isDownload = (result: FileContentResult): result is DownloadDescriptor =>
+  "url" in result;
 
 export function FileAtRevision({
   repoId,
@@ -48,14 +53,22 @@ export function FileAtRevision({
     let view: { destroy(): void } | null = null;
 
     void (async () => {
-      const [{ EditorState, StateField, RangeSetBuilder }, { EditorView, lineNumbers, Decoration }] = await Promise.all(
-        [import("@codemirror/state"), import("@codemirror/view")],
-      );
+      const [
+        { EditorState, StateField, RangeSetBuilder },
+        { EditorView, lineNumbers, Decoration },
+      ] = await Promise.all([
+        import("@codemirror/state"),
+        import("@codemirror/view"),
+      ]);
       if (cancelled) return;
 
       const language = languageForPath(path);
-      const dark = typeof document !== "undefined" && document.documentElement.classList.contains("dark");
-      const lines = language ? await loadShikiLines({ code: content, language, dark }) : null;
+      const dark =
+        typeof document !== "undefined" &&
+        document.documentElement.classList.contains("dark");
+      const lines = language
+        ? await loadShikiLines({ code: content, language, dark })
+        : null;
       if (cancelled) return;
 
       const state = EditorState.create({ doc: content });
@@ -68,8 +81,18 @@ export function FileAtRevision({
             const len = token.content.length;
             const from = docLine.from + col;
             const to = from + len;
-            if (token.color && token.content.trim().length > 0 && to <= docLine.to) {
-              builder.add(from, to, Decoration.mark({ attributes: { style: `color:${token.color}` } }));
+            if (
+              token.color &&
+              token.content.trim().length > 0 &&
+              to <= docLine.to
+            ) {
+              builder.add(
+                from,
+                to,
+                Decoration.mark({
+                  attributes: { style: `color:${token.color}` },
+                }),
+              );
             }
             col += len;
           }
@@ -91,7 +114,9 @@ export function FileAtRevision({
           highlight,
           EditorView.theme({
             "&": { height: "100%", fontSize: "12px" },
-            ".cm-scroller": { fontFamily: "var(--font-mono, ui-monospace, monospace)" },
+            ".cm-scroller": {
+              fontFamily: "var(--font-mono, ui-monospace, monospace)",
+            },
           }),
         ],
       });
@@ -106,14 +131,20 @@ export function FileAtRevision({
   }, [inlineUtf8, content, path, theme]);
 
   if (isLoading) return <Placeholder>Loading file…</Placeholder>;
-  if (isError || !data) return <Placeholder tone="danger">Could not load this file.</Placeholder>;
+  if (isError || !data)
+    return <Placeholder tone="danger">Could not load this file.</Placeholder>;
 
   if (isDownload(data)) {
     return (
       <div className="m-3 border p-4 text-xs">
-        <div className="text-foreground font-medium">File too large to display inline</div>
+        <div className="text-foreground font-medium">
+          File too large to display inline
+        </div>
         <div className="text-muted-foreground mt-1">{data.size} bytes.</div>
-        <a href={data.url} className="text-primary mt-2 inline-block hover:underline">
+        <a
+          href={data.url}
+          className="text-primary mt-2 inline-block hover:underline"
+        >
           Download file
         </a>
       </div>
@@ -124,7 +155,9 @@ export function FileAtRevision({
     return (
       <div className="m-3 border p-4 text-xs">
         <div className="text-foreground font-medium">Binary file</div>
-        <div className="text-muted-foreground mt-1">{data.size} bytes; not shown as text.</div>
+        <div className="text-muted-foreground mt-1">
+          {data.size} bytes; not shown as text.
+        </div>
       </div>
     );
   }

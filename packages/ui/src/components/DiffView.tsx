@@ -36,7 +36,13 @@ const renderToken: RenderToken = (token, defaultRender, index) => {
   return defaultRender(token, index);
 };
 
-export function DiffView({ file, diffView }: { readonly file: DiffFile; readonly diffView: "inline" | "split" }) {
+export function DiffView({
+  file,
+  diffView,
+}: {
+  readonly file: DiffFile;
+  readonly diffView: "inline" | "split";
+}) {
   const themePref = useUiStore((s) => s.theme);
   const parsedFile = useMemo(() => {
     try {
@@ -46,7 +52,9 @@ export function DiffView({ file, diffView }: { readonly file: DiffFile; readonly
     }
   }, [file]);
 
-  const [tokens, setTokens] = useState<ReturnType<typeof tokenize> | null>(null);
+  const [tokens, setTokens] = useState<ReturnType<typeof tokenize> | null>(
+    null,
+  );
 
   useEffect(() => {
     setTokens(null);
@@ -54,11 +62,15 @@ export function DiffView({ file, diffView }: { readonly file: DiffFile; readonly
     const language = languageForPath(file.newPath || file.oldPath);
     if (!language) return;
     let cancelled = false;
-    const dark = typeof document !== "undefined" && document.documentElement.classList.contains("dark");
+    const dark =
+      typeof document !== "undefined" &&
+      document.documentElement.classList.contains("dark");
     void loadShikiRefractor({ language, dark }).then((refractor) => {
       if (cancelled || !refractor) return;
       try {
-        setTokens(tokenize(parsedFile.hunks, { highlight: true, refractor, language }));
+        setTokens(
+          tokenize(parsedFile.hunks, { highlight: true, refractor, language }),
+        );
       } catch {
         // highlighting is best-effort; fall back to plain text
       }

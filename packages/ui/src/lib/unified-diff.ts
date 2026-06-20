@@ -13,7 +13,8 @@ const NL = String.fromCharCode(10);
 const BACKSLASH = String.fromCharCode(92);
 const NO_NEWLINE_MARKER = `${BACKSLASH} No newline at end of file`;
 
-const lineMarker = (kind: string): string => (kind === "add" ? "+" : kind === "delete" ? "-" : " ");
+const lineMarker = (kind: string): string =>
+  kind === "add" ? "+" : kind === "delete" ? "-" : " ";
 
 /** Serialize a single {@link DiffFile} into a unified-diff patch string. */
 export const fileToUnifiedDiff = (file: DiffFile): string => {
@@ -27,7 +28,9 @@ export const fileToUnifiedDiff = (file: DiffFile): string => {
   out.push(`+++ ${deleted ? "/dev/null" : `b/${newPath}`}`);
 
   for (const hunk of file.hunks) {
-    out.push(`@@ -${hunk.oldStart},${hunk.oldLines} +${hunk.newStart},${hunk.newLines} @@`);
+    out.push(
+      `@@ -${hunk.oldStart},${hunk.oldLines} +${hunk.newStart},${hunk.newLines} @@`,
+    );
     for (const line of hunk.lines) {
       if (line.kind === "noNewlineAtEof") {
         out.push(NO_NEWLINE_MARKER);

@@ -24,7 +24,9 @@ const makeEntry = (overrides: Partial<StatusEntry>): StatusEntry =>
   });
 
 const fakeStatus = new WorkingTreeStatus({
-  entries: [makeEntry({ path: "a.ts", staged: "modified", unstaged: "modified" })],
+  entries: [
+    makeEntry({ path: "a.ts", staged: "modified", unstaged: "modified" }),
+  ],
   hasConflicts: false,
 });
 
@@ -71,7 +73,9 @@ const makeFakeApi = (overrides: Partial<CbranchApi> = {}): CbranchApi =>
 const makeWrapper =
   (api: CbranchApi) =>
   ({ children }: { children: ReactNode }) => {
-    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const qc = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
     return (
       <QueryClientProvider client={qc}>
         <ApiProvider api={api}>{children}</ApiProvider>
@@ -82,7 +86,9 @@ const makeWrapper =
 describe("useStatus", () => {
   test("fetches working-tree status from the API", async () => {
     const api = makeFakeApi();
-    const { result } = renderHook(() => useStatus(repoId), { wrapper: makeWrapper(api) });
+    const { result } = renderHook(() => useStatus(repoId), {
+      wrapper: makeWrapper(api),
+    });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data?.entries).toHaveLength(1);
     expect(result.current.data?.entries[0]?.path).toBe("a.ts");
@@ -90,7 +96,9 @@ describe("useStatus", () => {
 
   test("does not fetch when repoId is null", () => {
     const api = makeFakeApi();
-    const { result } = renderHook(() => useStatus(null), { wrapper: makeWrapper(api) });
+    const { result } = renderHook(() => useStatus(null), {
+      wrapper: makeWrapper(api),
+    });
     expect(result.current.fetchStatus).toBe("idle");
     expect(api.statusGet).not.toHaveBeenCalled();
   });
@@ -99,7 +107,9 @@ describe("useStatus", () => {
 describe("useStageFiles", () => {
   test("calls stageFiles and invalidates status on settled", async () => {
     const api = makeFakeApi();
-    const { result } = renderHook(() => useStageFiles(repoId), { wrapper: makeWrapper(api) });
+    const { result } = renderHook(() => useStageFiles(repoId), {
+      wrapper: makeWrapper(api),
+    });
     await act(async () => {
       result.current.mutate({ paths: ["a.ts"] });
     });

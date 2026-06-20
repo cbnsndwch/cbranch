@@ -2,7 +2,13 @@ import { type RemoteInfo, type RepoId } from "@cbranch/rpc-contract";
 import { useState } from "react";
 import { toast } from "sonner";
 
-import { useRemoteAdd, useRemoteList, useRemoteRemove, useRemoteRename, useRemoteSetUrl } from "../rpc/hooks";
+import {
+  useRemoteAdd,
+  useRemoteList,
+  useRemoteRemove,
+  useRemoteRename,
+  useRemoteSetUrl,
+} from "../rpc/hooks";
 import {
   AlertDialog,
   AlertDialogClose,
@@ -24,7 +30,11 @@ type EditState =
   | { kind: "editUrl"; remoteName: string; value: string }
   | null;
 
-export function RemotesManagerDialog({ repoId, open, onOpenChange }: RemotesManagerDialogProps) {
+export function RemotesManagerDialog({
+  repoId,
+  open,
+  onOpenChange,
+}: RemotesManagerDialogProps) {
   const { data: remotes } = useRemoteList(repoId);
   const addMut = useRemoteAdd(repoId);
   const renameMut = useRemoteRename(repoId);
@@ -53,7 +63,11 @@ export function RemotesManagerDialog({ repoId, open, onOpenChange }: RemotesMana
   };
 
   const handleRenameStart = (remote: RemoteInfo) => {
-    setEditState({ kind: "renaming", remoteName: remote.name, value: remote.name });
+    setEditState({
+      kind: "renaming",
+      remoteName: remote.name,
+      value: remote.name,
+    });
   };
 
   const handleRenameConfirm = () => {
@@ -76,7 +90,11 @@ export function RemotesManagerDialog({ repoId, open, onOpenChange }: RemotesMana
   };
 
   const handleEditUrlStart = (remote: RemoteInfo) => {
-    setEditState({ kind: "editUrl", remoteName: remote.name, value: remote.fetchUrl });
+    setEditState({
+      kind: "editUrl",
+      remoteName: remote.name,
+      value: remote.fetchUrl,
+    });
   };
 
   const handleEditUrlConfirm = () => {
@@ -115,13 +133,17 @@ export function RemotesManagerDialog({ repoId, open, onOpenChange }: RemotesMana
       <AlertDialogContent className="max-w-2xl">
         <AlertDialogHeader>
           <AlertDialogTitle>Manage Remotes</AlertDialogTitle>
-          <AlertDialogDescription>Add, rename, or remove Git remotes for this repository.</AlertDialogDescription>
+          <AlertDialogDescription>
+            Add, rename, or remove Git remotes for this repository.
+          </AlertDialogDescription>
         </AlertDialogHeader>
 
         {/* Remote list */}
         <div className="my-2 overflow-auto">
           {list.length === 0 ? (
-            <p className="text-muted-foreground py-2 text-sm">No remotes configured.</p>
+            <p className="text-muted-foreground py-2 text-sm">
+              No remotes configured.
+            </p>
           ) : (
             <table className="w-full text-sm">
               <thead>
@@ -135,12 +157,18 @@ export function RemotesManagerDialog({ repoId, open, onOpenChange }: RemotesMana
                 {list.map((remote) => (
                   <tr key={remote.name} className="border-b last:border-0">
                     <td className="py-1.5 pr-2">
-                      {editState?.kind === "renaming" && editState.remoteName === remote.name ? (
+                      {editState?.kind === "renaming" &&
+                      editState.remoteName === remote.name ? (
                         <div className="flex items-center gap-1">
                           <input
                             type="text"
                             value={editState.value}
-                            onChange={(e) => setEditState({ ...editState, value: e.target.value })}
+                            onChange={(e) =>
+                              setEditState({
+                                ...editState,
+                                value: e.target.value,
+                              })
+                            }
                             className="h-7 w-28 border px-1 text-xs"
                             autoFocus
                             onKeyDown={(e) => {
@@ -169,12 +197,18 @@ export function RemotesManagerDialog({ repoId, open, onOpenChange }: RemotesMana
                       )}
                     </td>
                     <td className="max-w-[260px] py-1.5 pr-2">
-                      {editState?.kind === "editUrl" && editState.remoteName === remote.name ? (
+                      {editState?.kind === "editUrl" &&
+                      editState.remoteName === remote.name ? (
                         <div className="flex items-center gap-1">
                           <input
                             type="text"
                             value={editState.value}
-                            onChange={(e) => setEditState({ ...editState, value: e.target.value })}
+                            onChange={(e) =>
+                              setEditState({
+                                ...editState,
+                                value: e.target.value,
+                              })
+                            }
                             className="h-7 min-w-0 flex-1 border px-1 text-xs"
                             autoFocus
                             onKeyDown={(e) => {
@@ -199,7 +233,10 @@ export function RemotesManagerDialog({ repoId, open, onOpenChange }: RemotesMana
                           </button>
                         </div>
                       ) : (
-                        <span className="block truncate font-mono text-xs" title={remote.fetchUrl}>
+                        <span
+                          className="block truncate font-mono text-xs"
+                          title={remote.fetchUrl}
+                        >
                           {remote.fetchUrl}
                         </span>
                       )}
@@ -269,7 +306,9 @@ export function RemotesManagerDialog({ repoId, open, onOpenChange }: RemotesMana
         </div>
 
         <AlertDialogFooter className="mt-3">
-          <AlertDialogClose onClick={() => onOpenChange(false)}>Close</AlertDialogClose>
+          <AlertDialogClose onClick={() => onOpenChange(false)}>
+            Close
+          </AlertDialogClose>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>

@@ -52,8 +52,12 @@ describe("fileToUnifiedDiff (REQ-STACK-020)", () => {
   });
 
   test("added/deleted files use /dev/null on the right side", () => {
-    expect(fileToUnifiedDiff(mkFile({ newPath: "n.ts", status: "added" }))).toContain("--- /dev/null");
-    expect(fileToUnifiedDiff(mkFile({ newPath: "g.ts", status: "deleted" }))).toContain("+++ /dev/null");
+    expect(
+      fileToUnifiedDiff(mkFile({ newPath: "n.ts", status: "added" })),
+    ).toContain("--- /dev/null");
+    expect(
+      fileToUnifiedDiff(mkFile({ newPath: "g.ts", status: "deleted" })),
+    ).toContain("+++ /dev/null");
   });
 
   test("a no-newline-at-eof line emits the marker", () => {

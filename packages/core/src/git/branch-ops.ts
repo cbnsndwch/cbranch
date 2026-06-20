@@ -1,14 +1,22 @@
 // Branch lifecycle operations: create, switch, rename, delete, set-upstream.
 // (docs/spec/07 REQ-P3-BR-010..051)
 
-import { BranchInfo, type BranchSwitchStrategy, type GitError } from "@cbranch/rpc-contract";
+import {
+  BranchInfo,
+  type BranchSwitchStrategy,
+  type GitError,
+} from "@cbranch/rpc-contract";
 import { Effect } from "effect";
 
 import { branchList } from "./branches";
 import { assertNoLeadingDash, runGitOk } from "./run-git";
 
 // Return the BranchInfo for the named branch from a fresh listing.
-function lookupBranch(cwd: string, name: string, env?: NodeJS.ProcessEnv): Effect.Effect<BranchInfo, GitError> {
+function lookupBranch(
+  cwd: string,
+  name: string,
+  env?: NodeJS.ProcessEnv,
+): Effect.Effect<BranchInfo, GitError> {
   return Effect.flatMap(branchList(cwd, env), (listing) => {
     const found = listing.localBranches.find((b) => b.name === name);
     if (!found)
@@ -32,7 +40,9 @@ export const branchCreate = (
 ): Effect.Effect<BranchInfo, GitError> =>
   Effect.gen(function* () {
     const safeName = yield* assertNoLeadingDash(name, "branch name");
-    const args: string[] = switchAfter ? ["switch", "-c", safeName] : ["branch", safeName];
+    const args: string[] = switchAfter
+      ? ["switch", "-c", safeName]
+      : ["branch", safeName];
 
     if (startPoint) {
       const safeStart = yield* assertNoLeadingDash(startPoint, "start point");
@@ -59,7 +69,13 @@ export const branchSwitch = (
     if (strategy === "stash") {
       yield* runGitOk({
         cwd,
-        args: ["stash", "push", "--include-untracked", "-m", "cbranch-auto-stash"],
+        args: [
+          "stash",
+          "push",
+          "--include-untracked",
+          "-m",
+          "cbranch-auto-stash",
+        ],
         env,
         read: false,
       });
@@ -69,7 +85,12 @@ export const branchSwitch = (
     }
 
     if (strategy === "discard") {
-      yield* runGitOk({ cwd, args: ["switch", "--discard-changes", safeTarget], env, read: false });
+      yield* runGitOk({
+        cwd,
+        args: ["switch", "--discard-changes", safeTarget],
+        env,
+        read: false,
+      });
       return;
     }
 
@@ -87,7 +108,12 @@ export const branchRename = (
   Effect.gen(function* () {
     const safeOld = yield* assertNoLeadingDash(oldName, "branch name");
     const safeNew = yield* assertNoLeadingDash(newName, "new branch name");
-    yield* runGitOk({ cwd, args: ["branch", "-m", safeOld, safeNew], env, read: false });
+    yield* runGitOk({
+      cwd,
+      args: ["branch", "-m", safeOld, safeNew],
+      env,
+      read: false,
+    });
   });
 
 // REQ-P3-BR-040/041
@@ -100,7 +126,12 @@ export const branchDelete = (
   Effect.gen(function* () {
     const safeName = yield* assertNoLeadingDash(name, "branch name");
     const flag = force ? "-D" : "-d";
-    yield* runGitOk({ cwd, args: ["branch", flag, safeName], env, read: false });
+    yield* runGitOk({
+      cwd,
+      args: ["branch", flag, safeName],
+      env,
+      read: false,
+    });
   });
 
 // REQ-P3-BR-050/051
@@ -113,9 +144,19 @@ export const branchSetUpstream = (
   Effect.gen(function* () {
     const safeName = yield* assertNoLeadingDash(name, "branch name");
     if (upstream === undefined || upstream === "") {
-      yield* runGitOk({ cwd, args: ["branch", "--unset-upstream", safeName], env, read: false });
+      yield* runGitOk({
+        cwd,
+        args: ["branch", "--unset-upstream", safeName],
+        env,
+        read: false,
+      });
     } else {
       const safeUpstream = yield* assertNoLeadingDash(upstream, "upstream ref");
-      yield* runGitOk({ cwd, args: ["branch", "--set-upstream-to", safeUpstream, safeName], env, read: false });
+      yield* runGitOk({
+        cwd,
+        args: ["branch", "--set-upstream-to", safeUpstream, safeName],
+        env,
+        read: false,
+      });
     }
   });

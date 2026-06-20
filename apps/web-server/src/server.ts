@@ -14,7 +14,11 @@ import * as http from "node:http";
 
 import { type GitEngine } from "@cbranch/core";
 import { CbranchRpcs, type GitError } from "@cbranch/rpc-contract";
-import { Http, RpcServer, RpcSerialization } from "@cbranch/rpc-contract/effect-rpc-adapter";
+import {
+  Http,
+  RpcServer,
+  RpcSerialization,
+} from "@cbranch/rpc-contract/effect-rpc-adapter";
 import * as NodeHttpServer from "@effect/platform-node/NodeHttpServer";
 import { Layer } from "effect";
 
@@ -36,21 +40,40 @@ export const RPC_PATH = "/rpc";
  * `Origin`/`Host` guard. `provideMerge` keeps `HttpServer` (and the Node platform
  * services) in the output so a caller/test can read the bound address.
  */
-export const buildServerLive = (config: ServerConfig, engineLive: Layer.Layer<GitEngine, GitError>) => {
+export const buildServerLive = (
+  config: ServerConfig,
+  engineLive: Layer.Layer<GitEngine, GitError>,
+) => {
   // `handlersLayer` requires `GitEngine` directly; `sideChannelRoute` requires it as a
   // route-scoped requirement that only surfaces (unwrapped) after `HttpRouter.serve`.
   // So `engineLive` is provided once at the end — after `serve` — to satisfy both.
   const appLive = Layer.mergeAll(
-    RpcServer.layerHttp({ group: CbranchRpcs, path: RPC_PATH, protocol: "websocket" }),
-    Http.HttpStaticServer.layer({ root: config.clientDir, index: "index.html", spa: true }),
+    RpcServer.layerHttp({
+      group: CbranchRpcs,
+      path: RPC_PATH,
+      protocol: "websocket",
+    }),
+    Http.HttpStaticServer.layer({
+      root: config.clientDir,
+      index: "index.html",
+      spa: true,
+    }),
     sideChannelRoute,
-  ).pipe(Layer.provide(handlersLayer), Layer.provide(RpcSerialization.layerNdjson));
+  ).pipe(
+    Layer.provide(handlersLayer),
+    Layer.provide(RpcSerialization.layerNdjson),
+  );
 
   return Http.HttpRouter.serve(appLive, {
     middleware: makeOriginGuard(config.allowedHostnames),
     disableListenLog: true,
   }).pipe(
-    Layer.provideMerge(NodeHttpServer.layer(() => http.createServer(), { port: config.port, host: config.host })),
+    Layer.provideMerge(
+      NodeHttpServer.layer(() => http.createServer(), {
+        port: config.port,
+        host: config.host,
+      }),
+    ),
     Layer.provide(engineLive),
   );
 };

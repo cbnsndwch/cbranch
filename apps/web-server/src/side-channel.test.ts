@@ -12,7 +12,11 @@ describe("containBlobPath (NF-SEC-5)", () => {
   });
 
   test("normalizes backslashes and strips leading slashes", () => {
-    expect(containBlobPath(`${String.fromCharCode(92)}src${String.fromCharCode(92)}app.ts`)).toBe("src/app.ts");
+    expect(
+      containBlobPath(
+        `${String.fromCharCode(92)}src${String.fromCharCode(92)}app.ts`,
+      ),
+    ).toBe("src/app.ts");
     expect(containBlobPath("/src/app.ts")).toBe("src/app.ts");
   });
 
@@ -20,7 +24,15 @@ describe("containBlobPath (NF-SEC-5)", () => {
     expect(containBlobPath("my docs/read me.txt")).toBe("my docs/read me.txt");
   });
 
-  test.each(["../etc/passwd", "a/../../b", "..", "./x", "", "a//b", ".git/../x"])("rejects traversal %j", (p) => {
+  test.each([
+    "../etc/passwd",
+    "a/../../b",
+    "..",
+    "./x",
+    "",
+    "a//b",
+    ".git/../x",
+  ])("rejects traversal %j", (p) => {
     expect(containBlobPath(p)).toBeNull();
   });
 

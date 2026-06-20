@@ -9,12 +9,24 @@ import { ApiProvider } from "../../rpc/ApiProvider";
 import { MenuBar } from "../MenuBar";
 import { type MenuEntry, MENUS } from "./menu-model";
 
-const TOP_MENUS = ["Start", "Repository", "Navigate", "View", "Commands", "GitHub", "Plugins", "Tools", "Help"];
+const TOP_MENUS = [
+  "Start",
+  "Repository",
+  "Navigate",
+  "View",
+  "Commands",
+  "GitHub",
+  "Plugins",
+  "Tools",
+  "Help",
+];
 
 const fakeApi = { recentList: vi.fn(async () => []) } as unknown as CbranchApi;
 
 const renderMenuBar = () => {
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
   return render(
     <MemoryRouter>
       <QueryClientProvider client={queryClient}>

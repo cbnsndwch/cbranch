@@ -1,7 +1,13 @@
 import { RepoId } from "@cbranch/rpc-contract";
 import { describe, expect, test } from "vitest";
 
-import { buildLogQuery, clearFilter, describeFilters, emptyFilters, hasActiveFilters } from "./filters";
+import {
+  buildLogQuery,
+  clearFilter,
+  describeFilters,
+  emptyFilters,
+  hasActiveFilters,
+} from "./filters";
 
 const repoId = RepoId.make("repo-1");
 
@@ -34,10 +40,17 @@ describe("buildLogQuery (P1-FILT-1..6; spec 05 §2.4)", () => {
   });
 
   test("a ref pattern is only emitted in pattern scope", () => {
-    expect(buildLogQuery(repoId, { ...emptyFilters, refPattern: "refs/heads/*" }).refPattern).toBeUndefined();
-    expect(buildLogQuery(repoId, { ...emptyFilters, refScope: "pattern", refPattern: "refs/heads/*" }).refPattern).toBe(
-      "refs/heads/*",
-    );
+    expect(
+      buildLogQuery(repoId, { ...emptyFilters, refPattern: "refs/heads/*" })
+        .refPattern,
+    ).toBeUndefined();
+    expect(
+      buildLogQuery(repoId, {
+        ...emptyFilters,
+        refScope: "pattern",
+        refPattern: "refs/heads/*",
+      }).refPattern,
+    ).toBe("refs/heads/*");
   });
 });
 
@@ -48,7 +61,12 @@ describe("describeFilters / hasActiveFilters (P1-FILT-6)", () => {
   });
 
   test("one chip per active constraint", () => {
-    const filters = { ...emptyFilters, refScope: "all" as const, author: "ada", path: "src" };
+    const filters = {
+      ...emptyFilters,
+      refScope: "all" as const,
+      author: "ada",
+      path: "src",
+    };
     const labels = describeFilters(filters).map((c) => c.label);
     expect(labels).toContain("refs: all");
     expect(labels).toContain("author: ada");
@@ -59,11 +77,16 @@ describe("describeFilters / hasActiveFilters (P1-FILT-6)", () => {
 
 describe("clearFilter (P1-FILT-6)", () => {
   test("clearing a text field blanks it", () => {
-    expect(clearFilter({ ...emptyFilters, author: "ada" }, "author").author).toBe("");
+    expect(
+      clearFilter({ ...emptyFilters, author: "ada" }, "author").author,
+    ).toBe("");
   });
 
   test("clearing the ref scope returns to current + blank pattern", () => {
-    const cleared = clearFilter({ ...emptyFilters, refScope: "pattern", refPattern: "x" }, "refPattern");
+    const cleared = clearFilter(
+      { ...emptyFilters, refScope: "pattern", refPattern: "x" },
+      "refPattern",
+    );
     expect(cleared.refScope).toBe("current");
     expect(cleared.refPattern).toBe("");
   });

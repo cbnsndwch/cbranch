@@ -31,26 +31,45 @@ export const atLeast = (v: GitVersion, major: number, minor: number): boolean =>
  * flags) because at this point we have not yet established that git works at all; a
  * spawn `ENOENT` is mapped to `hostGitMissing` by {@link runGit}'s classifier.
  */
-export const detectGitVersion = (cwd: string): Effect.Effect<GitVersion, GitError> =>
-  Effect.flatMap(runGit({ cwd, args: ["--version"], read: false }), (result) => {
-    const classified = classifyVersionOutput(result.exitCode, decodeUtf8(result.stdout));
-    return classified instanceof GitErrorClass ? Effect.fail(classified) : Effect.succeed(classified);
-  });
+export const detectGitVersion = (
+  cwd: string,
+): Effect.Effect<GitVersion, GitError> =>
+  Effect.flatMap(
+    runGit({ cwd, args: ["--version"], read: false }),
+    (result) => {
+      const classified = classifyVersionOutput(
+        result.exitCode,
+        decodeUtf8(result.stdout),
+      );
+      return classified instanceof GitErrorClass
+        ? Effect.fail(classified)
+        : Effect.succeed(classified);
+    },
+  );
 
 /**
  * Pure version gate: interpret a `git --version` exit code + stdout into a
  * {@link GitVersion} or the appropriate `GitError`. Extracted from the spawn so the
  * missing/unparseable/too-old branches are unit-testable without a fake binary.
  */
-export const classifyVersionOutput = (exitCode: number | null, stdout: string): GitVersion | GitError => {
-  if (exitCode !== 0) return gitError("hostGitMissing", "`git --version` did not succeed");
+export const classifyVersionOutput = (
+  exitCode: number | null,
+  stdout: string,
+): GitVersion | GitError => {
+  if (exitCode !== 0)
+    return gitError("hostGitMissing", "`git --version` did not succeed");
   const parsed = parseGitVersion(stdout);
-  if (parsed === null) return gitError("hostGitMissing", "could not parse `git --version` output");
+  if (parsed === null)
+    return gitError("hostGitMissing", "could not parse `git --version` output");
   if (!atLeast(parsed, MIN_GIT_MAJOR, MIN_GIT_MINOR)) {
-    return gitError("hostGitTooOld", `host git ${parsed.raw} is below the required ${MIN_GIT_MAJOR}.${MIN_GIT_MINOR}`, {
-      detected: parsed.raw,
-      required: `${MIN_GIT_MAJOR}.${MIN_GIT_MINOR}`,
-    });
+    return gitError(
+      "hostGitTooOld",
+      `host git ${parsed.raw} is below the required ${MIN_GIT_MAJOR}.${MIN_GIT_MINOR}`,
+      {
+        detected: parsed.raw,
+        required: `${MIN_GIT_MAJOR}.${MIN_GIT_MINOR}`,
+      },
+    );
   }
   return parsed;
 };

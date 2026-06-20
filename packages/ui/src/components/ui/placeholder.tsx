@@ -3,7 +3,10 @@ import { type PropsWithChildren } from "react";
 import { cn } from "../../lib/cn";
 
 /** A panel-scoped empty/loading/error placeholder (P1-UI-GEN-1/2). */
-export function Placeholder({ tone = "muted", children }: PropsWithChildren<{ readonly tone?: "muted" | "danger" }>) {
+export function Placeholder({
+  tone = "muted",
+  children,
+}: PropsWithChildren<{ readonly tone?: "muted" | "danger" }>) {
   return (
     <div
       className={cn(

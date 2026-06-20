@@ -1,7 +1,10 @@
 import { Effect } from "effect";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 
-import { createFixtureWorkspace, type FixtureWorkspace } from "../testing/fixtures";
+import {
+  createFixtureWorkspace,
+  type FixtureWorkspace,
+} from "../testing/fixtures";
 import { branchList } from "./branches";
 
 describe("branchList", () => {
@@ -67,7 +70,9 @@ describe("branchList", () => {
     expect(main?.upstream?.name).toContain("origin/main");
     expect(main?.upstream?.ahead).toBe(1);
     expect(main?.upstream?.behind).toBe(0);
-    expect(listing.remoteBranches.some((b) => b.name === "origin/main")).toBe(true);
+    expect(listing.remoteBranches.some((b) => b.name === "origin/main")).toBe(
+      true,
+    );
   });
 
   test("detached HEAD — no currentBranch, detachedHead is populated", async () => {
@@ -110,7 +115,10 @@ describe("branchList", () => {
     await clone.git(["checkout", "-b", "main", "--track", "origin/main"]);
 
     // Add a commit on origin so clone is behind by 1
-    await origin.commit({ message: "origin commit 2", files: { "a.txt": "v2" } });
+    await origin.commit({
+      message: "origin commit 2",
+      files: { "a.txt": "v2" },
+    });
     await clone.fetch("origin");
 
     const listing = await Effect.runPromise(branchList(clone.dir));
@@ -135,8 +143,12 @@ describe("branchList", () => {
     const listing = await Effect.runPromise(branchList(clone.dir));
 
     // origin/HEAD symref must not appear
-    expect(listing.remoteBranches.some((b) => b.name.endsWith("/HEAD"))).toBe(false);
-    expect(listing.remoteBranches.some((b) => b.name === "origin/main")).toBe(true);
+    expect(listing.remoteBranches.some((b) => b.name.endsWith("/HEAD"))).toBe(
+      false,
+    );
+    expect(listing.remoteBranches.some((b) => b.name === "origin/main")).toBe(
+      true,
+    );
   });
 
   test("empty repo (no commits) — empty listing, no detachedHead", async () => {
@@ -172,7 +184,13 @@ describe("branchList", () => {
     await clone.addRemote("origin", origin.dir);
     await clone.fetch("origin");
     await clone.git(["checkout", "-b", "main", "--track", "origin/main"]);
-    await clone.git(["checkout", "-b", "feat/gone", "--track", "origin/feat/gone"]);
+    await clone.git([
+      "checkout",
+      "-b",
+      "feat/gone",
+      "--track",
+      "origin/feat/gone",
+    ]);
 
     // Delete the branch on origin
     await origin.deleteBranch("feat/gone");

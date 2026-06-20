@@ -34,7 +34,12 @@ import {
   type WorkingTreeStatus,
   type WorktreeInfo,
 } from "@cbranch/rpc-contract";
-import { useMutation, useQuery, useQueryClient, type UseQueryResult } from "@tanstack/react-query";
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type UseQueryResult,
+} from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 
 import { useApi } from "./ApiProvider";
@@ -42,10 +47,15 @@ import { queryKeys } from "./query-keys";
 
 export const useRecentList = (): UseQueryResult<ReadonlyArray<RecentRepo>> => {
   const api = useApi();
-  return useQuery({ queryKey: queryKeys.recentList(), queryFn: () => api.recentList() });
+  return useQuery({
+    queryKey: queryKeys.recentList(),
+    queryFn: () => api.recentList(),
+  });
 };
 
-export const useRepoState = (repoId: RepoId | null): UseQueryResult<RepoState> => {
+export const useRepoState = (
+  repoId: RepoId | null,
+): UseQueryResult<RepoState> => {
   const api = useApi();
   return useQuery({
     queryKey: repoId ? queryKeys.repoState(repoId) : ["inactive"],
@@ -54,16 +64,22 @@ export const useRepoState = (repoId: RepoId | null): UseQueryResult<RepoState> =
   });
 };
 
-export const useCommitDetail = (repoId: RepoId | null, oid: Oid | null): UseQueryResult<CommitDetail> => {
+export const useCommitDetail = (
+  repoId: RepoId | null,
+  oid: Oid | null,
+): UseQueryResult<CommitDetail> => {
   const api = useApi();
   return useQuery({
-    queryKey: repoId && oid ? queryKeys.commitDetail(repoId, oid) : ["inactive"],
+    queryKey:
+      repoId && oid ? queryKeys.commitDetail(repoId, oid) : ["inactive"],
     queryFn: () => api.commitDetail(repoId as RepoId, oid as Oid),
     enabled: repoId !== null && oid !== null,
   });
 };
 
-export const useCommitDiff = (spec: DiffSpec | null): UseQueryResult<ReadonlyArray<DiffFile>> => {
+export const useCommitDiff = (
+  spec: DiffSpec | null,
+): UseQueryResult<ReadonlyArray<DiffFile>> => {
   const api = useApi();
   return useQuery({
     queryKey: spec ? queryKeys.commitDiff(spec) : ["inactive"],
@@ -79,8 +95,12 @@ export const useFileContentAtRev = (
 ): UseQueryResult<FileContentResult> => {
   const api = useApi();
   return useQuery({
-    queryKey: repoId && rev && path ? queryKeys.fileContentAtRev(repoId, rev, path) : ["inactive"],
-    queryFn: () => api.fileContentAtRev(repoId as RepoId, path as string, rev as string),
+    queryKey:
+      repoId && rev && path
+        ? queryKeys.fileContentAtRev(repoId, rev, path)
+        : ["inactive"],
+    queryFn: () =>
+      api.fileContentAtRev(repoId as RepoId, path as string, rev as string),
     enabled: repoId !== null && rev !== null && path !== null,
   });
 };
@@ -97,7 +117,12 @@ export const useOpenRepo = () => {
   });
 };
 
-export type LogStreamStatus = "idle" | "loading" | "streaming" | "done" | "error";
+export type LogStreamStatus =
+  | "idle"
+  | "loading"
+  | "streaming"
+  | "done"
+  | "error";
 
 export interface LogStreamResult {
   readonly rows: ReadonlyArray<CommitSummary>;
@@ -167,7 +192,9 @@ export const useLogStream = (query: LogQuery | null): LogStreamResult => {
 
 // ── P2 query hooks ────────────────────────────────────────────────────────────
 
-export const useStatus = (repoId: RepoId | null): UseQueryResult<WorkingTreeStatus> => {
+export const useStatus = (
+  repoId: RepoId | null,
+): UseQueryResult<WorkingTreeStatus> => {
   const api = useApi();
   return useQuery({
     queryKey: repoId ? queryKeys.status(repoId) : ["inactive"],
@@ -183,13 +210,19 @@ export const useWorkingDiff = (
 ): UseQueryResult<DiffFile> => {
   const api = useApi();
   return useQuery({
-    queryKey: repoId && path ? queryKeys.workingDiff(repoId, path, staged) : ["inactive"],
-    queryFn: () => api.workingFileDiff(repoId as RepoId, path as string, staged),
+    queryKey:
+      repoId && path
+        ? queryKeys.workingDiff(repoId, path, staged)
+        : ["inactive"],
+    queryFn: () =>
+      api.workingFileDiff(repoId as RepoId, path as string, staged),
     enabled: repoId !== null && path !== null,
   });
 };
 
-export const useLastMessage = (repoId: RepoId | null): UseQueryResult<CommitMessage> => {
+export const useLastMessage = (
+  repoId: RepoId | null,
+): UseQueryResult<CommitMessage> => {
   const api = useApi();
   return useQuery({
     queryKey: repoId ? queryKeys.lastMessage(repoId) : ["inactive"],
@@ -203,7 +236,11 @@ export const useLastMessage = (repoId: RepoId | null): UseQueryResult<CommitMess
 export const useStageFiles = (repoId: RepoId) => {
   const api = useApi();
   const qc = useQueryClient();
-  return useMutation<void, unknown, { paths: ReadonlyArray<string>; all?: boolean }>({
+  return useMutation<
+    void,
+    unknown,
+    { paths: ReadonlyArray<string>; all?: boolean }
+  >({
     mutationFn: ({ paths, all }) => api.stageFiles(repoId, paths, all),
     onMutate: async ({ paths, all }) => {
       await qc.cancelQueries({ queryKey: queryKeys.status(repoId) });
@@ -212,7 +249,9 @@ export const useStageFiles = (repoId: RepoId) => {
         const pathSet = new Set(paths);
         qc.setQueryData(queryKeys.status(repoId), {
           ...prev,
-          entries: prev.entries.map((e) => (pathSet.has(e.path) ? { ...e, staged: e.unstaged } : e)),
+          entries: prev.entries.map((e) =>
+            pathSet.has(e.path) ? { ...e, staged: e.unstaged } : e,
+          ),
         });
       }
       return { prev };
@@ -230,7 +269,11 @@ export const useStageFiles = (repoId: RepoId) => {
 export const useUnstageFiles = (repoId: RepoId) => {
   const api = useApi();
   const qc = useQueryClient();
-  return useMutation<void, unknown, { paths: ReadonlyArray<string>; all?: boolean }>({
+  return useMutation<
+    void,
+    unknown,
+    { paths: ReadonlyArray<string>; all?: boolean }
+  >({
     mutationFn: ({ paths, all }) => api.unstageFiles(repoId, paths, all),
     onMutate: async ({ paths, all }) => {
       await qc.cancelQueries({ queryKey: queryKeys.status(repoId) });
@@ -239,7 +282,9 @@ export const useUnstageFiles = (repoId: RepoId) => {
         const pathSet = new Set(paths);
         qc.setQueryData(queryKeys.status(repoId), {
           ...prev,
-          entries: prev.entries.map((e) => (pathSet.has(e.path) ? { ...e, staged: "unmodified" } : e)),
+          entries: prev.entries.map((e) =>
+            pathSet.has(e.path) ? { ...e, staged: "unmodified" } : e,
+          ),
         });
       }
       return { prev };
@@ -279,7 +324,11 @@ export const useDeleteUntracked = (repoId: RepoId) => {
 export const useResetTo = (repoId: RepoId) => {
   const api = useApi();
   const qc = useQueryClient();
-  return useMutation<void, unknown, { mode: "soft" | "mixed" | "hard"; target: string }>({
+  return useMutation<
+    void,
+    unknown,
+    { mode: "soft" | "mixed" | "hard"; target: string }
+  >({
     mutationFn: ({ mode, target }) => api.resetTo(repoId, mode, target),
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: [repoId, "status"] });
@@ -339,7 +388,9 @@ export const useCommitCreate = (repoId: RepoId) => {
 
 // ── P3 query hooks ────────────────────────────────────────────────────────────
 
-export const useBranchList = (repoId: RepoId | null): UseQueryResult<BranchListing> => {
+export const useBranchList = (
+  repoId: RepoId | null,
+): UseQueryResult<BranchListing> => {
   const api = useApi();
   return useQuery({
     queryKey: repoId ? queryKeys.branches(repoId) : ["inactive"],
@@ -348,7 +399,9 @@ export const useBranchList = (repoId: RepoId | null): UseQueryResult<BranchListi
   });
 };
 
-export const useRemoteList = (repoId: RepoId | null): UseQueryResult<ReadonlyArray<RemoteInfo>> => {
+export const useRemoteList = (
+  repoId: RepoId | null,
+): UseQueryResult<ReadonlyArray<RemoteInfo>> => {
   const api = useApi();
   return useQuery({
     queryKey: repoId ? queryKeys.remotes(repoId) : ["inactive"],
@@ -357,7 +410,9 @@ export const useRemoteList = (repoId: RepoId | null): UseQueryResult<ReadonlyArr
   });
 };
 
-export const useWorktreeList = (repoId: RepoId | null): UseQueryResult<ReadonlyArray<WorktreeInfo>> => {
+export const useWorktreeList = (
+  repoId: RepoId | null,
+): UseQueryResult<ReadonlyArray<WorktreeInfo>> => {
   const api = useApi();
   return useQuery({
     queryKey: repoId ? queryKeys.worktrees(repoId) : ["inactive"],
@@ -366,7 +421,9 @@ export const useWorktreeList = (repoId: RepoId | null): UseQueryResult<ReadonlyA
   });
 };
 
-export const useStashList = (repoId: RepoId | null): UseQueryResult<ReadonlyArray<StashEntry>> => {
+export const useStashList = (
+  repoId: RepoId | null,
+): UseQueryResult<ReadonlyArray<StashEntry>> => {
   const api = useApi();
   return useQuery({
     queryKey: repoId ? queryKeys.stash(repoId) : ["inactive"],
@@ -375,7 +432,10 @@ export const useStashList = (repoId: RepoId | null): UseQueryResult<ReadonlyArra
   });
 };
 
-export const useStashShow = (repoId: RepoId | null, ref: string | null): UseQueryResult<ReadonlyArray<DiffFile>> => {
+export const useStashShow = (
+  repoId: RepoId | null,
+  ref: string | null,
+): UseQueryResult<ReadonlyArray<DiffFile>> => {
   const api = useApi();
   return useQuery({
     queryKey: repoId && ref ? queryKeys.stashShow(repoId, ref) : ["inactive"],
@@ -384,7 +444,9 @@ export const useStashShow = (repoId: RepoId | null, ref: string | null): UseQuer
   });
 };
 
-export const useTagList = (repoId: RepoId | null): UseQueryResult<ReadonlyArray<TagInfo>> => {
+export const useTagList = (
+  repoId: RepoId | null,
+): UseQueryResult<ReadonlyArray<TagInfo>> => {
   const api = useApi();
   return useQuery({
     queryKey: repoId ? queryKeys.tags(repoId) : ["inactive"],
@@ -401,7 +463,12 @@ export const useBranchCreate = (repoId: RepoId) => {
   return useMutation<
     BranchInfo,
     unknown,
-    { name: string; startPoint?: string; setUpstream?: boolean; switchAfter?: boolean }
+    {
+      name: string;
+      startPoint?: string;
+      setUpstream?: boolean;
+      switchAfter?: boolean;
+    }
   >({
     mutationFn: ({ name, startPoint, setUpstream, switchAfter }) =>
       api.branchCreate(repoId, name, startPoint, setUpstream, switchAfter),
@@ -416,8 +483,17 @@ export const useBranchCreate = (repoId: RepoId) => {
 export const useBranchSwitch = (repoId: RepoId) => {
   const api = useApi();
   const qc = useQueryClient();
-  return useMutation<void, unknown, { target: string; strategy?: BranchSwitchStrategy; stashAndReapply?: boolean }>({
-    mutationFn: ({ target, strategy, stashAndReapply }) => api.branchSwitch(repoId, target, strategy, stashAndReapply),
+  return useMutation<
+    void,
+    unknown,
+    {
+      target: string;
+      strategy?: BranchSwitchStrategy;
+      stashAndReapply?: boolean;
+    }
+  >({
+    mutationFn: ({ target, strategy, stashAndReapply }) =>
+      api.branchSwitch(repoId, target, strategy, stashAndReapply),
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: [repoId, "refs"] });
       void qc.invalidateQueries({ queryKey: [repoId, "status"] });
@@ -430,7 +506,8 @@ export const useBranchRename = (repoId: RepoId) => {
   const api = useApi();
   const qc = useQueryClient();
   return useMutation<void, unknown, { oldName: string; newName: string }>({
-    mutationFn: ({ oldName, newName }) => api.branchRename(repoId, oldName, newName),
+    mutationFn: ({ oldName, newName }) =>
+      api.branchRename(repoId, oldName, newName),
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: [repoId, "refs"] });
     },
@@ -452,7 +529,8 @@ export const useBranchSetUpstream = (repoId: RepoId) => {
   const api = useApi();
   const qc = useQueryClient();
   return useMutation<void, unknown, { name: string; upstream?: string }>({
-    mutationFn: ({ name, upstream }) => api.branchSetUpstream(repoId, name, upstream),
+    mutationFn: ({ name, upstream }) =>
+      api.branchSetUpstream(repoId, name, upstream),
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: [repoId, "refs"] });
     },
@@ -462,7 +540,11 @@ export const useBranchSetUpstream = (repoId: RepoId) => {
 export const useMergeCreate = (repoId: RepoId) => {
   const api = useApi();
   const qc = useQueryClient();
-  return useMutation<MergeResult, unknown, { ref: string; strategy: MergeMode }>({
+  return useMutation<
+    MergeResult,
+    unknown,
+    { ref: string; strategy: MergeMode }
+  >({
     mutationFn: ({ ref, strategy }) => api.mergeCreate(repoId, ref, strategy),
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: [repoId, "refs"] });
@@ -502,8 +584,13 @@ export const useRemoteAdd = (repoId: RepoId) => {
 export const useRemoteSetUrl = (repoId: RepoId) => {
   const api = useApi();
   const qc = useQueryClient();
-  return useMutation<void, unknown, { name: string; url: string; push?: boolean }>({
-    mutationFn: ({ name, url, push }) => api.remoteSetUrl(repoId, name, url, push),
+  return useMutation<
+    void,
+    unknown,
+    { name: string; url: string; push?: boolean }
+  >({
+    mutationFn: ({ name, url, push }) =>
+      api.remoteSetUrl(repoId, name, url, push),
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: [repoId, "config"] });
     },
@@ -514,7 +601,8 @@ export const useRemoteRename = (repoId: RepoId) => {
   const api = useApi();
   const qc = useQueryClient();
   return useMutation<void, unknown, { oldName: string; newName: string }>({
-    mutationFn: ({ oldName, newName }) => api.remoteRename(repoId, oldName, newName),
+    mutationFn: ({ oldName, newName }) =>
+      api.remoteRename(repoId, oldName, newName),
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: [repoId, "config"] });
     },
@@ -537,15 +625,17 @@ export const useRemoteRemove = (repoId: RepoId) => {
 export const useWorktreeAdd = (repoId: RepoId) => {
   const api = useApi();
   const qc = useQueryClient();
-  return useMutation<WorktreeInfo, unknown, { path: string; branch?: string; newBranch?: string; startPoint?: string }>(
-    {
-      mutationFn: ({ path, branch, newBranch, startPoint }) =>
-        api.worktreeAdd(repoId, path, { branch, newBranch, startPoint }),
-      onSettled: () => {
-        void qc.invalidateQueries({ queryKey: [repoId, "worktrees"] });
-      },
+  return useMutation<
+    WorktreeInfo,
+    unknown,
+    { path: string; branch?: string; newBranch?: string; startPoint?: string }
+  >({
+    mutationFn: ({ path, branch, newBranch, startPoint }) =>
+      api.worktreeAdd(repoId, path, { branch, newBranch, startPoint }),
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: [repoId, "worktrees"] });
     },
-  );
+  });
 };
 
 export const useWorktreeRemove = (repoId: RepoId) => {
@@ -578,7 +668,12 @@ export const useStashPush = (repoId: RepoId) => {
   return useMutation<
     StashEntry,
     unknown,
-    { message?: string; includeUntracked?: boolean; keepIndex?: boolean; stagedOnly?: boolean }
+    {
+      message?: string;
+      includeUntracked?: boolean;
+      keepIndex?: boolean;
+      stagedOnly?: boolean;
+    }
   >({
     mutationFn: (opts) => api.stashPush(repoId, opts),
     onSettled: () => {
@@ -642,7 +737,13 @@ export const useTagCreate = (repoId: RepoId) => {
   return useMutation<
     TagInfo,
     unknown,
-    { name: string; target?: string; tagType: TagType; message?: string; force?: boolean }
+    {
+      name: string;
+      target?: string;
+      tagType: TagType;
+      message?: string;
+      force?: boolean;
+    }
   >({
     mutationFn: ({ name, target, tagType, message, force }) =>
       api.tagCreate(repoId, name, { target, tagType, message, force }),
@@ -668,8 +769,13 @@ export const useTagDelete = (repoId: RepoId) => {
 export const useTagPush = (repoId: RepoId) => {
   const api = useApi();
   const qc = useQueryClient();
-  return useMutation<void, unknown, { remote: string; name?: string; all?: boolean }>({
-    mutationFn: ({ remote, name, all }) => api.tagPush(repoId, remote, { name, all }),
+  return useMutation<
+    void,
+    unknown,
+    { remote: string; name?: string; all?: boolean }
+  >({
+    mutationFn: ({ remote, name, all }) =>
+      api.tagPush(repoId, remote, { name, all }),
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: [repoId, "refs"] });
     },

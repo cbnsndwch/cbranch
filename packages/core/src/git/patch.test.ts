@@ -1,18 +1,30 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { DiffFile, DiffLine, Hunk, HunkSelection, PatchSelection } from "@cbranch/rpc-contract";
+import {
+  DiffFile,
+  DiffLine,
+  Hunk,
+  HunkSelection,
+  PatchSelection,
+} from "@cbranch/rpc-contract";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 
 import { run } from "../testing/effect-run";
-import { createFixtureWorkspace, type FixtureWorkspace } from "../testing/fixtures";
+import {
+  createFixtureWorkspace,
+  type FixtureWorkspace,
+} from "../testing/fixtures";
 import { diffWorkingFile } from "./diff";
 import { buildPatch, discardHunks, stageHunks, unstageHunks } from "./patch";
 
 const makeHunk = (
   oldStart: number,
   newStart: number,
-  lines: Array<{ kind: "context" | "add" | "delete" | "noNewlineAtEof"; content: string }>,
+  lines: Array<{
+    kind: "context" | "add" | "delete" | "noNewlineAtEof";
+    content: string;
+  }>,
 ): Hunk => {
   const diffLines = lines.map(
     (l) =>
@@ -64,7 +76,15 @@ describe("buildPatch", () => {
     const sel = new PatchSelection({
       repoId: "r" as never,
       path: "a.txt",
-      hunks: [new HunkSelection({ oldStart: 1, oldLines: 2, newStart: 1, newLines: 2, selectedLines: [] })],
+      hunks: [
+        new HunkSelection({
+          oldStart: 1,
+          oldLines: 2,
+          newStart: 1,
+          newLines: 2,
+          selectedLines: [],
+        }),
+      ],
     });
     const patch = buildPatch(df, sel);
     expect(patch).toContain(" ctx");
@@ -83,7 +103,15 @@ describe("buildPatch", () => {
     const sel = new PatchSelection({
       repoId: "r" as never,
       path: "a.txt",
-      hunks: [new HunkSelection({ oldStart: 1, oldLines: 1, newStart: 1, newLines: 1, selectedLines: [1] })],
+      hunks: [
+        new HunkSelection({
+          oldStart: 1,
+          oldLines: 1,
+          newStart: 1,
+          newLines: 1,
+          selectedLines: [1],
+        }),
+      ],
     });
     const patch = buildPatch(df, sel);
     expect(patch).not.toContain("-old");
@@ -101,7 +129,15 @@ describe("buildPatch", () => {
     const sel = new PatchSelection({
       repoId: "r" as never,
       path: "a.txt",
-      hunks: [new HunkSelection({ oldStart: 1, oldLines: 1, newStart: 1, newLines: 1, selectedLines: [0] })],
+      hunks: [
+        new HunkSelection({
+          oldStart: 1,
+          oldLines: 1,
+          newStart: 1,
+          newLines: 1,
+          selectedLines: [0],
+        }),
+      ],
     });
     const patch = buildPatch(df, sel);
     expect(patch).toContain("-old");
@@ -120,7 +156,15 @@ describe("buildPatch", () => {
     const sel = new PatchSelection({
       repoId: "r" as never,
       path: "a.txt",
-      hunks: [new HunkSelection({ oldStart: 1, oldLines: 1, newStart: 1, newLines: 3, selectedLines: [1] })],
+      hunks: [
+        new HunkSelection({
+          oldStart: 1,
+          oldLines: 1,
+          newStart: 1,
+          newLines: 3,
+          selectedLines: [1],
+        }),
+      ],
     });
     const patch = buildPatch(df, sel);
     expect(patch).toContain("+line1");
@@ -134,7 +178,15 @@ describe("buildPatch", () => {
     const sel = new PatchSelection({
       repoId: "r" as never,
       path: "new.txt",
-      hunks: [new HunkSelection({ oldStart: 0, oldLines: 0, newStart: 1, newLines: 1, selectedLines: [] })],
+      hunks: [
+        new HunkSelection({
+          oldStart: 0,
+          oldLines: 0,
+          newStart: 1,
+          newLines: 1,
+          selectedLines: [],
+        }),
+      ],
     });
     const patch = buildPatch(df, sel);
     expect(patch).toContain("new file mode 100644");
@@ -144,7 +196,11 @@ describe("buildPatch", () => {
 
   test("binary file throws", () => {
     const df = makeDiffFile("img.png", "modified", [], { isBinary: true });
-    const sel = new PatchSelection({ repoId: "r" as never, path: "img.png", hunks: [] });
+    const sel = new PatchSelection({
+      repoId: "r" as never,
+      path: "img.png",
+      hunks: [],
+    });
     expect(() => buildPatch(df, sel)).toThrow("binary file");
   });
 
@@ -158,7 +214,15 @@ describe("buildPatch", () => {
     const sel = new PatchSelection({
       repoId: "r" as never,
       path: "a.txt",
-      hunks: [new HunkSelection({ oldStart: 1, oldLines: 1, newStart: 1, newLines: 2, selectedLines: [0] })],
+      hunks: [
+        new HunkSelection({
+          oldStart: 1,
+          oldLines: 1,
+          newStart: 1,
+          newLines: 2,
+          selectedLines: [0],
+        }),
+      ],
     });
     const patch = buildPatch(df, sel);
     expect(patch).toContain(" always");
@@ -173,7 +237,15 @@ describe("buildPatch", () => {
     const sel = new PatchSelection({
       repoId: "r" as never,
       path: "a.txt",
-      hunks: [new HunkSelection({ oldStart: 1, oldLines: 0, newStart: 1, newLines: 1, selectedLines: [] })],
+      hunks: [
+        new HunkSelection({
+          oldStart: 1,
+          oldLines: 0,
+          newStart: 1,
+          newLines: 1,
+          selectedLines: [],
+        }),
+      ],
     });
     const patch = buildPatch(df, sel);
     expect(patch).toContain("\\ No newline at end of file");
@@ -181,11 +253,21 @@ describe("buildPatch", () => {
 
   test("deleted file patch — has deleted file mode and /dev/null as target", () => {
     const hunk = makeHunk(1, 0, [{ kind: "delete", content: "goodbye" }]);
-    const df = makeDiffFile("gone.txt", "deleted", [hunk], { oldMode: "100644" });
+    const df = makeDiffFile("gone.txt", "deleted", [hunk], {
+      oldMode: "100644",
+    });
     const sel = new PatchSelection({
       repoId: "r" as never,
       path: "gone.txt",
-      hunks: [new HunkSelection({ oldStart: 1, oldLines: 1, newStart: 0, newLines: 0, selectedLines: [] })],
+      hunks: [
+        new HunkSelection({
+          oldStart: 1,
+          oldLines: 1,
+          newStart: 0,
+          newLines: 0,
+          selectedLines: [],
+        }),
+      ],
     });
     const patch = buildPatch(df, sel);
     expect(patch).toContain("deleted file mode 100644");
@@ -200,7 +282,15 @@ describe("buildPatch", () => {
     const sel = new PatchSelection({
       repoId: "r" as never,
       path: "gone.txt",
-      hunks: [new HunkSelection({ oldStart: 1, oldLines: 1, newStart: 0, newLines: 0, selectedLines: [] })],
+      hunks: [
+        new HunkSelection({
+          oldStart: 1,
+          oldLines: 1,
+          newStart: 0,
+          newLines: 0,
+          selectedLines: [],
+        }),
+      ],
     });
     const patch = buildPatch(df, sel);
     expect(patch).not.toContain("deleted file mode");
@@ -209,11 +299,22 @@ describe("buildPatch", () => {
 
   test("mode change — emits old mode / new mode lines", () => {
     const hunk = makeHunk(1, 1, [{ kind: "context", content: "same" }]);
-    const df = makeDiffFile("script.sh", "modified", [hunk], { oldMode: "100644", newMode: "100755" });
+    const df = makeDiffFile("script.sh", "modified", [hunk], {
+      oldMode: "100644",
+      newMode: "100755",
+    });
     const sel = new PatchSelection({
       repoId: "r" as never,
       path: "script.sh",
-      hunks: [new HunkSelection({ oldStart: 1, oldLines: 1, newStart: 1, newLines: 1, selectedLines: [] })],
+      hunks: [
+        new HunkSelection({
+          oldStart: 1,
+          oldLines: 1,
+          newStart: 1,
+          newLines: 1,
+          selectedLines: [],
+        }),
+      ],
     });
     const patch = buildPatch(df, sel);
     expect(patch).toContain("old mode 100644");
@@ -234,7 +335,10 @@ describe("patch git operations", () => {
 
   test("stageHunks stages selected hunk", async () => {
     const repo = await ws.createRepo("stage-hunks-basic");
-    await repo.commit({ message: "init", files: { "a.txt": "line1\nline2\nline3\n" } });
+    await repo.commit({
+      message: "init",
+      files: { "a.txt": "line1\nline2\nline3\n" },
+    });
     await repo.writeFile("a.txt", "line1\nline2-modified\nline3\n");
 
     const diffFile = await run(diffWorkingFile(repo.dir, "a.txt", false));
@@ -266,11 +370,15 @@ describe("patch git operations", () => {
     await repo.commit({
       message: "init",
       files: {
-        "b.txt": "aaa\nbbb\nccc\nddd\neee\nfff\nggg\nhhh\niii\njjj\nkkk\nlll\nmmm\nnnn\nooo\nppp\n",
+        "b.txt":
+          "aaa\nbbb\nccc\nddd\neee\nfff\nggg\nhhh\niii\njjj\nkkk\nlll\nmmm\nnnn\nooo\nppp\n",
       },
     });
     // Modify line 1 and line 15 (far enough apart to be separate hunks)
-    await repo.writeFile("b.txt", "AAA\nbbb\nccc\nddd\neee\nfff\nggg\nhhh\niii\njjj\nkkk\nlll\nmmm\nnnn\nOOO\nppp\n");
+    await repo.writeFile(
+      "b.txt",
+      "AAA\nbbb\nccc\nddd\neee\nfff\nggg\nhhh\niii\njjj\nkkk\nlll\nmmm\nnnn\nOOO\nppp\n",
+    );
 
     const diffFile = await run(diffWorkingFile(repo.dir, "b.txt", false));
     // There should be 2 hunks; stage only the first
@@ -299,7 +407,10 @@ describe("patch git operations", () => {
 
   test("unstageHunks removes staged changes", async () => {
     const repo = await ws.createRepo("unstage-hunks");
-    await repo.commit({ message: "init", files: { "a.txt": "line1\nline2\nline3\n" } });
+    await repo.commit({
+      message: "init",
+      files: { "a.txt": "line1\nline2\nline3\n" },
+    });
     await repo.writeFile("a.txt", "line1\nline2-changed\nline3\n");
     await repo.stage("a.txt");
 
@@ -357,7 +468,10 @@ describe("patch git operations", () => {
     await repo.commit({ message: "init", files: { "file.bin": "text\n" } });
     // Write a binary-ish content (null byte makes git treat it as binary)
     const { writeFile: writeBinary } = await import("node:fs/promises");
-    await writeBinary(join(repo.dir, "file.bin"), Buffer.from([0x00, 0x01, 0x02, 0x03]));
+    await writeBinary(
+      join(repo.dir, "file.bin"),
+      Buffer.from([0x00, 0x01, 0x02, 0x03]),
+    );
 
     const sel = new PatchSelection({
       repoId: "r" as never,

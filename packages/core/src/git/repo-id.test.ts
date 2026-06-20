@@ -7,7 +7,9 @@ import { computeRepoId, isRepoId, normalizeAbsolute } from "./repo-id";
 describe("computeRepoId (DECISIONS D2)", () => {
   test("is the SHA-256 hex of the common-dir's UTF-8 bytes", () => {
     const commonDir = "/srv/repo/.git";
-    const expected = createHash("sha256").update(Buffer.from(commonDir, "utf8")).digest("hex");
+    const expected = createHash("sha256")
+      .update(Buffer.from(commonDir, "utf8"))
+      .digest("hex");
     expect(computeRepoId(commonDir)).toBe(expected);
   });
 
@@ -34,6 +36,8 @@ describe("normalizeAbsolute", () => {
   test("resolves a relative path against the base", () => {
     const out = normalizeAbsolute("/base/dir", "../other");
     // realpath may fail for the non-existent path → falls back to a resolved absolute.
-    expect(out.replace(/\\/g, "/")).toMatch(/\/base\/other$|^[A-Za-z]:\/base\/other$/);
+    expect(out.replace(/\\/g, "/")).toMatch(
+      /\/base\/other$|^[A-Za-z]:\/base\/other$/,
+    );
   });
 });

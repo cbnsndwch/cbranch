@@ -103,18 +103,27 @@ describe("recent list CRUD (P1-RECENT-1/3/5)", () => {
     const path = newPath();
     const store = makeConfigStore({ configPath: path });
     await run(store.upsertRecent(entry("/a")));
-    const written = JSON.parse(readFileSync(path, "utf8")) as { version: number };
+    const written = JSON.parse(readFileSync(path, "utf8")) as {
+      version: number;
+    };
     expect(written.version).toBe(CONFIG_VERSION);
   });
 });
 
 describe("resolveConfigPath (NF-CFG-7 / NF-PKG-9 precedence)", () => {
   test("CBRANCH_CONFIG wins", () => {
-    expect(resolveConfigPath({ CBRANCH_CONFIG: "/custom/c.json" } as NodeJS.ProcessEnv)).toBe("/custom/c.json");
+    expect(
+      resolveConfigPath({
+        CBRANCH_CONFIG: "/custom/c.json",
+      } as NodeJS.ProcessEnv),
+    ).toBe("/custom/c.json");
   });
 
   test("falls back to a cbranch/config.json under a config home", () => {
-    const resolved = resolveConfigPath({ XDG_CONFIG_HOME: "/xdg", APPDATA: "/appdata" } as NodeJS.ProcessEnv);
+    const resolved = resolveConfigPath({
+      XDG_CONFIG_HOME: "/xdg",
+      APPDATA: "/appdata",
+    } as NodeJS.ProcessEnv);
     expect(resolved.replace(/\\/g, "/")).toContain("cbranch/config.json");
   });
 });

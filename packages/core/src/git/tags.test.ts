@@ -1,8 +1,17 @@
 import { Effect } from "effect";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 
-import { createFixtureWorkspace, type FixtureWorkspace } from "../testing/fixtures";
-import { tagCreate, tagDelete, tagDeleteRemote, tagList, tagPush } from "./tags";
+import {
+  createFixtureWorkspace,
+  type FixtureWorkspace,
+} from "../testing/fixtures";
+import {
+  tagCreate,
+  tagDelete,
+  tagDeleteRemote,
+  tagList,
+  tagPush,
+} from "./tags";
 
 describe("tagList", () => {
   let ws: FixtureWorkspace;
@@ -92,7 +101,9 @@ describe("tagCreate", () => {
     const repo = await ws.createRepo("tc-lw");
     await repo.commit({ message: "init", files: { "a.txt": "a" } });
 
-    const tag = await Effect.runPromise(tagCreate(repo.dir, "v1.0.0", { tagType: "lightweight" }));
+    const tag = await Effect.runPromise(
+      tagCreate(repo.dir, "v1.0.0", { tagType: "lightweight" }),
+    );
     expect(tag.name).toBe("v1.0.0");
     expect(tag.fullRef).toBe("refs/tags/v1.0.0");
     expect(tag.isAnnotated).toBe(false);
@@ -104,7 +115,10 @@ describe("tagCreate", () => {
     await repo.commit({ message: "init", files: { "a.txt": "a" } });
 
     const tag = await Effect.runPromise(
-      tagCreate(repo.dir, "v1.0.0", { tagType: "annotated", message: "First release" }),
+      tagCreate(repo.dir, "v1.0.0", {
+        tagType: "annotated",
+        message: "First release",
+      }),
     );
     expect(tag.name).toBe("v1.0.0");
     expect(tag.isAnnotated).toBe(true);
@@ -117,7 +131,11 @@ describe("tagCreate", () => {
     await repo.commit({ message: "init", files: { "a.txt": "a" } });
     await repo.tag("v1.0.0");
 
-    await expect(Effect.runPromise(tagCreate(repo.dir, "v1.0.0", { tagType: "lightweight" }))).rejects.toMatchObject({
+    await expect(
+      Effect.runPromise(
+        tagCreate(repo.dir, "v1.0.0", { tagType: "lightweight" }),
+      ),
+    ).rejects.toMatchObject({
       code: "refExists",
     });
   });
@@ -140,7 +158,9 @@ describe("tagCreate", () => {
     const repo = await ws.createRepo("tc-signed");
     await repo.commit({ message: "init", files: { "a.txt": "a" } });
 
-    const exit = await Effect.runPromiseExit(tagCreate(repo.dir, "v1.0.0-signed", { tagType: "signed" }));
+    const exit = await Effect.runPromiseExit(
+      tagCreate(repo.dir, "v1.0.0-signed", { tagType: "signed" }),
+    );
     expect(exit._tag).toBe("Failure");
   });
 
@@ -155,7 +175,11 @@ describe("tagCreate", () => {
     await repo.tag("v1.0.0", { ref: oid1 });
     // Force-move to second commit
     const tag = await Effect.runPromise(
-      tagCreate(repo.dir, "v1.0.0", { tagType: "lightweight", force: true, target: oid2 }),
+      tagCreate(repo.dir, "v1.0.0", {
+        tagType: "lightweight",
+        force: true,
+        target: oid2,
+      }),
     );
     expect(tag.name).toBe("v1.0.0");
     expect(tag.targetOid).toBe(oid2);

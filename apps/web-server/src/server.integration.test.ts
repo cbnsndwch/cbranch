@@ -16,7 +16,12 @@ import {
   seedLinear,
 } from "@cbranch/core";
 import { CbranchRpcs, DiffSpec, LogQuery, Oid } from "@cbranch/rpc-contract";
-import { Http, RpcClient, RpcSerialization, Socket } from "@cbranch/rpc-contract/effect-rpc-adapter";
+import {
+  Http,
+  RpcClient,
+  RpcSerialization,
+  Socket,
+} from "@cbranch/rpc-contract/effect-rpc-adapter";
 import { Effect, Layer, Stream } from "effect";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 
@@ -50,7 +55,11 @@ afterAll(async () => {
 const fetchProbe = (url: string, init?: RequestInit) =>
   Effect.promise(async () => {
     const res = await fetch(url, init);
-    return { status: res.status, body: await res.text(), contentType: res.headers.get("content-type") };
+    return {
+      status: res.status,
+      body: await res.text(),
+      contentType: res.headers.get("content-type"),
+    };
   });
 
 describe("web-server end-to-end (NF-TEST-8)", () => {
@@ -59,7 +68,10 @@ describe("web-server end-to-end (NF-TEST-8)", () => {
       env: { CBRANCH_BIND_ADDRESS: "127.0.0.1", CBRANCH_PORT: "0" },
       clientDir,
     });
-    const serverLive = buildServerLive(config, gitEngineLayer({ env: process.env, configPath }));
+    const serverLive = buildServerLive(
+      config,
+      gitEngineLayer({ env: process.env, configPath }),
+    );
 
     const program = Effect.gen(function* () {
       const server = yield* Http.HttpServer.HttpServer;
@@ -79,8 +91,13 @@ describe("web-server end-to-end (NF-TEST-8)", () => {
         const handle = yield* client.RepoOpen({ path: repo.dir });
         const head = Oid.make(commits[commits.length - 1]!);
         const state = yield* client.RepoState({ repoId: handle.repoId });
-        const log = yield* Stream.runCollect(client.LogStream(new LogQuery({ repoId: handle.repoId, limit: 500 })));
-        const detail = yield* client.CommitDetail({ repoId: handle.repoId, oid: head });
+        const log = yield* Stream.runCollect(
+          client.LogStream(new LogQuery({ repoId: handle.repoId, limit: 500 })),
+        );
+        const detail = yield* client.CommitDetail({
+          repoId: handle.repoId,
+          oid: head,
+        });
         const diff = yield* client.CommitDiff(
           new DiffSpec({
             repoId: handle.repoId,
@@ -106,15 +123,35 @@ describe("web-server end-to-end (NF-TEST-8)", () => {
       // --- static bundle, SPA fallback, side-channel, Origin enforcement ---
       const root = yield* fetchProbe(`${base}/`);
       const appJs = yield* fetchProbe(`${base}/app.js`);
-      const spaFallback = yield* fetchProbe(`${base}/some/client/route`, { headers: { accept: "text/html" } });
-      const blob = yield* fetchProbe(`${base}/sidechannel/blob?repoId=${repoId}&rev=${head}&path=c.txt`);
-      const traversal = yield* fetchProbe(`${base}/sidechannel/blob?repoId=${repoId}&rev=${head}&path=../../etc`);
-      const forbidden = yield* fetchProbe(`${base}/`, { headers: { origin: "http://evil.example.com" } });
-      const forbiddenBlob = yield* fetchProbe(`${base}/sidechannel/blob?repoId=${repoId}&rev=${head}&path=c.txt`, {
+      const spaFallback = yield* fetchProbe(`${base}/some/client/route`, {
+        headers: { accept: "text/html" },
+      });
+      const blob = yield* fetchProbe(
+        `${base}/sidechannel/blob?repoId=${repoId}&rev=${head}&path=c.txt`,
+      );
+      const traversal = yield* fetchProbe(
+        `${base}/sidechannel/blob?repoId=${repoId}&rev=${head}&path=../../etc`,
+      );
+      const forbidden = yield* fetchProbe(`${base}/`, {
         headers: { origin: "http://evil.example.com" },
       });
+      const forbiddenBlob = yield* fetchProbe(
+        `${base}/sidechannel/blob?repoId=${repoId}&rev=${head}&path=c.txt`,
+        {
+          headers: { origin: "http://evil.example.com" },
+        },
+      );
 
-      return { rpc, root, appJs, spaFallback, blob, traversal, forbidden, forbiddenBlob };
+      return {
+        rpc,
+        root,
+        appJs,
+        spaFallback,
+        blob,
+        traversal,
+        forbidden,
+        forbiddenBlob,
+      };
     }).pipe(Effect.provide(serverLive), Effect.scoped);
 
     const r = await Effect.runPromise(program);

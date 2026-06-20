@@ -10,7 +10,10 @@ import { type CbranchApi } from "./api";
 
 const ApiContext = createContext<CbranchApi | null>(null);
 
-export const ApiProvider = ({ api, children }: PropsWithChildren<{ readonly api: CbranchApi }>) => (
+export const ApiProvider = ({
+  api,
+  children,
+}: PropsWithChildren<{ readonly api: CbranchApi }>) => (
   <ApiContext.Provider value={api}>{children}</ApiContext.Provider>
 );
 

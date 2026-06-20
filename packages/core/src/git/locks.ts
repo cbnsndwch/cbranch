@@ -17,7 +17,9 @@ export interface RepoLockRegistry {
    * by default — NF-LOCK-2). The same permit is shared across all callers for that
    * `repoId`, so concurrent mutations on one repo execute one at a time.
    */
-  readonly withRepoLock: (repoId: RepoId) => <A, E, R>(effect: Effect.Effect<A, E, R>) => Effect.Effect<A, E, R>;
+  readonly withRepoLock: (
+    repoId: RepoId,
+  ) => <A, E, R>(effect: Effect.Effect<A, E, R>) => Effect.Effect<A, E, R>;
   /** Number of distinct repositories that currently have a lock (introspection/tests). */
   readonly size: () => number;
 }

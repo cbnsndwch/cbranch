@@ -37,7 +37,8 @@ function parseWorktrees(stdout: string): WorktreeInfo[] {
         lockReason = line.length > 7 ? line.slice(7).trimStart() : undefined;
       } else if (line.startsWith("prunable")) {
         isPrunable = true;
-        prunableReason = line.length > 9 ? line.slice(9).trimStart() : undefined;
+        prunableReason =
+          line.length > 9 ? line.slice(9).trimStart() : undefined;
       }
     }
 
@@ -56,9 +57,16 @@ function parseWorktrees(stdout: string): WorktreeInfo[] {
   });
 }
 
-export const worktreeList = (cwd: string, env?: NodeJS.ProcessEnv): Effect.Effect<readonly WorktreeInfo[], GitError> =>
+export const worktreeList = (
+  cwd: string,
+  env?: NodeJS.ProcessEnv,
+): Effect.Effect<readonly WorktreeInfo[], GitError> =>
   Effect.gen(function* () {
-    const result = yield* runGitOk({ cwd, args: ["worktree", "list", "--porcelain"], env });
+    const result = yield* runGitOk({
+      cwd,
+      args: ["worktree", "list", "--porcelain"],
+      env,
+    });
     return parseWorktrees(decodeUtf8(result.stdout));
   });
 
@@ -81,7 +89,10 @@ export const worktreeAdd = (
     const list = yield* worktreeList(cwd, env);
     const normalPath = normalize(path);
     const entry = list.find((w) => w.path === normalPath);
-    if (!entry) return yield* Effect.fail(gitError("gitFailed", "worktree not found after add"));
+    if (!entry)
+      return yield* Effect.fail(
+        gitError("gitFailed", "worktree not found after add"),
+      );
     return entry;
   });
 
@@ -98,5 +109,10 @@ export const worktreeRemove = (
     yield* runGitOk({ cwd, args, env, read: false });
   });
 
-export const worktreePrune = (cwd: string, env?: NodeJS.ProcessEnv): Effect.Effect<void, GitError> =>
-  runGitOk({ cwd, args: ["worktree", "prune"], env, read: false }).pipe(Effect.asVoid);
+export const worktreePrune = (
+  cwd: string,
+  env?: NodeJS.ProcessEnv,
+): Effect.Effect<void, GitError> =>
+  runGitOk({ cwd, args: ["worktree", "prune"], env, read: false }).pipe(
+    Effect.asVoid,
+  );

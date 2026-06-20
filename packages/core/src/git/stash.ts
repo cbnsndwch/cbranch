@@ -1,9 +1,18 @@
 // Stash operations (docs/spec/07 REQ-P3-ST-*)
 
-import { type DiffFile as DiffFileType, type GitError, StashEntry } from "@cbranch/rpc-contract";
+import {
+  type DiffFile as DiffFileType,
+  type GitError,
+  StashEntry,
+} from "@cbranch/rpc-contract";
 import { Effect } from "effect";
 
-import { buildDiffFiles, parseNameStatus, parseNumstat, parsePatch } from "./diff";
+import {
+  buildDiffFiles,
+  parseNameStatus,
+  parseNumstat,
+  parsePatch,
+} from "./diff";
 import { gitError } from "./errors";
 import { decodeUtf8, runGit, runGitOk } from "./run-git";
 
@@ -64,9 +73,16 @@ function parseStashList(stdout: string): StashEntry[] {
     });
 }
 
-export const stashList = (cwd: string, env?: NodeJS.ProcessEnv): Effect.Effect<readonly StashEntry[], GitError> =>
+export const stashList = (
+  cwd: string,
+  env?: NodeJS.ProcessEnv,
+): Effect.Effect<readonly StashEntry[], GitError> =>
   Effect.gen(function* () {
-    const result = yield* runGitOk({ cwd, args: ["stash", "list", `--format=${STASH_FORMAT}`], env });
+    const result = yield* runGitOk({
+      cwd,
+      args: ["stash", "list", `--format=${STASH_FORMAT}`],
+      env,
+    });
     return parseStashList(decodeUtf8(result.stdout));
   });
 
@@ -97,7 +113,9 @@ export const stashPush = (
     const list = yield* stashList(cwd, env);
     const top = list[0];
     if (!top) {
-      return yield* Effect.fail(gitError("gitFailed", "stash push succeeded but stash list is empty"));
+      return yield* Effect.fail(
+        gitError("gitFailed", "stash push succeeded but stash list is empty"),
+      );
     }
     return top;
   });
@@ -113,11 +131,23 @@ export const stashShow = (
     // Compare stash@{N}^1 (the commit HEAD was at when stashing) to stash@{N}
     const parent = `${ref}^1`;
     const [ns, num, patch] = yield* Effect.all([
-      runGitOk({ cwd, args: ["diff", "-z", "--name-status", "--no-renames", parent, ref], env }),
-      runGitOk({ cwd, args: ["diff", "-z", "--numstat", "--no-renames", parent, ref], env }),
+      runGitOk({
+        cwd,
+        args: ["diff", "-z", "--name-status", "--no-renames", parent, ref],
+        env,
+      }),
+      runGitOk({
+        cwd,
+        args: ["diff", "-z", "--numstat", "--no-renames", parent, ref],
+        env,
+      }),
       runGitOk({ cwd, args: ["diff", "-p", "--no-renames", parent, ref], env }),
     ]);
-    return buildDiffFiles(parseNameStatus(ns.stdout), parseNumstat(num.stdout), parsePatch(decodeUtf8(patch.stdout)));
+    return buildDiffFiles(
+      parseNameStatus(ns.stdout),
+      parseNumstat(num.stdout),
+      parsePatch(decodeUtf8(patch.stdout)),
+    );
   });
 
 // ── stashApply / stashPop ─────────────────────────────────────────────────────
@@ -133,21 +163,44 @@ const runStashConflictAware = (
     const stderr = decodeUtf8(result.stderr);
     const stdout = decodeUtf8(result.stdout);
     if (stderr.includes("CONFLICT") || stdout.includes("CONFLICT")) {
-      return yield* Effect.fail(gitError("mergeConflict", "stash apply produced conflicts"));
+      return yield* Effect.fail(
+        gitError("mergeConflict", "stash apply produced conflicts"),
+      );
     }
-    return yield* Effect.fail(gitError("gitFailed", `git ${args[1]} failed`, { stderr }));
+    return yield* Effect.fail(
+      gitError("gitFailed", `git ${args[1]} failed`, { stderr }),
+    );
   });
 
-export const stashApply = (cwd: string, ref: string, env?: NodeJS.ProcessEnv): Effect.Effect<void, GitError> =>
+export const stashApply = (
+  cwd: string,
+  ref: string,
+  env?: NodeJS.ProcessEnv,
+): Effect.Effect<void, GitError> =>
   runStashConflictAware(cwd, ["stash", "apply", ref], env);
 
-export const stashPop = (cwd: string, ref: string, env?: NodeJS.ProcessEnv): Effect.Effect<void, GitError> =>
+export const stashPop = (
+  cwd: string,
+  ref: string,
+  env?: NodeJS.ProcessEnv,
+): Effect.Effect<void, GitError> =>
   runStashConflictAware(cwd, ["stash", "pop", ref], env);
 
 // ── stashDrop / stashClear ────────────────────────────────────────────────────
 
-export const stashDrop = (cwd: string, ref: string, env?: NodeJS.ProcessEnv): Effect.Effect<void, GitError> =>
-  runGitOk({ cwd, args: ["stash", "drop", ref], env, read: false }).pipe(Effect.asVoid);
+export const stashDrop = (
+  cwd: string,
+  ref: string,
+  env?: NodeJS.ProcessEnv,
+): Effect.Effect<void, GitError> =>
+  runGitOk({ cwd, args: ["stash", "drop", ref], env, read: false }).pipe(
+    Effect.asVoid,
+  );
 
-export const stashClear = (cwd: string, env?: NodeJS.ProcessEnv): Effect.Effect<void, GitError> =>
-  runGitOk({ cwd, args: ["stash", "clear"], env, read: false }).pipe(Effect.asVoid);
+export const stashClear = (
+  cwd: string,
+  env?: NodeJS.ProcessEnv,
+): Effect.Effect<void, GitError> =>
+  runGitOk({ cwd, args: ["stash", "clear"], env, read: false }).pipe(
+    Effect.asVoid,
+  );

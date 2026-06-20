@@ -1,7 +1,10 @@
 import { Effect } from "effect";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 
-import { createFixtureWorkspace, type FixtureWorkspace } from "../testing/fixtures";
+import {
+  createFixtureWorkspace,
+  type FixtureWorkspace,
+} from "../testing/fixtures";
 import { parseStatusOutput, statusGet } from "./status";
 
 const NUL = String.fromCharCode(0);
@@ -58,7 +61,12 @@ describe("parseStatusOutput", () => {
   });
 
   test("conflicted entry sets isConflicted and hasConflicts", () => {
-    const out = parseStatusOutput(buf("u UU N... 100644 100644 100644 100644 aaa bbb ccc ddd conflict.txt" + NUL));
+    const out = parseStatusOutput(
+      buf(
+        "u UU N... 100644 100644 100644 100644 aaa bbb ccc ddd conflict.txt" +
+          NUL,
+      ),
+    );
     expect(out.hasConflicts).toBe(true);
     const e = out.entries[0];
     expect(e?.isConflicted).toBe(true);
@@ -114,7 +122,11 @@ describe("parseStatusOutput", () => {
   });
 
   test("path with spaces", () => {
-    const out = parseStatusOutput(buf("1 .M N... 100644 100644 100644 aaa bbb my file with spaces.txt" + NUL));
+    const out = parseStatusOutput(
+      buf(
+        "1 .M N... 100644 100644 100644 aaa bbb my file with spaces.txt" + NUL,
+      ),
+    );
     expect(out.entries[0]?.path).toBe("my file with spaces.txt");
   });
 
@@ -129,7 +141,9 @@ describe("parseStatusOutput", () => {
   });
 
   test("initial repo (no HEAD) has no branch oid", () => {
-    const out = parseStatusOutput(buf("# branch.oid (initial)" + NUL + "# branch.head main" + NUL));
+    const out = parseStatusOutput(
+      buf("# branch.oid (initial)" + NUL + "# branch.head main" + NUL),
+    );
     expect(out.branch?.oid).toBeUndefined();
     expect(out.branch?.head).toBe("main");
     expect(out.entries).toHaveLength(0);
@@ -171,7 +185,9 @@ describe("parseStatusOutput", () => {
   });
 
   test("unknown token prefix — skipped without error", () => {
-    const out = parseStatusOutput(buf("X unknown-token.txt" + NUL + "? untracked.txt" + NUL));
+    const out = parseStatusOutput(
+      buf("X unknown-token.txt" + NUL + "? untracked.txt" + NUL),
+    );
     // The "X" token should be silently skipped; only the untracked entry appears
     expect(out.entries).toHaveLength(1);
     expect(out.entries[0]?.path).toBe("untracked.txt");

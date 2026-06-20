@@ -75,7 +75,10 @@ export interface ShikiToken {
   readonly color?: string;
 }
 interface ShikiHighlighter {
-  codeToTokens(code: string, options: { lang: string; theme: string }): { tokens: ShikiToken[][] };
+  codeToTokens(
+    code: string,
+    options: { lang: string; theme: string },
+  ): { tokens: ShikiToken[][] };
   loadLanguage(lang: string): Promise<void>;
   getLoadedLanguages(): string[];
 }
@@ -153,7 +156,10 @@ export const loadShikiRefractor = async ({
     const theme = dark ? DARK_THEME : LIGHT_THEME;
     return {
       highlight(text: string) {
-        const { tokens } = highlighter.codeToTokens(text, { lang: language, theme });
+        const { tokens } = highlighter.codeToTokens(text, {
+          lang: language,
+          theme,
+        });
         const nodes: unknown[] = [];
         tokens.forEach((line, index) => {
           for (const token of line) {
@@ -164,7 +170,8 @@ export const loadShikiRefractor = async ({
               children: [{ type: "text", value: token.content }],
             });
           }
-          if (index < tokens.length - 1) nodes.push({ type: "text", value: NL });
+          if (index < tokens.length - 1)
+            nodes.push({ type: "text", value: NL });
         });
         return nodes;
       },

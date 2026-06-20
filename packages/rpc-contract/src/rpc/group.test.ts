@@ -38,7 +38,11 @@ import { GitError } from "../schemas/errors";
 import { InvalidationEvent } from "../schemas/live";
 import { Oid, RepoId } from "../schemas/primitives";
 import { LogQuery } from "../schemas/queries";
-import { CommitCreated, CommitMessage, WorkingTreeStatus } from "../schemas/working-tree";
+import {
+  CommitCreated,
+  CommitMessage,
+  WorkingTreeStatus,
+} from "../schemas/working-tree";
 import { CbranchRpcs } from "./group";
 
 // --- schema-valid sample data (branded ids + one instance per success type) ---
@@ -161,10 +165,20 @@ const branchInfo = new BranchInfo({
   upstream: branchUpstream,
   isRemote: false,
 });
-const branchListing = new BranchListing({ localBranches: [branchInfo], remoteBranches: [], currentBranch: "main" });
+const branchListing = new BranchListing({
+  localBranches: [branchInfo],
+  remoteBranches: [],
+  currentBranch: "main",
+});
 const mergeResult = new MergeResult({ mode: "fastForward", newTipOid: oid1 });
-const syncProgress = new SyncProgressEvent({ _tag: "progress", text: "Fetching origin" });
-const remoteInfo = new RemoteInfo({ name: "origin", fetchUrl: "https://example.com/repo.git" });
+const syncProgress = new SyncProgressEvent({
+  _tag: "progress",
+  text: "Fetching origin",
+});
+const remoteInfo = new RemoteInfo({
+  name: "origin",
+  fetchUrl: "https://example.com/repo.git",
+});
 const worktreeInfo = new WorktreeInfo({
   path: "/srv/repo",
   headOid: oid1,
@@ -195,15 +209,25 @@ const tagInfo = new TagInfo({
 const handlers = CbranchRpcs.toLayer({
   RepoOpen: ({ path }) =>
     path === ""
-      ? Effect.fail(new GitError({ code: "repoNotFound", message: "no repository at path" }))
+      ? Effect.fail(
+          new GitError({
+            code: "repoNotFound",
+            message: "no repository at path",
+          }),
+        )
       : Effect.succeed(repoHandle),
   RepoRecentList: () => Effect.succeed([recentRepo]),
   RepoRecentRemove: () => Effect.void,
   RepoState: () => Effect.succeed(repoState),
-  RepoSubscribe: () => Stream.make(new InvalidationEvent({ repoId, domains: ["status", "commits", "refs"] })),
+  RepoSubscribe: () =>
+    Stream.make(
+      new InvalidationEvent({ repoId, domains: ["status", "commits", "refs"] }),
+    ),
   LogStream: ({ limit }) =>
     limit < 0
-      ? Stream.fail(new GitError({ code: "gitFailed", message: "limit must be >= 0" }))
+      ? Stream.fail(
+          new GitError({ code: "gitFailed", message: "limit must be >= 0" }),
+        )
       : Stream.fromIterable([commitSummary("first"), commitSummary("second")]),
   CommitDetail: () => Effect.succeed(commitDetail),
   CommitDiff: () => Effect.succeed([textDiffFile, binaryDiffFile]),
@@ -221,7 +245,8 @@ const handlers = CbranchRpcs.toLayer({
       : Effect.succeed(fileContent),
 
   // ── P2: stage & commit (S1 plumbing; schema-valid stubs, no git logic) ───────
-  StatusGet: () => Effect.succeed(new WorkingTreeStatus({ entries: [], hasConflicts: false })),
+  StatusGet: () =>
+    Effect.succeed(new WorkingTreeStatus({ entries: [], hasConflicts: false })),
   StageFiles: () => Effect.void,
   UnstageFiles: () => Effect.void,
   DiscardFiles: () => Effect.void,
@@ -230,8 +255,14 @@ const handlers = CbranchRpcs.toLayer({
   StageHunks: () => Effect.void,
   UnstageHunks: () => Effect.void,
   DiscardHunks: () => Effect.void,
-  CommitCreate: ({ subject }) => Effect.succeed(new CommitCreated({ oid: oid1, shortOid: "1111111", subject })),
-  CommitLastMessage: () => Effect.succeed(new CommitMessage({ subject: "init", body: "", raw: "init" })),
+  CommitCreate: ({ subject }) =>
+    Effect.succeed(
+      new CommitCreated({ oid: oid1, shortOid: "1111111", subject }),
+    ),
+  CommitLastMessage: () =>
+    Effect.succeed(
+      new CommitMessage({ subject: "init", body: "", raw: "init" }),
+    ),
 
   // ── P3: branches ────────────────────────────────────────────────────────────
   BranchList: () => Effect.succeed(branchListing),
@@ -302,7 +333,9 @@ describe("CbranchRpcs P1 contract (in-memory RpcTest round-trip)", () => {
       const events = yield* Stream.runCollect(client.RepoSubscribe({ repoId }));
 
       // 6. log.stream (stream of CommitSummary; honors limit)
-      const summaries = yield* Stream.runCollect(client.LogStream({ repoId, limit: 10 }));
+      const summaries = yield* Stream.runCollect(
+        client.LogStream({ repoId, limit: 10 }),
+      );
 
       // 7. commit.detail (unary)
       const detail = yield* client.CommitDetail({ repoId, oid: oid1 });
@@ -319,13 +352,37 @@ describe("CbranchRpcs P1 contract (in-memory RpcTest round-trip)", () => {
       });
 
       // 9. diff.workingFile (unary)
-      const workingDiff = yield* client.DiffWorkingFile({ repoId, path: "a.txt", staged: false });
+      const workingDiff = yield* client.DiffWorkingFile({
+        repoId,
+        path: "a.txt",
+        staged: false,
+      });
 
       // 10. file.contentAtRev (unary union: inline FileContent vs DownloadDescriptor)
-      const inline = yield* client.FileContentAtRev({ repoId, path: "a.txt", rev: "HEAD" });
-      const descriptor = yield* client.FileContentAtRev({ repoId, path: "huge.bin", rev: "HEAD" });
+      const inline = yield* client.FileContentAtRev({
+        repoId,
+        path: "a.txt",
+        rev: "HEAD",
+      });
+      const descriptor = yield* client.FileContentAtRev({
+        repoId,
+        path: "huge.bin",
+        rev: "HEAD",
+      });
 
-      return { handle, recents, removed, state, events, summaries, detail, diffFiles, workingDiff, inline, descriptor };
+      return {
+        handle,
+        recents,
+        removed,
+        state,
+        events,
+        summaries,
+        detail,
+        diffFiles,
+        workingDiff,
+        inline,
+        descriptor,
+      };
     }).pipe(Effect.provide(handlers), Effect.scoped);
 
     const result = await Effect.runPromise(program);
@@ -386,7 +443,9 @@ describe("CbranchRpcs P1 contract (in-memory RpcTest round-trip)", () => {
   test("a handler GitError surfaces on the streaming per-item error channel", async () => {
     const program = Effect.gen(function* () {
       const client = yield* RpcTest.makeClient(CbranchRpcs);
-      return yield* Effect.flip(Stream.runCollect(client.LogStream({ repoId, limit: -1 })));
+      return yield* Effect.flip(
+        Stream.runCollect(client.LogStream({ repoId, limit: -1 })),
+      );
     }).pipe(Effect.provide(handlers), Effect.scoped);
 
     const error = await Effect.runPromise(program);
@@ -399,7 +458,9 @@ describe("CbranchRpcs P1 contract (in-memory RpcTest round-trip)", () => {
     const program = Effect.gen(function* () {
       const client = yield* RpcTest.makeClient(CbranchRpcs);
       // repoId must be a string; feeding a number must be rejected by the boundary.
-      return yield* Effect.exit(client.RepoState({ repoId: 123 as unknown as RepoId }));
+      return yield* Effect.exit(
+        client.RepoState({ repoId: 123 as unknown as RepoId }),
+      );
     }).pipe(Effect.provide(handlers), Effect.scoped);
 
     const exit = await Effect.runPromise(program);
@@ -410,13 +471,20 @@ describe("CbranchRpcs P1 contract (in-memory RpcTest round-trip)", () => {
 
 describe("payload Schemas validate at the boundary (RPC-032)", () => {
   test("a malformed LogQuery decodes to a typed SchemaError failure, not a throw", () => {
-    const exit = Schema.decodeUnknownExit(LogQuery)({ repoId: 123, limit: "not-a-number" });
+    const exit = Schema.decodeUnknownExit(LogQuery)({
+      repoId: 123,
+      limit: "not-a-number",
+    });
 
     expect(Exit.isFailure(exit)).toBe(true);
   });
 
   test("a well-formed LogQuery decodes successfully", () => {
-    const exit = Schema.decodeUnknownExit(LogQuery)({ repoId: "abc", limit: 100, refScope: "all" });
+    const exit = Schema.decodeUnknownExit(LogQuery)({
+      repoId: "abc",
+      limit: 100,
+      refScope: "all",
+    });
 
     expect(Exit.isSuccess(exit)).toBe(true);
   });

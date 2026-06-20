@@ -7,7 +7,9 @@ import { Oid } from "./primitives";
 
 // ─── Branch ───────────────────────────────────────────────────────────────────
 
-export class BranchUpstream extends Schema.Class<BranchUpstream>("BranchUpstream")({
+export class BranchUpstream extends Schema.Class<BranchUpstream>(
+  "BranchUpstream",
+)({
   ref: Schema.String,
   name: Schema.String,
   ahead: Schema.Number,
@@ -25,14 +27,20 @@ export class BranchInfo extends Schema.Class<BranchInfo>("BranchInfo")({
   remoteName: Schema.optional(Schema.String),
 }) {}
 
-export class BranchListing extends Schema.Class<BranchListing>("BranchListing")({
-  localBranches: Schema.Array(BranchInfo),
-  remoteBranches: Schema.Array(BranchInfo),
-  currentBranch: Schema.optional(Schema.String),
-  detachedHead: Schema.optional(Oid),
-}) {}
+export class BranchListing extends Schema.Class<BranchListing>("BranchListing")(
+  {
+    localBranches: Schema.Array(BranchInfo),
+    remoteBranches: Schema.Array(BranchInfo),
+    currentBranch: Schema.optional(Schema.String),
+    detachedHead: Schema.optional(Oid),
+  },
+) {}
 
-export const BranchSwitchStrategy = Schema.Literals(["carry", "stash", "discard"]);
+export const BranchSwitchStrategy = Schema.Literals([
+  "carry",
+  "stash",
+  "discard",
+]);
 export type BranchSwitchStrategy = typeof BranchSwitchStrategy.Type;
 
 // ─── Merge ────────────────────────────────────────────────────────────────────
@@ -40,7 +48,12 @@ export type BranchSwitchStrategy = typeof BranchSwitchStrategy.Type;
 export const MergeMode = Schema.Literals(["ff", "no-ff", "squash"]);
 export type MergeMode = typeof MergeMode.Type;
 
-export const MergeResultMode = Schema.Literals(["fastForward", "merge", "squash", "alreadyUpToDate"]);
+export const MergeResultMode = Schema.Literals([
+  "fastForward",
+  "merge",
+  "squash",
+  "alreadyUpToDate",
+]);
 export type MergeResultMode = typeof MergeResultMode.Type;
 
 export class MergeResult extends Schema.Class<MergeResult>("MergeResult")({
@@ -52,19 +65,23 @@ export class MergeResult extends Schema.Class<MergeResult>("MergeResult")({
 
 // ─── Sync (streaming) ─────────────────────────────────────────────────────────
 
-export class SyncProgressEvent extends Schema.Class<SyncProgressEvent>("SyncProgressEvent")({
+export class SyncProgressEvent extends Schema.Class<SyncProgressEvent>(
+  "SyncProgressEvent",
+)({
   _tag: Schema.Literal("progress"),
   text: Schema.String,
 }) {}
 
-export class SyncRefUpdate extends Schema.Class<SyncRefUpdate>("SyncRefUpdate")({
-  _tag: Schema.Literal("refUpdate"),
-  summary: Schema.String,
-  localRef: Schema.String,
-  remoteRef: Schema.String,
-  fromOid: Schema.optional(Oid),
-  toOid: Schema.optional(Oid),
-}) {}
+export class SyncRefUpdate extends Schema.Class<SyncRefUpdate>("SyncRefUpdate")(
+  {
+    _tag: Schema.Literal("refUpdate"),
+    summary: Schema.String,
+    localRef: Schema.String,
+    remoteRef: Schema.String,
+    fromOid: Schema.optional(Oid),
+    toOid: Schema.optional(Oid),
+  },
+) {}
 
 export const SyncEvent = Schema.Union([SyncProgressEvent, SyncRefUpdate]);
 export type SyncEvent = typeof SyncEvent.Type;

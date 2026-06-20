@@ -1,7 +1,21 @@
 // @vitest-environment jsdom
-import { CommitCreated, CommitMessage, Oid, RepoId, StatusEntry, WorkingTreeStatus } from "@cbranch/rpc-contract";
+import {
+  CommitCreated,
+  CommitMessage,
+  Oid,
+  RepoId,
+  StatusEntry,
+  WorkingTreeStatus,
+} from "@cbranch/rpc-contract";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
@@ -54,7 +68,10 @@ const makeApi = (overrides: Partial<CbranchApi> = {}): CbranchApi => ({
   stageHunks: vi.fn(async () => undefined),
   unstageHunks: vi.fn(async () => undefined),
   discardHunks: vi.fn(async () => undefined),
-  commitCreate: vi.fn(async () => new CommitCreated({ oid, shortOid: "aaaaaaa", subject: "test" })),
+  commitCreate: vi.fn(
+    async () =>
+      new CommitCreated({ oid, shortOid: "aaaaaaa", subject: "test" }),
+  ),
   commitLastMessage: vi.fn(async () => {
     throw new Error("noop");
   }),
@@ -77,12 +94,14 @@ const renderPanel = (api: CbranchApi) => {
 };
 
 beforeEach(() => {
-  if (!Element.prototype.scrollIntoView) Element.prototype.scrollIntoView = () => undefined;
-  (globalThis as unknown as { ResizeObserver: unknown }).ResizeObserver = class {
-    observe() {}
-    unobserve() {}
-    disconnect() {}
-  };
+  if (!Element.prototype.scrollIntoView)
+    Element.prototype.scrollIntoView = () => undefined;
+  (globalThis as unknown as { ResizeObserver: unknown }).ResizeObserver =
+    class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    };
   useUiStore.setState({
     commitDraft: { subject: "", body: "", amend: false, signoff: false },
     activeRepoId: null,
@@ -101,53 +120,76 @@ describe("CommitPanel", () => {
       fireEvent.change(subjectInput, { target: { value: "my commit" } });
     });
     // The commit button (not "Reuse Last Message") should be disabled
-    const commitBtn = Array.from(document.querySelectorAll("button")).find((b) => b.textContent?.trim() === "Commit");
+    const commitBtn = Array.from(document.querySelectorAll("button")).find(
+      (b) => b.textContent?.trim() === "Commit",
+    );
     expect(commitBtn).toBeDefined();
     expect(commitBtn?.disabled).toBe(true);
   });
 
   test("Commit button is disabled when subject is empty", async () => {
-    const api = makeApi({ statusGet: vi.fn(async () => makeStatus([stagedEntry])) });
+    const api = makeApi({
+      statusGet: vi.fn(async () => makeStatus([stagedEntry])),
+    });
     renderPanel(api);
     await waitFor(() => expect(api.statusGet).toHaveBeenCalled());
     // subject is empty (default)
-    const commitBtn = Array.from(document.querySelectorAll("button")).find((b) => b.textContent?.trim() === "Commit");
+    const commitBtn = Array.from(document.querySelectorAll("button")).find(
+      (b) => b.textContent?.trim() === "Commit",
+    );
     expect(commitBtn?.disabled).toBe(true);
   });
 
   test("Commit button is enabled when staged changes present and subject non-empty", async () => {
-    const api = makeApi({ statusGet: vi.fn(async () => makeStatus([stagedEntry])) });
+    const api = makeApi({
+      statusGet: vi.fn(async () => makeStatus([stagedEntry])),
+    });
     renderPanel(api);
     await waitFor(() => expect(api.statusGet).toHaveBeenCalled());
     const subjectInput = screen.getByLabelText("Commit subject");
     await act(async () => {
       fireEvent.change(subjectInput, { target: { value: "my commit" } });
     });
-    const commitBtn = Array.from(document.querySelectorAll("button")).find((b) => b.textContent?.trim() === "Commit");
+    const commitBtn = Array.from(document.querySelectorAll("button")).find(
+      (b) => b.textContent?.trim() === "Commit",
+    );
     expect(commitBtn?.disabled).toBe(false);
   });
 
   test("clicking Commit calls commitCreate with correct input", async () => {
-    const api = makeApi({ statusGet: vi.fn(async () => makeStatus([stagedEntry])) });
+    const api = makeApi({
+      statusGet: vi.fn(async () => makeStatus([stagedEntry])),
+    });
     renderPanel(api);
     await waitFor(() => expect(api.statusGet).toHaveBeenCalled());
     const subjectInput = screen.getByLabelText("Commit subject");
     await act(async () => {
       fireEvent.change(subjectInput, { target: { value: "add feature" } });
     });
-    const commitBtn = Array.from(document.querySelectorAll("button")).find((b) => b.textContent?.trim() === "Commit");
+    const commitBtn = Array.from(document.querySelectorAll("button")).find(
+      (b) => b.textContent?.trim() === "Commit",
+    );
     await act(async () => {
       fireEvent.click(commitBtn!);
     });
     await waitFor(() =>
       expect(api.commitCreate).toHaveBeenCalledWith(
-        expect.objectContaining({ repoId, subject: "add feature", amend: false, signoff: false }),
+        expect.objectContaining({
+          repoId,
+          subject: "add feature",
+          amend: false,
+          signoff: false,
+        }),
       ),
     );
   });
 
   test("Reuse Last Message fills the subject from last commit", async () => {
-    const msg = new CommitMessage({ subject: "prev subject", body: "prev body", raw: "prev subject\n\nprev body" });
+    const msg = new CommitMessage({
+      subject: "prev subject",
+      body: "prev body",
+      raw: "prev subject\n\nprev body",
+    });
     const api = makeApi({
       statusGet: vi.fn(async () => makeStatus([stagedEntry])),
       commitLastMessage: vi.fn(async () => msg),
@@ -163,7 +205,9 @@ describe("CommitPanel", () => {
       fireEvent.click(reuseBtn);
     });
     await waitFor(() => {
-      const subjectInput = screen.getByLabelText("Commit subject") as HTMLInputElement;
+      const subjectInput = screen.getByLabelText(
+        "Commit subject",
+      ) as HTMLInputElement;
       expect(subjectInput.value).toBe("prev subject");
     });
   });
@@ -183,12 +227,18 @@ describe("CommitPanel", () => {
       fireEvent.click(amendSwitch);
     });
     // With amend=true, commit should be enabled even with no staged changes
-    const commitBtn = Array.from(document.querySelectorAll("button")).find((b) => b.textContent?.trim() === "Commit");
+    const commitBtn = Array.from(document.querySelectorAll("button")).find(
+      (b) => b.textContent?.trim() === "Commit",
+    );
     // Click commit
     await act(async () => {
       fireEvent.click(commitBtn!);
     });
-    await waitFor(() => expect(api.commitCreate).toHaveBeenCalledWith(expect.objectContaining({ amend: true })));
+    await waitFor(() =>
+      expect(api.commitCreate).toHaveBeenCalledWith(
+        expect.objectContaining({ amend: true }),
+      ),
+    );
   });
 
   test("shows 72-char limit warning when subject exceeds limit", async () => {

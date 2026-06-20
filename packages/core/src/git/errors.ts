@@ -11,7 +11,11 @@ import { type GitErrorCode } from "@cbranch/rpc-contract";
 import { GitError } from "@cbranch/rpc-contract";
 
 /** Construct a `GitError` with a scrubbed, display-safe message. */
-export const gitError = (code: GitErrorCode, message: string, detail?: unknown): GitError =>
+export const gitError = (
+  code: GitErrorCode,
+  message: string,
+  detail?: unknown,
+): GitError =>
   new GitError({
     code,
     message: scrubSecrets(message),
@@ -26,13 +30,17 @@ export const gitError = (code: GitErrorCode, message: string, detail?: unknown):
 export const scrubSecrets = (input: string): string => {
   let out = input;
   // userinfo in URLs: scheme://user:secret@host  →  scheme://user:***@host
-  out = out.replace(/([a-zA-Z][a-zA-Z0-9+.-]*:\/\/[^/\s:@]+):[^/\s@]+@/g, "$1:***@");
+  out = out.replace(
+    /([a-zA-Z][a-zA-Z0-9+.-]*:\/\/[^/\s:@]+):[^/\s@]+@/g,
+    "$1:***@",
+  );
   // bare token userinfo: scheme://secret@host    →  scheme://***@host
   out = out.replace(/([a-zA-Z][a-zA-Z0-9+.-]*:\/\/)[^/\s:@]+@/g, "$1***@");
   return out;
 };
 
-const scrubDetail = (detail: unknown): unknown => (typeof detail === "string" ? scrubSecrets(detail) : detail);
+const scrubDetail = (detail: unknown): unknown =>
+  typeof detail === "string" ? scrubSecrets(detail) : detail;
 
 /**
  * Map a Node spawn/`fs` error (the `error.code` is a STABLE machine token, not a
@@ -59,7 +67,11 @@ export const classifyNodeError = (err: unknown): GitError => {
 /** Spawn-time failure of the `git` binary lookup itself → `hostGitMissing`. */
 export const classifyGitSpawnError = (err: unknown): GitError => {
   const code = nodeErrorCode(err);
-  if (code === "ENOENT") return gitError("hostGitMissing", "the host `git` executable was not found on PATH");
+  if (code === "ENOENT")
+    return gitError(
+      "hostGitMissing",
+      "the host `git` executable was not found on PATH",
+    );
   return classifyNodeError(err);
 };
 
@@ -69,18 +81,31 @@ export const classifyGitSpawnError = (err: unknown): GitError => {
  * specific probe's failure (e.g. `open` treating a failed `--is-inside-work-tree`
  * as `notARepository`) classify contextually rather than parsing stderr here.
  */
-export const classifyExit = (exitCode: number | null, stderr: string): GitError =>
-  gitError("gitFailed", `git exited with code ${exitCode ?? "null"}`, gitStderrExcerpt(stderr));
+export const classifyExit = (
+  exitCode: number | null,
+  stderr: string,
+): GitError =>
+  gitError(
+    "gitFailed",
+    `git exited with code ${exitCode ?? "null"}`,
+    gitStderrExcerpt(stderr),
+  );
 
 /** A short, credential-scrubbed stderr excerpt for `detail` (never control flow). */
-export const gitStderrExcerpt = (stderr: string): { readonly gitStderrExcerpt: string } | undefined => {
+export const gitStderrExcerpt = (
+  stderr: string,
+): { readonly gitStderrExcerpt: string } | undefined => {
   const trimmed = stderr.trim();
   if (trimmed === "") return undefined;
-  const excerpt = trimmed.length > 2000 ? `${trimmed.slice(0, 2000)}…` : trimmed;
+  const excerpt =
+    trimmed.length > 2000 ? `${trimmed.slice(0, 2000)}…` : trimmed;
   return { gitStderrExcerpt: scrubSecrets(excerpt) };
 };
 
 const nodeErrorCode = (err: unknown): string | undefined =>
-  typeof err === "object" && err !== null && "code" in err && typeof (err as { code: unknown }).code === "string"
+  typeof err === "object" &&
+  err !== null &&
+  "code" in err &&
+  typeof (err as { code: unknown }).code === "string"
     ? (err as { code: string }).code
     : undefined;

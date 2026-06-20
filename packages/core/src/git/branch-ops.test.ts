@@ -2,8 +2,17 @@ import { Effect } from "effect";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 
 import { runExit } from "../testing/effect-run";
-import { createFixtureWorkspace, type FixtureWorkspace } from "../testing/fixtures";
-import { branchCreate, branchDelete, branchRename, branchSetUpstream, branchSwitch } from "./branch-ops";
+import {
+  createFixtureWorkspace,
+  type FixtureWorkspace,
+} from "../testing/fixtures";
+import {
+  branchCreate,
+  branchDelete,
+  branchRename,
+  branchSetUpstream,
+  branchSwitch,
+} from "./branch-ops";
 import { branchList } from "./branches";
 
 describe("branch lifecycle", () => {
@@ -36,7 +45,9 @@ describe("branch lifecycle", () => {
     const repo = await ws.createRepo("bops-create-sw");
     await repo.commit({ message: "init", files: { "a.txt": "a" } });
 
-    await Effect.runPromise(branchCreate(repo.dir, "feat/y", undefined, undefined, true));
+    await Effect.runPromise(
+      branchCreate(repo.dir, "feat/y", undefined, undefined, true),
+    );
 
     const listing = await Effect.runPromise(branchList(repo.dir));
     expect(listing.currentBranch).toBe("feat/y");
@@ -52,7 +63,9 @@ describe("branch lifecycle", () => {
     await clone.git(["checkout", "-b", "main", "--track", "origin/main"]);
 
     // Create new branch from remote ref with upstream set
-    await Effect.runPromise(branchCreate(clone.dir, "feat/z", "origin/main", true));
+    await Effect.runPromise(
+      branchCreate(clone.dir, "feat/z", "origin/main", true),
+    );
 
     const listing = await Effect.runPromise(branchList(clone.dir));
     const feat = listing.localBranches.find((b) => b.name === "feat/z");
@@ -112,7 +125,9 @@ describe("branch lifecycle", () => {
 
     const listing = await Effect.runPromise(branchList(repo.dir));
     expect(listing.localBranches.some((b) => b.name === "new-name")).toBe(true);
-    expect(listing.localBranches.some((b) => b.name === "old-name")).toBe(false);
+    expect(listing.localBranches.some((b) => b.name === "old-name")).toBe(
+      false,
+    );
   });
 
   test("branchRename — can rename the currently checked-out branch", async () => {
@@ -136,7 +151,9 @@ describe("branch lifecycle", () => {
     await Effect.runPromise(branchDelete(repo.dir, "to-delete", false));
 
     const listing = await Effect.runPromise(branchList(repo.dir));
-    expect(listing.localBranches.some((b) => b.name === "to-delete")).toBe(false);
+    expect(listing.localBranches.some((b) => b.name === "to-delete")).toBe(
+      false,
+    );
   });
 
   test("branchDelete — safe delete of unmerged branch fails", async () => {
@@ -162,7 +179,9 @@ describe("branch lifecycle", () => {
     await Effect.runPromise(branchDelete(repo.dir, "unmerged-force", true));
 
     const listing = await Effect.runPromise(branchList(repo.dir));
-    expect(listing.localBranches.some((b) => b.name === "unmerged-force")).toBe(false);
+    expect(listing.localBranches.some((b) => b.name === "unmerged-force")).toBe(
+      false,
+    );
   });
 
   // ── set-upstream ─────────────────────────────────────────────────────────────
@@ -178,7 +197,9 @@ describe("branch lifecycle", () => {
     await repo.branch("feat/up");
 
     // feat/up has no upstream yet — set it
-    await Effect.runPromise(branchSetUpstream(repo.dir, "feat/up", "origin/main"));
+    await Effect.runPromise(
+      branchSetUpstream(repo.dir, "feat/up", "origin/main"),
+    );
 
     const listing = await Effect.runPromise(branchList(repo.dir));
     const feat = listing.localBranches.find((b) => b.name === "feat/up");

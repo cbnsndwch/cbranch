@@ -38,7 +38,13 @@ import { GitError } from "../schemas/errors";
 import { InvalidationEvent } from "../schemas/live";
 import { Oid, RepoId } from "../schemas/primitives";
 import { DiffSpec, LogQuery } from "../schemas/queries";
-import { CommitCreated, CommitInput, CommitMessage, PatchSelection, WorkingTreeStatus } from "../schemas/working-tree";
+import {
+  CommitCreated,
+  CommitInput,
+  CommitMessage,
+  PatchSelection,
+  WorkingTreeStatus,
+} from "../schemas/working-tree";
 
 export const CbranchRpcs = RpcGroup.make(
   // repo.open — entry point (no clone). Logically only repoNotFound | notARepository
@@ -108,19 +114,30 @@ export const CbranchRpcs = RpcGroup.make(
   // ── P2: stage & commit (docs/spec/06; 14 §7) ───────────────────────────────
   // status.get — full working-tree status snapshot (porcelain v2).
   Rpc.make("StatusGet", {
-    payload: { repoId: RepoId, includeIgnored: Schema.optional(Schema.Boolean) },
+    payload: {
+      repoId: RepoId,
+      includeIgnored: Schema.optional(Schema.Boolean),
+    },
     success: WorkingTreeStatus,
     error: GitError,
   }),
   // stage.files ✎ — stage whole files (or `all` = `git add -A`).
   Rpc.make("StageFiles", {
-    payload: { repoId: RepoId, paths: Schema.Array(Schema.String), all: Schema.optional(Schema.Boolean) },
+    payload: {
+      repoId: RepoId,
+      paths: Schema.Array(Schema.String),
+      all: Schema.optional(Schema.Boolean),
+    },
     success: Schema.Void,
     error: GitError,
   }),
   // unstage.files ✎ — unstage whole files (or `all` = `git reset`).
   Rpc.make("UnstageFiles", {
-    payload: { repoId: RepoId, paths: Schema.Array(Schema.String), all: Schema.optional(Schema.Boolean) },
+    payload: {
+      repoId: RepoId,
+      paths: Schema.Array(Schema.String),
+      all: Schema.optional(Schema.Boolean),
+    },
     success: Schema.Void,
     error: GitError,
   }),
@@ -138,7 +155,11 @@ export const CbranchRpcs = RpcGroup.make(
   }),
   // reset.to ✎ — `git reset --<mode> <target>`.
   Rpc.make("ResetTo", {
-    payload: { repoId: RepoId, mode: Schema.Literals(["soft", "mixed", "hard"]), target: Schema.String },
+    payload: {
+      repoId: RepoId,
+      mode: Schema.Literals(["soft", "mixed", "hard"]),
+      target: Schema.String,
+    },
     success: Schema.Void,
     error: GitError,
   }),
@@ -217,7 +238,11 @@ export const CbranchRpcs = RpcGroup.make(
   }),
   // branch.setUpstream ✎ — upstream=absent/undefined = unset upstream.
   Rpc.make("BranchSetUpstream", {
-    payload: { repoId: RepoId, name: Schema.String, upstream: Schema.optional(Schema.String) },
+    payload: {
+      repoId: RepoId,
+      name: Schema.String,
+      upstream: Schema.optional(Schema.String),
+    },
     success: Schema.Void,
     error: GitError,
   }),
@@ -299,7 +324,12 @@ export const CbranchRpcs = RpcGroup.make(
     error: GitError,
   }),
   Rpc.make("RemoteSetUrl", {
-    payload: { repoId: RepoId, name: Schema.String, url: Schema.String, push: Schema.optional(Schema.Boolean) },
+    payload: {
+      repoId: RepoId,
+      name: Schema.String,
+      url: Schema.String,
+      push: Schema.optional(Schema.Boolean),
+    },
     success: Schema.Void,
     error: GitError,
   }),
@@ -332,7 +362,11 @@ export const CbranchRpcs = RpcGroup.make(
     error: GitError,
   }),
   Rpc.make("WorktreeRemove", {
-    payload: { repoId: RepoId, path: Schema.String, force: Schema.optional(Schema.Boolean) },
+    payload: {
+      repoId: RepoId,
+      path: Schema.String,
+      force: Schema.optional(Schema.Boolean),
+    },
     success: Schema.Void,
     error: GitError,
   }),

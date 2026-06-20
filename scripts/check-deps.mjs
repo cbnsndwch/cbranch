@@ -25,7 +25,11 @@ const ALLOWED_INTERNAL = {
   "@cbranch/core": new Set(["@cbranch/rpc-contract"]),
   "@cbranch/ui": new Set(["@cbranch/rpc-contract"]),
   "@cbranch/web-server": new Set(["@cbranch/core", "@cbranch/rpc-contract"]),
-  "@cbranch/vscode-ext": new Set(["@cbranch/ui", "@cbranch/rpc-contract", "@cbranch/core"]),
+  "@cbranch/vscode-ext": new Set([
+    "@cbranch/ui",
+    "@cbranch/rpc-contract",
+    "@cbranch/core",
+  ]),
 };
 
 // Server / listening-socket libraries. Only @cbranch/web-server may declare these.
@@ -68,7 +72,8 @@ function collectPackages() {
     for (const entry of readdirSync(base, { withFileTypes: true })) {
       if (!entry.isDirectory()) continue;
       const pkgPath = join(base, entry.name, "package.json");
-      if (existsSync(pkgPath)) out.push({ dir: `${top}/${entry.name}`, pkg: readJson(pkgPath) });
+      if (existsSync(pkgPath))
+        out.push({ dir: `${top}/${entry.name}`, pkg: readJson(pkgPath) });
     }
   }
   return out;
@@ -92,7 +97,9 @@ for (const { dir, pkg } of packages) {
   // (1) internal direction
   const allowed = ALLOWED_INTERNAL[name];
   if (!allowed) {
-    violations.push(`${dir}: unknown workspace package name "${name}" (not in the allowed-direction map).`);
+    violations.push(
+      `${dir}: unknown workspace package name "${name}" (not in the allowed-direction map).`,
+    );
   } else {
     for (const dep of all) {
       if (dep.startsWith("@cbranch/") && dep !== name && !allowed.has(dep)) {
@@ -122,4 +129,6 @@ if (violations.length > 0) {
   process.exit(1);
 }
 
-console.log(`Dependency-direction check passed (${packages.length} workspace packages).`);
+console.log(
+  `Dependency-direction check passed (${packages.length} workspace packages).`,
+);

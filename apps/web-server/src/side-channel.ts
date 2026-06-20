@@ -40,7 +40,8 @@ const hasUnsafeChars = (value: string): boolean => {
  * Validate a revision token (oid / ref / `<rev>`): non-empty and free of the control
  * characters that could inject an extra `cat-file` batch request (NF-SEC-6).
  */
-export const safeRev = (rev: string): string | null => (rev !== "" && !hasUnsafeChars(rev) ? rev : null);
+export const safeRev = (rev: string): string | null =>
+  rev !== "" && !hasUnsafeChars(rev) ? rev : null;
 
 /**
  * Contain a repo-relative blob path (NF-SEC-5): reject empty, absolute, control-char,
@@ -83,36 +84,45 @@ export const guessContentType = (path: string): string =>
  * the repo's object database via the engine's `cat-file` pool. Maps a missing object
  * or any `GitError` to `404` (no detail leakage), bad inputs to `400`.
  */
-export const sideChannelRoute = Http.HttpRouter.add("GET", SIDE_CHANNEL_PATH, (request) =>
-  Effect.gen(function* () {
-    const url = new URL(request.url, "http://localhost");
-    const repoIdRaw = url.searchParams.get("repoId");
-    const revRaw = url.searchParams.get("rev");
-    const pathRaw = url.searchParams.get("path");
-    if (repoIdRaw === null || revRaw === null || pathRaw === null) {
-      return Http.HttpServerResponse.text("missing repoId/rev/path", { status: 400 });
-    }
-    const rev = safeRev(revRaw);
-    const path = containBlobPath(pathRaw);
-    if (rev === null || path === null) {
-      return Http.HttpServerResponse.text("invalid rev/path", { status: 400 });
-    }
+export const sideChannelRoute = Http.HttpRouter.add(
+  "GET",
+  SIDE_CHANNEL_PATH,
+  (request) =>
+    Effect.gen(function* () {
+      const url = new URL(request.url, "http://localhost");
+      const repoIdRaw = url.searchParams.get("repoId");
+      const revRaw = url.searchParams.get("rev");
+      const pathRaw = url.searchParams.get("path");
+      if (repoIdRaw === null || revRaw === null || pathRaw === null) {
+        return Http.HttpServerResponse.text("missing repoId/rev/path", {
+          status: 400,
+        });
+      }
+      const rev = safeRev(revRaw);
+      const path = containBlobPath(pathRaw);
+      if (rev === null || path === null) {
+        return Http.HttpServerResponse.text("invalid rev/path", {
+          status: 400,
+        });
+      }
 
-    const engine = yield* GitEngine;
-    const bytes = yield* engine.readObject(RepoId.make(repoIdRaw), `${rev}:${path}`).pipe(
-      Effect.map((obj) => obj?.data ?? null),
-      Effect.catch(() => Effect.succeed(null)),
-    );
-    if (bytes === null) {
-      return Http.HttpServerResponse.text("not found", { status: 404 });
-    }
-    return Http.HttpServerResponse.uint8Array(bytes, {
-      status: 200,
-      contentType: guessContentType(path),
-      headers: {
-        "content-disposition": `attachment; filename="${basename(path)}"`,
-        "cache-control": "no-store",
-      },
-    });
-  }),
+      const engine = yield* GitEngine;
+      const bytes = yield* engine
+        .readObject(RepoId.make(repoIdRaw), `${rev}:${path}`)
+        .pipe(
+          Effect.map((obj) => obj?.data ?? null),
+          Effect.catch(() => Effect.succeed(null)),
+        );
+      if (bytes === null) {
+        return Http.HttpServerResponse.text("not found", { status: 404 });
+      }
+      return Http.HttpServerResponse.uint8Array(bytes, {
+        status: 200,
+        contentType: guessContentType(path),
+        headers: {
+          "content-disposition": `attachment; filename="${basename(path)}"`,
+          "cache-control": "no-store",
+        },
+      });
+    }),
 );

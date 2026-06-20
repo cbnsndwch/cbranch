@@ -46,7 +46,9 @@ export class StatusBranch extends Schema.Class<StatusBranch>("StatusBranch")({
  * The full working-tree status snapshot (`status.get`, 14 §7). `hasConflicts` is the
  * pre-computed gate the UI uses to block committing while a merge is unresolved.
  */
-export class WorkingTreeStatus extends Schema.Class<WorkingTreeStatus>("WorkingTreeStatus")({
+export class WorkingTreeStatus extends Schema.Class<WorkingTreeStatus>(
+  "WorkingTreeStatus",
+)({
   entries: Schema.Array(StatusEntry),
   branch: Schema.optional(StatusBranch),
   hasConflicts: Schema.Boolean,
@@ -57,20 +59,24 @@ export class WorkingTreeStatus extends Schema.Class<WorkingTreeStatus>("WorkingT
  * within the file's working diff; `selectedLines` holds the indices (into the hunk's
  * line array) of the chosen +/- lines — an empty array means the WHOLE hunk.
  */
-export class HunkSelection extends Schema.Class<HunkSelection>("HunkSelection")({
-  oldStart: Schema.Number,
-  oldLines: Schema.Number,
-  newStart: Schema.Number,
-  newLines: Schema.Number,
-  selectedLines: Schema.Array(Schema.Number),
-}) {}
+export class HunkSelection extends Schema.Class<HunkSelection>("HunkSelection")(
+  {
+    oldStart: Schema.Number,
+    oldLines: Schema.Number,
+    newStart: Schema.Number,
+    newLines: Schema.Number,
+    selectedLines: Schema.Array(Schema.Number),
+  },
+) {}
 
 /**
  * A structured partial-stage selection for one file (DECISIONS → D15): the client
  * ships the SELECTION, never a raw patch — only the server, holding git's normalized
  * content, can slice a byte-faithful minimal patch (REQ-P2-HUNK-004, AC-10).
  */
-export class PatchSelection extends Schema.Class<PatchSelection>("PatchSelection")({
+export class PatchSelection extends Schema.Class<PatchSelection>(
+  "PatchSelection",
+)({
   repoId: RepoId,
   path: Schema.String,
   hunks: Schema.Array(HunkSelection),
@@ -107,19 +113,23 @@ export class CommitInput extends Schema.Class<CommitInput>("CommitInput")({
  * The result of a successful `commit.create`: the new commit's full {@link Oid}, its
  * abbreviated form, and the committed subject line.
  */
-export class CommitCreated extends Schema.Class<CommitCreated>("CommitCreated")({
-  oid: Oid,
-  shortOid: Schema.String,
-  subject: Schema.String,
-}) {}
+export class CommitCreated extends Schema.Class<CommitCreated>("CommitCreated")(
+  {
+    oid: Oid,
+    shortOid: Schema.String,
+    subject: Schema.String,
+  },
+) {}
 
 /**
  * A commit's message split for reuse (`commit.lastMessage`, MSG-001): `subject` +
  * `body` parsed apart, plus the verbatim `raw` text (the message editor seeds from
  * `raw` to preserve trailers/whitespace exactly).
  */
-export class CommitMessage extends Schema.Class<CommitMessage>("CommitMessage")({
-  subject: Schema.String,
-  body: Schema.String,
-  raw: Schema.String,
-}) {}
+export class CommitMessage extends Schema.Class<CommitMessage>("CommitMessage")(
+  {
+    subject: Schema.String,
+    body: Schema.String,
+    raw: Schema.String,
+  },
+) {}

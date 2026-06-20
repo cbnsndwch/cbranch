@@ -3,7 +3,13 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { cn } from "../lib/cn";
-import { useBranchCreate, useBranchDelete, useBranchList, useBranchRename, useBranchSwitch } from "../rpc/hooks";
+import {
+  useBranchCreate,
+  useBranchDelete,
+  useBranchList,
+  useBranchRename,
+  useBranchSwitch,
+} from "../rpc/hooks";
 import { RemotesManagerDialog } from "./RemotesManagerDialog";
 import {
   AlertDialog,
@@ -117,7 +123,10 @@ export function BranchesPanel({ repoId }: BranchesPanelProps) {
       {
         onError: (err) => {
           const msg = String(err);
-          if (msg.includes("would be overwritten") || msg.includes("dirtyWorkingTree")) {
+          if (
+            msg.includes("would be overwritten") ||
+            msg.includes("dirtyWorkingTree")
+          ) {
             setDialog({ kind: "dirtyTree", target });
           } else {
             toast.error(msg);
@@ -131,7 +140,11 @@ export function BranchesPanel({ repoId }: BranchesPanelProps) {
     if (dialog?.kind !== "dirtyTree") return;
     const target = dialog.target;
     switchMut.mutate(
-      { target, strategy, stashAndReapply: strategy === "stash" ? false : undefined },
+      {
+        target,
+        strategy,
+        stashAndReapply: strategy === "stash" ? false : undefined,
+      },
       {
         onSuccess: () => {
           toast.success("Switched to " + target);
@@ -153,7 +166,9 @@ export function BranchesPanel({ repoId }: BranchesPanelProps) {
   if (error) {
     return (
       <div className="flex h-full items-center justify-center">
-        <span className="text-destructive text-sm">Failed to load branches</span>
+        <span className="text-destructive text-sm">
+          Failed to load branches
+        </span>
       </div>
     );
   }
@@ -201,7 +216,9 @@ export function BranchesPanel({ repoId }: BranchesPanelProps) {
             />
           ))}
           {localBranches.length === 0 && (
-            <div className="text-muted-foreground px-3 py-2 text-[11px]">No local branches</div>
+            <div className="text-muted-foreground px-3 py-2 text-[11px]">
+              No local branches
+            </div>
           )}
         </div>
 
@@ -258,16 +275,26 @@ export function BranchesPanel({ repoId }: BranchesPanelProps) {
               />
             </label>
             <label className="flex items-center gap-2 text-sm">
-              <input type="checkbox" checked={createSwitch} onChange={(e) => setCreateSwitch(e.target.checked)} />
+              <input
+                type="checkbox"
+                checked={createSwitch}
+                onChange={(e) => setCreateSwitch(e.target.checked)}
+              />
               Switch to this branch
             </label>
             <label className="flex items-center gap-2 text-sm">
-              <input type="checkbox" checked={createUpstream} onChange={(e) => setCreateUpstream(e.target.checked)} />
+              <input
+                type="checkbox"
+                checked={createUpstream}
+                onChange={(e) => setCreateUpstream(e.target.checked)}
+              />
               Set upstream tracking
             </label>
           </div>
           <AlertDialogFooter>
-            <AlertDialogClose onClick={() => setDialog(null)}>Cancel</AlertDialogClose>
+            <AlertDialogClose onClick={() => setDialog(null)}>
+              Cancel
+            </AlertDialogClose>
             <AlertDialogAction
               onClick={handleCreate}
               disabled={!createName.trim() || createMut.isPending}
@@ -306,7 +333,9 @@ export function BranchesPanel({ repoId }: BranchesPanelProps) {
             </label>
           </div>
           <AlertDialogFooter>
-            <AlertDialogClose onClick={() => setDialog(null)}>Cancel</AlertDialogClose>
+            <AlertDialogClose onClick={() => setDialog(null)}>
+              Cancel
+            </AlertDialogClose>
             <AlertDialogAction
               onClick={handleRename}
               disabled={!renameNew.trim() || renameMut.isPending}
@@ -329,15 +358,25 @@ export function BranchesPanel({ repoId }: BranchesPanelProps) {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete branch</AlertDialogTitle>
             <AlertDialogDescription>
-              {dialog?.kind === "delete" ? `Delete branch "${dialog.name}"? This cannot be undone.` : ""}
+              {dialog?.kind === "delete"
+                ? `Delete branch "${dialog.name}"? This cannot be undone.`
+                : ""}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogClose onClick={() => setDialog(null)}>Cancel</AlertDialogClose>
-            <AlertDialogAction onClick={() => handleDelete(false)} disabled={deleteMut.isPending}>
+            <AlertDialogClose onClick={() => setDialog(null)}>
+              Cancel
+            </AlertDialogClose>
+            <AlertDialogAction
+              onClick={() => handleDelete(false)}
+              disabled={deleteMut.isPending}
+            >
               Delete
             </AlertDialogAction>
-            <AlertDialogAction onClick={() => handleDelete(true)} disabled={deleteMut.isPending}>
+            <AlertDialogAction
+              onClick={() => handleDelete(true)}
+              disabled={deleteMut.isPending}
+            >
               Force delete
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -345,7 +384,11 @@ export function BranchesPanel({ repoId }: BranchesPanelProps) {
       </AlertDialog>
 
       {/* Remotes manager dialog */}
-      <RemotesManagerDialog repoId={repoId} open={remotesOpen} onOpenChange={setRemotesOpen} />
+      <RemotesManagerDialog
+        repoId={repoId}
+        open={remotesOpen}
+        onOpenChange={setRemotesOpen}
+      />
 
       {/* Dirty tree dialog */}
       <AlertDialog
@@ -358,11 +401,14 @@ export function BranchesPanel({ repoId }: BranchesPanelProps) {
           <AlertDialogHeader>
             <AlertDialogTitle>Uncommitted changes</AlertDialogTitle>
             <AlertDialogDescription>
-              You have local changes. How do you want to handle them when switching branches?
+              You have local changes. How do you want to handle them when
+              switching branches?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogClose onClick={() => setDialog(null)}>Cancel</AlertDialogClose>
+            <AlertDialogClose onClick={() => setDialog(null)}>
+              Cancel
+            </AlertDialogClose>
             <AlertDialogAction
               onClick={() => handleDirtyTreeStrategy("stash")}
               disabled={switchMut.isPending}
@@ -377,7 +423,10 @@ export function BranchesPanel({ repoId }: BranchesPanelProps) {
             >
               Carry over
             </AlertDialogAction>
-            <AlertDialogAction onClick={() => handleDirtyTreeStrategy("discard")} disabled={switchMut.isPending}>
+            <AlertDialogAction
+              onClick={() => handleDirtyTreeStrategy("discard")}
+              disabled={switchMut.isPending}
+            >
               Discard
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -396,14 +445,27 @@ interface BranchRowProps {
 
 function BranchRow({ branch, onSwitch, onRename, onDelete }: BranchRowProps) {
   return (
-    <div className={cn("group flex items-center px-3 py-1.5 hover:bg-accent/50", branch.isCurrent && "bg-accent/30")}>
-      <span className="text-primary mr-2 w-2 text-xs">{branch.isCurrent ? "●" : ""}</span>
+    <div
+      className={cn(
+        "group flex items-center px-3 py-1.5 hover:bg-accent/50",
+        branch.isCurrent && "bg-accent/30",
+      )}
+    >
+      <span className="text-primary mr-2 w-2 text-xs">
+        {branch.isCurrent ? "●" : ""}
+      </span>
       <span className="flex-1 truncate font-mono text-xs">{branch.name}</span>
       {branch.upstream && (
         <span className="mr-2 flex gap-1 text-[10px]">
-          {branch.upstream.ahead > 0 && <span className="text-green-600">{"+" + String(branch.upstream.ahead)}</span>}
+          {branch.upstream.ahead > 0 && (
+            <span className="text-green-600">
+              {"+" + String(branch.upstream.ahead)}
+            </span>
+          )}
           {branch.upstream.behind > 0 && (
-            <span className="text-orange-500">{"-" + String(branch.upstream.behind)}</span>
+            <span className="text-orange-500">
+              {"-" + String(branch.upstream.behind)}
+            </span>
           )}
         </span>
       )}
@@ -416,13 +478,20 @@ function BranchRow({ branch, onSwitch, onRename, onDelete }: BranchRowProps) {
         </DropdownMenuTrigger>
         <DropdownMenuContent side="bottom" align="end">
           {!branch.isCurrent && !branch.isRemote && (
-            <DropdownMenuItem onClick={() => onSwitch(branch.name)}>Switch to</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onSwitch(branch.name)}>
+              Switch to
+            </DropdownMenuItem>
           )}
           {!branch.isRemote && (
             <>
-              <DropdownMenuItem onClick={() => onRename(branch.name)}>Rename</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onRename(branch.name)}>
+                Rename
+              </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem variant="destructive" onClick={() => onDelete(branch.name)}>
+              <DropdownMenuItem
+                variant="destructive"
+                onClick={() => onDelete(branch.name)}
+              >
                 Delete
               </DropdownMenuItem>
             </>

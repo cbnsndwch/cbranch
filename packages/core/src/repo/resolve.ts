@@ -27,32 +27,52 @@ export interface ResolvedRepo {
 }
 
 /** Working directory to run subsequent reads against (bare repos have no worktree). */
-export const repoCwd = (repo: ResolvedRepo): string => (repo.isBare ? repo.gitDir : repo.root);
+export const repoCwd = (repo: ResolvedRepo): string =>
+  repo.isBare ? repo.gitDir : repo.root;
 
-export const resolveRepo = (inputPath: string): Effect.Effect<ResolvedRepo, GitError> =>
+export const resolveRepo = (
+  inputPath: string,
+): Effect.Effect<ResolvedRepo, GitError> =>
   Effect.gen(function* () {
     // 1. Path must exist; ENOENT → repoNotFound, other fs problem → fsError/permission.
     yield* Effect.tryPromise({
       try: () => stat(inputPath),
       catch: (err): GitError => {
         const code =
-          typeof err === "object" && err !== null && "code" in err ? (err as { code: unknown }).code : undefined;
-        return code === "ENOENT" ? gitError("repoNotFound", "no such path") : classifyNodeError(err);
+          typeof err === "object" && err !== null && "code" in err
+            ? (err as { code: unknown }).code
+            : undefined;
+        return code === "ENOENT"
+          ? gitError("repoNotFound", "no such path")
+          : classifyNodeError(err);
       },
     });
 
     // 2. Classify the repository. A non-zero exit here means "not a git repository".
     const probe = yield* runGit({
       cwd: inputPath,
-      args: ["rev-parse", "--is-bare-repository", "--is-inside-work-tree", "--absolute-git-dir", "--git-common-dir"],
+      args: [
+        "rev-parse",
+        "--is-bare-repository",
+        "--is-inside-work-tree",
+        "--absolute-git-dir",
+        "--git-common-dir",
+      ],
     });
     if (probe.exitCode !== 0) {
-      return yield* Effect.fail(gitError("notARepository", "path is not inside a git repository"));
+      return yield* Effect.fail(
+        gitError("notARepository", "path is not inside a git repository"),
+      );
     }
     const lines = decodeUtf8(probe.stdout)
       .split("\n")
       .map((l) => l.trim());
-    const [isBareStr, isInsideStr, absoluteGitDir, commonDirRaw] = lines as [string, string, string, string];
+    const [isBareStr, isInsideStr, absoluteGitDir, commonDirRaw] = lines as [
+      string,
+      string,
+      string,
+      string,
+    ];
     const isBare = isBareStr === "true";
     const isInsideWorkTree = isInsideStr === "true";
 
@@ -62,12 +82,21 @@ export const resolveRepo = (inputPath: string): Effect.Effect<ResolvedRepo, GitE
     // 3. Top-level working dir (absent for bare / when inside the git dir).
     let root = isBare ? gitDir : dirname(gitDir);
     if (!isBare && isInsideWorkTree) {
-      const top = yield* runGit({ cwd: inputPath, args: ["rev-parse", "--show-toplevel"] });
+      const top = yield* runGit({
+        cwd: inputPath,
+        args: ["rev-parse", "--show-toplevel"],
+      });
       if (top.exitCode === 0) {
         const text = decodeUtf8(top.stdout).trim();
         if (text !== "") root = normalizeAbsolute(inputPath, text);
       }
     }
 
-    return { repoId: computeRepoId(commonDir), root, gitDir, commonDir, isBare };
+    return {
+      repoId: computeRepoId(commonDir),
+      root,
+      gitDir,
+      commonDir,
+      isBare,
+    };
   });

@@ -68,7 +68,12 @@ export function GraphCell({
             stroke="var(--color-selection-bg)"
             strokeWidth={2}
           />
-          <circle cx={nodeX} cy={nodeY} r={NODE_RADIUS - 1} style={{ fill: stroke(row.color) }} />
+          <circle
+            cx={nodeX}
+            cy={nodeY}
+            r={NODE_RADIUS - 1}
+            style={{ fill: stroke(row.color) }}
+          />
         </>
       ) : (
         <circle

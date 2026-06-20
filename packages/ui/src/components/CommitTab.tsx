@@ -29,9 +29,15 @@ export function CommitTab({
   const dateMode = useUiStore((s) => s.dateMode);
   const knownRefStrings = useUiStore((s) => s.knownRefStrings);
 
-  if (oid === null) return <Placeholder>Select a commit to see its details.</Placeholder>;
+  if (oid === null)
+    return <Placeholder>Select a commit to see its details.</Placeholder>;
   if (isLoading) return <Placeholder>Loading commit…</Placeholder>;
-  if (isError || !data) return <Placeholder tone="danger">Could not load commit {shortOid(oid)}.</Placeholder>;
+  if (isError || !data)
+    return (
+      <Placeholder tone="danger">
+        Could not load commit {shortOid(oid)}.
+      </Placeholder>
+    );
 
   const authorInitials = initials(data.author.name);
 
@@ -67,7 +73,9 @@ export function CommitTab({
           <dt className="text-muted-foreground">Date:</dt>
           <dd>
             {formatInstant(data.author.when.epochSeconds, dateMode)}{" "}
-            <span className="text-muted-foreground">({formatEpoch(data.author.when.epochSeconds)})</span>
+            <span className="text-muted-foreground">
+              ({formatEpoch(data.author.when.epochSeconds)})
+            </span>
           </dd>
           <dt className="text-muted-foreground">Commit hash:</dt>
           <dd className="font-mono break-all">{data.oid}</dd>
@@ -90,7 +98,9 @@ export function CommitTab({
           ) : null}
         </dl>
         {/* Subject strip */}
-        <div className="bg-muted mt-2 px-2 py-1.5 text-[12px]">{data.subject}</div>
+        <div className="bg-muted mt-2 px-2 py-1.5 text-[12px]">
+          {data.subject}
+        </div>
         {/* Contained in branches */}
         <div className="mt-2">
           <div className="text-muted-foreground">Contained in branches:</div>

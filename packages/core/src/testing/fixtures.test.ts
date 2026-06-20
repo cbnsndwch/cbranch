@@ -1,6 +1,12 @@
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 
-import { createFixtureWorkspace, type FixtureWorkspace, fixtureDate, seedConflict, seedLinear } from "./fixtures";
+import {
+  createFixtureWorkspace,
+  type FixtureWorkspace,
+  fixtureDate,
+  seedConflict,
+  seedLinear,
+} from "./fixtures";
 
 let ws: FixtureWorkspace;
 beforeAll(async () => {
@@ -21,7 +27,11 @@ describe("deterministic fixtures (NF-TEST-4)", () => {
 
   test("the first deterministic commit has a known stable hash", async () => {
     const repo = await ws.createRepo("known");
-    const oid = await repo.commit({ message: "a", files: { "a.txt": "a\n" }, date: fixtureDate(1) });
+    const oid = await repo.commit({
+      message: "a",
+      files: { "a.txt": "a\n" },
+      date: fixtureDate(1),
+    });
     expect(oid).toBe("a4a762c87406a42d608f743b470bfd175e1a5829");
   });
 });
@@ -35,7 +45,11 @@ describe("harness capabilities (NF-TEST-3)", () => {
     await repo.tag("v2", { message: "release 2" });
     await repo.commit({ message: "second", files: { "b.txt": "b\n" } });
 
-    const branches = (await repo.git(["branch", "--format=%(refname:short)"])).stdout.split("\n").filter(Boolean);
+    const branches = (
+      await repo.git(["branch", "--format=%(refname:short)"])
+    ).stdout
+      .split("\n")
+      .filter(Boolean);
     expect(branches).toContain("feature");
     const tags = (await repo.git(["tag"])).stdout.split("\n").filter(Boolean);
     expect(tags).toEqual(["v1", "v2"]);
@@ -43,7 +57,9 @@ describe("harness capabilities (NF-TEST-3)", () => {
     expect(v2Type).toBe("tag"); // annotated
 
     await repo.checkout("HEAD", { detach: true });
-    const sym = await repo.git(["symbolic-ref", "--quiet", "HEAD"], { allowFailure: true });
+    const sym = await repo.git(["symbolic-ref", "--quiet", "HEAD"], {
+      allowFailure: true,
+    });
     expect(sym.code).not.toBe(0); // detached
   });
 
@@ -57,7 +73,11 @@ describe("harness capabilities (NF-TEST-3)", () => {
     await repo.checkout("main");
     const result = await repo.merge("topic", { noFastForward: true });
     expect(result.conflict).toBe(false);
-    const parents = (await repo.git(["rev-list", "--parents", "-n", "1", "HEAD"])).stdout.trim().split(" ");
+    const parents = (
+      await repo.git(["rev-list", "--parents", "-n", "1", "HEAD"])
+    ).stdout
+      .trim()
+      .split(" ");
     expect(parents).toHaveLength(3); // commit + 2 parents
   });
 
@@ -76,7 +96,9 @@ describe("harness capabilities (NF-TEST-3)", () => {
     await local.git(["push", "-q", "origin", "main"]);
     await local.setUpstream("main", "origin/main");
     await local.fetch("origin");
-    const upstream = (await local.git(["rev-parse", "--abbrev-ref", "main@{upstream}"])).stdout.trim();
+    const upstream = (
+      await local.git(["rev-parse", "--abbrev-ref", "main@{upstream}"])
+    ).stdout.trim();
     expect(upstream).toBe("origin/main");
   });
 
@@ -86,7 +108,9 @@ describe("harness capabilities (NF-TEST-3)", () => {
     await repo.writeFile("a.txt", "changed\n"); // unstaged
     await repo.writeFile("staged.txt", "s\n");
     await repo.stage("staged.txt"); // staged add
-    const status = (await repo.git(["status", "--porcelain=v2", "-z"])).stdout.split("\0").filter(Boolean);
+    const status = (await repo.git(["status", "--porcelain=v2", "-z"])).stdout
+      .split("\0")
+      .filter(Boolean);
     expect(status.length).toBeGreaterThanOrEqual(2);
   });
 });

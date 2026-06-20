@@ -2,7 +2,14 @@ import { type StashEntry, type RepoId } from "@cbranch/rpc-contract";
 import { useState } from "react";
 import { toast } from "sonner";
 
-import { useStashApply, useStashClear, useStashDrop, useStashList, useStashPop, useStashPush } from "../rpc/hooks";
+import {
+  useStashApply,
+  useStashClear,
+  useStashDrop,
+  useStashList,
+  useStashPop,
+  useStashPush,
+} from "../rpc/hooks";
 import { DestructiveConfirmDialog } from "./DestructiveConfirmDialog";
 import {
   AlertDialog,
@@ -14,7 +21,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "./ui/alert-dialog";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "./ui/dropdown-menu";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "./ui/dropdown-menu";
 
 interface StashPanelProps {
   repoId: RepoId;
@@ -124,12 +136,24 @@ export function StashPanel({ repoId }: StashPanelProps) {
 
       {/* Stash list */}
       <div className="min-h-0 flex-1 overflow-auto">
-        {isLoading && <div className="text-muted-foreground px-3 py-4 text-sm">Loading stashes…</div>}
+        {isLoading && (
+          <div className="text-muted-foreground px-3 py-4 text-sm">
+            Loading stashes…
+          </div>
+        )}
         {!isLoading && list.length === 0 && (
-          <div className="text-muted-foreground px-3 py-4 text-sm">No stash entries.</div>
+          <div className="text-muted-foreground px-3 py-4 text-sm">
+            No stash entries.
+          </div>
         )}
         {list.map((entry) => (
-          <StashRow key={entry.ref} entry={entry} onApply={handleApply} onPop={handlePop} onDrop={handleDrop} />
+          <StashRow
+            key={entry.ref}
+            entry={entry}
+            onApply={handleApply}
+            onPop={handlePop}
+            onDrop={handleDrop}
+          />
         ))}
       </div>
 
@@ -138,7 +162,9 @@ export function StashPanel({ repoId }: StashPanelProps) {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Stash changes</AlertDialogTitle>
-            <AlertDialogDescription>Save your current working directory changes to the stash.</AlertDialogDescription>
+            <AlertDialogDescription>
+              Save your current working directory changes to the stash.
+            </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="flex flex-col gap-3 py-2">
             <label className="flex flex-col gap-1">
@@ -161,16 +187,26 @@ export function StashPanel({ repoId }: StashPanelProps) {
               Include untracked files
             </label>
             <label className="flex items-center gap-2 text-sm">
-              <input type="checkbox" checked={keepIndex} onChange={(e) => setKeepIndex(e.target.checked)} />
+              <input
+                type="checkbox"
+                checked={keepIndex}
+                onChange={(e) => setKeepIndex(e.target.checked)}
+              />
               Keep index (staged changes stay staged)
             </label>
             <label className="flex items-center gap-2 text-sm">
-              <input type="checkbox" checked={stagedOnly} onChange={(e) => setStagedOnly(e.target.checked)} />
+              <input
+                type="checkbox"
+                checked={stagedOnly}
+                onChange={(e) => setStagedOnly(e.target.checked)}
+              />
               Staged only
             </label>
           </div>
           <AlertDialogFooter>
-            <AlertDialogClose onClick={() => setNewStashOpen(false)}>Cancel</AlertDialogClose>
+            <AlertDialogClose onClick={() => setNewStashOpen(false)}>
+              Cancel
+            </AlertDialogClose>
             <AlertDialogAction
               onClick={handlePush}
               disabled={pushMut.isPending}
@@ -210,9 +246,13 @@ function StashRow({ entry, onApply, onPop, onDrop }: StashRowProps) {
           <span className="text-muted-foreground shrink-0 font-mono text-[10px]">
             {"stash@{" + String(entry.index) + "}"}
           </span>
-          <span className="truncate text-xs">{entry.subject || entry.message}</span>
+          <span className="truncate text-xs">
+            {entry.subject || entry.message}
+          </span>
         </div>
-        <div className="text-muted-foreground mt-0.5 text-[10px]">{entry.branch}</div>
+        <div className="text-muted-foreground mt-0.5 text-[10px]">
+          {entry.branch}
+        </div>
       </div>
       <DropdownMenu>
         <DropdownMenuTrigger
@@ -222,9 +262,16 @@ function StashRow({ entry, onApply, onPop, onDrop }: StashRowProps) {
           …
         </DropdownMenuTrigger>
         <DropdownMenuContent side="bottom" align="end">
-          <DropdownMenuItem onClick={() => onApply(entry.ref)}>Apply</DropdownMenuItem>
-          <DropdownMenuItem onClick={() => onPop(entry.ref)}>Pop</DropdownMenuItem>
-          <DropdownMenuItem variant="destructive" onClick={() => onDrop(entry.ref)}>
+          <DropdownMenuItem onClick={() => onApply(entry.ref)}>
+            Apply
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => onPop(entry.ref)}>
+            Pop
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            variant="destructive"
+            onClick={() => onDrop(entry.ref)}
+          >
             Drop
           </DropdownMenuItem>
         </DropdownMenuContent>

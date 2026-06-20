@@ -18,7 +18,10 @@ export function useNavigation(): Navigation {
   const navigate = useNavigate();
   const { repoId } = useParams<{ repoId: string }>();
 
-  const openRepo = useCallback((id: RepoId) => navigate(`/repos/${id}`), [navigate]);
+  const openRepo = useCallback(
+    (id: RepoId) => navigate(`/repos/${id}`),
+    [navigate],
+  );
   const selectOid = useCallback(
     (oid: Oid) => {
       // Commit selection is only meaningful within an open repository.

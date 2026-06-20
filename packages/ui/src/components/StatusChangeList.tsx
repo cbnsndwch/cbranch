@@ -24,7 +24,9 @@ export function StatusChangeList({
   onDestructive,
 }: StatusChangeListProps) {
   if (entries.length === 0) {
-    return <p className="text-muted-foreground px-4 py-2 text-xs">No changes.</p>;
+    return (
+      <p className="text-muted-foreground px-4 py-2 text-xs">No changes.</p>
+    );
   }
 
   return (
@@ -50,7 +52,9 @@ export function StatusChangeList({
               className="flex min-w-0 flex-1 items-center gap-1.5 text-left"
               onClick={() => onSelect(entry.path, staged)}
             >
-              <span className="text-muted-foreground min-w-[60px] text-xs">{label}</span>
+              <span className="text-muted-foreground min-w-[60px] text-xs">
+                {label}
+              </span>
               <span className="truncate text-xs">{entry.path}</span>
             </button>
             <div className="flex shrink-0 gap-1 opacity-0 group-hover:opacity-100">

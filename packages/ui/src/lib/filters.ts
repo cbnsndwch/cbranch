@@ -51,7 +51,8 @@ export const buildLogQuery = (repoId: RepoId, filters: LogFilters): LogQuery =>
     repoId,
     limit: DEFAULT_LOG_LIMIT,
     refScope: filters.refScope,
-    refPattern: filters.refScope === "pattern" ? trimmed(filters.refPattern) : undefined,
+    refPattern:
+      filters.refScope === "pattern" ? trimmed(filters.refPattern) : undefined,
     path: trimmed(filters.path),
     author: trimmed(filters.author),
     grep: trimmed(filters.grep),
@@ -68,25 +69,40 @@ export interface FilterChip {
 }
 
 /** Derive the visible chips for the active, non-default filters (P1-FILT-6). */
-export const describeFilters = (filters: LogFilters): ReadonlyArray<FilterChip> => {
+export const describeFilters = (
+  filters: LogFilters,
+): ReadonlyArray<FilterChip> => {
   const chips: FilterChip[] = [];
-  if (filters.refScope === "all") chips.push({ key: "refScope", label: "refs: all" });
+  if (filters.refScope === "all")
+    chips.push({ key: "refScope", label: "refs: all" });
   if (filters.refScope === "pattern" && trimmed(filters.refPattern)) {
-    chips.push({ key: "refPattern", label: `refs: ${filters.refPattern.trim()}` });
+    chips.push({
+      key: "refPattern",
+      label: `refs: ${filters.refPattern.trim()}`,
+    });
   }
-  if (trimmed(filters.path)) chips.push({ key: "path", label: `path: ${filters.path.trim()}` });
-  if (trimmed(filters.author)) chips.push({ key: "author", label: `author: ${filters.author.trim()}` });
-  if (trimmed(filters.grep)) chips.push({ key: "grep", label: `msg: ${filters.grep.trim()}` });
-  if (trimmed(filters.since)) chips.push({ key: "since", label: `since: ${filters.since.trim()}` });
-  if (trimmed(filters.until)) chips.push({ key: "until", label: `until: ${filters.until.trim()}` });
+  if (trimmed(filters.path))
+    chips.push({ key: "path", label: `path: ${filters.path.trim()}` });
+  if (trimmed(filters.author))
+    chips.push({ key: "author", label: `author: ${filters.author.trim()}` });
+  if (trimmed(filters.grep))
+    chips.push({ key: "grep", label: `msg: ${filters.grep.trim()}` });
+  if (trimmed(filters.since))
+    chips.push({ key: "since", label: `since: ${filters.since.trim()}` });
+  if (trimmed(filters.until))
+    chips.push({ key: "until", label: `until: ${filters.until.trim()}` });
   return chips;
 };
 
 /** Whether any constraint narrows the default head window (drives the no-match empty state, P1-FILT-9). */
-export const hasActiveFilters = (filters: LogFilters): boolean => describeFilters(filters).length > 0;
+export const hasActiveFilters = (filters: LogFilters): boolean =>
+  describeFilters(filters).length > 0;
 
 /** Clear one filter field back to its default (chip removal, P1-FILT-6). */
-export const clearFilter = (filters: LogFilters, key: keyof LogFilters): LogFilters => {
+export const clearFilter = (
+  filters: LogFilters,
+  key: keyof LogFilters,
+): LogFilters => {
   if (key === "refScope" || key === "refPattern") {
     return { ...filters, refScope: "current", refPattern: "" };
   }

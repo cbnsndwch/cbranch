@@ -10,8 +10,18 @@
 // Binary files carry empty hunks and `additions`/`deletions = null`; gitlinks surface via
 // the `160000` mode; a root commit diffs against the empty tree (`--root`).
 
-import { type ChangeCode, type DiffFile as DiffFileType, type DiffSpec, type GitError } from "@cbranch/rpc-contract";
-import { DiffFile, DiffLine, Hunk, Oid as OidBrand } from "@cbranch/rpc-contract";
+import {
+  type ChangeCode,
+  type DiffFile as DiffFileType,
+  type DiffSpec,
+  type GitError,
+} from "@cbranch/rpc-contract";
+import {
+  DiffFile,
+  DiffLine,
+  Hunk,
+  Oid as OidBrand,
+} from "@cbranch/rpc-contract";
 import { Effect } from "effect";
 
 import { assertNoLeadingDash, decodeUtf8, runGitOk } from "./run-git";
@@ -51,7 +61,9 @@ export interface NameStatusEntry {
  * Parse `--name-status -z`: a flat NUL-token stream. A rename/copy record is
  * `R<score>\0<old>\0<new>`; every other record is `<X>\0<path>`.
  */
-export const parseNameStatus = (stdout: Buffer): ReadonlyArray<NameStatusEntry> => {
+export const parseNameStatus = (
+  stdout: Buffer,
+): ReadonlyArray<NameStatusEntry> => {
   const tokens = decodeUtf8(stdout).split("\0");
   const out: NameStatusEntry[] = [];
   let i = 0;
@@ -69,7 +81,11 @@ export const parseNameStatus = (stdout: Buffer): ReadonlyArray<NameStatusEntry> 
       i += 3;
     } else {
       const path = tokens[i + 1] ?? "";
-      out.push({ status: mapStatusLetter(letter), oldPath: path, newPath: path });
+      out.push({
+        status: mapStatusLetter(letter),
+        oldPath: path,
+        newPath: path,
+      });
       i += 2;
     }
   }
@@ -139,7 +155,13 @@ const DEL_MARKER = /-/;
 /** Parse a `@@ -a,b +c,d @@` header (or combined `@@@ … @@@`). Counts default to 1. */
 const parseHunkHeader = (
   line: string,
-): { oldStart: number; oldLines: number; newStart: number; newLines: number; markerWidth: number } | null => {
+): {
+  oldStart: number;
+  oldLines: number;
+  newStart: number;
+  newLines: number;
+  markerWidth: number;
+} | null => {
   const at = /^(@+)/.exec(line);
   if (at === null) return null;
   const atCount = (at[1] as string).length;
@@ -198,18 +220,32 @@ export const parsePatch = (text: string): ReadonlyArray<PatchFile> => {
       continue;
     }
 
-    if (hunk !== null && (line.startsWith(" ") || line.startsWith("+") || line.startsWith("-"))) {
+    if (
+      hunk !== null &&
+      (line.startsWith(" ") || line.startsWith("+") || line.startsWith("-"))
+    ) {
       const marker = line.slice(0, markerWidth);
       const content = line.slice(markerWidth);
       const mutableLines = hunk.lines as DiffLine[];
       if (ADD_MARKER.test(marker)) {
-        mutableLines.push(new DiffLine({ kind: "add", content, newLineNo: newNo }));
+        mutableLines.push(
+          new DiffLine({ kind: "add", content, newLineNo: newNo }),
+        );
         newNo += 1;
       } else if (DEL_MARKER.test(marker)) {
-        mutableLines.push(new DiffLine({ kind: "delete", content, oldLineNo: oldNo }));
+        mutableLines.push(
+          new DiffLine({ kind: "delete", content, oldLineNo: oldNo }),
+        );
         oldNo += 1;
       } else {
-        mutableLines.push(new DiffLine({ kind: "context", content, oldLineNo: oldNo, newLineNo: newNo }));
+        mutableLines.push(
+          new DiffLine({
+            kind: "context",
+            content,
+            oldLineNo: oldNo,
+            newLineNo: newNo,
+          }),
+        );
         oldNo += 1;
         newNo += 1;
       }
@@ -219,16 +255,22 @@ export const parsePatch = (text: string): ReadonlyArray<PatchFile> => {
     if (line.startsWith("\\")) {
       // "\ No newline at end of file" — applies to the preceding +/- line.
       if (hunk !== null)
-        (hunk.lines as DiffLine[]).push(new DiffLine({ kind: "noNewlineAtEof", content: line.slice(2) }));
+        (hunk.lines as DiffLine[]).push(
+          new DiffLine({ kind: "noNewlineAtEof", content: line.slice(2) }),
+        );
       continue;
     }
 
     // Pre-hunk metadata lines.
     if (line.startsWith("Binary files ")) file.isBinary = true;
-    else if (line.startsWith("old mode ")) file.oldMode = line.slice("old mode ".length).trim();
-    else if (line.startsWith("new mode ")) file.newMode = line.slice("new mode ".length).trim();
-    else if (line.startsWith("new file mode ")) file.newMode = line.slice("new file mode ".length).trim();
-    else if (line.startsWith("deleted file mode ")) file.oldMode = line.slice("deleted file mode ".length).trim();
+    else if (line.startsWith("old mode "))
+      file.oldMode = line.slice("old mode ".length).trim();
+    else if (line.startsWith("new mode "))
+      file.newMode = line.slice("new mode ".length).trim();
+    else if (line.startsWith("new file mode "))
+      file.newMode = line.slice("new file mode ".length).trim();
+    else if (line.startsWith("deleted file mode "))
+      file.oldMode = line.slice("deleted file mode ".length).trim();
     else if (line.startsWith("index ")) {
       const m = /^index ([0-9a-f]+)\.\.([0-9a-f]+)(?: (\d+))?/.exec(line);
       if (m !== null) {
@@ -258,7 +300,8 @@ export const buildDiffFiles = (
   nameStatus.map((ns, i) => {
     const num = numstat[i];
     const pf = patch[i];
-    const isBinary = (num !== undefined && num.additions === null) || (pf?.isBinary ?? false);
+    const isBinary =
+      (num !== undefined && num.additions === null) || (pf?.isBinary ?? false);
     return new DiffFile({
       oldPath: ns.oldPath,
       newPath: ns.newPath,
@@ -284,7 +327,8 @@ const whitespaceArgs = (ws: DiffSpec["whitespace"]): ReadonlyArray<string> =>
  * Rename control. We force `-M -C` or `--no-renames` (never leaving it to repo config)
  * so the three parallel outputs stay one-entry-per-file aligned (DM-060).
  */
-const renameArgs = (renames: boolean): ReadonlyArray<string> => (renames ? ["-M", "-C"] : ["--no-renames"]);
+const renameArgs = (renames: boolean): ReadonlyArray<string> =>
+  renames ? ["-M", "-C"] : ["--no-renames"];
 
 /** Build the three aligned diff commands (name-status, numstat, patch) for a base prefix. */
 const diffTriple = (
@@ -298,9 +342,26 @@ const diffTriple = (
 ): { nameStatus: string[]; numstat: string[]; patch: string[] } => {
   const tail = paths.length > 0 ? ["--", ...paths] : [];
   return {
-    nameStatus: [...base, "-z", "--name-status", ...renames, ...ws, ...rev, ...tail],
+    nameStatus: [
+      ...base,
+      "-z",
+      "--name-status",
+      ...renames,
+      ...ws,
+      ...rev,
+      ...tail,
+    ],
     numstat: [...base, "-z", "--numstat", ...renames, ...ws, ...rev, ...tail],
-    patch: [...base, "-p", ...renames, ...ws, ...context, ...combined, ...rev, ...tail],
+    patch: [
+      ...base,
+      "-p",
+      ...renames,
+      ...ws,
+      ...context,
+      ...combined,
+      ...rev,
+      ...tail,
+    ],
   };
 };
 
@@ -313,7 +374,11 @@ const assembleDiff = (
     const ns = yield* runGitOk({ cwd, args: cmds.nameStatus, env });
     const num = yield* runGitOk({ cwd, args: cmds.numstat, env });
     const patch = yield* runGitOk({ cwd, args: cmds.patch, env });
-    return buildDiffFiles(parseNameStatus(ns.stdout), parseNumstat(num.stdout), parsePatch(decodeUtf8(patch.stdout)));
+    return buildDiffFiles(
+      parseNameStatus(ns.stdout),
+      parseNumstat(num.stdout),
+      parsePatch(decodeUtf8(patch.stdout)),
+    );
   });
 
 /** `commit.diff` — changed files for a commit or range (DiffSpec, 05 §2.6). */
@@ -332,7 +397,15 @@ export const commitDiff = (
 
     if (spec.cached) {
       // Index vs the target tree (an unusual but valid `commit.diff` request).
-      const cmds = diffTriple(["diff", "--cached"], ws, renames, context, combined, [target], paths);
+      const cmds = diffTriple(
+        ["diff", "--cached"],
+        ws,
+        renames,
+        context,
+        combined,
+        [target],
+        paths,
+      );
       return yield* assembleDiff(cwd, cmds, env);
     }
 
@@ -345,7 +418,15 @@ export const commitDiff = (
     } else {
       rev = ["--root", target];
     }
-    const cmds = diffTriple(["diff-tree", "-r", "--no-commit-id"], ws, renames, context, combined, rev, paths);
+    const cmds = diffTriple(
+      ["diff-tree", "-r", "--no-commit-id"],
+      ws,
+      renames,
+      context,
+      combined,
+      rev,
+      paths,
+    );
     return yield* assembleDiff(cwd, cmds, env);
   });
 
@@ -360,9 +441,21 @@ export const diffWorkingFile = (
     const cachedFlag = staged ? ["--cached"] : [];
     const base = ["diff", ...cachedFlag];
     const tail = ["--", path];
-    const ns = yield* runGitOk({ cwd, args: [...base, "-z", "--name-status", "--no-renames", ...tail], env });
-    const num = yield* runGitOk({ cwd, args: [...base, "-z", "--numstat", "--no-renames", ...tail], env });
-    const patch = yield* runGitOk({ cwd, args: [...base, "-p", "--no-renames", ...tail], env });
+    const ns = yield* runGitOk({
+      cwd,
+      args: [...base, "-z", "--name-status", "--no-renames", ...tail],
+      env,
+    });
+    const num = yield* runGitOk({
+      cwd,
+      args: [...base, "-z", "--numstat", "--no-renames", ...tail],
+      env,
+    });
+    const patch = yield* runGitOk({
+      cwd,
+      args: [...base, "-p", "--no-renames", ...tail],
+      env,
+    });
     const files = buildDiffFiles(
       parseNameStatus(ns.stdout),
       parseNumstat(num.stdout),

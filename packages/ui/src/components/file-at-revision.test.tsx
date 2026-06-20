@@ -1,5 +1,13 @@
 // @vitest-environment jsdom
-import { CommitDetail, DiffFile, DownloadDescriptor, FileContent, Oid, RepoId, Signature } from "@cbranch/rpc-contract";
+import {
+  CommitDetail,
+  DiffFile,
+  DownloadDescriptor,
+  FileContent,
+  Oid,
+  RepoId,
+  Signature,
+} from "@cbranch/rpc-contract";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { type ReactNode } from "react";
@@ -21,7 +29,9 @@ vi.mock("../lib/shiki-highlighter", () => ({
 // Minimal CodeMirror stubs so the read-only editor mounts without the real (lazy) engine.
 vi.mock("@codemirror/state", () => ({
   EditorState: {
-    create: ({ doc }: { doc?: string }) => ({ doc: { _text: doc ?? "", lines: 1, line: () => ({ from: 0, to: 0 }) } }),
+    create: ({ doc }: { doc?: string }) => ({
+      doc: { _text: doc ?? "", lines: 1, line: () => ({ from: 0, to: 0 }) },
+    }),
     readOnly: { of: () => ({}) },
   },
   StateField: { define: () => ({}) },
@@ -34,7 +44,13 @@ vi.mock("@codemirror/state", () => ({
 }));
 vi.mock("@codemirror/view", () => ({
   EditorView: class {
-    constructor({ parent, state }: { parent: HTMLElement; state: { doc: { _text: string } } }) {
+    constructor({
+      parent,
+      state,
+    }: {
+      parent: HTMLElement;
+      state: { doc: { _text: string } };
+    }) {
       const el = document.createElement("div");
       el.className = "cm-content";
       el.textContent = state.doc._text;
@@ -72,7 +88,11 @@ const file = (newPath: string): DiffFile =>
     ],
   });
 
-const sig = new Signature({ name: "Ada", email: "ada@x", when: { epochSeconds: 1, tzOffsetMinutes: 0 } });
+const sig = new Signature({
+  name: "Ada",
+  email: "ada@x",
+  when: { epochSeconds: 1, tzOffsetMinutes: 0 },
+});
 
 const makeApi = (over: Partial<CbranchApi>): CbranchApi =>
   ({
@@ -92,13 +112,22 @@ const makeApi = (over: Partial<CbranchApi>): CbranchApi =>
         }),
     ),
     fileContentAtRev: vi.fn(
-      async () => new FileContent({ path: "a.ts", size: 3, isBinary: false, encoding: "utf8", content: "hello world" }),
+      async () =>
+        new FileContent({
+          path: "a.ts",
+          size: 3,
+          isBinary: false,
+          encoding: "utf8",
+          content: "hello world",
+        }),
     ),
     ...over,
   }) as unknown as CbranchApi;
 
 const renderWithApi = (ui: ReactNode, api: CbranchApi) => {
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
   return render(
     <QueryClientProvider client={queryClient}>
       <ApiProvider api={api}>{ui}</ApiProvider>
@@ -107,9 +136,16 @@ const renderWithApi = (ui: ReactNode, api: CbranchApi) => {
 };
 
 beforeEach(() => {
-  Object.defineProperty(HTMLElement.prototype, "offsetHeight", { configurable: true, value: 600 });
-  Object.defineProperty(HTMLElement.prototype, "offsetWidth", { configurable: true, value: 400 });
-  if (!Element.prototype.scrollIntoView) Element.prototype.scrollIntoView = () => undefined;
+  Object.defineProperty(HTMLElement.prototype, "offsetHeight", {
+    configurable: true,
+    value: 600,
+  });
+  Object.defineProperty(HTMLElement.prototype, "offsetWidth", {
+    configurable: true,
+    value: 400,
+  });
+  if (!Element.prototype.scrollIntoView)
+    Element.prototype.scrollIntoView = () => undefined;
   useUiStore.setState({ diffView: "inline", theme: "light" });
 });
 afterEach(() => {
@@ -121,15 +157,27 @@ afterEach(() => {
 
 describe("FileAtRevision (P1-DIFF-7 / P1-UI-DIFF-3)", () => {
   test("renders inline utf8 content in the editor", async () => {
-    renderWithApi(<FileAtRevision repoId={repoId} rev={oid} path="a.ts" />, makeApi({}));
+    renderWithApi(
+      <FileAtRevision repoId={repoId} rev={oid} path="a.ts" />,
+      makeApi({}),
+    );
     expect(await screen.findByText("hello world")).toBeTruthy();
   });
 
   test("a large blob shows a side-channel download link, not the editor", async () => {
     const api = makeApi({
-      fileContentAtRev: vi.fn(async () => new DownloadDescriptor({ url: "/sidechannel/blob?x=1", size: 999999 })),
+      fileContentAtRev: vi.fn(
+        async () =>
+          new DownloadDescriptor({
+            url: "/sidechannel/blob?x=1",
+            size: 999999,
+          }),
+      ),
     });
-    renderWithApi(<FileAtRevision repoId={repoId} rev={oid} path="big.bin" />, api);
+    renderWithApi(
+      <FileAtRevision repoId={repoId} rev={oid} path="big.bin" />,
+      api,
+    );
     const link = await screen.findByText("Download file");
     expect(link.getAttribute("href")).toBe("/sidechannel/blob?x=1");
   });
@@ -137,10 +185,20 @@ describe("FileAtRevision (P1-DIFF-7 / P1-UI-DIFF-3)", () => {
   test("a base64 (binary) blob shows the binary placeholder", async () => {
     const api = makeApi({
       fileContentAtRev: vi.fn(
-        async () => new FileContent({ path: "x.png", size: 10, isBinary: true, encoding: "base64", content: "AAAA" }),
+        async () =>
+          new FileContent({
+            path: "x.png",
+            size: 10,
+            isBinary: true,
+            encoding: "base64",
+            content: "AAAA",
+          }),
       ),
     });
-    renderWithApi(<FileAtRevision repoId={repoId} rev={oid} path="x.png" />, api);
+    renderWithApi(
+      <FileAtRevision repoId={repoId} rev={oid} path="x.png" />,
+      api,
+    );
     expect(await screen.findByText("Binary file")).toBeTruthy();
   });
 });

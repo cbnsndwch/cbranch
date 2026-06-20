@@ -11,7 +11,11 @@
 
 // ── the engine ───────────────────────────────────────────────────────────────
 export { GitEngine, type GitEngineApi } from "./engine/git-engine";
-export { gitEngineLayer, makeGitEngine, type MakeGitEngineOptions } from "./engine/live";
+export {
+  gitEngineLayer,
+  makeGitEngine,
+  type MakeGitEngineOptions,
+} from "./engine/live";
 
 // ── host-git execution infrastructure ──────────────────────────────────────────
 export {
@@ -42,7 +46,12 @@ export {
 } from "./git/version";
 export { computeRepoId, isRepoId, normalizeAbsolute } from "./git/repo-id";
 export { makeRepoLockRegistry, type RepoLockRegistry } from "./git/locks";
-export { type CatFilePool, makeCatFilePool, type ObjectData, type ObjectInfo } from "./git/cat-file-pool";
+export {
+  type CatFilePool,
+  makeCatFilePool,
+  type ObjectData,
+  type ObjectInfo,
+} from "./git/cat-file-pool";
 
 // ── history / diff / content / watcher (P1, core-B) ─────────────────────────────
 export {
@@ -70,8 +79,18 @@ export {
   parsePatch,
   type PatchFile,
 } from "./git/diff";
-export { fileContentAtRev, INLINE_CONTENT_CAP, looksBinary, sidechannelBlobUrl } from "./git/content";
-export { classifyChange, COALESCE_MS, type WatchTarget, WatcherRegistry } from "./git/watcher";
+export {
+  fileContentAtRev,
+  INLINE_CONTENT_CAP,
+  looksBinary,
+  sidechannelBlobUrl,
+} from "./git/content";
+export {
+  classifyChange,
+  COALESCE_MS,
+  type WatchTarget,
+  WatcherRegistry,
+} from "./git/watcher";
 
 // ── config store ───────────────────────────────────────────────────────────────
 export {
@@ -88,7 +107,11 @@ export {
 
 // ── repository operations (parsers + resolvers reused by core-B) ────────────────
 export { repoCwd, type ResolvedRepo, resolveRepo } from "./repo/resolve";
-export { detectInProgress, parseBranchHeader, readRepoState } from "./repo/state";
+export {
+  detectInProgress,
+  parseBranchHeader,
+  readRepoState,
+} from "./repo/state";
 
 // ── test-only fixture harness (NF-TEST-3/4) ────────────────────────────────────
 export * from "./testing/fixtures";

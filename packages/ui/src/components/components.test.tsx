@@ -11,7 +11,14 @@ import {
   Signature,
 } from "@cbranch/rpc-contract";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { type ReactNode } from "react";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
@@ -28,7 +35,11 @@ const repoId = RepoId.make("repo-1");
 const oid = Oid.make("0123456789abcdef0123456789abcdef01234567");
 
 const sig = (name: string) =>
-  new Signature({ name, email: `${name}@example.test`, when: { epochSeconds: 1_700_000_000, tzOffsetMinutes: 0 } });
+  new Signature({
+    name,
+    email: `${name}@example.test`,
+    when: { epochSeconds: 1_700_000_000, tzOffsetMinutes: 0 },
+  });
 
 const repoState = new RepoState({
   isDetached: false,
@@ -43,9 +54,22 @@ const repoState = new RepoState({
 const makeFakeApi = (overrides: Partial<CbranchApi> = {}): CbranchApi => ({
   repoOpen: vi.fn(
     async (path: string) =>
-      new RepoHandle({ repoId, root: path, gitDir: `${path}/.git`, commonDir: `${path}/.git`, state: repoState }),
+      new RepoHandle({
+        repoId,
+        root: path,
+        gitDir: `${path}/.git`,
+        commonDir: `${path}/.git`,
+        state: repoState,
+      }),
   ),
-  recentList: vi.fn(async () => [new RecentRepo({ path: "/repos/demo", name: "demo", repoId, lastOpenedAt: 1 })]),
+  recentList: vi.fn(async () => [
+    new RecentRepo({
+      path: "/repos/demo",
+      name: "demo",
+      repoId,
+      lastOpenedAt: 1,
+    }),
+  ]),
   recentRemove: vi.fn(async () => undefined),
   repoState: vi.fn(async () => repoState),
   commitDetail: vi.fn(
@@ -67,7 +91,14 @@ const makeFakeApi = (overrides: Partial<CbranchApi> = {}): CbranchApi => ({
     throw new Error("not implemented");
   }),
   fileContentAtRev: vi.fn(
-    async () => new FileContent({ path: "a.txt", size: 2, isBinary: false, encoding: "utf8", content: "a" }),
+    async () =>
+      new FileContent({
+        path: "a.txt",
+        size: 2,
+        isBinary: false,
+        encoding: "utf8",
+        content: "a",
+      }),
   ),
   statusGet: vi.fn(async () => {
     throw new Error("not implemented");
@@ -92,7 +123,9 @@ const makeFakeApi = (overrides: Partial<CbranchApi> = {}): CbranchApi => ({
 });
 
 const renderWithApi = (ui: ReactNode, api: CbranchApi) => {
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
   // MemoryRouter supplies the router context that navigation hooks (D13) depend on.
   return render(
     <MemoryRouter>
@@ -105,13 +138,19 @@ const renderWithApi = (ui: ReactNode, api: CbranchApi) => {
 
 beforeEach(() => {
   // jsdom lacks these; cmdk observes layout + scrolls the active item into view.
-  (globalThis as unknown as { ResizeObserver: unknown }).ResizeObserver = class {
-    observe() {}
-    unobserve() {}
-    disconnect() {}
-  };
-  if (!Element.prototype.scrollIntoView) Element.prototype.scrollIntoView = () => undefined;
-  useUiStore.setState({ activeRepoId: null, selectedOid: null, paletteOpen: false });
+  (globalThis as unknown as { ResizeObserver: unknown }).ResizeObserver =
+    class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    };
+  if (!Element.prototype.scrollIntoView)
+    Element.prototype.scrollIntoView = () => undefined;
+  useUiStore.setState({
+    activeRepoId: null,
+    selectedOid: null,
+    paletteOpen: false,
+  });
 });
 afterEach(() => cleanup());
 
@@ -124,7 +163,10 @@ describe("StatusSummary (NF-TEST-7)", () => {
 
 describe("DetailsPanel (NF-TEST-7)", () => {
   test("renders the selected commit's subject and author", async () => {
-    renderWithApi(<DetailsPanel repoId={repoId} oid={oid} onSelectOid={() => undefined} />, makeFakeApi());
+    renderWithApi(
+      <DetailsPanel repoId={repoId} oid={oid} onSelectOid={() => undefined} />,
+      makeFakeApi(),
+    );
     expect(await screen.findByText("first commit")).toBeTruthy();
     // author/committer render as split text nodes; assert on the panel's text content.
     expect(document.body.textContent).toContain("Ada@example.test");
@@ -138,7 +180,9 @@ describe("CommandPalette (NF-TEST-7 / P1-UI-OPEN-1)", () => {
     renderWithApi(<CommandPalette />, api);
     const item = await screen.findByText("demo");
     fireEvent.click(item);
-    await waitFor(() => expect(api.repoOpen).toHaveBeenCalledWith("/repos/demo"));
+    await waitFor(() =>
+      expect(api.repoOpen).toHaveBeenCalledWith("/repos/demo"),
+    );
   });
 });
 
@@ -146,12 +190,16 @@ describe("useInvalidationBus (spec 15 §2 / NF-ERR-6)", () => {
   test("invalidates [repoId, domain] queries on an InvalidationEvent", () => {
     let captured: StreamHandlers<InvalidationEvent> | undefined;
     const api = makeFakeApi({
-      subscribe: vi.fn((_id: RepoId, handlers: StreamHandlers<InvalidationEvent>) => {
-        captured = handlers;
-        return () => undefined;
-      }),
+      subscribe: vi.fn(
+        (_id: RepoId, handlers: StreamHandlers<InvalidationEvent>) => {
+          captured = handlers;
+          return () => undefined;
+        },
+      ),
     });
-    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
     const spy = vi.spyOn(queryClient, "invalidateQueries");
     function Probe() {
       useInvalidationBus(repoId);
@@ -164,7 +212,11 @@ describe("useInvalidationBus (spec 15 §2 / NF-ERR-6)", () => {
         </ApiProvider>
       </QueryClientProvider>,
     );
-    act(() => captured?.onItem(new InvalidationEvent({ repoId, domains: ["status", "commits"] })));
+    act(() =>
+      captured?.onItem(
+        new InvalidationEvent({ repoId, domains: ["status", "commits"] }),
+      ),
+    );
     expect(spy).toHaveBeenCalledWith({ queryKey: [repoId, "status"] });
     expect(spy).toHaveBeenCalledWith({ queryKey: [repoId, "commits"] });
   });

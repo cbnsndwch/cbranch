@@ -2,7 +2,10 @@ import type { CommitInput } from "@cbranch/rpc-contract";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 
 import { run } from "../testing/effect-run";
-import { createFixtureWorkspace, type FixtureWorkspace } from "../testing/fixtures";
+import {
+  createFixtureWorkspace,
+  type FixtureWorkspace,
+} from "../testing/fixtures";
 import { commitCreate, commitLastMessage } from "./commit-write";
 
 const BASE_INPUT: Omit<CommitInput, "repoId" | "subject"> = {
@@ -30,7 +33,11 @@ describe("commit-write git operations", () => {
     await repo.writeFile("a.txt", "hello\n");
     await repo.stage("a.txt");
 
-    const input: CommitInput = { ...BASE_INPUT, repoId: "test" as any, subject: "add a.txt" };
+    const input: CommitInput = {
+      ...BASE_INPUT,
+      repoId: "test" as any,
+      subject: "add a.txt",
+    };
     const result = await run(commitCreate(repo.dir, input));
 
     expect(result.subject).toBe("add a.txt");
@@ -65,7 +72,11 @@ describe("commit-write git operations", () => {
     const repo = await ws.createRepo("commit-empty-guard");
     await repo.commit({ message: "init", files: { "init.txt": "init\n" } });
 
-    const input: CommitInput = { ...BASE_INPUT, repoId: "test" as any, subject: "empty" };
+    const input: CommitInput = {
+      ...BASE_INPUT,
+      repoId: "test" as any,
+      subject: "empty",
+    };
     await expect(run(commitCreate(repo.dir, input))).rejects.toThrow();
   });
 
@@ -73,7 +84,12 @@ describe("commit-write git operations", () => {
     const repo = await ws.createRepo("commit-allow-empty");
     await repo.commit({ message: "init", files: { "init.txt": "init\n" } });
 
-    const input: CommitInput = { ...BASE_INPUT, repoId: "test" as any, subject: "empty ok", allowEmpty: true };
+    const input: CommitInput = {
+      ...BASE_INPUT,
+      repoId: "test" as any,
+      subject: "empty ok",
+      allowEmpty: true,
+    };
     const result = await run(commitCreate(repo.dir, input));
 
     expect(result.subject).toBe("empty ok");
@@ -87,7 +103,12 @@ describe("commit-write git operations", () => {
     await repo.writeFile("x.txt", "x\n");
     await repo.stage("x.txt");
 
-    const input: CommitInput = { ...BASE_INPUT, repoId: "test" as any, subject: "amended", amend: true };
+    const input: CommitInput = {
+      ...BASE_INPUT,
+      repoId: "test" as any,
+      subject: "amended",
+      amend: true,
+    };
     await run(commitCreate(repo.dir, input));
 
     const log = await repo.git(["log", "-1", "--format=%s"]);
@@ -100,7 +121,12 @@ describe("commit-write git operations", () => {
     await repo.writeFile("s.txt", "s\n");
     await repo.stage("s.txt");
 
-    const input: CommitInput = { ...BASE_INPUT, repoId: "test" as any, subject: "signed", signoff: true };
+    const input: CommitInput = {
+      ...BASE_INPUT,
+      repoId: "test" as any,
+      subject: "signed",
+      signoff: true,
+    };
     await run(commitCreate(repo.dir, input));
 
     const log = await repo.git(["log", "-1", "--format=%B"]);
@@ -109,7 +135,10 @@ describe("commit-write git operations", () => {
 
   test("commitLastMessage returns the subject of the most recent commit", async () => {
     const repo = await ws.createRepo("last-message-subject");
-    await repo.commit({ message: "my subject", files: { "init.txt": "init\n" } });
+    await repo.commit({
+      message: "my subject",
+      files: { "init.txt": "init\n" },
+    });
 
     const msg = await run(commitLastMessage(repo.dir));
 

@@ -35,7 +35,12 @@ const ctx = await esbuild.context({
   target: "node20",
   sourcemap: true,
   // Keep the same externals as build.mjs — effect ships Node-ready ESM; inline workspace pkgs.
-  external: ["effect", "effect/*", "@effect/platform-node", "@effect/platform-node/*"],
+  external: [
+    "effect",
+    "effect/*",
+    "@effect/platform-node",
+    "@effect/platform-node/*",
+  ],
   plugins: [
     {
       name: "restart-on-build",

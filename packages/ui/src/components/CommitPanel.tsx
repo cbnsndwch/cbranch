@@ -9,7 +9,12 @@ import { CommitMessageEditor } from "./CommitMessageEditor";
 import { ConventionalCommitBar } from "./ConventionalCommitBar";
 import { Button } from "./ui/button";
 import { Switch } from "./ui/switch";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./ui/tooltip";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "./ui/tooltip";
 
 interface CommitPanelProps {
   repoId: RepoId;
@@ -28,7 +33,9 @@ export function CommitPanel({ repoId }: CommitPanelProps) {
   const [ccScope, setCcScope] = useState("");
   const [ccBreaking, setCcBreaking] = useState(false);
 
-  const hasStaged = statusQuery.data ? hasStagedChanges(statusQuery.data) : false;
+  const hasStaged = statusQuery.data
+    ? hasStagedChanges(statusQuery.data)
+    : false;
   const subjectEmpty = commitDraft.subject.trim() === "";
 
   let disabledReason: string | null = null;
@@ -40,8 +47,12 @@ export function CommitPanel({ repoId }: CommitPanelProps) {
     setCcScope(scope);
     setCcBreaking(breaking);
     if (type) {
-      const prefix = type + (scope ? `(${scope})` : "") + (breaking ? "!" : "") + ": ";
-      const existing = commitDraft.subject.replace(/^[a-z]+(\([^)]*\))?!?: /, "");
+      const prefix =
+        type + (scope ? `(${scope})` : "") + (breaking ? "!" : "") + ": ";
+      const existing = commitDraft.subject.replace(
+        /^[a-z]+(\([^)]*\))?!?: /,
+        "",
+      );
       updateCommitDraft({ subject: prefix + existing });
     }
   };
@@ -79,7 +90,12 @@ export function CommitPanel({ repoId }: CommitPanelProps) {
   return (
     <TooltipProvider>
       <div className="flex flex-col gap-0 border-t text-xs">
-        <ConventionalCommitBar type={ccType} scope={ccScope} breaking={ccBreaking} onChange={handleCcChange} />
+        <ConventionalCommitBar
+          type={ccType}
+          scope={ccScope}
+          breaking={ccBreaking}
+          onChange={handleCcChange}
+        />
         <CommitMessageEditor
           subject={commitDraft.subject}
           body={commitDraft.body}
@@ -117,7 +133,9 @@ export function CommitPanel({ repoId }: CommitPanelProps) {
             Reuse Last Message
           </Button>
           <Tooltip>
-            <TooltipTrigger render={<span tabIndex={disabledReason ? 0 : undefined} />}>
+            <TooltipTrigger
+              render={<span tabIndex={disabledReason ? 0 : undefined} />}
+            >
               <Button
                 size="sm"
                 onClick={handleCommit}

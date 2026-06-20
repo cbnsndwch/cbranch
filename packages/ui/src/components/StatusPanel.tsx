@@ -1,7 +1,13 @@
 import { type RepoId } from "@cbranch/rpc-contract";
 
 import { groupStatusEntries } from "../lib/status";
-import { useDeleteUntracked, useDiscardFiles, useStageFiles, useStatus, useUnstageFiles } from "../rpc/hooks";
+import {
+  useDeleteUntracked,
+  useDiscardFiles,
+  useStageFiles,
+  useStatus,
+  useUnstageFiles,
+} from "../rpc/hooks";
 import { useUiStore } from "../state/store";
 import { ChangeListToolbar } from "./ChangeListToolbar";
 import { StatusChangeList } from "./StatusChangeList";
@@ -32,8 +38,10 @@ export function StatusPanel({ repoId }: StatusPanelProps) {
 
   const { staged, unstaged } = groupStatusEntries(status?.entries ?? []);
 
-  const allStagedSelected = staged.length > 0 && staged.every((e) => stagedSelection.has(e.path));
-  const allUnstagedSelected = unstaged.length > 0 && unstaged.every((e) => unstagedSelection.has(e.path));
+  const allStagedSelected =
+    staged.length > 0 && staged.every((e) => stagedSelection.has(e.path));
+  const allUnstagedSelected =
+    unstaged.length > 0 && unstaged.every((e) => unstagedSelection.has(e.path));
 
   const handleStagedSelectAll = () => {
     if (allStagedSelected) setStagedSelection([]);
@@ -97,7 +105,9 @@ export function StatusPanel({ repoId }: StatusPanelProps) {
             if (sel.length > 0) stageFiles.mutate({ paths: sel });
             else stageFiles.mutate({ paths: [], all: true });
           }}
-          actionLabel={[...unstagedSelection].length > 0 ? "Stage Selected" : "Stage All"}
+          actionLabel={
+            [...unstagedSelection].length > 0 ? "Stage Selected" : "Stage All"
+          }
           disabled={unstaged.length === 0}
         />
         <div className="min-h-0 overflow-y-auto">
@@ -116,7 +126,9 @@ export function StatusPanel({ repoId }: StatusPanelProps) {
       {/* Empty state when nothing at all */}
       {staged.length === 0 && unstaged.length === 0 && (
         <div className="absolute inset-0 flex items-center justify-center">
-          <p className="text-muted-foreground text-sm">No changes in working tree.</p>
+          <p className="text-muted-foreground text-sm">
+            No changes in working tree.
+          </p>
         </div>
       )}
     </div>

@@ -30,7 +30,13 @@ export interface WatchTarget {
 /** Forward-slash path of `p` relative to `base`, or `null` when `p` is not under `base`. */
 const relativeUnder = (base: string, p: string): string | null => {
   const rel = relative(base, p).replace(/\\/g, "/");
-  if (rel === "" || rel.startsWith("../") || rel === ".." || /^[a-zA-Z]:\//.test(rel)) return null;
+  if (
+    rel === "" ||
+    rel.startsWith("../") ||
+    rel === ".." ||
+    /^[a-zA-Z]:\//.test(rel)
+  )
+    return null;
   return rel;
 };
 
@@ -40,21 +46,34 @@ const relativeUnder = (base: string, p: string): string | null => {
  * change is `status`. Unmapped git-dir files (e.g. `logs/HEAD`, `COMMIT_EDITMSG`) yield
  * `[]` and are dropped.
  */
-export const classifyChange = (commonDir: string, changedPath: string): ReadonlyArray<Domain> => {
+export const classifyChange = (
+  commonDir: string,
+  changedPath: string,
+): ReadonlyArray<Domain> => {
   const rel = relativeUnder(commonDir, changedPath);
   if (rel === null) return ["status"]; // worktree file add/modify/delete
 
   if (rel === "HEAD") return ["refs", "commits", "inProgress"];
-  if (rel.startsWith("refs/heads/") || rel.startsWith("refs/remotes/")) return ["refs", "commits", "inProgress"];
+  if (rel.startsWith("refs/heads/") || rel.startsWith("refs/remotes/"))
+    return ["refs", "commits", "inProgress"];
   if (rel === "packed-refs") return ["refs", "commits", "inProgress"];
   if (rel.startsWith("refs/tags/")) return ["tags", "commits"];
   if (rel === "refs/stash" || rel === "logs/refs/stash") return ["stash"];
   if (rel === "index") return ["status"];
   if (rel === "worktrees" || rel.startsWith("worktrees/")) return ["worktrees"];
-  if (rel === "MERGE_HEAD" || rel === "CHERRY_PICK_HEAD" || rel === "REVERT_HEAD" || rel === "BISECT_LOG") {
+  if (
+    rel === "MERGE_HEAD" ||
+    rel === "CHERRY_PICK_HEAD" ||
+    rel === "REVERT_HEAD" ||
+    rel === "BISECT_LOG"
+  ) {
     return ["inProgress", "refs"];
   }
-  if (rel.startsWith("rebase-merge/") || rel.startsWith("rebase-apply/") || rel.startsWith("sequencer/")) {
+  if (
+    rel.startsWith("rebase-merge/") ||
+    rel.startsWith("rebase-apply/") ||
+    rel.startsWith("sequencer/")
+  ) {
     return ["inProgress", "refs"];
   }
   if (rel.endsWith("_HEAD")) return ["inProgress", "refs"]; // ORIG_HEAD, FETCH_HEAD, …
@@ -107,14 +126,23 @@ export class WatcherRegistry {
   }
 
   private createEntry(target: WatchTarget): Entry {
-    const paths = target.isBare ? [target.commonDir] : [target.commonDir, target.root];
+    const paths = target.isBare
+      ? [target.commonDir]
+      : [target.commonDir, target.root];
     const watcher = watch(paths, {
       ignoreInitial: true,
       persistent: true,
       ignored: makeIgnored(target.commonDir),
     });
-    const entry: Entry = { watcher, listeners: new Set(), pending: new Set(), timer: null };
-    watcher.on("all", (_event, changedPath) => this.onChange(target, entry, changedPath));
+    const entry: Entry = {
+      watcher,
+      listeners: new Set(),
+      pending: new Set(),
+      timer: null,
+    };
+    watcher.on("all", (_event, changedPath) =>
+      this.onChange(target, entry, changedPath),
+    );
     watcher.on("error", () => {
       // A watcher error MUST NOT crash the service; subscribers simply stop receiving.
     });
@@ -122,7 +150,11 @@ export class WatcherRegistry {
     return entry;
   }
 
-  private onChange(target: WatchTarget, entry: Entry, changedPath: string): void {
+  private onChange(
+    target: WatchTarget,
+    entry: Entry,
+    changedPath: string,
+  ): void {
     const domains = classifyChange(target.commonDir, changedPath);
     if (domains.length === 0) return;
     for (const d of domains) entry.pending.add(d);

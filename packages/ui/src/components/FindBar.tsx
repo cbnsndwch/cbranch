@@ -32,7 +32,12 @@ export function FindBar({
     }
   };
 
-  const counter = query.trim() === "" ? "" : matchCount === 0 ? "no matches" : `${current + 1} / ${matchCount}`;
+  const counter =
+    query.trim() === ""
+      ? ""
+      : matchCount === 0
+        ? "no matches"
+        : `${current + 1} / ${matchCount}`;
 
   return (
     <div className="flex items-center gap-1 border-b px-2 py-1">
@@ -46,7 +51,10 @@ export function FindBar({
         aria-label="Find in loaded history"
         className="bg-input/40 text-foreground focus:border-ring flex-1 border px-1 py-0.5 text-xs outline-none"
       />
-      <span className="text-muted-foreground w-20 text-right text-[11px]" aria-live="polite">
+      <span
+        className="text-muted-foreground w-20 text-right text-[11px]"
+        aria-live="polite"
+      >
         {counter}
       </span>
       <button

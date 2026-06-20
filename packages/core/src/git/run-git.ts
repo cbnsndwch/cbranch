@@ -44,7 +44,13 @@ export interface RunGitOptions {
 /** Decode a captured buffer as UTF-8, replacing invalid sequences (ENC-002). */
 export const decodeUtf8 = (buf: Buffer): string => buf.toString("utf8");
 
-const READ_FLAGS = ["-c", "color.ui=false", "-c", "core.quotePath=false", "--no-optional-locks"] as const;
+const READ_FLAGS = [
+  "-c",
+  "color.ui=false",
+  "-c",
+  "core.quotePath=false",
+  "--no-optional-locks",
+] as const;
 
 /**
  * The non-interactive, locale-stable environment for host-`git` (14 §3.3).
@@ -54,7 +60,9 @@ const READ_FLAGS = ["-c", "color.ui=false", "-c", "core.quotePath=false", "--no-
  * a dependency-free, cross-platform fail-fast askpass that never blocks and never
  * surfaces a credential.
  */
-export const nonInteractiveEnv = (extra?: NodeJS.ProcessEnv): NodeJS.ProcessEnv => ({
+export const nonInteractiveEnv = (
+  extra?: NodeJS.ProcessEnv,
+): NodeJS.ProcessEnv => ({
   ...process.env,
   GIT_TERMINAL_PROMPT: "0",
   GIT_SSH_COMMAND: "ssh -o BatchMode=yes",
@@ -76,9 +84,12 @@ export const nonInteractiveEnv = (extra?: NodeJS.ProcessEnv): NodeJS.ProcessEnv 
  * `rev-parse --verify HEAD` returns non-zero on an unborn branch, which is DATA, not
  * a failure). Fails only when the process cannot be spawned/abort.
  */
-export const runGit = (opts: RunGitOptions): Effect.Effect<GitResult, GitError> =>
+export const runGit = (
+  opts: RunGitOptions,
+): Effect.Effect<GitResult, GitError> =>
   Effect.callback<GitResult, GitError>((resume, signal) => {
-    const args = opts.read === false ? [...opts.args] : [...READ_FLAGS, ...opts.args];
+    const args =
+      opts.read === false ? [...opts.args] : [...READ_FLAGS, ...opts.args];
 
     let child: ChildProcessWithoutNullStreams;
     try {
@@ -142,7 +153,9 @@ export const runGit = (opts: RunGitOptions): Effect.Effect<GitResult, GitError> 
  * exit genuinely means the command failed; use {@link runGit} when the exit code is
  * itself meaningful data.
  */
-export const runGitOk = (opts: RunGitOptions): Effect.Effect<GitResult, GitError> =>
+export const runGitOk = (
+  opts: RunGitOptions,
+): Effect.Effect<GitResult, GitError> =>
   Effect.flatMap(runGit(opts), (result) =>
     result.exitCode === 0
       ? Effect.succeed(result)
@@ -156,10 +169,19 @@ export const runGitOk = (opts: RunGitOptions): Effect.Effect<GitResult, GitError
  * when it is used OUTSIDE a `--` separator (option-injection guard, NF-SEC-6). Values
  * placed after `--` (pathspecs) are safe and need not pass through this.
  */
-export const assertNoLeadingDash = (value: string, what: string): Effect.Effect<string, GitError> =>
+export const assertNoLeadingDash = (
+  value: string,
+  what: string,
+): Effect.Effect<string, GitError> =>
   value.startsWith("-")
-    ? Effect.fail(gitError("invalidRefName", `refusing ${what} beginning with '-': would be read as a git option`))
+    ? Effect.fail(
+        gitError(
+          "invalidRefName",
+          `refusing ${what} beginning with '-': would be read as a git option`,
+        ),
+      )
     : Effect.succeed(value);
 
 /** Validate that a string is a plausible object id (hex, 4–64 chars) before use. */
-export const isHexOid = (value: string): boolean => /^[0-9a-fA-F]{4,64}$/.test(value);
+export const isHexOid = (value: string): boolean =>
+  /^[0-9a-fA-F]{4,64}$/.test(value);

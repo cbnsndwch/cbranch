@@ -27,21 +27,33 @@ export const parseRef = (raw: string): RefLabel => {
   const token = raw.trim();
 
   // Detached HEAD: the `HEAD` indicator sits on the checked-out commit (REQ-GRAPH-014).
-  if (token === "HEAD") return { kind: "head", name: "HEAD", isHead: true, raw };
+  if (token === "HEAD")
+    return { kind: "head", name: "HEAD", isHead: true, raw };
 
   // `HEAD -> main`: HEAD points at a local branch; mark the branch as current.
   const headArrow = "HEAD -> ";
   if (token.startsWith(headArrow)) {
-    return { kind: "localBranch", name: token.slice(headArrow.length), isHead: true, raw };
+    return {
+      kind: "localBranch",
+      name: token.slice(headArrow.length),
+      isHead: true,
+      raw,
+    };
   }
 
   const tagPrefix = "tag: ";
   if (token.startsWith(tagPrefix)) {
-    return { kind: "tag", name: token.slice(tagPrefix.length), isHead: false, raw };
+    return {
+      kind: "tag",
+      name: token.slice(tagPrefix.length),
+      isHead: false,
+      raw,
+    };
   }
 
   // Heuristic remote-tracking branch: a `<remote>/<rest>` short name (see file header).
-  if (token.includes("/")) return { kind: "remoteBranch", name: token, isHead: false, raw };
+  if (token.includes("/"))
+    return { kind: "remoteBranch", name: token, isHead: false, raw };
 
   return { kind: "localBranch", name: token, isHead: false, raw };
 };
@@ -50,8 +62,15 @@ export const parseRef = (raw: string): RefLabel => {
  * Parse and order a row's decorations for display: the current `HEAD` branch first, then
  * local branches, remote-tracking branches, tags, and a bare detached `HEAD` last.
  */
-export const parseRefs = (raw: ReadonlyArray<string>): ReadonlyArray<RefLabel> => {
-  const order: Record<RefKind, number> = { localBranch: 0, remoteBranch: 1, tag: 2, head: 3 };
+export const parseRefs = (
+  raw: ReadonlyArray<string>,
+): ReadonlyArray<RefLabel> => {
+  const order: Record<RefKind, number> = {
+    localBranch: 0,
+    remoteBranch: 1,
+    tag: 2,
+    head: 3,
+  };
   return raw
     .map(parseRef)
     .map((label, index) => ({ label, index }))

@@ -47,14 +47,18 @@ export const stripIpv6Brackets = (host: string): string =>
   host.startsWith("[") && host.endsWith("]") ? host.slice(1, -1) : host;
 
 /** Normalize a hostname for allowlist comparison: lowercased, IPv6 brackets removed. */
-export const normalizeHostname = (host: string): string => stripIpv6Brackets(host.toLowerCase());
+export const normalizeHostname = (host: string): string =>
+  stripIpv6Brackets(host.toLowerCase());
 
 /** A host is loopback if it is one of the well-known loopback names/addresses. */
 export const isLoopbackHost = (host: string): boolean =>
-  (LOOPBACK_HOSTNAMES as ReadonlyArray<string>).includes(normalizeHostname(host));
+  (LOOPBACK_HOSTNAMES as ReadonlyArray<string>).includes(
+    normalizeHostname(host),
+  );
 
 /** The default static-bundle directory: `<server>/public`, resolved from this module. */
-export const defaultClientDir = (): string => resolve(dirname(fileURLToPath(import.meta.url)), "..", "public");
+export const defaultClientDir = (): string =>
+  resolve(dirname(fileURLToPath(import.meta.url)), "..", "public");
 
 /**
  * Ensure the static-bundle directory exists so `HttpStaticServer.layer` can build even
@@ -72,7 +76,9 @@ const parsePort = (value: string | undefined): number | undefined => {
 };
 
 const asLogLevel = (value: string | undefined): LogLevel | undefined =>
-  value === "error" || value === "warn" || value === "info" || value === "debug" ? value : undefined;
+  value === "error" || value === "warn" || value === "info" || value === "debug"
+    ? value
+    : undefined;
 
 /**
  * Resolve the effective {@link ServerConfig}. `env` overrides the persisted `config`
@@ -87,12 +93,26 @@ export const resolveServerConfig = (opts?: {
   const env = opts?.env ?? process.env;
   const persisted = opts?.config;
 
-  const host = env.CBRANCH_BIND_ADDRESS ?? persisted?.bind.address ?? DEFAULT_HOST;
-  const port = parsePort(env.CBRANCH_PORT) ?? persisted?.bind.port ?? DEFAULT_PORT;
-  const logLevel = asLogLevel(env.CBRANCH_LOG_LEVEL) ?? persisted?.logLevel ?? "info";
-  const clientDir = opts?.clientDir ?? env.CBRANCH_CLIENT_DIR ?? defaultClientDir();
+  const host =
+    env.CBRANCH_BIND_ADDRESS ?? persisted?.bind.address ?? DEFAULT_HOST;
+  const port =
+    parsePort(env.CBRANCH_PORT) ?? persisted?.bind.port ?? DEFAULT_PORT;
+  const logLevel =
+    asLogLevel(env.CBRANCH_LOG_LEVEL) ?? persisted?.logLevel ?? "info";
+  const clientDir =
+    opts?.clientDir ?? env.CBRANCH_CLIENT_DIR ?? defaultClientDir();
 
-  const allowedHostnames = new Set<string>([normalizeHostname(host), ...LOOPBACK_HOSTNAMES]);
+  const allowedHostnames = new Set<string>([
+    normalizeHostname(host),
+    ...LOOPBACK_HOSTNAMES,
+  ]);
 
-  return { host, port, clientDir, logLevel, isLoopback: isLoopbackHost(host), allowedHostnames };
+  return {
+    host,
+    port,
+    clientDir,
+    logLevel,
+    isLoopback: isLoopbackHost(host),
+    allowedHostnames,
+  };
 };

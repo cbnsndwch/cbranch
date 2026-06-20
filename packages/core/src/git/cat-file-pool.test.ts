@@ -2,7 +2,11 @@ import { Effect } from "effect";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 
 import { runScoped } from "../testing/effect-run";
-import { createFixtureWorkspace, type FixtureRepo, type FixtureWorkspace } from "../testing/fixtures";
+import {
+  createFixtureWorkspace,
+  type FixtureRepo,
+  type FixtureWorkspace,
+} from "../testing/fixtures";
 import { makeCatFilePool } from "./cat-file-pool";
 
 let ws: FixtureWorkspace;
@@ -12,7 +16,10 @@ let headOid: string;
 beforeAll(async () => {
   ws = await createFixtureWorkspace();
   repo = await ws.createRepo("objs");
-  headOid = await repo.commit({ message: "init", files: { "a.txt": "hello\n" } });
+  headOid = await repo.commit({
+    message: "init",
+    files: { "a.txt": "hello\n" },
+  });
 });
 afterAll(async () => {
   await ws.cleanup();

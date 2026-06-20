@@ -15,7 +15,13 @@ import {
 import { type ReactNode, useMemo, useRef, useState } from "react";
 
 import { cn } from "../lib/cn";
-import { allDirPaths, buildFileTree, diffTotals, flatRows, treeRows } from "../lib/diff";
+import {
+  allDirPaths,
+  buildFileTree,
+  diffTotals,
+  flatRows,
+  treeRows,
+} from "../lib/diff";
 
 // Changed-file list (P1-DIFF-2 / P1-UI-DIFF-1): flat or directory-tree view, each entry a
 // Lucide status icon and (for renames/copies) old → new paths; virtualized for large change
@@ -47,13 +53,23 @@ const STATUS_TONE: Partial<Record<ChangeCode, string>> = {
 function StatusIcon({ status }: { readonly status: ChangeCode }) {
   const Icon = STATUS_ICON[status];
   return (
-    <Icon className={cn("size-3.5 shrink-0", STATUS_TONE[status] ?? "text-muted-foreground")} aria-hidden="true" />
+    <Icon
+      className={cn(
+        "size-3.5 shrink-0",
+        STATUS_TONE[status] ?? "text-muted-foreground",
+      )}
+      aria-hidden="true"
+    />
   );
 }
 
 function FileLabel({ file }: { readonly file: DiffFile }): ReactNode {
   // Renames/copies show both paths (similarity is not carried by the contract, P1-DIFF-1).
-  if ((file.status === "renamed" || file.status === "copied") && file.oldPath && file.oldPath !== file.newPath) {
+  if (
+    (file.status === "renamed" || file.status === "copied") &&
+    file.oldPath &&
+    file.oldPath !== file.newPath
+  ) {
     return (
       <span className="truncate">
         <span className="text-muted-foreground">{file.oldPath} → </span>
@@ -112,7 +128,11 @@ export function ChangedFileList({
         </span>
         <span className="text-status-ahead">+{totals.additions}</span>
         <span className="text-destructive">-{totals.deletions}</span>
-        <div className="ml-auto flex items-center" role="group" aria-label="File list view">
+        <div
+          className="ml-auto flex items-center"
+          role="group"
+          aria-label="File list view"
+        >
           {(["flat", "tree"] as const).map((m) => (
             <button
               key={m}
@@ -129,8 +149,19 @@ export function ChangedFileList({
           ))}
         </div>
       </div>
-      <div ref={parentRef} className="min-h-0 flex-1 overflow-auto text-xs" role="listbox" aria-label="Changed files">
-        <div style={{ height: virtualizer.getTotalSize(), position: "relative", width: "100%" }}>
+      <div
+        ref={parentRef}
+        className="min-h-0 flex-1 overflow-auto text-xs"
+        role="listbox"
+        aria-label="Changed files"
+      >
+        <div
+          style={{
+            height: virtualizer.getTotalSize(),
+            position: "relative",
+            width: "100%",
+          }}
+        >
           {virtualizer.getVirtualItems().map((item) => {
             const row = rows[item.index]!;
             const indent = 4 + row.depth * 12;
@@ -141,7 +172,10 @@ export function ChangedFileList({
                 role={row.kind === "file" ? "option" : undefined}
                 aria-selected={row.kind === "file" ? isSelected : undefined}
                 className="absolute top-0 left-0 w-full"
-                style={{ height: item.size, transform: `translateY(${item.start}px)` }}
+                style={{
+                  height: item.size,
+                  transform: `translateY(${item.start}px)`,
+                }}
               >
                 {row.kind === "dir" ? (
                   <button
@@ -151,9 +185,15 @@ export function ChangedFileList({
                     className="hover:bg-accent text-muted-foreground flex h-full w-full items-center gap-1 pr-2 text-left"
                   >
                     {expanded.has(row.path) ? (
-                      <ChevronDown className="size-3 shrink-0" aria-hidden="true" />
+                      <ChevronDown
+                        className="size-3 shrink-0"
+                        aria-hidden="true"
+                      />
                     ) : (
-                      <ChevronRight className="size-3 shrink-0" aria-hidden="true" />
+                      <ChevronRight
+                        className="size-3 shrink-0"
+                        aria-hidden="true"
+                      />
                     )}
                     <span className="truncate">{row.name}</span>
                   </button>
@@ -168,7 +208,11 @@ export function ChangedFileList({
                     )}
                   >
                     <StatusIcon status={row.file!.status} />
-                    {mode === "tree" ? <span className="truncate">{row.name}</span> : <FileLabel file={row.file!} />}
+                    {mode === "tree" ? (
+                      <span className="truncate">{row.name}</span>
+                    ) : (
+                      <FileLabel file={row.file!} />
+                    )}
                   </button>
                 )}
               </div>

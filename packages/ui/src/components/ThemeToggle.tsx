@@ -10,7 +10,8 @@ export function ThemeToggle() {
   const theme = useUiStore((s) => s.theme);
   const setTheme = useUiStore((s) => s.setTheme);
   const Icon = theme === "dark" ? Moon : theme === "light" ? Sun : Monitor;
-  const next = () => setTheme(CYCLE[(CYCLE.indexOf(theme) + 1) % CYCLE.length]!);
+  const next = () =>
+    setTheme(CYCLE[(CYCLE.indexOf(theme) + 1) % CYCLE.length]!);
   return (
     <button
       type="button"

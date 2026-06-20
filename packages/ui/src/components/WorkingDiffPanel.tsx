@@ -1,6 +1,16 @@
-import { type Hunk, HunkSelection, PatchSelection, type RepoId } from "@cbranch/rpc-contract";
+import {
+  type Hunk,
+  HunkSelection,
+  PatchSelection,
+  type RepoId,
+} from "@cbranch/rpc-contract";
 
-import { useWorkingDiff, useDiscardHunks, useStageHunks, useUnstageHunks } from "../rpc/hooks";
+import {
+  useWorkingDiff,
+  useDiscardHunks,
+  useStageHunks,
+  useUnstageHunks,
+} from "../rpc/hooks";
 import { useUiStore } from "../state/store";
 import { Button } from "./ui/button";
 import { Placeholder } from "./ui/placeholder";
@@ -132,7 +142,8 @@ export function WorkingDiffPanel({ repoId }: { readonly repoId: RepoId }) {
   if (isLoading) return <Placeholder>Loading diff…</Placeholder>;
   if (isError) return <Placeholder>Failed to load diff.</Placeholder>;
   if (!data) return <Placeholder>No diff data.</Placeholder>;
-  if (data.isBinary) return <Placeholder>Binary file — cannot diff.</Placeholder>;
+  if (data.isBinary)
+    return <Placeholder>Binary file — cannot diff.</Placeholder>;
   if (data.hunks.length === 0) return <Placeholder>No changes.</Placeholder>;
 
   return (
@@ -160,7 +171,13 @@ export function WorkingDiffPanel({ repoId }: { readonly repoId: RepoId }) {
       {/* Hunks */}
       <div className="min-h-0 flex-1 overflow-y-auto p-2">
         {data.hunks.map((hunk, i) => (
-          <HunkBlock key={i} repoId={repoId} path={path} hunk={hunk} staged={staged} />
+          <HunkBlock
+            key={i}
+            repoId={repoId}
+            path={path}
+            hunk={hunk}
+            staged={staged}
+          />
         ))}
       </div>
     </div>

@@ -1,6 +1,11 @@
 // Merge operations (docs/spec/07 REQ-P3-MG-001..007)
 
-import { type GitError, MergeResult, type MergeMode, Oid } from "@cbranch/rpc-contract";
+import {
+  type GitError,
+  MergeResult,
+  type MergeMode,
+  Oid,
+} from "@cbranch/rpc-contract";
 import { Effect } from "effect";
 
 import { assertNoLeadingDash, decodeUtf8, runGit, runGitOk } from "./run-git";
@@ -17,20 +22,39 @@ export const mergeCreate = (
 
     if (strategy === "squash") {
       // REQ-P3-MG-004: stage only, no commit
-      yield* runGitOk({ cwd, args: ["merge", "--squash", safeRef], env, read: false });
+      yield* runGitOk({
+        cwd,
+        args: ["merge", "--squash", safeRef],
+        env,
+        read: false,
+      });
       return new MergeResult({ mode: "squash", staged: true });
     }
 
     if (strategy === "no-ff") {
       // REQ-P3-MG-003: always create a merge commit
-      yield* runGitOk({ cwd, args: ["merge", "--no-ff", "--no-edit", safeRef], env, read: false });
-      const headRaw = yield* runGitOk({ cwd, args: ["rev-parse", "HEAD"], env });
+      yield* runGitOk({
+        cwd,
+        args: ["merge", "--no-ff", "--no-edit", safeRef],
+        env,
+        read: false,
+      });
+      const headRaw = yield* runGitOk({
+        cwd,
+        args: ["rev-parse", "HEAD"],
+        env,
+      });
       const commitOid = decodeUtf8(headRaw.stdout).trim() as Oid;
       return new MergeResult({ mode: "merge", commitOid });
     }
 
     // "ff" strategy: attempt fast-forward only; detect result from git output
-    const raw = yield* runGit({ cwd, args: ["merge", "--ff", safeRef], env, read: false });
+    const raw = yield* runGit({
+      cwd,
+      args: ["merge", "--ff", safeRef],
+      env,
+      read: false,
+    });
 
     if (raw.exitCode !== 0) {
       // git merge failed — surface the error
@@ -43,7 +67,10 @@ export const mergeCreate = (
 
     const out = decodeUtf8(raw.stdout).trim();
 
-    if (out.includes("Already up to date") || out.includes("Already up-to-date")) {
+    if (
+      out.includes("Already up to date") ||
+      out.includes("Already up-to-date")
+    ) {
       return new MergeResult({ mode: "alreadyUpToDate" });
     }
 
@@ -54,5 +81,10 @@ export const mergeCreate = (
   });
 
 // REQ-P3-MG-007
-export const mergeAbort = (cwd: string, env?: NodeJS.ProcessEnv): Effect.Effect<void, GitError> =>
-  runGitOk({ cwd, args: ["merge", "--abort"], env, read: false }).pipe(Effect.asVoid);
+export const mergeAbort = (
+  cwd: string,
+  env?: NodeJS.ProcessEnv,
+): Effect.Effect<void, GitError> =>
+  runGitOk({ cwd, args: ["merge", "--abort"], env, read: false }).pipe(
+    Effect.asVoid,
+  );

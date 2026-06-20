@@ -46,16 +46,18 @@ export type ChangeCode = typeof ChangeCode.Type;
  * body/stats live on {@link CommitDetail}. Dates are the raw git date strings
  * (`authorDate`/`committerDate`), not the structured {@link Signature} instant.
  */
-export class CommitSummary extends Schema.Class<CommitSummary>("CommitSummary")({
-  oid: Oid,
-  parents: Schema.Array(Oid),
-  authorName: Schema.String,
-  authorEmail: Schema.String,
-  authorDate: Schema.String,
-  committerDate: Schema.String,
-  subject: Schema.String,
-  refs: Schema.Array(Schema.String),
-}) {}
+export class CommitSummary extends Schema.Class<CommitSummary>("CommitSummary")(
+  {
+    oid: Oid,
+    parents: Schema.Array(Oid),
+    authorName: Schema.String,
+    authorEmail: Schema.String,
+    authorDate: Schema.String,
+    committerDate: Schema.String,
+    subject: Schema.String,
+    refs: Schema.Array(Schema.String),
+  },
+) {}
 
 /**
  * The full commit (`commit.detail`, DM-010/011 + DECISIONS D7): structured
@@ -89,7 +91,15 @@ export class RepoState extends Schema.Class<RepoState>("RepoState")({
   headOid: Schema.optional(Oid),
   currentBranch: Schema.optional(Schema.String),
   isDetached: Schema.Boolean,
-  inProgress: Schema.Literals(["none", "merge", "rebase", "cherryPick", "revert", "bisect", "am"]),
+  inProgress: Schema.Literals([
+    "none",
+    "merge",
+    "rebase",
+    "cherryPick",
+    "revert",
+    "bisect",
+    "am",
+  ]),
   isBare: Schema.Boolean,
   isEmpty: Schema.Boolean,
   repoRoot: Schema.String,
@@ -180,7 +190,9 @@ export class FileContent extends Schema.Class<FileContent>("FileContent")({
  * A short-lived, perimeter-protected download pointer for content over the inline
  * size cap (NF-LIMIT-3 = 10 MB; 14 §3.7 / DECISIONS D4) — never bytes/base64.
  */
-export class DownloadDescriptor extends Schema.Class<DownloadDescriptor>("DownloadDescriptor")({
+export class DownloadDescriptor extends Schema.Class<DownloadDescriptor>(
+  "DownloadDescriptor",
+)({
   url: Schema.String,
   size: Schema.Number,
   contentType: Schema.optional(Schema.String),
@@ -193,5 +205,8 @@ export class DownloadDescriptor extends Schema.Class<DownloadDescriptor>("Downlo
  * exclusive on their required fields (`content`/`encoding` vs `url`), so the union
  * decodes unambiguously.
  */
-export const FileContentResult = Schema.Union([FileContent, DownloadDescriptor]);
+export const FileContentResult = Schema.Union([
+  FileContent,
+  DownloadDescriptor,
+]);
 export type FileContentResult = typeof FileContentResult.Type;

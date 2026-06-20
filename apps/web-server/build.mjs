@@ -16,6 +16,11 @@ await build({
   format: "esm",
   target: "node20",
   sourcemap: true,
-  external: ["effect", "effect/*", "@effect/platform-node", "@effect/platform-node/*"],
+  external: [
+    "effect",
+    "effect/*",
+    "@effect/platform-node",
+    "@effect/platform-node/*",
+  ],
   logLevel: "warning",
 });

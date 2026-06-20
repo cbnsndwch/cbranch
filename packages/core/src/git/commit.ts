@@ -8,8 +8,16 @@
 // them); stats come from a `--numstat` diff against the first parent (empty tree for a
 // root commit, `--root`).
 
-import { type CommitDetail as CommitDetailType, type GitError, type Oid } from "@cbranch/rpc-contract";
-import { CommitDetail, Oid as OidBrand, Signature } from "@cbranch/rpc-contract";
+import {
+  type CommitDetail as CommitDetailType,
+  type GitError,
+  type Oid,
+} from "@cbranch/rpc-contract";
+import {
+  CommitDetail,
+  Oid as OidBrand,
+  Signature,
+} from "@cbranch/rpc-contract";
 import { Effect } from "effect";
 
 import { parseNumstat } from "./diff";
@@ -54,7 +62,10 @@ const stripTrailingNewline = (s: string): string => s.replace(/\n+$/, "");
 
 /** Aggregate `filesChanged/additions/deletions` for a commit (binary files add 0). */
 const aggregateStats = (
-  numstat: ReadonlyArray<{ additions: number | null; deletions: number | null }>,
+  numstat: ReadonlyArray<{
+    additions: number | null;
+    deletions: number | null;
+  }>,
 ): { filesChanged: number; additions: number; deletions: number } => {
   let additions = 0;
   let deletions = 0;
@@ -74,7 +85,11 @@ export const commitDetail = (
   Effect.gen(function* () {
     const rev = yield* assertNoLeadingDash(oid, "commit id");
 
-    const scalars = yield* runGitOk({ cwd, args: ["show", "-s", `--format=${DETAIL_FORMAT}`, rev], env });
+    const scalars = yield* runGitOk({
+      cwd,
+      args: ["show", "-s", `--format=${DETAIL_FORMAT}`, rev],
+      env,
+    });
     const fields = stripTrailingNewline(decodeUtf8(scalars.stdout)).split(FS);
     const [
       fullOid,
@@ -93,18 +108,37 @@ export const commitDetail = (
     ] = fields as string[];
 
     // Body + raw message are multi-line; read each on its own so no separator collides.
-    const rawMessage = yield* runGitOk({ cwd, args: ["show", "-s", "--format=%B", rev], env });
-    const bodyOut = yield* runGitOk({ cwd, args: ["show", "-s", "--format=%b", rev], env });
+    const rawMessage = yield* runGitOk({
+      cwd,
+      args: ["show", "-s", "--format=%B", rev],
+      env,
+    });
+    const bodyOut = yield* runGitOk({
+      cwd,
+      args: ["show", "-s", "--format=%b", rev],
+      env,
+    });
 
     // Stats vs first parent; `--root` makes a root commit diff against the empty tree.
     const numstatOut = yield* runGitOk({
       cwd,
-      args: ["diff-tree", "-r", "-z", "--no-commit-id", "--numstat", "--root", rev],
+      args: [
+        "diff-tree",
+        "-r",
+        "-z",
+        "--no-commit-id",
+        "--numstat",
+        "--root",
+        rev,
+      ],
       env,
     });
     const stats = aggregateStats(parseNumstat(numstatOut.stdout));
 
-    const parents = (parentsRaw ?? "") === "" ? [] : (parentsRaw as string).split(" ").filter((p) => p !== "");
+    const parents =
+      (parentsRaw ?? "") === ""
+        ? []
+        : (parentsRaw as string).split(" ").filter((p) => p !== "");
 
     return new CommitDetail({
       oid: OidBrand.make(fullOid as string),
@@ -113,17 +147,24 @@ export const commitDetail = (
       author: new Signature({
         name: authorName as string,
         email: authorEmail as string,
-        when: { epochSeconds: Number(authorEpoch), tzOffsetMinutes: parseTzOffsetMinutes(authorIso as string) },
+        when: {
+          epochSeconds: Number(authorEpoch),
+          tzOffsetMinutes: parseTzOffsetMinutes(authorIso as string),
+        },
       }),
       committer: new Signature({
         name: committerName as string,
         email: committerEmail as string,
-        when: { epochSeconds: Number(committerEpoch), tzOffsetMinutes: parseTzOffsetMinutes(committerIso as string) },
+        when: {
+          epochSeconds: Number(committerEpoch),
+          tzOffsetMinutes: parseTzOffsetMinutes(committerIso as string),
+        },
       }),
       subject: subject ?? "",
       body: stripTrailingNewline(decodeUtf8(bodyOut.stdout)),
       messageRaw: stripTrailingNewline(decodeUtf8(rawMessage.stdout)),
-      encoding: encoding === undefined || encoding === "" ? undefined : encoding,
+      encoding:
+        encoding === undefined || encoding === "" ? undefined : encoding,
       stats,
     });
   });

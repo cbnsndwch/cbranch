@@ -1,8 +1,16 @@
 import { Effect, Stream } from "effect";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 
-import { createFixtureWorkspace, type FixtureWorkspace } from "../testing/fixtures";
-import { fetchStream, pullStream, pushDeleteRemoteRef, pushStream } from "./sync";
+import {
+  createFixtureWorkspace,
+  type FixtureWorkspace,
+} from "../testing/fixtures";
+import {
+  fetchStream,
+  pullStream,
+  pushDeleteRemoteRef,
+  pushStream,
+} from "./sync";
 
 describe("sync streaming", () => {
   let ws: FixtureWorkspace;
@@ -22,7 +30,9 @@ describe("sync streaming", () => {
     const clone = await ws.createRepo("sync-fetch-clone");
     await clone.addRemote("origin", origin.dir);
 
-    const events = await Effect.runPromise(Stream.runCollect(fetchStream(clone.dir, "origin")));
+    const events = await Effect.runPromise(
+      Stream.runCollect(fetchStream(clone.dir, "origin")),
+    );
 
     expect(events.length).toBeGreaterThanOrEqual(0);
   });
@@ -39,7 +49,9 @@ describe("sync streaming", () => {
     // Add commit to origin
     await origin.commit({ message: "second", files: { "b.txt": "b" } });
 
-    const events = await Effect.runPromise(Stream.runCollect(fetchStream(clone.dir, "origin")));
+    const events = await Effect.runPromise(
+      Stream.runCollect(fetchStream(clone.dir, "origin")),
+    );
     const arr = [...events];
 
     // At least a progress event should appear; refUpdate may appear depending on git output
@@ -53,7 +65,9 @@ describe("sync streaming", () => {
     const clone = await ws.createRepo("sync-fetchall-clone");
     await clone.addRemote("origin", origin.dir);
 
-    const events = await Effect.runPromise(Stream.runCollect(fetchStream(clone.dir, undefined, true)));
+    const events = await Effect.runPromise(
+      Stream.runCollect(fetchStream(clone.dir, undefined, true)),
+    );
 
     expect(events.length).toBeGreaterThanOrEqual(0);
   });
@@ -70,7 +84,9 @@ describe("sync streaming", () => {
     // Add commit on origin
     await origin.commit({ message: "upstream", files: { "b.txt": "b" } });
 
-    const events = await Effect.runPromise(Stream.runCollect(pullStream(clone.dir, "ff-only")));
+    const events = await Effect.runPromise(
+      Stream.runCollect(pullStream(clone.dir, "ff-only")),
+    );
 
     expect(events.length).toBeGreaterThanOrEqual(0);
   });
@@ -82,7 +98,9 @@ describe("sync streaming", () => {
     await work.addRemote("origin", origin.dir);
     await work.commit({ message: "init", files: { "a.txt": "a" } });
 
-    const events = await Effect.runPromise(Stream.runCollect(pushStream(work.dir, "origin", "main", true)));
+    const events = await Effect.runPromise(
+      Stream.runCollect(pushStream(work.dir, "origin", "main", true)),
+    );
 
     expect(events.length).toBeGreaterThanOrEqual(0);
   });
@@ -99,7 +117,9 @@ describe("sync streaming", () => {
     // Add commit on origin
     await origin.commit({ message: "upstream", files: { "b.txt": "b" } });
 
-    const events = await Effect.runPromise(Stream.runCollect(pullStream(clone.dir, "rebase")));
+    const events = await Effect.runPromise(
+      Stream.runCollect(pullStream(clone.dir, "rebase")),
+    );
     expect(events.length).toBeGreaterThanOrEqual(0);
   });
 
@@ -115,7 +135,9 @@ describe("sync streaming", () => {
     // Add commit on origin
     await origin.commit({ message: "upstream", files: { "b.txt": "b" } });
 
-    const events = await Effect.runPromise(Stream.runCollect(pullStream(clone.dir, "merge")));
+    const events = await Effect.runPromise(
+      Stream.runCollect(pullStream(clone.dir, "merge")),
+    );
     expect(events.length).toBeGreaterThanOrEqual(0);
   });
 
@@ -123,7 +145,9 @@ describe("sync streaming", () => {
     const repo = await ws.createRepo("sync-fetch-fail");
     await repo.commit({ message: "init", files: { "a.txt": "a" } });
 
-    const exit = await Effect.runPromiseExit(Stream.runCollect(fetchStream(repo.dir, "no-such-remote")));
+    const exit = await Effect.runPromiseExit(
+      Stream.runCollect(fetchStream(repo.dir, "no-such-remote")),
+    );
     expect(exit._tag).toBe("Failure");
   });
 
@@ -139,10 +163,15 @@ describe("sync streaming", () => {
     await work.branch("to-delete");
     await work.git(["push", "origin", "to-delete"]);
 
-    await Effect.runPromise(pushDeleteRemoteRef(work.dir, "origin", "to-delete"));
+    await Effect.runPromise(
+      pushDeleteRemoteRef(work.dir, "origin", "to-delete"),
+    );
 
     // Verify the remote branch no longer exists
-    const raw = await work.git(["ls-remote", "--heads", "origin", "to-delete"], { allowFailure: true });
+    const raw = await work.git(
+      ["ls-remote", "--heads", "origin", "to-delete"],
+      { allowFailure: true },
+    );
     expect(raw.stdout.trim()).toBe("");
   });
 });

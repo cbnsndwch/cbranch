@@ -24,7 +24,10 @@ export interface Identity {
 }
 
 /** Deterministic default committer/author identity. */
-export const DEFAULT_IDENTITY: Identity = { name: "Cb Tester", email: "tester@cbranch.test" };
+export const DEFAULT_IDENTITY: Identity = {
+  name: "Cb Tester",
+  email: "tester@cbranch.test",
+};
 
 /** A fixed base instant; `fixtureDate(n)` advances it deterministically. */
 const BASE_EPOCH = 1_700_000_000;
@@ -52,7 +55,11 @@ export interface GitRunResult {
   readonly stderr: string;
 }
 
-const runGitRaw = (cwd: string, args: ReadonlyArray<string>, env: NodeJS.ProcessEnv): Promise<GitRunResult> =>
+const runGitRaw = (
+  cwd: string,
+  args: ReadonlyArray<string>,
+  env: NodeJS.ProcessEnv,
+): Promise<GitRunResult> =>
   new Promise((resolve, reject) => {
     const child = spawn("git", args, { cwd, env, windowsHide: true });
     let stdout = "";
@@ -93,7 +100,9 @@ export class FixtureRepo {
   ): Promise<GitRunResult> {
     const result = await runGitRaw(this.dir, args, this.baseEnv(opts?.env));
     if (result.code !== 0 && opts?.allowFailure !== true) {
-      throw new Error(`git ${args.join(" ")} failed (${result.code}): ${result.stderr}`);
+      throw new Error(
+        `git ${args.join(" ")} failed (${result.code}): ${result.stderr}`,
+      );
     }
     return result;
   }
@@ -128,13 +137,19 @@ export class FixtureRepo {
   async commit(opts: CommitOptions): Promise<string> {
     this.commitSeq += 1;
     if (opts.files !== undefined) {
-      await Promise.all(Object.entries(opts.files).map(([path, content]) => this.writeFile(path, content)));
+      await Promise.all(
+        Object.entries(opts.files).map(([path, content]) =>
+          this.writeFile(path, content),
+        ),
+      );
       await this.stage(...Object.keys(opts.files));
     }
     const author = opts.author ?? DEFAULT_IDENTITY;
     const committer = opts.committer ?? DEFAULT_IDENTITY;
-    const authorDate = opts.authorDate ?? opts.date ?? fixtureDate(this.commitSeq);
-    const committerDate = opts.committerDate ?? opts.date ?? fixtureDate(this.commitSeq);
+    const authorDate =
+      opts.authorDate ?? opts.date ?? fixtureDate(this.commitSeq);
+    const committerDate =
+      opts.committerDate ?? opts.date ?? fixtureDate(this.commitSeq);
     const env: NodeJS.ProcessEnv = {
       GIT_AUTHOR_NAME: author.name,
       GIT_AUTHOR_EMAIL: author.email,
@@ -146,12 +161,16 @@ export class FixtureRepo {
     const args = ["commit", "-q", "-m", opts.message];
     // Allow an empty commit when no files were supplied (terse fixtures); harmless
     // when there ARE staged changes (git only honors it if the commit is empty).
-    if (opts.allowEmpty === true || opts.files === undefined) args.push("--allow-empty");
+    if (opts.allowEmpty === true || opts.files === undefined)
+      args.push("--allow-empty");
     await this.git(args, { env });
     return this.revParse("HEAD");
   }
 
-  async branch(name: string, opts?: { startPoint?: string; force?: boolean }): Promise<void> {
+  async branch(
+    name: string,
+    opts?: { startPoint?: string; force?: boolean },
+  ): Promise<void> {
     const args = ["branch"];
     if (opts?.force === true) args.push("-f");
     args.push(name);
@@ -163,7 +182,10 @@ export class FixtureRepo {
     await this.git(["branch", opts?.force === true ? "-D" : "-d", name]);
   }
 
-  async checkout(ref: string, opts?: { detach?: boolean; create?: boolean }): Promise<void> {
+  async checkout(
+    ref: string,
+    opts?: { detach?: boolean; create?: boolean },
+  ): Promise<void> {
     const args = ["checkout", "-q"];
     if (opts?.create === true) args.push("-b");
     if (opts?.detach === true) args.push("--detach");
@@ -171,7 +193,10 @@ export class FixtureRepo {
     await this.git(args);
   }
 
-  async tag(name: string, opts?: { message?: string; ref?: string; annotated?: boolean }): Promise<void> {
+  async tag(
+    name: string,
+    opts?: { message?: string; ref?: string; annotated?: boolean },
+  ): Promise<void> {
     const annotated = opts?.annotated === true || opts?.message !== undefined;
     const args = ["tag"];
     if (annotated) args.push("-a", "-m", opts?.message ?? name);
@@ -190,7 +215,10 @@ export class FixtureRepo {
   }
 
   /** Merge `ref` into the current branch; returns whether it left conflicts. */
-  async merge(ref: string, opts?: { message?: string; noFastForward?: boolean }): Promise<{ conflict: boolean }> {
+  async merge(
+    ref: string,
+    opts?: { message?: string; noFastForward?: boolean },
+  ): Promise<{ conflict: boolean }> {
     const args = ["merge", "--no-edit"];
     if (opts?.noFastForward === true) args.push("--no-ff");
     if (opts?.message !== undefined) args.push("-m", opts.message);
@@ -226,7 +254,10 @@ export class FixtureRepo {
   }
 
   /** Add a linked worktree and return a handle to it (shares this repo's `repoId`). */
-  async worktreeAdd(path: string, opts?: { branch?: string; detach?: boolean }): Promise<FixtureRepo> {
+  async worktreeAdd(
+    path: string,
+    opts?: { branch?: string; detach?: boolean },
+  ): Promise<FixtureRepo> {
     const abs = join(this.dir, path);
     const args = ["worktree", "add", "-q"];
     if (opts?.detach === true) args.push("--detach");
@@ -242,7 +273,10 @@ export class FixtureRepo {
 export interface FixtureWorkspace {
   readonly root: string;
   /** Create + `init` a repository under the workspace. */
-  readonly createRepo: (name: string, opts?: { bare?: boolean; initialBranch?: string }) => Promise<FixtureRepo>;
+  readonly createRepo: (
+    name: string,
+    opts?: { bare?: boolean; initialBranch?: string },
+  ) => Promise<FixtureRepo>;
   /** Create a directory (no git) — for "open a non-repo" negative tests. */
   readonly createPlainDir: (name: string) => Promise<string>;
   readonly cleanup: () => Promise<void>;
@@ -266,7 +300,13 @@ export const createFixtureWorkspace = async (): Promise<FixtureWorkspace> => {
     },
     // Retries absorb the Windows race where a just-killed `cat-file` process still
     // holds a handle to its cwd for a few ms after SIGKILL (EBUSY/EPERM on rmdir).
-    cleanup: () => rm(root, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 }),
+    cleanup: () =>
+      rm(root, {
+        recursive: true,
+        force: true,
+        maxRetries: 20,
+        retryDelay: 100,
+      }),
   };
 };
 
@@ -274,19 +314,43 @@ export const createFixtureWorkspace = async (): Promise<FixtureWorkspace> => {
 
 /** A small linear repo: commits `a`, `b`, `c` on `main` with deterministic hashes. */
 export const seedLinear = async (repo: FixtureRepo): Promise<string[]> => {
-  const a = await repo.commit({ message: "a", files: { "a.txt": "a\n" }, date: fixtureDate(1) });
-  const b = await repo.commit({ message: "b", files: { "b.txt": "b\n" }, date: fixtureDate(2) });
-  const c = await repo.commit({ message: "c", files: { "c.txt": "c\n" }, date: fixtureDate(3) });
+  const a = await repo.commit({
+    message: "a",
+    files: { "a.txt": "a\n" },
+    date: fixtureDate(1),
+  });
+  const b = await repo.commit({
+    message: "b",
+    files: { "b.txt": "b\n" },
+    date: fixtureDate(2),
+  });
+  const c = await repo.commit({
+    message: "c",
+    files: { "c.txt": "c\n" },
+    date: fixtureDate(3),
+  });
   return [a, b, c];
 };
 
 /** Create an unmerged/conflicted index by merging two divergent edits of one file. */
 export const seedConflict = async (repo: FixtureRepo): Promise<void> => {
-  await repo.commit({ message: "base", files: { "f.txt": "base\n" }, date: fixtureDate(1) });
+  await repo.commit({
+    message: "base",
+    files: { "f.txt": "base\n" },
+    date: fixtureDate(1),
+  });
   await repo.branch("other");
-  await repo.commit({ message: "ours", files: { "f.txt": "ours\n" }, date: fixtureDate(2) });
+  await repo.commit({
+    message: "ours",
+    files: { "f.txt": "ours\n" },
+    date: fixtureDate(2),
+  });
   await repo.checkout("other");
-  await repo.commit({ message: "theirs", files: { "f.txt": "theirs\n" }, date: fixtureDate(3) });
+  await repo.commit({
+    message: "theirs",
+    files: { "f.txt": "theirs\n" },
+    date: fixtureDate(3),
+  });
   await repo.checkout("main");
   await repo.merge("other");
 };

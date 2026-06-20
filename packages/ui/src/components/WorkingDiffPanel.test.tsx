@@ -1,5 +1,12 @@
 // @vitest-environment jsdom
-import { DiffFile, DiffLine, Hunk, HunkSelection, PatchSelection, RepoId } from "@cbranch/rpc-contract";
+import {
+  DiffFile,
+  DiffLine,
+  Hunk,
+  HunkSelection,
+  PatchSelection,
+  RepoId,
+} from "@cbranch/rpc-contract";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -56,7 +63,9 @@ const makeFakeApi = (overrides: Partial<CbranchApi> = {}): CbranchApi => ({
 });
 
 const renderWithApi = (ui: ReactNode, api: CbranchApi) => {
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
   return render(
     <MemoryRouter>
       <QueryClientProvider client={queryClient}>
@@ -74,7 +83,12 @@ const makeHunk = (): Hunk =>
     newStart: 1,
     newLines: 3,
     lines: [
-      new DiffLine({ kind: "context", content: "ctx", oldLineNo: 1, newLineNo: 1 }),
+      new DiffLine({
+        kind: "context",
+        content: "ctx",
+        oldLineNo: 1,
+        newLineNo: 1,
+      }),
       new DiffLine({ kind: "delete", content: "old line", oldLineNo: 2 }),
       new DiffLine({ kind: "add", content: "new line", newLineNo: 2 }),
     ],
@@ -103,31 +117,49 @@ describe("WorkingDiffPanel", () => {
   });
 
   test("shows hunk header when diff loads", async () => {
-    const api = makeFakeApi({ workingFileDiff: vi.fn(async () => makeDiffFile()) });
+    const api = makeFakeApi({
+      workingFileDiff: vi.fn(async () => makeDiffFile()),
+    });
     act(() => {
-      useUiStore.setState({ selectedDiffFile: { path: "a.txt", staged: false } });
+      useUiStore.setState({
+        selectedDiffFile: { path: "a.txt", staged: false },
+      });
     });
     renderWithApi(<WorkingDiffPanel repoId={repoId} />, api);
     expect(await screen.findByText("@@ -1,3 +1,3 @@")).toBeTruthy();
   });
 
   test("shows Stage Hunk button for worktree side (staged=false)", async () => {
-    const api = makeFakeApi({ workingFileDiff: vi.fn(async () => makeDiffFile()) });
+    const api = makeFakeApi({
+      workingFileDiff: vi.fn(async () => makeDiffFile()),
+    });
     act(() => {
-      useUiStore.setState({ selectedDiffFile: { path: "a.txt", staged: false } });
+      useUiStore.setState({
+        selectedDiffFile: { path: "a.txt", staged: false },
+      });
     });
     renderWithApi(<WorkingDiffPanel repoId={repoId} />, api);
-    expect(await screen.findByRole("button", { name: /stage hunk/i })).toBeTruthy();
-    expect(await screen.findByRole("button", { name: /discard hunk/i })).toBeTruthy();
+    expect(
+      await screen.findByRole("button", { name: /stage hunk/i }),
+    ).toBeTruthy();
+    expect(
+      await screen.findByRole("button", { name: /discard hunk/i }),
+    ).toBeTruthy();
   });
 
   test("shows Unstage Hunk button for staged side (staged=true)", async () => {
-    const api = makeFakeApi({ workingFileDiff: vi.fn(async () => makeDiffFile()) });
+    const api = makeFakeApi({
+      workingFileDiff: vi.fn(async () => makeDiffFile()),
+    });
     act(() => {
-      useUiStore.setState({ selectedDiffFile: { path: "a.txt", staged: true } });
+      useUiStore.setState({
+        selectedDiffFile: { path: "a.txt", staged: true },
+      });
     });
     renderWithApi(<WorkingDiffPanel repoId={repoId} />, api);
-    expect(await screen.findByRole("button", { name: /unstage hunk/i })).toBeTruthy();
+    expect(
+      await screen.findByRole("button", { name: /unstage hunk/i }),
+    ).toBeTruthy();
   });
 
   test("Stage Hunk button calls stageHunks with correct PatchSelection", async () => {
@@ -137,7 +169,9 @@ describe("WorkingDiffPanel", () => {
       stageHunks: stageHunksFn,
     });
     act(() => {
-      useUiStore.setState({ selectedDiffFile: { path: "a.txt", staged: false } });
+      useUiStore.setState({
+        selectedDiffFile: { path: "a.txt", staged: false },
+      });
     });
     renderWithApi(<WorkingDiffPanel repoId={repoId} />, api);
     const btn = await screen.findByRole("button", { name: /stage hunk/i });
@@ -152,9 +186,13 @@ describe("WorkingDiffPanel", () => {
   });
 
   test("toggling to staged side calls setSelectedDiffFile with staged=true", async () => {
-    const api = makeFakeApi({ workingFileDiff: vi.fn(async () => makeDiffFile()) });
+    const api = makeFakeApi({
+      workingFileDiff: vi.fn(async () => makeDiffFile()),
+    });
     act(() => {
-      useUiStore.setState({ selectedDiffFile: { path: "a.txt", staged: false } });
+      useUiStore.setState({
+        selectedDiffFile: { path: "a.txt", staged: false },
+      });
     });
     renderWithApi(<WorkingDiffPanel repoId={repoId} />, api);
     await screen.findByText("@@ -1,3 +1,3 @@");

@@ -34,9 +34,13 @@ export interface ObjectData extends ObjectInfo {
 
 export interface CatFilePool {
   /** Read a full object (`null` when missing/ambiguous). Bytes are raw (ENC-003). */
-  readonly readObject: (rev: string) => Effect.Effect<ObjectData | null, GitError>;
+  readonly readObject: (
+    rev: string,
+  ) => Effect.Effect<ObjectData | null, GitError>;
   /** Read object metadata only (`null` when missing/ambiguous). */
-  readonly objectInfo: (rev: string) => Effect.Effect<ObjectInfo | null, GitError>;
+  readonly objectInfo: (
+    rev: string,
+  ) => Effect.Effect<ObjectInfo | null, GitError>;
 }
 
 type Pending = {
@@ -65,7 +69,9 @@ class BatchProcess {
     });
     this.child.stdout.on("data", (chunk: Buffer) => this.onData(chunk));
     this.child.on("error", (err) => this.fail(err));
-    this.child.on("close", () => this.fail(new Error("cat-file process closed")));
+    this.child.on("close", () =>
+      this.fail(new Error("cat-file process closed")),
+    );
   }
 
   request(rev: string): Promise<ObjectData | ObjectInfo | null> {
@@ -140,8 +146,10 @@ const parseHeader = (line: string): ObjectInfo | null => {
 
 /** Reject revs that could break the line protocol or inject a `git` option. */
 const validateRev = (rev: string): GitError | null => {
-  if (rev.includes("\n") || rev.includes("\r")) return gitError("gitFailed", "object id must be a single line");
-  if (rev.startsWith("-")) return gitError("invalidRefName", "object id must not begin with '-'");
+  if (rev.includes("\n") || rev.includes("\r"))
+    return gitError("gitFailed", "object id must be a single line");
+  if (rev.startsWith("-"))
+    return gitError("invalidRefName", "object id must not begin with '-'");
   return null;
 };
 
@@ -155,7 +163,10 @@ export const makeCatFilePool = (
 ): Effect.Effect<CatFilePool, GitError, Scope.Scope> =>
   Effect.map(
     Effect.acquireRelease(
-      Effect.sync(() => ({ batch: new BatchProcess(cwd, true, env), check: new BatchProcess(cwd, false, env) })),
+      Effect.sync(() => ({
+        batch: new BatchProcess(cwd, true, env),
+        check: new BatchProcess(cwd, false, env),
+      })),
       (pair) =>
         Effect.sync(() => {
           pair.batch.close();

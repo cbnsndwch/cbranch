@@ -9,8 +9,16 @@
 
 import { basename } from "node:path";
 
-import { type FileContentResult, type GitError, type RepoId } from "@cbranch/rpc-contract";
-import { DownloadDescriptor, FileContent, Oid as OidBrand } from "@cbranch/rpc-contract";
+import {
+  type FileContentResult,
+  type GitError,
+  type RepoId,
+} from "@cbranch/rpc-contract";
+import {
+  DownloadDescriptor,
+  FileContent,
+  Oid as OidBrand,
+} from "@cbranch/rpc-contract";
 import { Effect } from "effect";
 
 import { type CatFilePool } from "./cat-file-pool";
@@ -29,7 +37,11 @@ export const looksBinary = (data: Buffer): boolean => {
 };
 
 /** Build the relative side-channel URL for over-cap blobs (DECISIONS D4). */
-export const sidechannelBlobUrl = (repoId: RepoId, rev: string, path: string): string =>
+export const sidechannelBlobUrl = (
+  repoId: RepoId,
+  rev: string,
+  path: string,
+): string =>
   `/sidechannel/blob?repoId=${encodeURIComponent(repoId)}&rev=${encodeURIComponent(rev)}&path=${encodeURIComponent(path)}`;
 
 /**
@@ -47,7 +59,9 @@ export const fileContentAtRev = (
     const spec = `${rev}:${path}`;
     const info = yield* pool.objectInfo(spec);
     if (info === null) {
-      return yield* Effect.fail(gitError("fsError", "no object exists at the requested revision/path"));
+      return yield* Effect.fail(
+        gitError("fsError", "no object exists at the requested revision/path"),
+      );
     }
 
     if (info.size > INLINE_CONTENT_CAP) {
@@ -60,7 +74,9 @@ export const fileContentAtRev = (
 
     const obj = yield* pool.readObject(spec);
     if (obj === null) {
-      return yield* Effect.fail(gitError("fsError", "no object exists at the requested revision/path"));
+      return yield* Effect.fail(
+        gitError("fsError", "no object exists at the requested revision/path"),
+      );
     }
     const isBinary = looksBinary(obj.data);
     return new FileContent({

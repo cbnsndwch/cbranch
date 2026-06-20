@@ -29,7 +29,9 @@ export type Domain = typeof Domain.Type;
  * A single push from `repo.subscribe`: the set of domains that changed for a repo
  * (14 §5). The class name doubles as the exported wire type.
  */
-export class InvalidationEvent extends Schema.Class<InvalidationEvent>("InvalidationEvent")({
+export class InvalidationEvent extends Schema.Class<InvalidationEvent>(
+  "InvalidationEvent",
+)({
   repoId: RepoId,
   domains: Schema.Array(Domain),
 }) {}

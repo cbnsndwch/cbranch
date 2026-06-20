@@ -1,21 +1,31 @@
 import { GitError } from "@cbranch/rpc-contract";
 import { describe, expect, test } from "vitest";
 
-import { classifyGitSpawnError, classifyNodeError, gitError, gitStderrExcerpt, scrubSecrets } from "./errors";
+import {
+  classifyGitSpawnError,
+  classifyNodeError,
+  gitError,
+  gitStderrExcerpt,
+  scrubSecrets,
+} from "./errors";
 
 describe("scrubSecrets (NF-SEC-9 / NF-LOG-4)", () => {
   test("redacts user:password embedded in a remote URL", () => {
-    expect(scrubSecrets("fatal: https://alice:s3cr3t@github.com/x.git failed")).toBe(
-      "fatal: https://alice:***@github.com/x.git failed",
-    );
+    expect(
+      scrubSecrets("fatal: https://alice:s3cr3t@github.com/x.git failed"),
+    ).toBe("fatal: https://alice:***@github.com/x.git failed");
   });
 
   test("redacts a bare token in userinfo", () => {
-    expect(scrubSecrets("remote: https://ghp_TOKEN123@github.com/x")).toBe("remote: https://***@github.com/x");
+    expect(scrubSecrets("remote: https://ghp_TOKEN123@github.com/x")).toBe(
+      "remote: https://***@github.com/x",
+    );
   });
 
   test("leaves credential-free text untouched", () => {
-    expect(scrubSecrets("fatal: not a git repository")).toBe("fatal: not a git repository");
+    expect(scrubSecrets("fatal: not a git repository")).toBe(
+      "fatal: not a git repository",
+    );
   });
 });
 
@@ -35,11 +45,15 @@ describe("gitError", () => {
 
 describe("classifyNodeError (stable error codes, never localized text)", () => {
   test("EACCES → permissionDenied", () => {
-    expect(classifyNodeError({ code: "EACCES", message: "denied" }).code).toBe("permissionDenied");
+    expect(classifyNodeError({ code: "EACCES", message: "denied" }).code).toBe(
+      "permissionDenied",
+    );
   });
 
   test("ENOENT → fsError", () => {
-    expect(classifyNodeError({ code: "ENOENT", message: "missing" }).code).toBe("fsError");
+    expect(classifyNodeError({ code: "ENOENT", message: "missing" }).code).toBe(
+      "fsError",
+    );
   });
 
   test("abort → cancelled", () => {
@@ -53,7 +67,10 @@ describe("classifyNodeError (stable error codes, never localized text)", () => {
 
 describe("classifyGitSpawnError", () => {
   test("ENOENT for the git binary → hostGitMissing", () => {
-    expect(classifyGitSpawnError({ code: "ENOENT", message: "spawn git ENOENT" }).code).toBe("hostGitMissing");
+    expect(
+      classifyGitSpawnError({ code: "ENOENT", message: "spawn git ENOENT" })
+        .code,
+    ).toBe("hostGitMissing");
   });
 });
 

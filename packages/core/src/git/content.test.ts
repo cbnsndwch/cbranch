@@ -14,7 +14,13 @@ describe("looksBinary", () => {
 
 describe("sidechannelBlobUrl", () => {
   test("builds a relative, URL-encoded side-channel route (DECISIONS D4)", () => {
-    const url = sidechannelBlobUrl(RepoIdBrand.make("r1"), "HEAD", "dir/a b.txt");
-    expect(url).toBe("/sidechannel/blob?repoId=r1&rev=HEAD&path=dir%2Fa%20b.txt");
+    const url = sidechannelBlobUrl(
+      RepoIdBrand.make("r1"),
+      "HEAD",
+      "dir/a b.txt",
+    );
+    expect(url).toBe(
+      "/sidechannel/blob?repoId=r1&rev=HEAD&path=dir%2Fa%20b.txt",
+    );
   });
 });

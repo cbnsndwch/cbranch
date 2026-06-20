@@ -1,7 +1,13 @@
 // @vitest-environment jsdom
 import { RepoId, StatusEntry, WorkingTreeStatus } from "@cbranch/rpc-contract";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { type ReactNode } from "react";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
@@ -67,7 +73,10 @@ const makeFakeApi = (overrides: Partial<CbranchApi> = {}): CbranchApi =>
     ...overrides,
   }) as unknown as CbranchApi;
 
-const renderPanel = (api: CbranchApi, ui: ReactNode = <StatusPanel repoId={repoId} />) => {
+const renderPanel = (
+  api: CbranchApi,
+  ui: ReactNode = <StatusPanel repoId={repoId} />,
+) => {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <MemoryRouter>
@@ -85,7 +94,8 @@ beforeEach(() => {
     unstagedSelection: new Set(),
     selectedDiffFile: null,
   });
-  if (!Element.prototype.scrollIntoView) Element.prototype.scrollIntoView = () => undefined;
+  if (!Element.prototype.scrollIntoView)
+    Element.prototype.scrollIntoView = () => undefined;
 });
 afterEach(() => cleanup());
 
@@ -96,37 +106,75 @@ describe("StatusPanel", () => {
   });
 
   test("shows staged entry in Staged Changes section", async () => {
-    const entry = makeEntry({ path: "src/foo.ts", staged: "modified", unstaged: "unmodified" });
-    const status = new WorkingTreeStatus({ entries: [entry], hasConflicts: false });
+    const entry = makeEntry({
+      path: "src/foo.ts",
+      staged: "modified",
+      unstaged: "unmodified",
+    });
+    const status = new WorkingTreeStatus({
+      entries: [entry],
+      hasConflicts: false,
+    });
     renderPanel(makeFakeApi({ statusGet: vi.fn(async () => status) }));
     expect(await screen.findByText("src/foo.ts")).toBeTruthy();
     expect(await screen.findByText("Staged Changes")).toBeTruthy();
   });
 
   test("shows untracked entry in Unstaged Changes section", async () => {
-    const entry = makeEntry({ path: "new-file.ts", staged: "unmodified", unstaged: "unmodified", isUntracked: true });
-    const status = new WorkingTreeStatus({ entries: [entry], hasConflicts: false });
+    const entry = makeEntry({
+      path: "new-file.ts",
+      staged: "unmodified",
+      unstaged: "unmodified",
+      isUntracked: true,
+    });
+    const status = new WorkingTreeStatus({
+      entries: [entry],
+      hasConflicts: false,
+    });
     renderPanel(makeFakeApi({ statusGet: vi.fn(async () => status) }));
     expect(await screen.findByText("new-file.ts")).toBeTruthy();
     expect(await screen.findByText("Unstaged Changes")).toBeTruthy();
   });
 
   test("Stage All button calls stageFiles with all:true", async () => {
-    const unstaged = makeEntry({ path: "a.ts", staged: "unmodified", unstaged: "modified" });
-    const status = new WorkingTreeStatus({ entries: [unstaged], hasConflicts: false });
+    const unstaged = makeEntry({
+      path: "a.ts",
+      staged: "unmodified",
+      unstaged: "modified",
+    });
+    const status = new WorkingTreeStatus({
+      entries: [unstaged],
+      hasConflicts: false,
+    });
     const stageFilesFn = vi.fn(async () => undefined);
-    renderPanel(makeFakeApi({ statusGet: vi.fn(async () => status), stageFiles: stageFilesFn }));
+    renderPanel(
+      makeFakeApi({
+        statusGet: vi.fn(async () => status),
+        stageFiles: stageFilesFn,
+      }),
+    );
 
     await screen.findByText("Unstaged Changes");
     // "Stage All" button is in the unstaged toolbar
-    const stageAllBtn = await screen.findByRole("button", { name: "Stage All" });
+    const stageAllBtn = await screen.findByRole("button", {
+      name: "Stage All",
+    });
     fireEvent.click(stageAllBtn);
-    await waitFor(() => expect(stageFilesFn).toHaveBeenCalledWith(repoId, [], true));
+    await waitFor(() =>
+      expect(stageFilesFn).toHaveBeenCalledWith(repoId, [], true),
+    );
   });
 
   test("clicking a file row sets selectedDiffFile in the store", async () => {
-    const entry = makeEntry({ path: "changed.ts", staged: "unmodified", unstaged: "modified" });
-    const status = new WorkingTreeStatus({ entries: [entry], hasConflicts: false });
+    const entry = makeEntry({
+      path: "changed.ts",
+      staged: "unmodified",
+      unstaged: "modified",
+    });
+    const status = new WorkingTreeStatus({
+      entries: [entry],
+      hasConflicts: false,
+    });
     renderPanel(makeFakeApi({ statusGet: vi.fn(async () => status) }));
 
     const fileBtn = await screen.findByRole("button", { name: /changed\.ts/ });

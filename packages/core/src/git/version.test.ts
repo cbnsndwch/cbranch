@@ -14,7 +14,12 @@ import {
 
 describe("parseGitVersion", () => {
   test("parses a standard version line", () => {
-    expect(parseGitVersion("git version 2.54.0")).toEqual({ raw: "git version 2.54.0", major: 2, minor: 54, patch: 0 });
+    expect(parseGitVersion("git version 2.54.0")).toEqual({
+      raw: "git version 2.54.0",
+      major: 2,
+      minor: 54,
+      patch: 0,
+    });
   });
 
   test("parses a vendor-suffixed Windows version", () => {
@@ -27,7 +32,12 @@ describe("parseGitVersion", () => {
   });
 });
 
-const v = (major: number, minor: number): GitVersion => ({ raw: "", major, minor, patch: 0 });
+const v = (major: number, minor: number): GitVersion => ({
+  raw: "",
+  major,
+  minor,
+  patch: 0,
+});
 
 describe("atLeast", () => {
   test("true above and at the floor, false below", () => {
@@ -46,7 +56,9 @@ describe("classifyVersionOutput (NF-PKG-5 gate branches)", () => {
   });
 
   test("unparseable stdout → hostGitMissing", () => {
-    expect((classifyVersionOutput(0, "garbage") as GitError).code).toBe("hostGitMissing");
+    expect((classifyVersionOutput(0, "garbage") as GitError).code).toBe(
+      "hostGitMissing",
+    );
   });
 
   test("below floor → hostGitTooOld", () => {

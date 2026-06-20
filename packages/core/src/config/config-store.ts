@@ -64,9 +64,16 @@ export const defaultConfig = (): Config => ({
 });
 
 /** Resolve the config file path with the documented precedence (NF-CFG-7 / NF-PKG-9). */
-export const resolveConfigPath = (env: NodeJS.ProcessEnv = process.env): string => {
-  if (typeof env.CBRANCH_CONFIG === "string" && env.CBRANCH_CONFIG !== "") return env.CBRANCH_CONFIG;
-  if (process.platform === "win32" && typeof env.APPDATA === "string" && env.APPDATA !== "") {
+export const resolveConfigPath = (
+  env: NodeJS.ProcessEnv = process.env,
+): string => {
+  if (typeof env.CBRANCH_CONFIG === "string" && env.CBRANCH_CONFIG !== "")
+    return env.CBRANCH_CONFIG;
+  if (
+    process.platform === "win32" &&
+    typeof env.APPDATA === "string" &&
+    env.APPDATA !== ""
+  ) {
     return join(env.APPDATA, "cbranch", "config.json");
   }
   const xdg =
@@ -81,9 +88,14 @@ export interface ConfigStore {
   /** Load the config; ALWAYS succeeds with documented defaults on any problem. */
   readonly load: () => Effect.Effect<Config>;
   readonly listRecent: () => Effect.Effect<ReadonlyArray<RecentRepo>>;
-  readonly upsertRecent: (entry: RecentRepoEntry) => Effect.Effect<void, GitError>;
+  readonly upsertRecent: (
+    entry: RecentRepoEntry,
+  ) => Effect.Effect<void, GitError>;
   readonly removeRecent: (repoId: RepoId) => Effect.Effect<void, GitError>;
-  readonly renameRecent: (repoId: RepoId, name: string) => Effect.Effect<void, GitError>;
+  readonly renameRecent: (
+    repoId: RepoId,
+    name: string,
+  ) => Effect.Effect<void, GitError>;
 }
 
 export const makeConfigStore = (opts?: {
@@ -94,9 +106,10 @@ export const makeConfigStore = (opts?: {
 
   const load = (): Effect.Effect<Config> =>
     Effect.map(
-      Effect.tryPromise({ try: () => readFile(path, "utf8"), catch: () => null }).pipe(
-        Effect.orElseSucceed(() => null),
-      ),
+      Effect.tryPromise({
+        try: () => readFile(path, "utf8"),
+        catch: () => null,
+      }).pipe(Effect.orElseSucceed(() => null)),
       (raw) => (raw === null ? defaultConfig() : normalizeConfig(raw)),
     );
 
@@ -104,13 +117,21 @@ export const makeConfigStore = (opts?: {
     Effect.tryPromise({
       try: async () => {
         await mkdir(dirname(path), { recursive: true });
-        await writeFile(path, `${JSON.stringify({ ...config, version: CONFIG_VERSION }, null, 2)}\n`, "utf8");
+        await writeFile(
+          path,
+          `${JSON.stringify({ ...config, version: CONFIG_VERSION }, null, 2)}\n`,
+          "utf8",
+        );
       },
       catch: classifyNodeError,
     });
 
-  const mutate = (f: (recents: RecentRepoEntry[]) => RecentRepoEntry[]): Effect.Effect<void, GitError> =>
-    Effect.flatMap(load(), (config) => save({ ...config, recentRepos: f([...config.recentRepos]) }));
+  const mutate = (
+    f: (recents: RecentRepoEntry[]) => RecentRepoEntry[],
+  ): Effect.Effect<void, GitError> =>
+    Effect.flatMap(load(), (config) =>
+      save({ ...config, recentRepos: f([...config.recentRepos]) }),
+    );
 
   return {
     path,
@@ -128,9 +149,17 @@ export const makeConfigStore = (opts?: {
         ),
       ),
     // Move/insert at the top, de-duplicated by resolved path (P1-RECENT-1/3).
-    upsertRecent: (entry) => mutate((recents) => [entry, ...recents.filter((r) => r.path !== entry.path)]),
-    removeRecent: (repoId) => mutate((recents) => recents.filter((r) => r.repoId !== repoId)),
-    renameRecent: (repoId, name) => mutate((recents) => recents.map((r) => (r.repoId === repoId ? { ...r, name } : r))),
+    upsertRecent: (entry) =>
+      mutate((recents) => [
+        entry,
+        ...recents.filter((r) => r.path !== entry.path),
+      ]),
+    removeRecent: (repoId) =>
+      mutate((recents) => recents.filter((r) => r.repoId !== repoId)),
+    renameRecent: (repoId, name) =>
+      mutate((recents) =>
+        recents.map((r) => (r.repoId === repoId ? { ...r, name } : r)),
+      ),
   };
 };
 
@@ -148,7 +177,10 @@ const normalizeConfig = (raw: string): Config => {
   return {
     version: typeof obj.version === "number" ? obj.version : base.version,
     recentRepos: normalizeRecents(obj.recentRepos),
-    theme: obj.theme === "light" || obj.theme === "dark" || obj.theme === "system" ? obj.theme : base.theme,
+    theme:
+      obj.theme === "light" || obj.theme === "dark" || obj.theme === "system"
+        ? obj.theme
+        : base.theme,
     locale: typeof obj.locale === "string" ? obj.locale : base.locale,
     logLevel: isLogLevel(obj.logLevel) ? obj.logLevel : base.logLevel,
     bind: normalizeBind(obj.bind, base.bind),
@@ -169,13 +201,21 @@ const normalizeRecents = (value: unknown): RecentRepoEntry[] => {
       typeof e.repoId === "string" &&
       typeof e.lastOpenedAt === "number"
     ) {
-      out.push({ path: e.path, name: e.name, repoId: e.repoId, lastOpenedAt: e.lastOpenedAt });
+      out.push({
+        path: e.path,
+        name: e.name,
+        repoId: e.repoId,
+        lastOpenedAt: e.lastOpenedAt,
+      });
     }
   }
   return out;
 };
 
-const normalizeBind = (value: unknown, fallback: Config["bind"]): Config["bind"] => {
+const normalizeBind = (
+  value: unknown,
+  fallback: Config["bind"],
+): Config["bind"] => {
   if (typeof value !== "object" || value === null) return fallback;
   const b = value as Record<string, unknown>;
   return {
@@ -190,13 +230,15 @@ const isLogLevel = (v: unknown): v is Config["logLevel"] =>
 const pickNumbers = (value: unknown): Record<string, number> => {
   if (typeof value !== "object" || value === null) return {};
   const out: Record<string, number> = {};
-  for (const [k, v] of Object.entries(value)) if (typeof v === "number") out[k] = v;
+  for (const [k, v] of Object.entries(value))
+    if (typeof v === "number") out[k] = v;
   return out;
 };
 
 const pickStrings = (value: unknown): Record<string, string> => {
   if (typeof value !== "object" || value === null) return {};
   const out: Record<string, string> = {};
-  for (const [k, v] of Object.entries(value)) if (typeof v === "string") out[k] = v;
+  for (const [k, v] of Object.entries(value))
+    if (typeof v === "string") out[k] = v;
   return out;
 };

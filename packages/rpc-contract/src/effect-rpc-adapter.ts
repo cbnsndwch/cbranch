@@ -19,7 +19,13 @@
 // re-verify every symbol above on any deliberate effect bump.
 
 // --- RPC: catalog + server/client protocol + serialization ---
-export { Rpc, RpcClient, RpcGroup, RpcSerialization, RpcServer } from "effect/unstable/rpc";
+export {
+  Rpc,
+  RpcClient,
+  RpcGroup,
+  RpcSerialization,
+  RpcServer,
+} from "effect/unstable/rpc";
 
 // --- RPC test transport: in-memory client<->server, no sockets/serialization ---
 // P0.5: verified present at effect@4.0.0-beta.84 as `RpcTest.makeClient(group)`.

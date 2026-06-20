@@ -1,6 +1,12 @@
 import { describe, expect, test } from "vitest";
 
-import { buildDiffFiles, mapStatusLetter, parseNameStatus, parseNumstat, parsePatch } from "./diff";
+import {
+  buildDiffFiles,
+  mapStatusLetter,
+  parseNameStatus,
+  parseNumstat,
+  parsePatch,
+} from "./diff";
 
 describe("mapStatusLetter", () => {
   test("maps every git status letter to a ChangeCode", () => {
@@ -26,7 +32,10 @@ describe("parseNameStatus (-z)", () => {
   });
 
   test("parses rename (3-token) records with both paths", () => {
-    const buf = Buffer.from("R100\0b.txt\0b2.txt\0A\0bin.dat\0R100\0a.txt\0renamed.txt\0", "utf8");
+    const buf = Buffer.from(
+      "R100\0b.txt\0b2.txt\0A\0bin.dat\0R100\0a.txt\0renamed.txt\0",
+      "utf8",
+    );
     expect(parseNameStatus(buf)).toEqual([
       { status: "renamed", oldPath: "b.txt", newPath: "b2.txt" },
       { status: "added", oldPath: "bin.dat", newPath: "bin.dat" },
@@ -37,7 +46,10 @@ describe("parseNameStatus (-z)", () => {
 
 describe("parseNumstat (-z)", () => {
   test("parses plain counts", () => {
-    const buf = Buffer.from(["2\t1\ta.txt", "1\t0\tb.txt", "0\t1\tkeep.txt", ""].join("\0"), "utf8");
+    const buf = Buffer.from(
+      ["2\t1\ta.txt", "1\t0\tb.txt", "0\t1\tkeep.txt", ""].join("\0"),
+      "utf8",
+    );
     const out = parseNumstat(buf);
     expect(out).toEqual([
       { additions: 2, deletions: 1, oldPath: "a.txt", newPath: "a.txt" },
@@ -50,7 +62,12 @@ describe("parseNumstat (-z)", () => {
     const buf = Buffer.from("0\t0\t\0b.txt\0b2.txt\0-\t-\tbin.dat\0", "utf8");
     expect(parseNumstat(buf)).toEqual([
       { additions: 0, deletions: 0, oldPath: "b.txt", newPath: "b2.txt" },
-      { additions: null, deletions: null, oldPath: "bin.dat", newPath: "bin.dat" },
+      {
+        additions: null,
+        deletions: null,
+        oldPath: "bin.dat",
+        newPath: "bin.dat",
+      },
     ]);
   });
 });
@@ -82,7 +99,9 @@ describe("parsePatch", () => {
     expect(hunk.oldLines).toBe(3);
     expect(hunk.newStart).toBe(1);
     expect(hunk.newLines).toBe(4);
-    expect(hunk.lines.map((l) => [l.kind, l.oldLineNo, l.newLineNo, l.content])).toEqual([
+    expect(
+      hunk.lines.map((l) => [l.kind, l.oldLineNo, l.newLineNo, l.content]),
+    ).toEqual([
       ["context", 1, 1, "line1"],
       ["delete", 2, undefined, "line2"],
       ["add", undefined, 2, "CHANGED"],
@@ -120,8 +139,12 @@ describe("parsePatch", () => {
 
 describe("buildDiffFiles", () => {
   test("zips name-status + numstat + patch by order; binary ⇒ null counts + empty hunks", () => {
-    const nameStatus = parseNameStatus(Buffer.from("M\0a.txt\0A\0bin.dat\0", "utf8"));
-    const numstat = parseNumstat(Buffer.from("2\t1\ta.txt\0-\t-\tbin.dat\0", "utf8"));
+    const nameStatus = parseNameStatus(
+      Buffer.from("M\0a.txt\0A\0bin.dat\0", "utf8"),
+    );
+    const numstat = parseNumstat(
+      Buffer.from("2\t1\ta.txt\0-\t-\tbin.dat\0", "utf8"),
+    );
     const patch = parsePatch(
       [
         "diff --git a/a.txt b/a.txt",

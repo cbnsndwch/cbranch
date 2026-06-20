@@ -7,12 +7,17 @@
 
 import { Effect, type Exit, type Scope } from "effect";
 
-export const run = <A, E>(effect: Effect.Effect<A, E>): Promise<A> => Effect.runPromise(effect);
+export const run = <A, E>(effect: Effect.Effect<A, E>): Promise<A> =>
+  Effect.runPromise(effect);
 
-export const runExit = <A, E>(effect: Effect.Effect<A, E>): Promise<Exit.Exit<A, E>> => Effect.runPromiseExit(effect);
+export const runExit = <A, E>(
+  effect: Effect.Effect<A, E>,
+): Promise<Exit.Exit<A, E>> => Effect.runPromiseExit(effect);
 
-export const runScoped = <A, E>(effect: Effect.Effect<A, E, Scope.Scope>): Promise<A> =>
-  Effect.runPromise(Effect.scoped(effect));
+export const runScoped = <A, E>(
+  effect: Effect.Effect<A, E, Scope.Scope>,
+): Promise<A> => Effect.runPromise(Effect.scoped(effect));
 
-export const runScopedExit = <A, E>(effect: Effect.Effect<A, E, Scope.Scope>): Promise<Exit.Exit<A, E>> =>
-  Effect.runPromiseExit(Effect.scoped(effect));
+export const runScopedExit = <A, E>(
+  effect: Effect.Effect<A, E, Scope.Scope>,
+): Promise<Exit.Exit<A, E>> => Effect.runPromiseExit(Effect.scoped(effect));

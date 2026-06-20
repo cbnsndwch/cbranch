@@ -25,13 +25,18 @@ export const useInvalidationBus = (repoId: RepoId | null): void => {
     if (repoId === null) return;
     let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
     const scheduleReconnect = () => {
-      reconnectTimer = setTimeout(() => setGeneration((g) => g + 1), RECONNECT_DELAY_MS);
+      reconnectTimer = setTimeout(
+        () => setGeneration((g) => g + 1),
+        RECONNECT_DELAY_MS,
+      );
     };
 
     const unsubscribe = api.subscribe(repoId, {
       onItem: (event) => {
         for (const domain of event.domains) {
-          void queryClient.invalidateQueries({ queryKey: domainKey(event.repoId, domain) });
+          void queryClient.invalidateQueries({
+            queryKey: domainKey(event.repoId, domain),
+          });
         }
       },
       onError: () => {

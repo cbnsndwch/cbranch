@@ -3,8 +3,16 @@ import { join } from "node:path";
 import { Effect } from "effect";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 
-import { createFixtureWorkspace, type FixtureWorkspace } from "../testing/fixtures";
-import { worktreeAdd, worktreeList, worktreePrune, worktreeRemove } from "./worktrees";
+import {
+  createFixtureWorkspace,
+  type FixtureWorkspace,
+} from "../testing/fixtures";
+import {
+  worktreeAdd,
+  worktreeList,
+  worktreePrune,
+  worktreeRemove,
+} from "./worktrees";
 
 describe("worktreeList", () => {
   let ws: FixtureWorkspace;
@@ -37,7 +45,9 @@ describe("worktreeList", () => {
     await repo.commit({ message: "init", files: { "a.txt": "a" } });
     const wtPath = join(ws.root, "wt-add-linked");
 
-    const info = await Effect.runPromise(worktreeAdd(repo.dir, wtPath, { newBranch: "feat/linked" }));
+    const info = await Effect.runPromise(
+      worktreeAdd(repo.dir, wtPath, { newBranch: "feat/linked" }),
+    );
 
     expect(info.path).toBe(wtPath);
     expect(info.isMain).toBe(false);
@@ -54,7 +64,9 @@ describe("worktreeList", () => {
     await repo.commit({ message: "init", files: { "a.txt": "a" } });
     const wtPath = join(ws.root, "wt-remove-linked");
 
-    await Effect.runPromise(worktreeAdd(repo.dir, wtPath, { newBranch: "feat/to-remove" }));
+    await Effect.runPromise(
+      worktreeAdd(repo.dir, wtPath, { newBranch: "feat/to-remove" }),
+    );
     let list = await Effect.runPromise(worktreeList(repo.dir));
     expect(list).toHaveLength(2);
 
@@ -68,7 +80,9 @@ describe("worktreeList", () => {
     const repo = await ws.createRepo("wt-prune");
     await repo.commit({ message: "init", files: { "a.txt": "a" } });
 
-    await expect(Effect.runPromise(worktreePrune(repo.dir))).resolves.toBeUndefined();
+    await expect(
+      Effect.runPromise(worktreePrune(repo.dir)),
+    ).resolves.toBeUndefined();
   });
 
   test("worktreeAdd with existing branch checks out that branch", async () => {
@@ -77,7 +91,9 @@ describe("worktreeList", () => {
     await repo.branch("side");
     const wtPath = join(ws.root, "wt-existing-linked");
 
-    const info = await Effect.runPromise(worktreeAdd(repo.dir, wtPath, { branch: "side" }));
+    const info = await Effect.runPromise(
+      worktreeAdd(repo.dir, wtPath, { branch: "side" }),
+    );
 
     expect(info.branch).toBe("refs/heads/side");
     expect(info.path).toBe(wtPath);
@@ -110,7 +126,9 @@ describe("worktreeList", () => {
     await repo.commit({ message: "init", files: { "a.txt": "a" } });
     const wtPath = join(ws.root, "wt-locked-nr-linked");
 
-    await Effect.runPromise(worktreeAdd(repo.dir, wtPath, { newBranch: "feat/lock-nr" }));
+    await Effect.runPromise(
+      worktreeAdd(repo.dir, wtPath, { newBranch: "feat/lock-nr" }),
+    );
     await repo.git(["worktree", "lock", wtPath]);
 
     const list = await Effect.runPromise(worktreeList(repo.dir));
@@ -124,7 +142,9 @@ describe("worktreeList", () => {
     await repo.commit({ message: "init", files: { "a.txt": "a" } });
     const wtPath = join(ws.root, "wt-lr-linked");
 
-    await Effect.runPromise(worktreeAdd(repo.dir, wtPath, { newBranch: "feat/lr" }));
+    await Effect.runPromise(
+      worktreeAdd(repo.dir, wtPath, { newBranch: "feat/lr" }),
+    );
     await repo.git(["worktree", "lock", "--reason", "CI hold", wtPath]);
 
     const list = await Effect.runPromise(worktreeList(repo.dir));
@@ -166,7 +186,9 @@ describe("worktreeList", () => {
     const wtPath = join(ws.root, "wt-locked-linked");
 
     // Create the worktree and then lock it via raw git (with a reason to cover lockReason path)
-    await Effect.runPromise(worktreeAdd(repo.dir, wtPath, { newBranch: "feat/locked" }));
+    await Effect.runPromise(
+      worktreeAdd(repo.dir, wtPath, { newBranch: "feat/locked" }),
+    );
     await repo.git(["worktree", "lock", "--reason", "keep it safe", wtPath]);
 
     const list = await Effect.runPromise(worktreeList(repo.dir));
@@ -178,11 +200,16 @@ describe("worktreeList", () => {
 
   test("worktreeAdd with startPoint — worktree checks out commit at startPoint", async () => {
     const repo = await ws.createRepo("wt-startpoint");
-    const oid1 = await repo.commit({ message: "first", files: { "a.txt": "v1" } });
+    const oid1 = await repo.commit({
+      message: "first",
+      files: { "a.txt": "v1" },
+    });
     await repo.commit({ message: "second", files: { "a.txt": "v2" } });
     const wtPath = join(ws.root, "wt-startpoint-linked");
 
-    const info = await Effect.runPromise(worktreeAdd(repo.dir, wtPath, { newBranch: "feat/sp", startPoint: oid1 }));
+    const info = await Effect.runPromise(
+      worktreeAdd(repo.dir, wtPath, { newBranch: "feat/sp", startPoint: oid1 }),
+    );
 
     expect(info.headOid).toBe(oid1);
   });
@@ -194,7 +221,9 @@ describe("worktreeList", () => {
     await repo.commit({ message: "init", files: { "a.txt": "a" } });
     const wtPath = join(ws.root, "wt-force-remove-linked");
 
-    await Effect.runPromise(worktreeAdd(repo.dir, wtPath, { newBranch: "feat/force" }));
+    await Effect.runPromise(
+      worktreeAdd(repo.dir, wtPath, { newBranch: "feat/force" }),
+    );
 
     // Add an uncommitted change in the linked worktree so non-forced remove would fail
     await writeFile(join(wtPath, "a.txt"), "modified");
@@ -213,7 +242,9 @@ describe("worktreeList", () => {
     await repo.commit({ message: "init", files: { "a.txt": "a" } });
     const wtPath = join(ws.root, "wt-prunable-linked");
 
-    await Effect.runPromise(worktreeAdd(repo.dir, wtPath, { newBranch: "feat/prunable" }));
+    await Effect.runPromise(
+      worktreeAdd(repo.dir, wtPath, { newBranch: "feat/prunable" }),
+    );
 
     // Delete the worktree directory without going through git — makes it prunable
     await rm(wtPath, { recursive: true, force: true });

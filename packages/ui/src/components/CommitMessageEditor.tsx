@@ -5,7 +5,12 @@ interface CommitMessageEditorProps {
   onBodyChange: (s: string) => void;
 }
 
-export function CommitMessageEditor({ subject, body, onSubjectChange, onBodyChange }: CommitMessageEditorProps) {
+export function CommitMessageEditor({
+  subject,
+  body,
+  onSubjectChange,
+  onBodyChange,
+}: CommitMessageEditorProps) {
   const overLimit = subject.length > 72;
   return (
     <div className="flex flex-col gap-1 px-2 py-1">
@@ -19,7 +24,10 @@ export function CommitMessageEditor({ subject, body, onSubjectChange, onBodyChan
           className="border-input focus:ring-ring/50 h-7 w-full rounded-none border bg-transparent px-2 text-xs focus:ring-1 focus:outline-none"
         />
         {overLimit && (
-          <span className="text-destructive absolute top-1 right-2 text-[10px]" aria-live="polite">
+          <span
+            className="text-destructive absolute top-1 right-2 text-[10px]"
+            aria-live="polite"
+          >
             {subject.length}/72
           </span>
         )}

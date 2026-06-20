@@ -14,7 +14,9 @@ function PlaceholderPage({ title }: { readonly title: string }) {
   return (
     <div className="flex h-dvh flex-col items-center justify-center gap-2 text-center">
       <p className="text-sm font-medium">{title}</p>
-      <p className="text-muted-foreground text-xs">Coming in a later milestone.</p>
+      <p className="text-muted-foreground text-xs">
+        Coming in a later milestone.
+      </p>
     </div>
   );
 }
@@ -47,11 +49,26 @@ export const router = createBrowserRouter([
       { path: "/repos/:repoId", element: <App /> },
       { path: "/repos/:repoId/commits/:oid", element: <App /> },
       // Future surfaces — URL namespace reserved now, UI to follow (D13).
-      { path: "/repos/:repoId/branches/:name", element: <PlaceholderPage title="Branch history" /> },
-      { path: "/repos/:repoId/tags/:name", element: <PlaceholderPage title="Tag history" /> },
-      { path: "/repos/:repoId/worktrees/:id", element: <PlaceholderPage title="Worktree view" /> },
-      { path: "/repos/:repoId/stash/:index", element: <PlaceholderPage title="Stash detail" /> },
-      { path: "/repos/:repoId/blame/:rev/*", element: <PlaceholderPage title="File blame" /> },
+      {
+        path: "/repos/:repoId/branches/:name",
+        element: <PlaceholderPage title="Branch history" />,
+      },
+      {
+        path: "/repos/:repoId/tags/:name",
+        element: <PlaceholderPage title="Tag history" />,
+      },
+      {
+        path: "/repos/:repoId/worktrees/:id",
+        element: <PlaceholderPage title="Worktree view" />,
+      },
+      {
+        path: "/repos/:repoId/stash/:index",
+        element: <PlaceholderPage title="Stash detail" />,
+      },
+      {
+        path: "/repos/:repoId/blame/:rev/*",
+        element: <PlaceholderPage title="File blame" />,
+      },
     ],
   },
 ]);

@@ -1,5 +1,11 @@
 // @vitest-environment jsdom
-import { CommitDetail, DiffFile, Oid, RepoId, Signature } from "@cbranch/rpc-contract";
+import {
+  CommitDetail,
+  DiffFile,
+  Oid,
+  RepoId,
+  Signature,
+} from "@cbranch/rpc-contract";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { type ReactNode } from "react";
@@ -46,9 +52,16 @@ const file = (over: Partial<DiffFile> & { newPath: string }): DiffFile =>
     newMode: over.newMode,
   });
 
-const sig = new Signature({ name: "Ada", email: "ada@x", when: { epochSeconds: 1, tzOffsetMinutes: 0 } });
+const sig = new Signature({
+  name: "Ada",
+  email: "ada@x",
+  when: { epochSeconds: 1, tzOffsetMinutes: 0 },
+});
 
-const fakeApi = (files: ReadonlyArray<DiffFile>, parents: ReadonlyArray<Oid>): CbranchApi =>
+const fakeApi = (
+  files: ReadonlyArray<DiffFile>,
+  parents: ReadonlyArray<Oid>,
+): CbranchApi =>
   ({
     commitDiff: vi.fn(async () => files),
     commitDetail: vi.fn(
@@ -68,7 +81,9 @@ const fakeApi = (files: ReadonlyArray<DiffFile>, parents: ReadonlyArray<Oid>): C
   }) as unknown as CbranchApi;
 
 const renderWithApi = (ui: ReactNode, api: CbranchApi) => {
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
   return render(
     <QueryClientProvider client={queryClient}>
       <ApiProvider api={api}>{ui}</ApiProvider>
@@ -77,9 +92,16 @@ const renderWithApi = (ui: ReactNode, api: CbranchApi) => {
 };
 
 beforeEach(() => {
-  Object.defineProperty(HTMLElement.prototype, "offsetHeight", { configurable: true, value: 600 });
-  Object.defineProperty(HTMLElement.prototype, "offsetWidth", { configurable: true, value: 400 });
-  if (!Element.prototype.scrollIntoView) Element.prototype.scrollIntoView = () => undefined;
+  Object.defineProperty(HTMLElement.prototype, "offsetHeight", {
+    configurable: true,
+    value: 600,
+  });
+  Object.defineProperty(HTMLElement.prototype, "offsetWidth", {
+    configurable: true,
+    value: 400,
+  });
+  if (!Element.prototype.scrollIntoView)
+    Element.prototype.scrollIntoView = () => undefined;
   useUiStore.setState({ diffView: "inline" });
 });
 afterEach(() => {
@@ -108,7 +130,10 @@ describe("ChangedFileList (P1-UI-DIFF-1)", () => {
 
 describe("DiffPanel (P1-DIFF-*)", () => {
   test("renders the selected file's hunk and the layout controls", async () => {
-    renderWithApi(<DiffPanel repoId={repoId} oid={oid} />, fakeApi([file({ newPath: "a.ts" })], []));
+    renderWithApi(
+      <DiffPanel repoId={repoId} oid={oid} />,
+      fakeApi([file({ newPath: "a.ts" })], []),
+    );
     expect(await screen.findByText(/added line/)).toBeTruthy();
     expect(screen.getByLabelText("Side-by-side diff")).toBeTruthy();
   });
@@ -116,19 +141,28 @@ describe("DiffPanel (P1-DIFF-*)", () => {
   test("a merge commit exposes the base/parent selector (P1-DET-3)", async () => {
     const p1 = Oid.make("1111111111111111111111111111111111111111");
     const p2 = Oid.make("2222222222222222222222222222222222222222");
-    renderWithApi(<DiffPanel repoId={repoId} oid={oid} />, fakeApi([file({ newPath: "a.ts" })], [p1, p2]));
+    renderWithApi(
+      <DiffPanel repoId={repoId} oid={oid} />,
+      fakeApi([file({ newPath: "a.ts" })], [p1, p2]),
+    );
     expect(await screen.findByLabelText("Diff base")).toBeTruthy();
     expect(screen.getByText("combined")).toBeTruthy();
   });
 
   test("submodule entries render as a placeholder, not text (P1-DIFF-10)", async () => {
-    const api = fakeApi([file({ newPath: "vendor/lib", newMode: "160000", hunks: [] })], []);
+    const api = fakeApi(
+      [file({ newPath: "vendor/lib", newMode: "160000", hunks: [] })],
+      [],
+    );
     renderWithApi(<DiffPanel repoId={repoId} oid={oid} />, api);
     expect(await screen.findByText(/Submodule/)).toBeTruthy();
   });
 
   test("binary changes render the binary card (P1-DIFF-8)", async () => {
-    const api = fakeApi([file({ newPath: "logo.png", isBinary: true, hunks: [] })], []);
+    const api = fakeApi(
+      [file({ newPath: "logo.png", isBinary: true, hunks: [] })],
+      [],
+    );
     renderWithApi(<DiffPanel repoId={repoId} oid={oid} />, api);
     expect(await screen.findByText("Binary file")).toBeTruthy();
   });

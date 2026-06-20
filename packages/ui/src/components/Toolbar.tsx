@@ -1,4 +1,10 @@
-import { ArrowDownUp, Download, FolderOpen, RefreshCw, Upload } from "lucide-react";
+import {
+  ArrowDownUp,
+  Download,
+  FolderOpen,
+  RefreshCw,
+  Upload,
+} from "lucide-react";
 import { type FormEvent, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -20,11 +26,15 @@ export function Toolbar() {
   const api = useApi();
 
   const repoRoot = state?.repoRoot ?? "—";
-  const currentBranch = state?.isDetached ? "HEAD" : (state?.currentBranch ?? "—");
+  const currentBranch = state?.isDetached
+    ? "HEAD"
+    : (state?.currentBranch ?? "—");
   const defaultRemote = remotes?.[0]?.name ?? "origin";
 
   const syncUnsubRef = useRef<(() => void) | null>(null);
-  const [syncRunning, setSyncRunning] = useState<"fetch" | "pull" | "push" | null>(null);
+  const [syncRunning, setSyncRunning] = useState<
+    "fetch" | "pull" | "push" | null
+  >(null);
   const [pullMode, setPullMode] = useState<PullMode>("ff-only");
 
   useEffect(() => {
@@ -123,8 +133,14 @@ export function Toolbar() {
           setSyncRunning(null);
           syncUnsubRef.current = null;
           const msg = String(err);
-          if (msg.includes("nonFastForward") || msg.includes("non-fast-forward")) {
-            toast.error("Push rejected (non-fast-forward). Pull first, then retry.", { id: toastId });
+          if (
+            msg.includes("nonFastForward") ||
+            msg.includes("non-fast-forward")
+          ) {
+            toast.error(
+              "Push rejected (non-fast-forward). Pull first, then retry.",
+              { id: toastId },
+            );
           } else {
             toast.error("Push failed: " + msg, { id: toastId });
           }
@@ -157,13 +173,21 @@ export function Toolbar() {
       >
         <FolderOpen className="size-4" aria-hidden="true" />
       </button>
-      <button type="button" className="flex h-[22px] items-center border px-1 py-0.5" aria-label="Refresh">
+      <button
+        type="button"
+        className="flex h-[22px] items-center border px-1 py-0.5"
+        aria-label="Refresh"
+      >
         <RefreshCw className="size-4" aria-hidden="true" />
       </button>
       {/* Repo path */}
-      <span className="flex h-[22px] max-w-[200px] items-center truncate border px-1 text-[11px]">{repoRoot}</span>
+      <span className="flex h-[22px] max-w-[200px] items-center truncate border px-1 text-[11px]">
+        {repoRoot}
+      </span>
       {/* Current branch */}
-      <span className="flex h-[22px] items-center border px-1 text-[11px]">{currentBranch}</span>
+      <span className="flex h-[22px] items-center border px-1 text-[11px]">
+        {currentBranch}
+      </span>
       <div className="flex-1" />
       {/* Ref scope */}
       <select

@@ -20,4 +20,10 @@ export {
 } from "./config";
 export { isAllowedRequest, makeOriginGuard } from "./origin-guard";
 export { handlersLayer } from "./rpc-handlers";
-export { containBlobPath, guessContentType, safeRev, SIDE_CHANNEL_PATH, sideChannelRoute } from "./side-channel";
+export {
+  containBlobPath,
+  guessContentType,
+  safeRev,
+  SIDE_CHANNEL_PATH,
+  sideChannelRoute,
+} from "./side-channel";

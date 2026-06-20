@@ -7,7 +7,8 @@ import { type CbranchRpcClient, RpcClientService } from "./client";
 
 // A fake client (NF-TEST-7: no live host) implementing just the methods exercised here.
 const fakeClient = {
-  RepoOpen: ({ path }: { path: string }) => Effect.succeed({ repoId: RepoId.make("r1"), root: path }),
+  RepoOpen: ({ path }: { path: string }) =>
+    Effect.succeed({ repoId: RepoId.make("r1"), root: path }),
   LogStream: (_query: unknown) =>
     Stream.fromIterable([
       { oid: Oid.make("a"), subject: "a" },
@@ -15,7 +16,9 @@ const fakeClient = {
     ]),
 } as unknown as CbranchRpcClient;
 
-const runtime = ManagedRuntime.make(Layer.succeed(RpcClientService, fakeClient));
+const runtime = ManagedRuntime.make(
+  Layer.succeed(RpcClientService, fakeClient),
+);
 const api = makeApi(runtime);
 
 describe("makeApi", () => {

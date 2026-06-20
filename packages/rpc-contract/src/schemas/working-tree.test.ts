@@ -37,7 +37,13 @@ const statusEntry = new StatusEntry({
   worktreeMode: "100644",
 });
 
-const statusBranch = new StatusBranch({ head: "main", upstream: "origin/main", ahead: 2, behind: 0, oid });
+const statusBranch = new StatusBranch({
+  head: "main",
+  upstream: "origin/main",
+  ahead: 2,
+  behind: 0,
+  oid,
+});
 
 const workingTreeStatus = new WorkingTreeStatus({
   entries: [statusEntry],
@@ -48,7 +54,15 @@ const workingTreeStatus = new WorkingTreeStatus({
 const patchSelection = new PatchSelection({
   repoId,
   path: "src/app.ts",
-  hunks: [new HunkSelection({ oldStart: 1, oldLines: 3, newStart: 1, newLines: 4, selectedLines: [2, 3] })],
+  hunks: [
+    new HunkSelection({
+      oldStart: 1,
+      oldLines: 3,
+      newStart: 1,
+      newLines: 4,
+      selectedLines: [2, 3],
+    }),
+  ],
 });
 
 const commitInput = new CommitInput({
@@ -63,14 +77,20 @@ const commitInput = new CommitInput({
   noVerify: false,
 });
 
-const commitCreated = new CommitCreated({ oid, shortOid: "1111111", subject: "feat: add thing" });
+const commitCreated = new CommitCreated({
+  oid,
+  shortOid: "1111111",
+  subject: "feat: add thing",
+});
 const commitMessage = new CommitMessage({
   subject: "feat: add thing",
   body: "the body",
   raw: "feat: add thing\n\nthe body",
 });
 
-const cases: ReadonlyArray<readonly [string, Schema.Codec<unknown, unknown>, unknown]> = [
+const cases: ReadonlyArray<
+  readonly [string, Schema.Codec<unknown, unknown>, unknown]
+> = [
   ["StatusEntry", StatusEntry, statusEntry],
   ["StatusBranch", StatusBranch, statusBranch],
   ["WorkingTreeStatus", WorkingTreeStatus, workingTreeStatus],
@@ -81,11 +101,14 @@ const cases: ReadonlyArray<readonly [string, Schema.Codec<unknown, unknown>, unk
 ];
 
 describe("working-tree Schemas round-trip (encode → decode)", () => {
-  test.each(cases)("%s encodes JSON-safe and decodes back unchanged", (_name, schema, instance) => {
-    const encoded = Schema.encodeUnknownSync(schema)(instance);
-    expect(JSON.parse(JSON.stringify(encoded))).toEqual(encoded);
-    expect(Schema.decodeUnknownSync(schema)(encoded)).toEqual(instance);
-  });
+  test.each(cases)(
+    "%s encodes JSON-safe and decodes back unchanged",
+    (_name, schema, instance) => {
+      const encoded = Schema.encodeUnknownSync(schema)(instance);
+      expect(JSON.parse(JSON.stringify(encoded))).toEqual(encoded);
+      expect(Schema.decodeUnknownSync(schema)(encoded)).toEqual(instance);
+    },
+  );
 
   test("optional fields may be absent (minimal instances decode)", () => {
     const minimal = new StatusEntry({
@@ -103,7 +126,10 @@ describe("working-tree Schemas round-trip (encode → decode)", () => {
   });
 
   test("a malformed WorkingTreeStatus is a typed failure, not a throw", () => {
-    const exit = Schema.decodeUnknownExit(WorkingTreeStatus)({ entries: "nope", hasConflicts: 1 });
+    const exit = Schema.decodeUnknownExit(WorkingTreeStatus)({
+      entries: "nope",
+      hasConflicts: 1,
+    });
     expect(exit._tag).toBe("Failure");
   });
 });

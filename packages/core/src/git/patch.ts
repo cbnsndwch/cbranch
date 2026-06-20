@@ -8,7 +8,10 @@ import { runGit, runGitOk, decodeUtf8 } from "./run-git";
 const BACKSLASH = String.fromCharCode(92);
 const NL = "\n";
 
-export const buildPatch = (diffFile: DiffFile, selection: PatchSelection): string => {
+export const buildPatch = (
+  diffFile: DiffFile,
+  selection: PatchSelection,
+): string => {
   if (diffFile.isBinary) throw new Error("binary file");
 
   const path = selection.path;
@@ -25,7 +28,11 @@ export const buildPatch = (diffFile: DiffFile, selection: PatchSelection): strin
     lines.push("--- a/" + path);
     lines.push("+++ /dev/null");
   } else {
-    if (diffFile.oldMode && diffFile.newMode && diffFile.oldMode !== diffFile.newMode) {
+    if (
+      diffFile.oldMode &&
+      diffFile.newMode &&
+      diffFile.oldMode !== diffFile.newMode
+    ) {
       lines.push("old mode " + diffFile.oldMode);
       lines.push("new mode " + diffFile.newMode);
     }
@@ -34,7 +41,9 @@ export const buildPatch = (diffFile: DiffFile, selection: PatchSelection): strin
   }
 
   for (const sel of selection.hunks) {
-    const hunk = diffFile.hunks.find((h) => h.oldStart === sel.oldStart && h.newStart === sel.newStart);
+    const hunk = diffFile.hunks.find(
+      (h) => h.oldStart === sel.oldStart && h.newStart === sel.newStart,
+    );
     if (hunk === undefined) continue;
 
     const selectedSet = new Set(sel.selectedLines);
@@ -73,7 +82,17 @@ export const buildPatch = (diffFile: DiffFile, selection: PatchSelection): strin
       }
     }
 
-    lines.push("@@ -" + hunk.oldStart + "," + oldCount + " +" + hunk.newStart + "," + newCount + " @@");
+    lines.push(
+      "@@ -" +
+        hunk.oldStart +
+        "," +
+        oldCount +
+        " +" +
+        hunk.newStart +
+        "," +
+        newCount +
+        " @@",
+    );
     for (const bl of bodyLines) lines.push(bl);
   }
 
@@ -95,10 +114,18 @@ const applyPatch = (
     });
     if (checkResult.exitCode !== 0) {
       return yield* Effect.fail(
-        gitError("gitFailed", "patch check failed: " + decodeUtf8(checkResult.stderr).slice(0, 200)),
+        gitError(
+          "gitFailed",
+          "patch check failed: " + decodeUtf8(checkResult.stderr).slice(0, 200),
+        ),
       );
     }
-    yield* runGitOk({ cwd, args: ["apply", "--recount", ...extraArgs, "-"], read: false, stdin });
+    yield* runGitOk({
+      cwd,
+      args: ["apply", "--recount", ...extraArgs, "-"],
+      read: false,
+      stdin,
+    });
   });
 
 export const stageHunks = (
@@ -107,7 +134,10 @@ export const stageHunks = (
 ): Effect.Effect<void, import("@cbranch/rpc-contract").GitError> =>
   Effect.gen(function* () {
     const diffFile = yield* diffWorkingFile(cwd, selection.path, false);
-    if (diffFile.isBinary) return yield* Effect.fail(gitError("gitFailed", "cannot partial-stage binary file"));
+    if (diffFile.isBinary)
+      return yield* Effect.fail(
+        gitError("gitFailed", "cannot partial-stage binary file"),
+      );
     yield* applyPatch(cwd, buildPatch(diffFile, selection), ["--cached"]);
   });
 
@@ -117,8 +147,14 @@ export const unstageHunks = (
 ): Effect.Effect<void, import("@cbranch/rpc-contract").GitError> =>
   Effect.gen(function* () {
     const diffFile = yield* diffWorkingFile(cwd, selection.path, true);
-    if (diffFile.isBinary) return yield* Effect.fail(gitError("gitFailed", "cannot partial-stage binary file"));
-    yield* applyPatch(cwd, buildPatch(diffFile, selection), ["--reverse", "--cached"]);
+    if (diffFile.isBinary)
+      return yield* Effect.fail(
+        gitError("gitFailed", "cannot partial-stage binary file"),
+      );
+    yield* applyPatch(cwd, buildPatch(diffFile, selection), [
+      "--reverse",
+      "--cached",
+    ]);
   });
 
 export const discardHunks = (
@@ -127,6 +163,9 @@ export const discardHunks = (
 ): Effect.Effect<void, import("@cbranch/rpc-contract").GitError> =>
   Effect.gen(function* () {
     const diffFile = yield* diffWorkingFile(cwd, selection.path, false);
-    if (diffFile.isBinary) return yield* Effect.fail(gitError("gitFailed", "cannot partial-stage binary file"));
+    if (diffFile.isBinary)
+      return yield* Effect.fail(
+        gitError("gitFailed", "cannot partial-stage binary file"),
+      );
     yield* applyPatch(cwd, buildPatch(diffFile, selection), ["--reverse"]);
   });

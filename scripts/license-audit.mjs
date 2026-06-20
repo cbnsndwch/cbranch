@@ -46,7 +46,14 @@ const DEV_EXTRA = new Set(["MPL-2.0"]);
 const DEV_ALLOWLIST = new Set([...PROD_ALLOWLIST, ...DEV_EXTRA]);
 
 // Strong copyleft / network-copyleft — rejected EVERYWHERE, even in dev tooling.
-const ALWAYS_DENY = new Set(["GPL-2.0", "GPL-3.0", "LGPL-2.1", "LGPL-3.0", "AGPL-3.0", "SSPL-1.0"]);
+const ALWAYS_DENY = new Set([
+  "GPL-2.0",
+  "GPL-3.0",
+  "LGPL-2.1",
+  "LGPL-3.0",
+  "AGPL-3.0",
+  "SSPL-1.0",
+]);
 
 function tokenizeSpdx(expr) {
   return expr
@@ -63,13 +70,18 @@ function expressionPasses(expr, allow) {
   if (allow.has(expr)) return true;
   const tokens = tokenizeSpdx(expr);
   if (tokens.length === 0) return false;
-  return /\bOR\b/i.test(expr) ? tokens.some((t) => allow.has(t)) : tokens.every((t) => allow.has(t));
+  return /\bOR\b/i.test(expr)
+    ? tokens.some((t) => allow.has(t))
+    : tokens.every((t) => allow.has(t));
 }
 
 function getRecords(args) {
   let raw;
   try {
-    raw = execSync(`pnpm licenses list ${args} --json`, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+    raw = execSync(`pnpm licenses list ${args} --json`, {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
   } catch (err) {
     raw = err.stdout?.toString() ?? "";
     if (!raw.trim()) return [];
@@ -78,20 +90,25 @@ function getRecords(args) {
   try {
     data = JSON.parse(raw);
   } catch {
-    console.error(`license-audit: could not parse \`pnpm licenses list ${args} --json\`.`);
+    console.error(
+      `license-audit: could not parse \`pnpm licenses list ${args} --json\`.`,
+    );
     process.exit(1);
   }
   const records = [];
   const push = (entry, licenseKey) => {
     const license = entry.license ?? licenseKey ?? "UNKNOWN";
-    const versions = entry.versions ?? (entry.version ? [entry.version] : ["?"]);
-    for (const version of versions) records.push({ name: entry.name, version, license });
+    const versions =
+      entry.versions ?? (entry.version ? [entry.version] : ["?"]);
+    for (const version of versions)
+      records.push({ name: entry.name, version, license });
   };
   if (Array.isArray(data)) {
     for (const entry of data) push(entry, entry.license);
   } else if (data && typeof data === "object") {
     for (const [licenseKey, entries] of Object.entries(data)) {
-      if (Array.isArray(entries)) for (const entry of entries) push(entry, licenseKey);
+      if (Array.isArray(entries))
+        for (const entry of entries) push(entry, licenseKey);
     }
   }
   return records;
@@ -100,11 +117,15 @@ function getRecords(args) {
 function audit(label, records, allow) {
   const offenders = [
     ...new Set(
-      records.filter((r) => !expressionPasses(r.license, allow)).map((r) => `${r.name}@${r.version} -> ${r.license}`),
+      records
+        .filter((r) => !expressionPasses(r.license, allow))
+        .map((r) => `${r.name}@${r.version} -> ${r.license}`),
     ),
   ].toSorted();
   if (offenders.length > 0) {
-    console.error(`license-audit FAILED (${label}): ${offenders.length} dependency license(s) not allowed:\n`);
+    console.error(
+      `license-audit FAILED (${label}): ${offenders.length} dependency license(s) not allowed:\n`,
+    );
     for (const o of offenders) console.error(`  - ${o}`);
     console.error(`\nAllowed (${label}): ${[...allow].join(", ")}`);
     return false;
@@ -117,7 +138,9 @@ const prod = getRecords("--prod");
 const all = getRecords("");
 
 if (prod.length === 0 && all.length === 0) {
-  console.log("license-audit: no dependency licenses reported (empty tree?). Treating as pass.");
+  console.log(
+    "license-audit: no dependency licenses reported (empty tree?). Treating as pass.",
+  );
   process.exit(0);
 }
 

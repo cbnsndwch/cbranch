@@ -1,8 +1,14 @@
-import { type ChangeCode, type StatusEntry, type WorkingTreeStatus } from "@cbranch/rpc-contract";
+import {
+  type ChangeCode,
+  type StatusEntry,
+  type WorkingTreeStatus,
+} from "@cbranch/rpc-contract";
 
-export const isStagedChange = (e: StatusEntry): boolean => e.staged !== "unmodified";
+export const isStagedChange = (e: StatusEntry): boolean =>
+  e.staged !== "unmodified";
 
-export const isUnstagedChange = (e: StatusEntry): boolean => e.unstaged !== "unmodified" || e.isUntracked;
+export const isUnstagedChange = (e: StatusEntry): boolean =>
+  e.unstaged !== "unmodified" || e.isUntracked;
 
 export const groupStatusEntries = (
   entries: ReadonlyArray<StatusEntry>,
@@ -37,6 +43,8 @@ export const statusLabel = (e: StatusEntry): string => {
   }
 };
 
-export const hasStagedChanges = (status: WorkingTreeStatus): boolean => status.entries.some(isStagedChange);
+export const hasStagedChanges = (status: WorkingTreeStatus): boolean =>
+  status.entries.some(isStagedChange);
 
-export const hasUnstagedChanges = (status: WorkingTreeStatus): boolean => status.entries.some(isUnstagedChange);
+export const hasUnstagedChanges = (status: WorkingTreeStatus): boolean =>
+  status.entries.some(isUnstagedChange);

@@ -29,7 +29,9 @@ const program = Effect.gen(function* () {
     );
   }
 
-  yield* Layer.launch(buildServerLive(config, gitEngineLayer({ env: process.env })));
+  yield* Layer.launch(
+    buildServerLive(config, gitEngineLayer({ env: process.env })),
+  );
 });
 
 NodeRuntime.runMain(program);

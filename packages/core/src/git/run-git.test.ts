@@ -6,8 +6,18 @@ import { Exit } from "effect";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 
 import { run, runExit } from "../testing/effect-run";
-import { createFixtureWorkspace, type FixtureWorkspace } from "../testing/fixtures";
-import { assertNoLeadingDash, decodeUtf8, isHexOid, nonInteractiveEnv, runGit, runGitOk } from "./run-git";
+import {
+  createFixtureWorkspace,
+  type FixtureWorkspace,
+} from "../testing/fixtures";
+import {
+  assertNoLeadingDash,
+  decodeUtf8,
+  isHexOid,
+  nonInteractiveEnv,
+  runGit,
+  runGitOk,
+} from "./run-git";
 
 let ws: FixtureWorkspace;
 beforeAll(async () => {
@@ -28,20 +38,26 @@ describe("nonInteractiveEnv (14 §3.3)", () => {
   });
 
   test("merges and overrides with extra entries", () => {
-    expect(nonInteractiveEnv({ GIT_AUTHOR_NAME: "x" }).GIT_AUTHOR_NAME).toBe("x");
+    expect(nonInteractiveEnv({ GIT_AUTHOR_NAME: "x" }).GIT_AUTHOR_NAME).toBe(
+      "x",
+    );
   });
 });
 
 describe("runGit", () => {
   test("captures stdout bytes and a zero exit for a successful command", async () => {
-    const result = await run(runGit({ cwd: process.cwd(), args: ["--version"], read: false }));
+    const result = await run(
+      runGit({ cwd: process.cwd(), args: ["--version"], read: false }),
+    );
     expect(result.exitCode).toBe(0);
     expect(decodeUtf8(result.stdout)).toMatch(/git version/);
   });
 
   test("returns a non-zero exit as DATA (not a failure)", async () => {
     const plain = mkdtempSync(join(tmpdir(), "cbranch-nonrepo-"));
-    const result = await run(runGit({ cwd: plain, args: ["rev-parse", "--git-dir"] }));
+    const result = await run(
+      runGit({ cwd: plain, args: ["rev-parse", "--git-dir"] }),
+    );
     expect(result.exitCode).not.toBe(0);
   });
 });
@@ -50,20 +66,26 @@ describe("runGitOk", () => {
   test("succeeds on exit 0", async () => {
     const repo = await ws.createRepo("ok");
     await repo.commit({ message: "init", files: { "a.txt": "a\n" } });
-    const result = await run(runGitOk({ cwd: repo.dir, args: ["rev-parse", "HEAD"] }));
+    const result = await run(
+      runGitOk({ cwd: repo.dir, args: ["rev-parse", "HEAD"] }),
+    );
     expect(result.exitCode).toBe(0);
   });
 
   test("fails with gitFailed on a non-zero exit", async () => {
     const plain = mkdtempSync(join(tmpdir(), "cbranch-nonrepo-"));
-    const exit = await runExit(runGitOk({ cwd: plain, args: ["rev-parse", "--git-dir"] }));
+    const exit = await runExit(
+      runGitOk({ cwd: plain, args: ["rev-parse", "--git-dir"] }),
+    );
     expect(Exit.isFailure(exit)).toBe(true);
   });
 });
 
 describe("argument-safety helpers (NF-SEC-6)", () => {
   test("assertNoLeadingDash rejects a value that looks like an option", async () => {
-    const exit = await runExit(assertNoLeadingDash("--upload-pack=evil", "ref"));
+    const exit = await runExit(
+      assertNoLeadingDash("--upload-pack=evil", "ref"),
+    );
     expect(Exit.isFailure(exit)).toBe(true);
   });
 

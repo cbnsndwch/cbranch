@@ -4,7 +4,12 @@
 // into SyncEvent items emitted as an Effect Stream. Real-time streaming is deferred; this
 // MVP collects all output then emits parsed events.
 
-import { type GitError, Oid, SyncProgressEvent, SyncRefUpdate } from "@cbranch/rpc-contract";
+import {
+  type GitError,
+  Oid,
+  SyncProgressEvent,
+  SyncRefUpdate,
+} from "@cbranch/rpc-contract";
 import { type SyncEvent } from "@cbranch/rpc-contract";
 import { Effect, Stream } from "effect";
 
@@ -16,7 +21,8 @@ import { assertNoLeadingDash, decodeUtf8, runGit, runGitOk } from "./run-git";
 //   " * [new branch]      main -> origin/main"
 //   "   a1b2c3..e5f6g7  feat -> origin/feat"
 //   " - [deleted]         origin/gone"
-const REF_UPDATE_RE = /^\s*(?:[+ *t!=-])\s+(.+?)\s{2,}([\w./-]+)\s+->\s+([\w./-]+)\s*(?:\((.*?)\))?$/;
+const REF_UPDATE_RE =
+  /^\s*(?:[+ *t!=-])\s+(.+?)\s{2,}([\w./-]+)\s+->\s+([\w./-]+)\s*(?:\((.*?)\))?$/;
 // Matches a sha range in summary: "abc1234..def5678"
 const OID_RANGE_RE = /^([0-9a-f]{7,40})\.\.([0-9a-f]{7,40})$/;
 
@@ -36,7 +42,16 @@ function parseEvents(stdout: Buffer, stderr: Buffer): SyncEvent[] {
       const rangeMatch = OID_RANGE_RE.exec(summary);
       const fromOid = rangeMatch ? (rangeMatch[1] as Oid) : undefined;
       const toOid = rangeMatch ? (rangeMatch[2] as Oid) : undefined;
-      events.push(new SyncRefUpdate({ _tag: "refUpdate", summary, localRef, remoteRef, fromOid, toOid }));
+      events.push(
+        new SyncRefUpdate({
+          _tag: "refUpdate",
+          summary,
+          localRef,
+          remoteRef,
+          fromOid,
+          toOid,
+        }),
+      );
     } else {
       // Skip git header lines like "From <url>" and "To <url>"
       if (/^(?:From|To)\s+\S/.test(line)) continue;
@@ -47,8 +62,12 @@ function parseEvents(stdout: Buffer, stderr: Buffer): SyncEvent[] {
   return events;
 }
 
-function makeStream(eff: Effect.Effect<SyncEvent[], GitError>): Stream.Stream<SyncEvent, GitError> {
-  return Stream.unwrap(Effect.map(eff, (events) => Stream.fromIterable(events)));
+function makeStream(
+  eff: Effect.Effect<SyncEvent[], GitError>,
+): Stream.Stream<SyncEvent, GitError> {
+  return Stream.unwrap(
+    Effect.map(eff, (events) => Stream.fromIterable(events)),
+  );
 }
 
 // REQ-P3-SY-001/002/003
@@ -74,7 +93,9 @@ export const fetchStream = (
 
       const raw = yield* runGit({ cwd, args, env, read: false });
       if (raw.exitCode !== 0) {
-        return yield* Effect.fail(classifyExit(raw.exitCode, decodeUtf8(raw.stderr)));
+        return yield* Effect.fail(
+          classifyExit(raw.exitCode, decodeUtf8(raw.stderr)),
+        );
       }
       return parseEvents(raw.stdout, raw.stderr);
     }),
@@ -97,7 +118,9 @@ export const pullStream = (
 
       const raw = yield* runGit({ cwd, args, env, read: false });
       if (raw.exitCode !== 0) {
-        return yield* Effect.fail(classifyExit(raw.exitCode, decodeUtf8(raw.stderr)));
+        return yield* Effect.fail(
+          classifyExit(raw.exitCode, decodeUtf8(raw.stderr)),
+        );
       }
       return parseEvents(raw.stdout, raw.stderr);
     }),
@@ -127,7 +150,9 @@ export const pushStream = (
 
       const raw = yield* runGit({ cwd, args, env, read: false });
       if (raw.exitCode !== 0) {
-        return yield* Effect.fail(classifyExit(raw.exitCode, decodeUtf8(raw.stderr)));
+        return yield* Effect.fail(
+          classifyExit(raw.exitCode, decodeUtf8(raw.stderr)),
+        );
       }
       return parseEvents(raw.stdout, raw.stderr);
     }),
@@ -143,5 +168,10 @@ export const pushDeleteRemoteRef = (
   Effect.gen(function* () {
     const safeRemote = yield* assertNoLeadingDash(remote, "remote");
     const safeRef = yield* assertNoLeadingDash(ref, "ref");
-    yield* runGitOk({ cwd, args: ["push", safeRemote, "--delete", safeRef], env, read: false });
+    yield* runGitOk({
+      cwd,
+      args: ["push", safeRemote, "--delete", safeRef],
+      env,
+      read: false,
+    });
   });

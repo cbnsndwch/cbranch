@@ -1,5 +1,18 @@
 {
-  "cSpell.words": ["cbranch"],
+  "cSpell.words": [
+    "autostash",
+    "cbranch",
+    "cmdk",
+    "lyra",
+    "msgpackr",
+    "oklch",
+    "shadcn",
+    "shiki",
+    "signoff",
+    "tailwindcss",
+    "Unsub",
+    "worktree"
+  ],
   "debug.inlineValues": "on",
   "editor.codeActionsOnSave": {
     "source.fixAll.oxc": "explicit"
@@ -34,5 +47,8 @@
     "**/.turbo/**": true,
     "**/node_modules/*/**": true
   },
-  "js/ts.tsdk.path": "node_modules/typescript/lib"
+  "js/ts.tsdk.path": "node_modules/typescript/lib",
+  "oxc.fmt.configPath": "${workspaceFolder}/.oxfmtrc.json",
+  "oxc.path.oxfmt": "${workspaceFolder}/node_modules/oxfmt/bin/oxfmt",
+  "oxc.useExecPath": true
 }

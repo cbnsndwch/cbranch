@@ -1,5 +1,8 @@
 import { type LogQuery } from "@cbranch/rpc-contract";
-import { LogQuery as LogQueryClass, RepoId as RepoIdBrand } from "@cbranch/rpc-contract";
+import {
+  LogQuery as LogQueryClass,
+  RepoId as RepoIdBrand,
+} from "@cbranch/rpc-contract";
 import { describe, expect, test } from "vitest";
 
 import {
@@ -13,8 +16,9 @@ import {
 } from "./history";
 
 const repoId = RepoIdBrand.make("a".repeat(64));
-const query = (over: Partial<ConstructorParameters<typeof LogQueryClass>[0]>): LogQuery =>
-  new LogQueryClass({ repoId, limit: 50, ...over });
+const query = (
+  over: Partial<ConstructorParameters<typeof LogQueryClass>[0]>,
+): LogQuery => new LogQueryClass({ repoId, limit: 50, ...over });
 
 describe("cappedLimit", () => {
   test("caps at the server window and defaults non-positive limits", () => {
@@ -41,7 +45,9 @@ describe("log cursor codec", () => {
 
 describe("buildLogArgs", () => {
   test("fixes topo+date ordering and the format, applies window + skip", () => {
-    const args = buildLogArgs(query({ limit: 5, cursor: encodeLogCursor(10, "x") }));
+    const args = buildLogArgs(
+      query({ limit: 5, cursor: encodeLogCursor(10, "x") }),
+    );
     expect(args).toContain("--topo-order");
     expect(args).toContain("--date-order");
     expect(args).toContain("--parents");
@@ -72,15 +78,25 @@ describe("buildLogArgs", () => {
   });
 
   test("pattern scope maps to --glob", () => {
-    expect(buildLogArgs(query({ refScope: "pattern", refPattern: "release/*" }))).toContain("--glob=release/*");
+    expect(
+      buildLogArgs(query({ refScope: "pattern", refPattern: "release/*" })),
+    ).toContain("--glob=release/*");
   });
 });
 
 describe("nextLogCursor", () => {
   test("advances skip by rows received", () => {
-    const rows = parseCommitSummaries(Buffer.from("o1\x1f\x1fan\x1fae\x1fad\x1fcd\x1f\x1fsubject\0", "utf8"));
-    const cursor = nextLogCursor(query({ cursor: encodeLogCursor(2, "prev") }), rows);
-    expect(decodeLogCursor(cursor ?? undefined)).toEqual({ skip: 3, oid: "o1" });
+    const rows = parseCommitSummaries(
+      Buffer.from("o1\x1f\x1fan\x1fae\x1fad\x1fcd\x1f\x1fsubject\0", "utf8"),
+    );
+    const cursor = nextLogCursor(
+      query({ cursor: encodeLogCursor(2, "prev") }),
+      rows,
+    );
+    expect(decodeLogCursor(cursor ?? undefined)).toEqual({
+      skip: 3,
+      oid: "o1",
+    });
   });
 
   test("no continuation cursor for an empty window", () => {
@@ -113,7 +129,8 @@ describe("parseCommitSummaries", () => {
   });
 
   test("root commit has no parents and no decorations", () => {
-    const rec = ["root", "", "Ann", "a@x", "d", "d", "", "init"].join("\x1f") + "\0";
+    const rec =
+      ["root", "", "Ann", "a@x", "d", "d", "", "init"].join("\x1f") + "\0";
     const row = parseCommitSummaries(Buffer.from(rec, "utf8"))[0]!;
     expect(row.parents).toEqual([]);
     expect(row.refs).toEqual([]);

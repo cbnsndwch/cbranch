@@ -53,11 +53,16 @@ for (const line of present) console.log(line);
 for (const line of missing) console.log(line);
 
 console.log("\nNon-Base-UI primitives (sourced elsewhere, informational):");
-for (const [role, source] of EXTERNAL) console.log(`  --   ${role} -> ${source}`);
+for (const [role, source] of EXTERNAL)
+  console.log(`  --   ${role} -> ${source}`);
 
 if (missing.length > 0) {
-  console.error(`\nFAIL: ${missing.length} required Base UI primitive(s) missing or renamed on the pinned version.`);
+  console.error(
+    `\nFAIL: ${missing.length} required Base UI primitive(s) missing or renamed on the pinned version.`,
+  );
   process.exit(1);
 }
 
-console.log(`\nPASS: all ${Object.keys(REQUIRED).length} required Base UI primitives are present.`);
+console.log(
+  `\nPASS: all ${Object.keys(REQUIRED).length} required Base UI primitives are present.`,
+);

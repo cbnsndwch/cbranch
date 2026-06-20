@@ -11,7 +11,11 @@
 
 import { basename } from "node:path";
 
-import { type GitError, type InvalidationEvent, type RepoId } from "@cbranch/rpc-contract";
+import {
+  type GitError,
+  type InvalidationEvent,
+  type RepoId,
+} from "@cbranch/rpc-contract";
 import { RepoHandle } from "@cbranch/rpc-contract";
 import { type Cause, Effect, Layer, Queue, Scope, Stream } from "effect";
 
@@ -26,13 +30,19 @@ import {
 import { branchList } from "../git/branches";
 import { type CatFilePool, makeCatFilePool } from "../git/cat-file-pool";
 import { commitDetail } from "../git/commit";
-import { commitCreate as commitCreateGit, commitLastMessage as commitLastMessageGit } from "../git/commit-write";
+import {
+  commitCreate as commitCreateGit,
+  commitLastMessage as commitLastMessageGit,
+} from "../git/commit-write";
 import { fileContentAtRev } from "../git/content";
 import { commitDiff, diffWorkingFile } from "../git/diff";
 import { gitError } from "../git/errors";
 import { makeLogStream } from "../git/history";
 import { makeRepoLockRegistry } from "../git/locks";
-import { mergeAbort as mergeAbortGit, mergeCreate as mergeCreateGit } from "../git/merge";
+import {
+  mergeAbort as mergeAbortGit,
+  mergeCreate as mergeCreateGit,
+} from "../git/merge";
 import {
   discardHunks as discardHunksGit,
   stageHunks as stageHunksGit,
@@ -101,13 +111,18 @@ export interface MakeGitEngineOptions {
  * and the `cat-file` pools register their teardown finalizers on this scope. Provide
  * the scope via a `Layer` ({@link gitEngineLayer}) or `Effect.scoped` (tests).
  */
-export const makeGitEngine = (opts?: MakeGitEngineOptions): Effect.Effect<GitEngineApi, GitError, Scope.Scope> =>
+export const makeGitEngine = (
+  opts?: MakeGitEngineOptions,
+): Effect.Effect<GitEngineApi, GitError, Scope.Scope> =>
   Effect.gen(function* () {
     const env = opts?.env;
     // 1. Version gate (REQ-ARCH-025 / NF-PKG-5) — fails construction if missing/too old.
     yield* detectGitVersion(opts?.versionProbeCwd ?? process.cwd());
 
-    const configStore: ConfigStore = makeConfigStore({ configPath: opts?.configPath, env });
+    const configStore: ConfigStore = makeConfigStore({
+      configPath: opts?.configPath,
+      env,
+    });
     const scope = yield* Effect.scope;
     const locks = makeRepoLockRegistry();
     const locations = new Map<string, ResolvedRepo>();
@@ -118,28 +133,45 @@ export const makeGitEngine = (opts?: MakeGitEngineOptions): Effect.Effect<GitEng
     const watchers = new WatcherRegistry();
     yield* Effect.addFinalizer(() => Effect.sync(() => watchers.closeAll()));
 
-    const resolveById = (repoId: RepoId): Effect.Effect<ResolvedRepo, GitError> =>
+    const resolveById = (
+      repoId: RepoId,
+    ): Effect.Effect<ResolvedRepo, GitError> =>
       Effect.gen(function* () {
         const cached = locations.get(repoId);
         if (cached !== undefined) return cached;
         const recents = yield* configStore.listRecent();
         const entry = recents.find((r) => r.repoId === repoId);
         if (entry === undefined) {
-          return yield* Effect.fail(gitError("repoUnavailable", "repository is not open and not in the recent list"));
+          return yield* Effect.fail(
+            gitError(
+              "repoUnavailable",
+              "repository is not open and not in the recent list",
+            ),
+          );
         }
         const repo = yield* resolveRepo(entry.path);
         if (repo.repoId !== repoId) {
-          return yield* Effect.fail(gitError("repoUnavailable", "recent entry no longer resolves to this repository"));
+          return yield* Effect.fail(
+            gitError(
+              "repoUnavailable",
+              "recent entry no longer resolves to this repository",
+            ),
+          );
         }
         locations.set(repo.repoId, repo);
         return repo;
       });
 
-    const poolFor = (repo: ResolvedRepo): Effect.Effect<CatFilePool, GitError> =>
+    const poolFor = (
+      repo: ResolvedRepo,
+    ): Effect.Effect<CatFilePool, GitError> =>
       Effect.gen(function* () {
         const cached = pools.get(repo.repoId);
         if (cached !== undefined) return cached;
-        const pool = yield* Scope.provide(makeCatFilePool(repoCwd(repo), env), scope);
+        const pool = yield* Scope.provide(
+          makeCatFilePool(repoCwd(repo), env),
+          scope,
+        );
         pools.set(repo.repoId, pool);
         return pool;
       });
@@ -149,8 +181,14 @@ export const makeGitEngine = (opts?: MakeGitEngineOptions): Effect.Effect<GitEng
         const repo = yield* resolveRepo(path);
         const state = yield* readRepoState(repo);
         locations.set(repo.repoId, repo);
-        const name = basename(repo.root) === "" ? repo.root : basename(repo.root);
-        yield* configStore.upsertRecent({ path: repo.root, name, repoId: repo.repoId, lastOpenedAt: Date.now() });
+        const name =
+          basename(repo.root) === "" ? repo.root : basename(repo.root);
+        yield* configStore.upsertRecent({
+          path: repo.root,
+          name,
+          repoId: repo.repoId,
+          lastOpenedAt: Date.now(),
+        });
         return new RepoHandle({
           repoId: repo.repoId,
           root: repo.root,
@@ -173,34 +211,57 @@ export const makeGitEngine = (opts?: MakeGitEngineOptions): Effect.Effect<GitEng
             Stream.callback<InvalidationEvent, GitError>(
               (queue: Queue.Queue<InvalidationEvent, GitError | Cause.Done>) =>
                 Effect.acquireRelease(
-                  Effect.sync(() => watchers.addListener(repo, (event) => Queue.offerUnsafe(queue, event))),
+                  Effect.sync(() =>
+                    watchers.addListener(repo, (event) =>
+                      Queue.offerUnsafe(queue, event),
+                    ),
+                  ),
                   (dispose) => Effect.sync(() => dispose()),
                 ),
             ),
           ),
         ),
       logStream: (query) =>
-        Stream.unwrap(Effect.map(resolveById(query.repoId), (repo) => makeLogStream(repoCwd(repo), query, env))),
+        Stream.unwrap(
+          Effect.map(resolveById(query.repoId), (repo) =>
+            makeLogStream(repoCwd(repo), query, env),
+          ),
+        ),
       commitDetail: (repoId, oid) =>
-        Effect.flatMap(resolveById(repoId), (repo) => commitDetail(repoCwd(repo), oid, env)),
-      commitDiff: (spec) => Effect.flatMap(resolveById(spec.repoId), (repo) => commitDiff(repoCwd(repo), spec, env)),
+        Effect.flatMap(resolveById(repoId), (repo) =>
+          commitDetail(repoCwd(repo), oid, env),
+        ),
+      commitDiff: (spec) =>
+        Effect.flatMap(resolveById(spec.repoId), (repo) =>
+          commitDiff(repoCwd(repo), spec, env),
+        ),
       diffWorkingFile: (repoId, path, staged) =>
-        Effect.flatMap(resolveById(repoId), (repo) => diffWorkingFile(repoCwd(repo), path, staged, env)),
+        Effect.flatMap(resolveById(repoId), (repo) =>
+          diffWorkingFile(repoCwd(repo), path, staged, env),
+        ),
       fileContentAtRev: (repoId, path, rev) =>
         Effect.flatMap(resolveById(repoId), (repo) =>
-          Effect.flatMap(poolFor(repo), (pool) => fileContentAtRev(pool, repoId, path, rev)),
+          Effect.flatMap(poolFor(repo), (pool) =>
+            fileContentAtRev(pool, repoId, path, rev),
+          ),
         ),
 
       // ── stage & commit (P2) ────────────────────────────────────────────────
       statusGet: (repoId, includeIgnored) =>
-        Effect.flatMap(resolveById(repoId), (repo) => statusGet(repoCwd(repo), includeIgnored)),
+        Effect.flatMap(resolveById(repoId), (repo) =>
+          statusGet(repoCwd(repo), includeIgnored),
+        ),
       stageFiles: (repoId, paths, all) =>
         Effect.flatMap(resolveById(repoId), (repo) =>
-          locks.withRepoLock(repoId)(stageFilesGit(repoCwd(repo), paths, all ?? false)),
+          locks.withRepoLock(repoId)(
+            stageFilesGit(repoCwd(repo), paths, all ?? false),
+          ),
         ),
       unstageFiles: (repoId, paths, all) =>
         Effect.flatMap(resolveById(repoId), (repo) =>
-          locks.withRepoLock(repoId)(unstageFilesGit(repoCwd(repo), paths, all ?? false)),
+          locks.withRepoLock(repoId)(
+            unstageFilesGit(repoCwd(repo), paths, all ?? false),
+          ),
         ),
       discardFiles: (repoId, paths) =>
         Effect.flatMap(resolveById(repoId), (repo) =>
@@ -216,90 +277,154 @@ export const makeGitEngine = (opts?: MakeGitEngineOptions): Effect.Effect<GitEng
         ),
       stageHunks: (selection) =>
         Effect.flatMap(resolveById(selection.repoId), (repo) =>
-          locks.withRepoLock(selection.repoId)(stageHunksGit(repoCwd(repo), selection)),
+          locks.withRepoLock(selection.repoId)(
+            stageHunksGit(repoCwd(repo), selection),
+          ),
         ),
       unstageHunks: (selection) =>
         Effect.flatMap(resolveById(selection.repoId), (repo) =>
-          locks.withRepoLock(selection.repoId)(unstageHunksGit(repoCwd(repo), selection)),
+          locks.withRepoLock(selection.repoId)(
+            unstageHunksGit(repoCwd(repo), selection),
+          ),
         ),
       discardHunks: (selection) =>
         Effect.flatMap(resolveById(selection.repoId), (repo) =>
-          locks.withRepoLock(selection.repoId)(discardHunksGit(repoCwd(repo), selection)),
+          locks.withRepoLock(selection.repoId)(
+            discardHunksGit(repoCwd(repo), selection),
+          ),
         ),
       commitCreate: (input) =>
         Effect.flatMap(resolveById(input.repoId), (repo) =>
-          locks.withRepoLock(input.repoId)(commitCreateGit(repoCwd(repo), input)),
+          locks.withRepoLock(input.repoId)(
+            commitCreateGit(repoCwd(repo), input),
+          ),
         ),
-      commitLastMessage: (repoId) => Effect.flatMap(resolveById(repoId), (repo) => commitLastMessageGit(repoCwd(repo))),
+      commitLastMessage: (repoId) =>
+        Effect.flatMap(resolveById(repoId), (repo) =>
+          commitLastMessageGit(repoCwd(repo)),
+        ),
 
       // Object-read infra (implemented now; consumed by core-B's history/diff/content).
       readObject: (repoId, rev) =>
-        Effect.flatMap(resolveById(repoId), (repo) => Effect.flatMap(poolFor(repo), (p) => p.readObject(rev))),
+        Effect.flatMap(resolveById(repoId), (repo) =>
+          Effect.flatMap(poolFor(repo), (p) => p.readObject(rev)),
+        ),
       objectInfo: (repoId, rev) =>
-        Effect.flatMap(resolveById(repoId), (repo) => Effect.flatMap(poolFor(repo), (p) => p.objectInfo(rev))),
+        Effect.flatMap(resolveById(repoId), (repo) =>
+          Effect.flatMap(poolFor(repo), (p) => p.objectInfo(rev)),
+        ),
 
       // ── branches (P3) ─────────────────────────────────────────────────────
-      branchList: (repoId) => Effect.flatMap(resolveById(repoId), (repo) => branchList(repoCwd(repo), env)),
+      branchList: (repoId) =>
+        Effect.flatMap(resolveById(repoId), (repo) =>
+          branchList(repoCwd(repo), env),
+        ),
       branchCreate: (repoId, name, startPoint, setUpstream, switchAfter) =>
         Effect.flatMap(resolveById(repoId), (repo) =>
-          locks.withRepoLock(repoId)(branchCreateGit(repoCwd(repo), name, startPoint, setUpstream, switchAfter, env)),
+          locks.withRepoLock(repoId)(
+            branchCreateGit(
+              repoCwd(repo),
+              name,
+              startPoint,
+              setUpstream,
+              switchAfter,
+              env,
+            ),
+          ),
         ),
       branchSwitch: (repoId, target, strategy, _stashAndReapply) =>
         Effect.flatMap(resolveById(repoId), (repo) =>
-          locks.withRepoLock(repoId)(branchSwitchGit(repoCwd(repo), target, strategy, env)),
+          locks.withRepoLock(repoId)(
+            branchSwitchGit(repoCwd(repo), target, strategy, env),
+          ),
         ),
       branchRename: (repoId, oldName, newName) =>
         Effect.flatMap(resolveById(repoId), (repo) =>
-          locks.withRepoLock(repoId)(branchRenameGit(repoCwd(repo), oldName, newName, env)),
+          locks.withRepoLock(repoId)(
+            branchRenameGit(repoCwd(repo), oldName, newName, env),
+          ),
         ),
       branchDelete: (repoId, name, force) =>
         Effect.flatMap(resolveById(repoId), (repo) =>
-          locks.withRepoLock(repoId)(branchDeleteGit(repoCwd(repo), name, force, env)),
+          locks.withRepoLock(repoId)(
+            branchDeleteGit(repoCwd(repo), name, force, env),
+          ),
         ),
       branchSetUpstream: (repoId, name, upstream) =>
         Effect.flatMap(resolveById(repoId), (repo) =>
-          locks.withRepoLock(repoId)(branchSetUpstreamGit(repoCwd(repo), name, upstream, env)),
+          locks.withRepoLock(repoId)(
+            branchSetUpstreamGit(repoCwd(repo), name, upstream, env),
+          ),
         ),
 
       // ── merge (P3) ────────────────────────────────────────────────────────
       mergeCreate: (repoId, ref, strategy) =>
         Effect.flatMap(resolveById(repoId), (repo) =>
-          locks.withRepoLock(repoId)(mergeCreateGit(repoCwd(repo), ref, strategy, env)),
+          locks.withRepoLock(repoId)(
+            mergeCreateGit(repoCwd(repo), ref, strategy, env),
+          ),
         ),
       mergeAbort: (repoId) =>
-        Effect.flatMap(resolveById(repoId), (repo) => locks.withRepoLock(repoId)(mergeAbortGit(repoCwd(repo), env))),
+        Effect.flatMap(resolveById(repoId), (repo) =>
+          locks.withRepoLock(repoId)(mergeAbortGit(repoCwd(repo), env)),
+        ),
 
       // ── sync (P3) ────────────────────────────────────────────────────────
       fetchStream: (repoId, remote, all, prune, tags) =>
         Stream.unwrap(
-          Effect.map(resolveById(repoId), (repo) => fetchStreamGit(repoCwd(repo), remote, all, prune, tags, env)),
+          Effect.map(resolveById(repoId), (repo) =>
+            fetchStreamGit(repoCwd(repo), remote, all, prune, tags, env),
+          ),
         ),
       pullStream: (repoId, mode, autostash) =>
-        Stream.unwrap(Effect.map(resolveById(repoId), (repo) => pullStreamGit(repoCwd(repo), mode, autostash, env))),
+        Stream.unwrap(
+          Effect.map(resolveById(repoId), (repo) =>
+            pullStreamGit(repoCwd(repo), mode, autostash, env),
+          ),
+        ),
       pushStream: (repoId, remote, branch, setUpstream, forceWithLease, tags) =>
         Stream.unwrap(
           Effect.map(resolveById(repoId), (repo) =>
-            pushStreamGit(repoCwd(repo), remote, branch, setUpstream, forceWithLease, tags, env),
+            pushStreamGit(
+              repoCwd(repo),
+              remote,
+              branch,
+              setUpstream,
+              forceWithLease,
+              tags,
+              env,
+            ),
           ),
         ),
       pushDeleteRemoteRef: (repoId, remote, ref, _refType) =>
         Effect.flatMap(resolveById(repoId), (repo) =>
-          locks.withRepoLock(repoId)(pushDeleteRemoteRefGit(repoCwd(repo), remote, ref, env)),
+          locks.withRepoLock(repoId)(
+            pushDeleteRemoteRefGit(repoCwd(repo), remote, ref, env),
+          ),
         ),
 
       // ── remotes (P3) ──────────────────────────────────────────────────────
-      remoteList: (repoId) => Effect.flatMap(resolveById(repoId), (repo) => remoteListGit(repoCwd(repo), env)),
+      remoteList: (repoId) =>
+        Effect.flatMap(resolveById(repoId), (repo) =>
+          remoteListGit(repoCwd(repo), env),
+        ),
       remoteAdd: (repoId, name, url) =>
         Effect.flatMap(resolveById(repoId), (repo) =>
-          locks.withRepoLock(repoId)(remoteAddGit(repoCwd(repo), name, url, env)),
+          locks.withRepoLock(repoId)(
+            remoteAddGit(repoCwd(repo), name, url, env),
+          ),
         ),
       remoteSetUrl: (repoId, name, url, push) =>
         Effect.flatMap(resolveById(repoId), (repo) =>
-          locks.withRepoLock(repoId)(remoteSetUrlGit(repoCwd(repo), name, url, push, env)),
+          locks.withRepoLock(repoId)(
+            remoteSetUrlGit(repoCwd(repo), name, url, push, env),
+          ),
         ),
       remoteRename: (repoId, oldName, newName) =>
         Effect.flatMap(resolveById(repoId), (repo) =>
-          locks.withRepoLock(repoId)(remoteRenameGit(repoCwd(repo), oldName, newName, env)),
+          locks.withRepoLock(repoId)(
+            remoteRenameGit(repoCwd(repo), oldName, newName, env),
+          ),
         ),
       remoteRemove: (repoId, name) =>
         Effect.flatMap(resolveById(repoId), (repo) =>
@@ -307,17 +432,31 @@ export const makeGitEngine = (opts?: MakeGitEngineOptions): Effect.Effect<GitEng
         ),
 
       // ── worktrees (P3) ────────────────────────────────────────────────────
-      worktreeList: (repoId) => Effect.flatMap(resolveById(repoId), (repo) => worktreeListGit(repoCwd(repo), env)),
+      worktreeList: (repoId) =>
+        Effect.flatMap(resolveById(repoId), (repo) =>
+          worktreeListGit(repoCwd(repo), env),
+        ),
       worktreeAdd: (repoId, path, branch, newBranch, startPoint) =>
         Effect.flatMap(resolveById(repoId), (repo) =>
-          locks.withRepoLock(repoId)(worktreeAddGit(repoCwd(repo), path, { branch, newBranch, startPoint }, env)),
+          locks.withRepoLock(repoId)(
+            worktreeAddGit(
+              repoCwd(repo),
+              path,
+              { branch, newBranch, startPoint },
+              env,
+            ),
+          ),
         ),
       worktreeRemove: (repoId, path, force) =>
         Effect.flatMap(resolveById(repoId), (repo) =>
-          locks.withRepoLock(repoId)(worktreeRemoveGit(repoCwd(repo), path, force, env)),
+          locks.withRepoLock(repoId)(
+            worktreeRemoveGit(repoCwd(repo), path, force, env),
+          ),
         ),
       worktreePrune: (repoId) =>
-        Effect.flatMap(resolveById(repoId), (repo) => locks.withRepoLock(repoId)(worktreePruneGit(repoCwd(repo), env))),
+        Effect.flatMap(resolveById(repoId), (repo) =>
+          locks.withRepoLock(repoId)(worktreePruneGit(repoCwd(repo), env)),
+        ),
 
       // ── stash (P3) ───────────────────────────────────────────────────────
       stashPush: (repoId, message, includeUntracked, keepIndex, stagedOnly) =>
@@ -325,32 +464,55 @@ export const makeGitEngine = (opts?: MakeGitEngineOptions): Effect.Effect<GitEng
           locks.withRepoLock(repoId)(
             stashPushGit(
               repoCwd(repo),
-              { message: message ?? undefined, includeUntracked, keepIndex, stagedOnly },
+              {
+                message: message ?? undefined,
+                includeUntracked,
+                keepIndex,
+                stagedOnly,
+              },
               env,
             ),
           ),
         ),
-      stashList: (repoId) => Effect.flatMap(resolveById(repoId), (repo) => stashListGit(repoCwd(repo), env)),
-      stashShow: (repoId, ref) => Effect.flatMap(resolveById(repoId), (repo) => stashShowGit(repoCwd(repo), ref, env)),
+      stashList: (repoId) =>
+        Effect.flatMap(resolveById(repoId), (repo) =>
+          stashListGit(repoCwd(repo), env),
+        ),
+      stashShow: (repoId, ref) =>
+        Effect.flatMap(resolveById(repoId), (repo) =>
+          stashShowGit(repoCwd(repo), ref, env),
+        ),
       stashApply: (repoId, ref) =>
         Effect.flatMap(resolveById(repoId), (repo) =>
           locks.withRepoLock(repoId)(stashApplyGit(repoCwd(repo), ref, env)),
         ),
       stashPop: (repoId, ref) =>
-        Effect.flatMap(resolveById(repoId), (repo) => locks.withRepoLock(repoId)(stashPopGit(repoCwd(repo), ref, env))),
+        Effect.flatMap(resolveById(repoId), (repo) =>
+          locks.withRepoLock(repoId)(stashPopGit(repoCwd(repo), ref, env)),
+        ),
       stashDrop: (repoId, ref) =>
         Effect.flatMap(resolveById(repoId), (repo) =>
           locks.withRepoLock(repoId)(stashDropGit(repoCwd(repo), ref, env)),
         ),
       stashClear: (repoId) =>
-        Effect.flatMap(resolveById(repoId), (repo) => locks.withRepoLock(repoId)(stashClearGit(repoCwd(repo), env))),
+        Effect.flatMap(resolveById(repoId), (repo) =>
+          locks.withRepoLock(repoId)(stashClearGit(repoCwd(repo), env)),
+        ),
 
       // ── tags (P3) ────────────────────────────────────────────────────────
-      tagList: (repoId) => Effect.flatMap(resolveById(repoId), (repo) => tagListGit(repoCwd(repo), env)),
+      tagList: (repoId) =>
+        Effect.flatMap(resolveById(repoId), (repo) =>
+          tagListGit(repoCwd(repo), env),
+        ),
       tagCreate: (repoId, name, target, tagType, message, force) =>
         Effect.flatMap(resolveById(repoId), (repo) =>
           locks.withRepoLock(repoId)(
-            tagCreateGit(repoCwd(repo), name, { target, tagType: tagType ?? "lightweight", message, force }, env),
+            tagCreateGit(
+              repoCwd(repo),
+              name,
+              { target, tagType: tagType ?? "lightweight", message, force },
+              env,
+            ),
           ),
         ),
       tagDelete: (repoId, name) =>
@@ -359,16 +521,22 @@ export const makeGitEngine = (opts?: MakeGitEngineOptions): Effect.Effect<GitEng
         ),
       tagPush: (repoId, remote, name, all) =>
         Effect.flatMap(resolveById(repoId), (repo) =>
-          locks.withRepoLock(repoId)(tagPushGit(repoCwd(repo), remote, { name, all }, env)),
+          locks.withRepoLock(repoId)(
+            tagPushGit(repoCwd(repo), remote, { name, all }, env),
+          ),
         ),
       tagDeleteRemote: (repoId, remote, name) =>
         Effect.flatMap(resolveById(repoId), (repo) =>
-          locks.withRepoLock(repoId)(tagDeleteRemoteGit(repoCwd(repo), remote, name, env)),
+          locks.withRepoLock(repoId)(
+            tagDeleteRemoteGit(repoCwd(repo), remote, name, env),
+          ),
         ),
     };
     return api;
   });
 
 /** A `Layer` providing the live {@link GitEngine}, owning the engine's scope. */
-export const gitEngineLayer = (opts?: MakeGitEngineOptions): Layer.Layer<GitEngine, GitError> =>
+export const gitEngineLayer = (
+  opts?: MakeGitEngineOptions,
+): Layer.Layer<GitEngine, GitError> =>
   Layer.effect(GitEngine, makeGitEngine(opts));

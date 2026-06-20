@@ -5,8 +5,17 @@ import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 
 import { run } from "../testing/effect-run";
-import { createFixtureWorkspace, type FixtureWorkspace } from "../testing/fixtures";
-import { deleteUntracked, discardFiles, resetTo, stageFiles, unstageFiles } from "./stage";
+import {
+  createFixtureWorkspace,
+  type FixtureWorkspace,
+} from "../testing/fixtures";
+import {
+  deleteUntracked,
+  discardFiles,
+  resetTo,
+  stageFiles,
+  unstageFiles,
+} from "./stage";
 
 describe("stage git operations", () => {
   let ws: FixtureWorkspace;
@@ -30,7 +39,10 @@ describe("stage git operations", () => {
 
   test("stageFiles all stages all modified files", async () => {
     const repo = await ws.createRepo("stage-all");
-    await repo.commit({ message: "init", files: { "a.txt": "a\n", "b.txt": "b\n" } });
+    await repo.commit({
+      message: "init",
+      files: { "a.txt": "a\n", "b.txt": "b\n" },
+    });
     await repo.writeFile("a.txt", "a2\n");
     await repo.writeFile("b.txt", "b2\n");
 
@@ -55,7 +67,10 @@ describe("stage git operations", () => {
 
   test("unstageFiles all resets all staged changes", async () => {
     const repo = await ws.createRepo("unstage-all");
-    await repo.commit({ message: "init", files: { "a.txt": "a\n", "b.txt": "b\n" } });
+    await repo.commit({
+      message: "init",
+      files: { "a.txt": "a\n", "b.txt": "b\n" },
+    });
     await repo.writeFile("a.txt", "a2\n");
     await repo.writeFile("b.txt", "b2\n");
     await repo.stage("a.txt", "b.txt");

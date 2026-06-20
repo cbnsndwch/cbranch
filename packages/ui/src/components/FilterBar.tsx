@@ -2,7 +2,12 @@ import { X } from "lucide-react";
 import { type FormEvent, useEffect, useState } from "react";
 
 import { cn } from "../lib/cn";
-import { clearFilter, describeFilters, type LogFilters, type RefScope } from "../lib/filters";
+import {
+  clearFilter,
+  describeFilters,
+  type LogFilters,
+  type RefScope,
+} from "../lib/filters";
 import { type DateMode } from "../lib/format";
 
 // History filter bar (P1-UI-FILT-1/3): ref-scope segmented control, path/author/message/
@@ -78,7 +83,9 @@ export function FilterBar({
               aria-pressed={draft.refScope === scope}
               className={cn(
                 "border px-1.5 py-0.5 text-[11px] first:rounded-l last:rounded-r",
-                draft.refScope === scope ? "bg-accent text-accent-foreground" : "text-muted-foreground",
+                draft.refScope === scope
+                  ? "bg-accent text-accent-foreground"
+                  : "text-muted-foreground",
               )}
             >
               {label}
@@ -93,9 +100,21 @@ export function FilterBar({
             onChange={(refPattern) => setDraft({ ...draft, refPattern })}
           />
         ) : null}
-        <Field label="path" value={draft.path} onChange={(path) => setDraft({ ...draft, path })} />
-        <Field label="author" value={draft.author} onChange={(author) => setDraft({ ...draft, author })} />
-        <Field label="msg" value={draft.grep} onChange={(grep) => setDraft({ ...draft, grep })} />
+        <Field
+          label="path"
+          value={draft.path}
+          onChange={(path) => setDraft({ ...draft, path })}
+        />
+        <Field
+          label="author"
+          value={draft.author}
+          onChange={(author) => setDraft({ ...draft, author })}
+        />
+        <Field
+          label="msg"
+          value={draft.grep}
+          onChange={(grep) => setDraft({ ...draft, grep })}
+        />
         <Field
           label="since"
           value={draft.since}
@@ -108,10 +127,17 @@ export function FilterBar({
           placeholder="2024-12-31"
           onChange={(until) => setDraft({ ...draft, until })}
         />
-        <button type="submit" className="hover:bg-accent border px-1.5 py-0.5 text-[11px]">
+        <button
+          type="submit"
+          className="hover:bg-accent border px-1.5 py-0.5 text-[11px]"
+        >
           Apply
         </button>
-        <div className="ml-auto flex items-center" role="group" aria-label="Date format">
+        <div
+          className="ml-auto flex items-center"
+          role="group"
+          aria-label="Date format"
+        >
           {(["relative", "absolute"] as const).map((mode) => (
             <button
               key={mode}
@@ -120,7 +146,9 @@ export function FilterBar({
               aria-pressed={dateMode === mode}
               className={cn(
                 "border px-1.5 py-0.5 text-[11px] capitalize first:rounded-l last:rounded-r",
-                dateMode === mode ? "bg-accent text-accent-foreground" : "text-muted-foreground",
+                dateMode === mode
+                  ? "bg-accent text-accent-foreground"
+                  : "text-muted-foreground",
               )}
             >
               {mode}

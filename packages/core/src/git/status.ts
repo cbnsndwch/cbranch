@@ -1,4 +1,10 @@
-import { type GitError, Oid as OidBrand, StatusBranch, StatusEntry, WorkingTreeStatus } from "@cbranch/rpc-contract";
+import {
+  type GitError,
+  Oid as OidBrand,
+  StatusBranch,
+  StatusEntry,
+  WorkingTreeStatus,
+} from "@cbranch/rpc-contract";
 import { type ChangeCode } from "@cbranch/rpc-contract";
 import { Effect } from "effect";
 
@@ -184,8 +190,13 @@ export const parseStatusOutput = (buf: Buffer): WorkingTreeStatus => {
   });
 };
 
-export const statusGet = (cwd: string, includeIgnored?: boolean): Effect.Effect<WorkingTreeStatus, GitError> => {
+export const statusGet = (
+  cwd: string,
+  includeIgnored?: boolean,
+): Effect.Effect<WorkingTreeStatus, GitError> => {
   const args: string[] = ["status", "--porcelain=v2", "-z", "--branch"];
   if (includeIgnored === true) args.push("--ignored=matching");
-  return Effect.map(runGitOk({ cwd, args }), (r) => parseStatusOutput(r.stdout));
+  return Effect.map(runGitOk({ cwd, args }), (r) =>
+    parseStatusOutput(r.stdout),
+  );
 };

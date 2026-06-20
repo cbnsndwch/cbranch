@@ -19,7 +19,9 @@ applyStoredTheme();
 const runtime = makeAppRuntime(defaultRpcUrl(window.location));
 const api = makeApi(runtime);
 const queryClient = new QueryClient({
-  defaultOptions: { queries: { staleTime: 30_000, retry: false, refetchOnWindowFocus: true } },
+  defaultOptions: {
+    queries: { staleTime: 30_000, retry: false, refetchOnWindowFocus: true },
+  },
 });
 
 const rootElement = document.getElementById("root");

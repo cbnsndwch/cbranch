@@ -59,11 +59,16 @@ type HttpRequest = Http.HttpServerRequest.HttpServerRequest;
  */
 export const makeOriginGuard =
   (allowedHostnames: ReadonlySet<string>) =>
-  <E, R>(httpEffect: Effect.Effect<HttpResponse, E, R>): Effect.Effect<HttpResponse, E, R | HttpRequest> =>
+  <E, R>(
+    httpEffect: Effect.Effect<HttpResponse, E, R>,
+  ): Effect.Effect<HttpResponse, E, R | HttpRequest> =>
     Effect.gen(function* () {
       const request = yield* Http.HttpServerRequest.HttpServerRequest;
       if (!isAllowedRequest(request.headers, allowedHostnames)) {
-        return Http.HttpServerResponse.text("forbidden: origin/host not in allowlist", { status: 403 });
+        return Http.HttpServerResponse.text(
+          "forbidden: origin/host not in allowlist",
+          { status: 403 },
+        );
       }
       return yield* httpEffect;
     });

@@ -11,7 +11,11 @@
 // `limit` (server-capped at 500, NF-LIMIT-5); deep scroll resumes via an opaque
 // `cursor` that encodes the traversal skip + boundary oid.
 
-import { type CommitSummary as CommitSummaryType, type GitError, type LogQuery } from "@cbranch/rpc-contract";
+import {
+  type CommitSummary as CommitSummaryType,
+  type GitError,
+  type LogQuery,
+} from "@cbranch/rpc-contract";
 import { CommitSummary, Oid as OidBrand } from "@cbranch/rpc-contract";
 import { Effect, Stream } from "effect";
 
@@ -28,7 +32,16 @@ const FS = "\x1f"; // unit separator between fields (never present in any field)
  * author name/email, author + committer raw ISO dates, decorations (`%D`), subject.
  * Fields are `\x1f`-separated; `-z` terminates each commit record with NUL.
  */
-export const LOG_FORMAT = ["%H", "%P", "%an", "%ae", "%aI", "%cI", "%D", "%s"].join(FS);
+export const LOG_FORMAT = [
+  "%H",
+  "%P",
+  "%an",
+  "%ae",
+  "%aI",
+  "%cI",
+  "%D",
+  "%s",
+].join(FS);
 
 /** An opaque, resumable history cursor: the consumed `skip` count + the boundary oid. */
 export interface LogCursor {
@@ -38,13 +51,19 @@ export interface LogCursor {
 
 /** Encode a {@link LogCursor} to an opaque base64url token (clients treat it as opaque). */
 export const encodeLogCursor = (skip: number, oid: string): string =>
-  Buffer.from(JSON.stringify({ v: 1, s: skip, o: oid }), "utf8").toString("base64url");
+  Buffer.from(JSON.stringify({ v: 1, s: skip, o: oid }), "utf8").toString(
+    "base64url",
+  );
 
 /** Decode an opaque history cursor; `null` if absent/malformed (⇒ start from the top). */
-export const decodeLogCursor = (cursor: string | undefined): LogCursor | null => {
+export const decodeLogCursor = (
+  cursor: string | undefined,
+): LogCursor | null => {
   if (cursor === undefined || cursor === "") return null;
   try {
-    const parsed = JSON.parse(Buffer.from(cursor, "base64url").toString("utf8")) as unknown;
+    const parsed = JSON.parse(
+      Buffer.from(cursor, "base64url").toString("utf8"),
+    ) as unknown;
     if (typeof parsed !== "object" || parsed === null) return null;
     const obj = parsed as { s?: unknown; o?: unknown };
     if (typeof obj.s !== "number" || typeof obj.o !== "string") return null;
@@ -59,7 +78,10 @@ export const decodeLogCursor = (cursor: string | undefined): LogCursor | null =>
  * live system the server attaches this to the stream; it is exported so a consumer (or
  * a test) can resume the SAME traversal — `skip` is simply how many rows it has seen.
  */
-export const nextLogCursor = (query: LogQuery, rows: ReadonlyArray<CommitSummaryType>): string | null => {
+export const nextLogCursor = (
+  query: LogQuery,
+  rows: ReadonlyArray<CommitSummaryType>,
+): string | null => {
   if (rows.length === 0) return null;
   const prev = decodeLogCursor(query.cursor)?.skip ?? 0;
   const last = rows[rows.length - 1] as CommitSummaryType;
@@ -68,7 +90,9 @@ export const nextLogCursor = (query: LogQuery, rows: ReadonlyArray<CommitSummary
 
 /** Apply the server window cap to a client-requested `limit` (defaulting non-positives). */
 export const cappedLimit = (limit: number): number =>
-  Number.isFinite(limit) && limit > 0 ? Math.min(Math.floor(limit), LOG_WINDOW_CAP) : LOG_WINDOW_CAP;
+  Number.isFinite(limit) && limit > 0
+    ? Math.min(Math.floor(limit), LOG_WINDOW_CAP)
+    : LOG_WINDOW_CAP;
 
 /** Map `refScope` (+ optional pattern) to the `git log` revision arguments (05 §2.4). */
 const refScopeArgs = (query: LogQuery): ReadonlyArray<string> => {
@@ -76,7 +100,9 @@ const refScopeArgs = (query: LogQuery): ReadonlyArray<string> => {
     case "all":
       return ["--all"];
     case "pattern":
-      return query.refPattern !== undefined && query.refPattern !== "" ? [`--glob=${query.refPattern}`] : ["HEAD"];
+      return query.refPattern !== undefined && query.refPattern !== ""
+        ? [`--glob=${query.refPattern}`]
+        : ["HEAD"];
     default:
       // "current" (the default scope, P1-FILT-1) ⇒ HEAD.
       return ["HEAD"];
@@ -87,7 +113,8 @@ const refScopeArgs = (query: LogQuery): ReadonlyArray<string> => {
 export const buildLogArgs = (query: LogQuery): ReadonlyArray<string> => {
   const limit = cappedLimit(query.limit);
   const skip = decodeLogCursor(query.cursor)?.skip ?? 0;
-  const wantsIgnoreCase = query.author !== undefined || query.grep !== undefined;
+  const wantsIgnoreCase =
+    query.author !== undefined || query.grep !== undefined;
 
   const args: string[] = [
     "log",
@@ -106,7 +133,8 @@ export const buildLogArgs = (query: LogQuery): ReadonlyArray<string> => {
   if (query.since !== undefined) args.push(`--since=${query.since}`);
   if (query.until !== undefined) args.push(`--until=${query.until}`);
   args.push(...refScopeArgs(query));
-  if (query.path !== undefined && query.path !== "") args.push("--", query.path);
+  if (query.path !== undefined && query.path !== "")
+    args.push("--", query.path);
   return args;
 };
 
@@ -114,14 +142,25 @@ export const buildLogArgs = (query: LogQuery): ReadonlyArray<string> => {
  * Parse the NUL-delimited `git log` window into ordered {@link CommitSummary} rows. Each
  * record is `oid \x1f parents \x1f an \x1f ae \x1f aDate \x1f cDate \x1f decorations \x1f subject`.
  */
-export const parseCommitSummaries = (stdout: Buffer): ReadonlyArray<CommitSummary> => {
+export const parseCommitSummaries = (
+  stdout: Buffer,
+): ReadonlyArray<CommitSummary> => {
   const text = decodeUtf8(stdout);
   const rows: CommitSummary[] = [];
   for (const record of text.split("\0")) {
     if (record === "") continue;
     const fields = record.split(FS);
     if (fields.length < 8) continue;
-    const [oid, parentsRaw, authorName, authorEmail, authorDate, committerDate, decorations, subject] = fields as [
+    const [
+      oid,
+      parentsRaw,
+      authorName,
+      authorEmail,
+      authorDate,
+      committerDate,
+      decorations,
+      subject,
+    ] = fields as [
       string,
       string,
       string,
@@ -131,7 +170,8 @@ export const parseCommitSummaries = (stdout: Buffer): ReadonlyArray<CommitSummar
       string,
       string,
     ];
-    const parents = parentsRaw === "" ? [] : parentsRaw.split(" ").filter((p) => p !== "");
+    const parents =
+      parentsRaw === "" ? [] : parentsRaw.split(" ").filter((p) => p !== "");
     const refs =
       decorations === ""
         ? []
@@ -173,8 +213,14 @@ export const makeLogStream = (
       }
       // A non-zero exit on an unborn branch (`git log HEAD` with no commits) is an empty
       // history, not a failure — distinguish it from a real error via the HEAD probe.
-      const head = yield* runGit({ cwd, args: ["rev-parse", "--quiet", "--verify", "HEAD"], env });
+      const head = yield* runGit({
+        cwd,
+        args: ["rev-parse", "--quiet", "--verify", "HEAD"],
+        env,
+      });
       if (head.exitCode !== 0) return Stream.empty;
-      return Stream.fail(classifyExit(result.exitCode, decodeUtf8(result.stderr)));
+      return Stream.fail(
+        classifyExit(result.exitCode, decodeUtf8(result.stderr)),
+      );
     }),
   );
