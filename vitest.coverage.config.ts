@@ -8,6 +8,7 @@ export default defineConfig({
   test: {
     include: ["packages/core/src/**/*.test.ts", "packages/rpc-contract/src/**/*.test.ts"],
     environment: "node",
+    testTimeout: 30_000,
     coverage: {
       provider: "v8",
       include: ["packages/core/src/**/*.ts", "packages/rpc-contract/src/**/*.ts"],

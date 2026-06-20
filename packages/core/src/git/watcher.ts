@@ -4,7 +4,7 @@
 // One SHARED chokidar watcher per `repoId` over the common git dir
 // (`rev-parse --git-common-dir`) + worktree. Changed paths are mapped to the closed
 // `Domain` set EXACTLY per 15 §3, `*.lock` and `objects/**` churn is ignored
-// (NF-WATCH-1), and a burst within ~150 ms is coalesced into ONE `InvalidationEvent`
+// (NF-WATCH-1), and a burst within ~300 ms is coalesced into ONE `InvalidationEvent`
 // whose `domains` is the union. Subscribers are ref-counted; the watcher is torn down
 // when the last one leaves (NF-WATCH-2). No echo suppression: an external terminal
 // `git` change MUST still emit (NF-WATCH-3).
@@ -15,8 +15,9 @@ import { type Domain, type RepoId } from "@cbranch/rpc-contract";
 import { InvalidationEvent } from "@cbranch/rpc-contract";
 import { type FSWatcher, watch } from "chokidar";
 
-/** Default coalesce window (NF-WATCH-1). */
-export const COALESCE_MS = 150;
+// 300 ms: git commits on Windows NTFS can write index then refs/heads/* with a gap
+// exceeding 150 ms under load; the wider window reliably coalesces both into one event.
+export const COALESCE_MS = 300;
 
 /** The watched-repo facts the registry needs (a subset of `ResolvedRepo`). */
 export interface WatchTarget {
