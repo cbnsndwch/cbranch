@@ -131,6 +131,35 @@ export const makeGitEngine = (opts?: MakeGitEngineOptions): Effect.Effect<GitEng
           Effect.flatMap(poolFor(repo), (pool) => fileContentAtRev(pool, repoId, path, rev)),
         ),
 
+      // ── stage & commit (P2, S1 stubs) ──────────────────────────────────────
+      // Typed `not implemented` stubs so the contract → handler → UI plumbing lands
+      // gate-green ahead of the real bodies. Each resolves the repo by id (same
+      // id→cwd mapping the reads use) so an unknown `repoId` already fails correctly,
+      // then fails `gitFailed`. The per-repo mutation lock (`makeRepoLockRegistry`) is
+      // instantiated in S3 when the first ✎ body needs `withRepoLock`.
+      statusGet: (repoId) =>
+        Effect.flatMap(resolveById(repoId), () => Effect.fail(gitError("gitFailed", "not implemented"))),
+      stageFiles: (repoId) =>
+        Effect.flatMap(resolveById(repoId), () => Effect.fail(gitError("gitFailed", "not implemented"))),
+      unstageFiles: (repoId) =>
+        Effect.flatMap(resolveById(repoId), () => Effect.fail(gitError("gitFailed", "not implemented"))),
+      discardFiles: (repoId) =>
+        Effect.flatMap(resolveById(repoId), () => Effect.fail(gitError("gitFailed", "not implemented"))),
+      deleteUntracked: (repoId) =>
+        Effect.flatMap(resolveById(repoId), () => Effect.fail(gitError("gitFailed", "not implemented"))),
+      resetTo: (repoId) =>
+        Effect.flatMap(resolveById(repoId), () => Effect.fail(gitError("gitFailed", "not implemented"))),
+      stageHunks: (selection) =>
+        Effect.flatMap(resolveById(selection.repoId), () => Effect.fail(gitError("gitFailed", "not implemented"))),
+      unstageHunks: (selection) =>
+        Effect.flatMap(resolveById(selection.repoId), () => Effect.fail(gitError("gitFailed", "not implemented"))),
+      discardHunks: (selection) =>
+        Effect.flatMap(resolveById(selection.repoId), () => Effect.fail(gitError("gitFailed", "not implemented"))),
+      commitCreate: (input) =>
+        Effect.flatMap(resolveById(input.repoId), () => Effect.fail(gitError("gitFailed", "not implemented"))),
+      commitLastMessage: (repoId) =>
+        Effect.flatMap(resolveById(repoId), () => Effect.fail(gitError("gitFailed", "not implemented"))),
+
       // Object-read infra (implemented now; consumed by core-B's history/diff/content).
       readObject: (repoId, rev) =>
         Effect.flatMap(resolveById(repoId), (repo) => Effect.flatMap(poolFor(repo), (p) => p.readObject(rev))),

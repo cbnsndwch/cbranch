@@ -26,6 +26,11 @@ export * from "./schemas/queries";
 // FileContent, DownloadDescriptor, FileContentResult).
 export * from "./schemas/domain";
 
+// P2 working-tree (stage & commit) Schemas: StatusEntry, StatusBranch,
+// WorkingTreeStatus, HunkSelection, PatchSelection, CommitInput, CommitCreated,
+// CommitMessage.
+export * from "./schemas/working-tree";
+
 // The P1 method catalog.
 export * from "./rpc/group";
 

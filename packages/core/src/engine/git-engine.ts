@@ -12,19 +12,24 @@
 // core-B stubs so the interface is COMPLETE and core-B only fills bodies.
 
 import {
+  type CommitCreated,
   type CommitDetail,
+  type CommitInput,
+  type CommitMessage,
   type DiffFile,
   type FileContentResult,
   type GitError,
   type InvalidationEvent,
   type LogQuery,
   type Oid,
+  type PatchSelection,
   type RecentRepo,
   type RepoHandle,
   type RepoId,
   type RepoState,
   type CommitSummary,
   type DiffSpec,
+  type WorkingTreeStatus,
 } from "@cbranch/rpc-contract";
 import { Context, type Effect, type Stream } from "effect";
 
@@ -61,6 +66,30 @@ export interface GitEngineApi {
   readonly diffWorkingFile: (repoId: RepoId, path: string, staged: boolean) => Effect.Effect<DiffFile, GitError>;
   /** file.contentAtRev — inline content or a download descriptor. core-B. */
   readonly fileContentAtRev: (repoId: RepoId, path: string, rev: string) => Effect.Effect<FileContentResult, GitError>;
+
+  // ── stage & commit (P2, S1 stubs) ──────────────────────────────────────────
+  /** status.get — full working-tree status snapshot (porcelain v2). READ. core-S2. */
+  readonly statusGet: (repoId: RepoId, includeIgnored?: boolean) => Effect.Effect<WorkingTreeStatus, GitError>;
+  /** stage.files ✎ — stage whole files (or `all` = `git add -A`). core-S3. */
+  readonly stageFiles: (repoId: RepoId, paths: ReadonlyArray<string>, all?: boolean) => Effect.Effect<void, GitError>;
+  /** unstage.files ✎ — unstage whole files (or `all` = `git reset`). core-S3. */
+  readonly unstageFiles: (repoId: RepoId, paths: ReadonlyArray<string>, all?: boolean) => Effect.Effect<void, GitError>;
+  /** discard.files ✎ — restore tracked files in the worktree. core-S3. */
+  readonly discardFiles: (repoId: RepoId, paths: ReadonlyArray<string>) => Effect.Effect<void, GitError>;
+  /** deleteUntracked ✎ — remove untracked files (`git clean -f`). core-S3. */
+  readonly deleteUntracked: (repoId: RepoId, paths: ReadonlyArray<string>) => Effect.Effect<void, GitError>;
+  /** reset.to ✎ — `git reset --<mode> <target>`. core-S3. */
+  readonly resetTo: (repoId: RepoId, mode: "soft" | "mixed" | "hard", target: string) => Effect.Effect<void, GitError>;
+  /** stage.hunks ✎ — partial stage from a structured selection. core-S4. */
+  readonly stageHunks: (selection: PatchSelection) => Effect.Effect<void, GitError>;
+  /** unstage.hunks ✎ — partial unstage from a structured selection. core-S4. */
+  readonly unstageHunks: (selection: PatchSelection) => Effect.Effect<void, GitError>;
+  /** discard.hunks ✎ — partial worktree discard from a structured selection. core-S4. */
+  readonly discardHunks: (selection: PatchSelection) => Effect.Effect<void, GitError>;
+  /** commit.create ✎ — `git commit -F -` with optional amend/signoff/sign/author. core-S5. */
+  readonly commitCreate: (input: CommitInput) => Effect.Effect<CommitCreated, GitError>;
+  /** commit.lastMessage — the last commit's split message (reuse/amend seed). READ. core-S5. */
+  readonly commitLastMessage: (repoId: RepoId) => Effect.Effect<CommitMessage, GitError>;
 
   // ── object-read infrastructure (internal; for core-B) ──────────────────────
   /** Read a full object via the repo's `cat-file --batch` pool (`null` if missing). */

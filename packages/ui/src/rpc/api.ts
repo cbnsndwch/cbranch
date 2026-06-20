@@ -8,7 +8,10 @@
 // React Query error state); a stream's per-item error reaches `onError`.
 
 import {
+  type CommitCreated,
   type CommitDetail,
+  type CommitInput,
+  type CommitMessage,
   type CommitSummary,
   type DiffFile,
   type DiffSpec,
@@ -16,10 +19,12 @@ import {
   type InvalidationEvent,
   type LogQuery,
   type Oid,
+  type PatchSelection,
   type RecentRepo,
   type RepoHandle,
   type RepoId,
   type RepoState,
+  type WorkingTreeStatus,
 } from "@cbranch/rpc-contract";
 import { Effect, Fiber, Stream } from "effect";
 
@@ -44,6 +49,18 @@ export interface CbranchApi {
   commitDetail(repoId: RepoId, oid: Oid): Promise<CommitDetail>;
   commitDiff(spec: DiffSpec): Promise<ReadonlyArray<DiffFile>>;
   fileContentAtRev(repoId: RepoId, path: string, rev: string): Promise<FileContentResult>;
+  // ── stage & commit (P2) ─────────────────────────────────────────────────────
+  statusGet(repoId: RepoId, includeIgnored?: boolean): Promise<WorkingTreeStatus>;
+  stageFiles(repoId: RepoId, paths: ReadonlyArray<string>, all?: boolean): Promise<void>;
+  unstageFiles(repoId: RepoId, paths: ReadonlyArray<string>, all?: boolean): Promise<void>;
+  discardFiles(repoId: RepoId, paths: ReadonlyArray<string>): Promise<void>;
+  deleteUntracked(repoId: RepoId, paths: ReadonlyArray<string>): Promise<void>;
+  resetTo(repoId: RepoId, mode: "soft" | "mixed" | "hard", target: string): Promise<void>;
+  stageHunks(selection: PatchSelection): Promise<void>;
+  unstageHunks(selection: PatchSelection): Promise<void>;
+  discardHunks(selection: PatchSelection): Promise<void>;
+  commitCreate(input: CommitInput): Promise<CommitCreated>;
+  commitLastMessage(repoId: RepoId): Promise<CommitMessage>;
   /** Subscribe to the streaming history feed; returns an unsubscribe (cancels the request). */
   logStream(query: LogQuery, handlers: StreamHandlers<CommitSummary>): Unsubscribe;
   /** Subscribe to the WS invalidation bus for a repo; returns an unsubscribe. */
@@ -76,6 +93,18 @@ export const makeApi = (runtime: AppRuntime): CbranchApi => {
     commitDiff: (spec) => runtime.runPromise(withClient((c) => c.CommitDiff(spec))),
     fileContentAtRev: (repoId, path, rev) =>
       runtime.runPromise(withClient((c) => c.FileContentAtRev({ repoId, path, rev }))),
+    statusGet: (repoId, includeIgnored) =>
+      runtime.runPromise(withClient((c) => c.StatusGet({ repoId, includeIgnored }))),
+    stageFiles: (repoId, paths, all) => runtime.runPromise(withClient((c) => c.StageFiles({ repoId, paths, all }))),
+    unstageFiles: (repoId, paths, all) => runtime.runPromise(withClient((c) => c.UnstageFiles({ repoId, paths, all }))),
+    discardFiles: (repoId, paths) => runtime.runPromise(withClient((c) => c.DiscardFiles({ repoId, paths }))),
+    deleteUntracked: (repoId, paths) => runtime.runPromise(withClient((c) => c.DeleteUntracked({ repoId, paths }))),
+    resetTo: (repoId, mode, target) => runtime.runPromise(withClient((c) => c.ResetTo({ repoId, mode, target }))),
+    stageHunks: (selection) => runtime.runPromise(withClient((c) => c.StageHunks(selection))),
+    unstageHunks: (selection) => runtime.runPromise(withClient((c) => c.UnstageHunks(selection))),
+    discardHunks: (selection) => runtime.runPromise(withClient((c) => c.DiscardHunks(selection))),
+    commitCreate: (input) => runtime.runPromise(withClient((c) => c.CommitCreate(input))),
+    commitLastMessage: (repoId) => runtime.runPromise(withClient((c) => c.CommitLastMessage({ repoId }))),
     logStream: (query, handlers) =>
       runStream(
         streamWithClient((c) => c.LogStream(query)),

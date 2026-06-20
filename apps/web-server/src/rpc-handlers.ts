@@ -29,4 +29,19 @@ export const handlersLayer = CbranchRpcs.toLayer({
     Effect.flatMap(GitEngine, (engine) => engine.diffWorkingFile(repoId, path, staged)),
   FileContentAtRev: ({ repoId, path, rev }) =>
     Effect.flatMap(GitEngine, (engine) => engine.fileContentAtRev(repoId, path, rev)),
+
+  // ── stage & commit (P2) ────────────────────────────────────────────────────
+  StatusGet: ({ repoId, includeIgnored }) =>
+    Effect.flatMap(GitEngine, (engine) => engine.statusGet(repoId, includeIgnored)),
+  StageFiles: ({ repoId, paths, all }) => Effect.flatMap(GitEngine, (engine) => engine.stageFiles(repoId, paths, all)),
+  UnstageFiles: ({ repoId, paths, all }) =>
+    Effect.flatMap(GitEngine, (engine) => engine.unstageFiles(repoId, paths, all)),
+  DiscardFiles: ({ repoId, paths }) => Effect.flatMap(GitEngine, (engine) => engine.discardFiles(repoId, paths)),
+  DeleteUntracked: ({ repoId, paths }) => Effect.flatMap(GitEngine, (engine) => engine.deleteUntracked(repoId, paths)),
+  ResetTo: ({ repoId, mode, target }) => Effect.flatMap(GitEngine, (engine) => engine.resetTo(repoId, mode, target)),
+  StageHunks: (selection) => Effect.flatMap(GitEngine, (engine) => engine.stageHunks(selection)),
+  UnstageHunks: (selection) => Effect.flatMap(GitEngine, (engine) => engine.unstageHunks(selection)),
+  DiscardHunks: (selection) => Effect.flatMap(GitEngine, (engine) => engine.discardHunks(selection)),
+  CommitCreate: (input) => Effect.flatMap(GitEngine, (engine) => engine.commitCreate(input)),
+  CommitLastMessage: ({ repoId }) => Effect.flatMap(GitEngine, (engine) => engine.commitLastMessage(repoId)),
 });

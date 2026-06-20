@@ -40,4 +40,14 @@ export const queryKeys = {
   fileContentAtRev: (repoId: RepoId, rev: string, path: string) => [repoId, "blob", rev, path] as const,
   /** `repo.recentList` — the persisted switcher list (not repo-scoped). */
   recentList: () => ["recent"] as const,
+  /** `status.get` — the working-tree status tree (domain: `status`). */
+  status: (repoId: RepoId) => [repoId, "status", "tree"] as const,
+  /**
+   * `diff.workingFile` — one file's working/index diff, keyed by `staged` side so a
+   * mixed-state file caches each side independently (under the `status` domain →
+   * REQ-P2-HUNK-003).
+   */
+  workingDiff: (repoId: RepoId, path: string, staged: boolean) => [repoId, "status", "diff", path, staged] as const,
+  /** `commit.lastMessage` — the last commit's message, for reuse/amend (domain: `commit`). */
+  lastMessage: (repoId: RepoId) => [repoId, "commit", "lastMessage"] as const,
 };

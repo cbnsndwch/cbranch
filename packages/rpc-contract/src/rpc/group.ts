@@ -26,6 +26,7 @@ import { GitError } from "../schemas/errors";
 import { InvalidationEvent } from "../schemas/live";
 import { Oid, RepoId } from "../schemas/primitives";
 import { DiffSpec, LogQuery } from "../schemas/queries";
+import { CommitCreated, CommitInput, CommitMessage, PatchSelection, WorkingTreeStatus } from "../schemas/working-tree";
 
 export const CbranchRpcs = RpcGroup.make(
   // repo.open — entry point (no clone). Logically only repoNotFound | notARepository
@@ -89,6 +90,74 @@ export const CbranchRpcs = RpcGroup.make(
   Rpc.make("FileContentAtRev", {
     payload: { repoId: RepoId, path: Schema.String, rev: Schema.String },
     success: FileContentResult,
+    error: GitError,
+  }),
+
+  // ── P2: stage & commit (docs/spec/06; 14 §7) ───────────────────────────────
+  // status.get — full working-tree status snapshot (porcelain v2).
+  Rpc.make("StatusGet", {
+    payload: { repoId: RepoId, includeIgnored: Schema.optional(Schema.Boolean) },
+    success: WorkingTreeStatus,
+    error: GitError,
+  }),
+  // stage.files ✎ — stage whole files (or `all` = `git add -A`).
+  Rpc.make("StageFiles", {
+    payload: { repoId: RepoId, paths: Schema.Array(Schema.String), all: Schema.optional(Schema.Boolean) },
+    success: Schema.Void,
+    error: GitError,
+  }),
+  // unstage.files ✎ — unstage whole files (or `all` = `git reset`).
+  Rpc.make("UnstageFiles", {
+    payload: { repoId: RepoId, paths: Schema.Array(Schema.String), all: Schema.optional(Schema.Boolean) },
+    success: Schema.Void,
+    error: GitError,
+  }),
+  // discard.files ✎ — restore tracked files in the worktree (`git restore --worktree`).
+  Rpc.make("DiscardFiles", {
+    payload: { repoId: RepoId, paths: Schema.Array(Schema.String) },
+    success: Schema.Void,
+    error: GitError,
+  }),
+  // deleteUntracked ✎ — remove untracked files (`git clean -f`); split from discard (D15).
+  Rpc.make("DeleteUntracked", {
+    payload: { repoId: RepoId, paths: Schema.Array(Schema.String) },
+    success: Schema.Void,
+    error: GitError,
+  }),
+  // reset.to ✎ — `git reset --<mode> <target>`.
+  Rpc.make("ResetTo", {
+    payload: { repoId: RepoId, mode: Schema.Literals(["soft", "mixed", "hard"]), target: Schema.String },
+    success: Schema.Void,
+    error: GitError,
+  }),
+  // stage.hunks ✎ — partial stage from a structured selection (server builds the patch).
+  Rpc.make("StageHunks", {
+    payload: PatchSelection,
+    success: Schema.Void,
+    error: GitError,
+  }),
+  // unstage.hunks ✎ — partial unstage from a structured selection.
+  Rpc.make("UnstageHunks", {
+    payload: PatchSelection,
+    success: Schema.Void,
+    error: GitError,
+  }),
+  // discard.hunks ✎ — partial worktree discard from a structured selection.
+  Rpc.make("DiscardHunks", {
+    payload: PatchSelection,
+    success: Schema.Void,
+    error: GitError,
+  }),
+  // commit.create ✎ — `git commit -F -` with optional amend/signoff/sign/author.
+  Rpc.make("CommitCreate", {
+    payload: CommitInput,
+    success: CommitCreated,
+    error: GitError,
+  }),
+  // commit.lastMessage — the last commit's split message (for reuse/amend seeding).
+  Rpc.make("CommitLastMessage", {
+    payload: { repoId: RepoId },
+    success: CommitMessage,
     error: GitError,
   }),
 );

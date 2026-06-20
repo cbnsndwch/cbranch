@@ -27,6 +27,7 @@ import { GitError } from "../schemas/errors";
 import { InvalidationEvent } from "../schemas/live";
 import { Oid, RepoId } from "../schemas/primitives";
 import { LogQuery } from "../schemas/queries";
+import { CommitCreated, CommitMessage, WorkingTreeStatus } from "../schemas/working-tree";
 import { CbranchRpcs } from "./group";
 
 // --- schema-valid sample data (branded ids + one instance per success type) ---
@@ -161,6 +162,19 @@ const handlers = CbranchRpcs.toLayer({
           }),
         )
       : Effect.succeed(fileContent),
+
+  // ── P2: stage & commit (S1 plumbing; schema-valid stubs, no git logic) ───────
+  StatusGet: () => Effect.succeed(new WorkingTreeStatus({ entries: [], hasConflicts: false })),
+  StageFiles: () => Effect.void,
+  UnstageFiles: () => Effect.void,
+  DiscardFiles: () => Effect.void,
+  DeleteUntracked: () => Effect.void,
+  ResetTo: () => Effect.void,
+  StageHunks: () => Effect.void,
+  UnstageHunks: () => Effect.void,
+  DiscardHunks: () => Effect.void,
+  CommitCreate: ({ subject }) => Effect.succeed(new CommitCreated({ oid: oid1, shortOid: "1111111", subject })),
+  CommitLastMessage: () => Effect.succeed(new CommitMessage({ subject: "init", body: "", raw: "init" })),
 });
 
 describe("CbranchRpcs P1 contract (in-memory RpcTest round-trip)", () => {
@@ -301,5 +315,23 @@ describe("payload Schemas validate at the boundary (RPC-032)", () => {
     const exit = Schema.decodeUnknownExit(LogQuery)({ repoId: "abc", limit: 100, refScope: "all" });
 
     expect(Exit.isSuccess(exit)).toBe(true);
+  });
+});
+
+describe("CbranchRpcs P2 stage & commit method catalog (DECISIONS D1 wire tags)", () => {
+  test.each([
+    "StatusGet",
+    "StageFiles",
+    "UnstageFiles",
+    "DiscardFiles",
+    "DeleteUntracked",
+    "ResetTo",
+    "StageHunks",
+    "UnstageHunks",
+    "DiscardHunks",
+    "CommitCreate",
+    "CommitLastMessage",
+  ])("exposes the %s wire tag", (tag) => {
+    expect(CbranchRpcs.requests.has(tag)).toBe(true);
   });
 });
