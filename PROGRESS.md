@@ -84,24 +84,23 @@ surfaces. It is not a separate milestone but a prerequisite for all future work.
 ## Blocked / decisions to surface
 - _(none yet)_
 
-## ▶ RESUME HERE (P3 core complete — UI work next)
+## ▶ RESUME HERE — P3 COMPLETE, STOP for review
 
-**P3-S1 through S9 COMPLETE. Gate green: 505 tests, 80.59% branches.**
+**P3 fully complete. Gate green: 505 tests, 80.69% branches.**
 
-Committed: S1 contract+stubs (5d31d47) · S2 branch listing (79c81a4) · S3 branch lifecycle (5b38e4a) · S4 merge (7fdd625) · S5 sync streaming (693c513) · S6 remotes (c0d36e9) · S7 worktrees (9273602) · S8 stash (63902b7) · S9 tags (0aabe44).
+### P3 core (S1-S9)
+S1 contract+stubs (5d31d47) · S2 branch listing (79c81a4) · S3 branch lifecycle (5b38e4a) · S4 merge (7fdd625) · S5 sync streaming (693c513) · S6 remotes (c0d36e9) · S7 worktrees (9273602) · S8 stash (63902b7) · S9 tags (0aabe44) · fix unused import (0e7d5fd).
 
-**All 33 P3 RPC methods are fully implemented in core.** Engine stubs replaced with real git invocations.
+33 new RPC methods across refs, config, worktrees, stash, tags domains. All engine stubs replaced with real git invocations.
 
-**Remaining: P3 UI slices (UI-A through UI-G)**
-- UI-A: BranchesPanel (virtualized local+remote groups, context menus, BranchCreateDialog, BranchRenameDialog, DirtyTreeDialog)
-- UI-B: SyncToolbar (Fetch/Pull/Push split buttons, progress toasts, non-FF AlertDialog)
-- UI-C: RemotesManagerDialog (table + add/edit/rename/remove)
-- UI-D: WorktreesPanel (list + Add/Remove/Prune + Switch context)
-- UI-E: StashPanel (list + Apply/Pop/Drop/Clear + new-stash dialog + diff preview)
-- UI-F: TagsPanel (list + new-tag dialog + delete/push actions)
-- UI-G: AppShell integration + command palette entries
+### P3 UI (UI-A + UI-B)
+- UI-A (4c28f5c): P3 query/mutation hooks · `activeView` store state · AppShell view nav tabs · BranchesPanel (local/remote list, create/rename/delete/dirty-tree dialogs, context menus)
+- UI-B (1b5ba77): Fetch/Pull/Push streaming toolbar buttons · RemotesManagerDialog · WorktreesPanel · StashPanel · TagsPanel
 
-**Next: P3-UI-A — Branches panel** (main new view; add "Branches" tab to AppShell).
+**STOP here — await user review before starting P4.**
+
+### Next: P4 (Diff & Conflict Resolution)
+Per `docs/spec/08-phase4-diff-conflict.md`. Key areas: three-way merge editor, conflict markers, rebase support.
 
 **The app runs end-to-end with stage+commit.** Open the "Changes" tab to see staged/unstaged file list, click a file to diff it, stage/unstage hunks, write a commit message, and commit.
 
