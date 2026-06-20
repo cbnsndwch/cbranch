@@ -17,7 +17,6 @@ import {
   type RemoteInfo,
   type RepoId,
   type StashEntry,
-  type SyncEvent,
   type TagInfo,
   type WorktreeInfo,
 } from "@cbranch/rpc-contract";
@@ -55,6 +54,12 @@ import {
   unstageFiles as unstageFilesGit,
 } from "../git/stage";
 import { statusGet } from "../git/status";
+import {
+  fetchStream as fetchStreamGit,
+  pullStream as pullStreamGit,
+  pushDeleteRemoteRef as pushDeleteRemoteRefGit,
+  pushStream as pushStreamGit,
+} from "../git/sync";
 import { detectGitVersion } from "../git/version";
 import { WatcherRegistry } from "../git/watcher";
 import { type ResolvedRepo, repoCwd, resolveRepo } from "../repo/resolve";
@@ -243,28 +248,22 @@ export const makeGitEngine = (opts?: MakeGitEngineOptions): Effect.Effect<GitEng
       mergeAbort: (repoId) =>
         Effect.flatMap(resolveById(repoId), (repo) => locks.withRepoLock(repoId)(mergeAbortGit(repoCwd(repo), env))),
 
-      // ── sync (P3, stubs) ──────────────────────────────────────────────────
-      fetchStream: (repoId, _remote, _all, _prune, _tags) =>
+      // ── sync (P3) ────────────────────────────────────────────────────────
+      fetchStream: (repoId, remote, all, prune, tags) =>
         Stream.unwrap(
-          Effect.flatMap(resolveById(repoId), (_repo) =>
-            Effect.fail(gitError("gitFailed", "P3: fetchStream not implemented")),
-          ),
-        ) as Stream.Stream<SyncEvent, GitError>,
-      pullStream: (repoId, _mode, _autostash) =>
+          Effect.map(resolveById(repoId), (repo) => fetchStreamGit(repoCwd(repo), remote, all, prune, tags, env)),
+        ),
+      pullStream: (repoId, mode, autostash) =>
+        Stream.unwrap(Effect.map(resolveById(repoId), (repo) => pullStreamGit(repoCwd(repo), mode, autostash, env))),
+      pushStream: (repoId, remote, branch, setUpstream, forceWithLease, tags) =>
         Stream.unwrap(
-          Effect.flatMap(resolveById(repoId), (_repo) =>
-            Effect.fail(gitError("gitFailed", "P3: pullStream not implemented")),
+          Effect.map(resolveById(repoId), (repo) =>
+            pushStreamGit(repoCwd(repo), remote, branch, setUpstream, forceWithLease, tags, env),
           ),
-        ) as Stream.Stream<SyncEvent, GitError>,
-      pushStream: (repoId, _remote, _branch, _setUpstream, _forceWithLease, _tags) =>
-        Stream.unwrap(
-          Effect.flatMap(resolveById(repoId), (_repo) =>
-            Effect.fail(gitError("gitFailed", "P3: pushStream not implemented")),
-          ),
-        ) as Stream.Stream<SyncEvent, GitError>,
-      pushDeleteRemoteRef: (repoId, _remote, _ref, _refType) =>
-        Effect.flatMap(resolveById(repoId), (_repo) =>
-          Effect.fail(gitError("gitFailed", "P3: pushDeleteRemoteRef not implemented")),
+        ),
+      pushDeleteRemoteRef: (repoId, remote, ref, _refType) =>
+        Effect.flatMap(resolveById(repoId), (repo) =>
+          locks.withRepoLock(repoId)(pushDeleteRemoteRefGit(repoCwd(repo), remote, ref, env)),
         ),
 
       // ── remotes (P3, stubs) ───────────────────────────────────────────────
