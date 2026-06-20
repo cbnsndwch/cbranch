@@ -15,6 +15,8 @@ import { applyTheme, readThemePref, type ThemePref } from "../theme/theme";
 
 export type DetailTab = "changes" | "commit" | "diff" | "filetree" | "gpg" | "console" | "output";
 
+export type ActiveView = "history" | "branches" | "worktrees" | "stash" | "tags";
+
 export interface CommitDraft {
   subject: string;
   body: string;
@@ -65,6 +67,9 @@ export interface UiState {
   // ── P2: which file the WorkingDiffPanel shows ───────────────────────────────
   readonly selectedDiffFile: { path: string; staged: boolean } | null;
   readonly setSelectedDiffFile: (f: { path: string; staged: boolean } | null) => void;
+  // ── P3: main view switching ──────────────────────────────────────────────────
+  readonly activeView: ActiveView;
+  readonly setActiveView: (view: ActiveView) => void;
 }
 
 export const useUiStore = create<UiState>((set) => ({
@@ -81,6 +86,7 @@ export const useUiStore = create<UiState>((set) => ({
   stagedSelection: new Set(),
   unstagedSelection: new Set(),
   selectedDiffFile: null,
+  activeView: "history",
   // Switching repositories supersedes the old selection and filters (P1-OPEN-4 / P1-X-4).
   setActiveRepoId: (activeRepoId) =>
     set({
@@ -128,4 +134,5 @@ export const useUiStore = create<UiState>((set) => ({
   setUnstagedSelection: (paths) => set({ unstagedSelection: new Set(paths) }),
   clearSelection: () => set({ stagedSelection: new Set(), unstagedSelection: new Set() }),
   setSelectedDiffFile: (selectedDiffFile) => set({ selectedDiffFile }),
+  setActiveView: (activeView) => set({ activeView }),
 }));

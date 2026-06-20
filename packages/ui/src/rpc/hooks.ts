@@ -7,6 +7,9 @@
 // goes through the injected {@link useApi} facade so components stay mockable (NF-TEST-7).
 
 import {
+  type BranchInfo,
+  type BranchListing,
+  type BranchSwitchStrategy,
   type CommitCreated,
   type CommitDetail,
   type CommitInput,
@@ -16,13 +19,20 @@ import {
   type DiffSpec,
   type FileContentResult,
   type LogQuery,
+  type MergeMode,
+  type MergeResult,
   type Oid,
   type PatchSelection,
   type RecentRepo,
+  type RemoteInfo,
   type RepoHandle,
   type RepoId,
   type RepoState,
+  type StashEntry,
+  type TagInfo,
+  type TagType,
   type WorkingTreeStatus,
+  type WorktreeInfo,
 } from "@cbranch/rpc-contract";
 import { useMutation, useQuery, useQueryClient, type UseQueryResult } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
@@ -323,6 +333,356 @@ export const useCommitCreate = (repoId: RepoId) => {
       void qc.invalidateQueries({ queryKey: [repoId, "commits"] });
       void qc.invalidateQueries({ queryKey: [repoId, "refs"] });
       void qc.invalidateQueries({ queryKey: [repoId, "inProgress"] });
+    },
+  });
+};
+
+// ── P3 query hooks ────────────────────────────────────────────────────────────
+
+export const useBranchList = (repoId: RepoId | null): UseQueryResult<BranchListing> => {
+  const api = useApi();
+  return useQuery({
+    queryKey: repoId ? queryKeys.branches(repoId) : ["inactive"],
+    queryFn: () => api.branchList(repoId as RepoId),
+    enabled: repoId !== null,
+  });
+};
+
+export const useRemoteList = (repoId: RepoId | null): UseQueryResult<ReadonlyArray<RemoteInfo>> => {
+  const api = useApi();
+  return useQuery({
+    queryKey: repoId ? queryKeys.remotes(repoId) : ["inactive"],
+    queryFn: () => api.remoteList(repoId as RepoId),
+    enabled: repoId !== null,
+  });
+};
+
+export const useWorktreeList = (repoId: RepoId | null): UseQueryResult<ReadonlyArray<WorktreeInfo>> => {
+  const api = useApi();
+  return useQuery({
+    queryKey: repoId ? queryKeys.worktrees(repoId) : ["inactive"],
+    queryFn: () => api.worktreeList(repoId as RepoId),
+    enabled: repoId !== null,
+  });
+};
+
+export const useStashList = (repoId: RepoId | null): UseQueryResult<ReadonlyArray<StashEntry>> => {
+  const api = useApi();
+  return useQuery({
+    queryKey: repoId ? queryKeys.stash(repoId) : ["inactive"],
+    queryFn: () => api.stashList(repoId as RepoId),
+    enabled: repoId !== null,
+  });
+};
+
+export const useStashShow = (repoId: RepoId | null, ref: string | null): UseQueryResult<ReadonlyArray<DiffFile>> => {
+  const api = useApi();
+  return useQuery({
+    queryKey: repoId && ref ? queryKeys.stashShow(repoId, ref) : ["inactive"],
+    queryFn: () => api.stashShow(repoId as RepoId, ref as string),
+    enabled: repoId !== null && ref !== null,
+  });
+};
+
+export const useTagList = (repoId: RepoId | null): UseQueryResult<ReadonlyArray<TagInfo>> => {
+  const api = useApi();
+  return useQuery({
+    queryKey: repoId ? queryKeys.tags(repoId) : ["inactive"],
+    queryFn: () => api.tagList(repoId as RepoId),
+    enabled: repoId !== null,
+  });
+};
+
+// ── P3 branch mutation hooks ──────────────────────────────────────────────────
+
+export const useBranchCreate = (repoId: RepoId) => {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation<
+    BranchInfo,
+    unknown,
+    { name: string; startPoint?: string; setUpstream?: boolean; switchAfter?: boolean }
+  >({
+    mutationFn: ({ name, startPoint, setUpstream, switchAfter }) =>
+      api.branchCreate(repoId, name, startPoint, setUpstream, switchAfter),
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: [repoId, "refs"] });
+      void qc.invalidateQueries({ queryKey: [repoId, "inProgress"] });
+      void qc.invalidateQueries({ queryKey: [repoId, "status"] });
+    },
+  });
+};
+
+export const useBranchSwitch = (repoId: RepoId) => {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation<void, unknown, { target: string; strategy?: BranchSwitchStrategy; stashAndReapply?: boolean }>({
+    mutationFn: ({ target, strategy, stashAndReapply }) => api.branchSwitch(repoId, target, strategy, stashAndReapply),
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: [repoId, "refs"] });
+      void qc.invalidateQueries({ queryKey: [repoId, "status"] });
+      void qc.invalidateQueries({ queryKey: [repoId, "inProgress"] });
+    },
+  });
+};
+
+export const useBranchRename = (repoId: RepoId) => {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation<void, unknown, { oldName: string; newName: string }>({
+    mutationFn: ({ oldName, newName }) => api.branchRename(repoId, oldName, newName),
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: [repoId, "refs"] });
+    },
+  });
+};
+
+export const useBranchDelete = (repoId: RepoId) => {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation<void, unknown, { name: string; force: boolean }>({
+    mutationFn: ({ name, force }) => api.branchDelete(repoId, name, force),
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: [repoId, "refs"] });
+    },
+  });
+};
+
+export const useBranchSetUpstream = (repoId: RepoId) => {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation<void, unknown, { name: string; upstream?: string }>({
+    mutationFn: ({ name, upstream }) => api.branchSetUpstream(repoId, name, upstream),
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: [repoId, "refs"] });
+    },
+  });
+};
+
+export const useMergeCreate = (repoId: RepoId) => {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation<MergeResult, unknown, { ref: string; strategy: MergeMode }>({
+    mutationFn: ({ ref, strategy }) => api.mergeCreate(repoId, ref, strategy),
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: [repoId, "refs"] });
+      void qc.invalidateQueries({ queryKey: [repoId, "inProgress"] });
+      void qc.invalidateQueries({ queryKey: [repoId, "status"] });
+      void qc.invalidateQueries({ queryKey: [repoId, "commits"] });
+    },
+  });
+};
+
+export const useMergeAbort = (repoId: RepoId) => {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation<void, unknown, void>({
+    mutationFn: () => api.mergeAbort(repoId),
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: [repoId, "refs"] });
+      void qc.invalidateQueries({ queryKey: [repoId, "inProgress"] });
+      void qc.invalidateQueries({ queryKey: [repoId, "status"] });
+    },
+  });
+};
+
+// ── P3 remote mutation hooks ──────────────────────────────────────────────────
+
+export const useRemoteAdd = (repoId: RepoId) => {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation<void, unknown, { name: string; url: string }>({
+    mutationFn: ({ name, url }) => api.remoteAdd(repoId, name, url),
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: [repoId, "config"] });
+    },
+  });
+};
+
+export const useRemoteSetUrl = (repoId: RepoId) => {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation<void, unknown, { name: string; url: string; push?: boolean }>({
+    mutationFn: ({ name, url, push }) => api.remoteSetUrl(repoId, name, url, push),
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: [repoId, "config"] });
+    },
+  });
+};
+
+export const useRemoteRename = (repoId: RepoId) => {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation<void, unknown, { oldName: string; newName: string }>({
+    mutationFn: ({ oldName, newName }) => api.remoteRename(repoId, oldName, newName),
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: [repoId, "config"] });
+    },
+  });
+};
+
+export const useRemoteRemove = (repoId: RepoId) => {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation<void, unknown, { name: string }>({
+    mutationFn: ({ name }) => api.remoteRemove(repoId, name),
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: [repoId, "config"] });
+    },
+  });
+};
+
+// ── P3 worktree mutation hooks ────────────────────────────────────────────────
+
+export const useWorktreeAdd = (repoId: RepoId) => {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation<WorktreeInfo, unknown, { path: string; branch?: string; newBranch?: string; startPoint?: string }>(
+    {
+      mutationFn: ({ path, branch, newBranch, startPoint }) =>
+        api.worktreeAdd(repoId, path, { branch, newBranch, startPoint }),
+      onSettled: () => {
+        void qc.invalidateQueries({ queryKey: [repoId, "worktrees"] });
+      },
+    },
+  );
+};
+
+export const useWorktreeRemove = (repoId: RepoId) => {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation<void, unknown, { path: string; force?: boolean }>({
+    mutationFn: ({ path, force }) => api.worktreeRemove(repoId, path, force),
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: [repoId, "worktrees"] });
+    },
+  });
+};
+
+export const useWorktreePrune = (repoId: RepoId) => {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation<void, unknown, void>({
+    mutationFn: () => api.worktreePrune(repoId),
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: [repoId, "worktrees"] });
+    },
+  });
+};
+
+// ── P3 stash mutation hooks ───────────────────────────────────────────────────
+
+export const useStashPush = (repoId: RepoId) => {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation<
+    StashEntry,
+    unknown,
+    { message?: string; includeUntracked?: boolean; keepIndex?: boolean; stagedOnly?: boolean }
+  >({
+    mutationFn: (opts) => api.stashPush(repoId, opts),
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: [repoId, "stash"] });
+      void qc.invalidateQueries({ queryKey: [repoId, "status"] });
+    },
+  });
+};
+
+export const useStashApply = (repoId: RepoId) => {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation<void, unknown, { ref: string }>({
+    mutationFn: ({ ref }) => api.stashApply(repoId, ref),
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: [repoId, "stash"] });
+      void qc.invalidateQueries({ queryKey: [repoId, "status"] });
+    },
+  });
+};
+
+export const useStashPop = (repoId: RepoId) => {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation<void, unknown, { ref: string }>({
+    mutationFn: ({ ref }) => api.stashPop(repoId, ref),
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: [repoId, "stash"] });
+      void qc.invalidateQueries({ queryKey: [repoId, "status"] });
+    },
+  });
+};
+
+export const useStashDrop = (repoId: RepoId) => {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation<void, unknown, { ref: string }>({
+    mutationFn: ({ ref }) => api.stashDrop(repoId, ref),
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: [repoId, "stash"] });
+    },
+  });
+};
+
+export const useStashClear = (repoId: RepoId) => {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation<void, unknown, void>({
+    mutationFn: () => api.stashClear(repoId),
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: [repoId, "stash"] });
+    },
+  });
+};
+
+// ── P3 tag mutation hooks ─────────────────────────────────────────────────────
+
+export const useTagCreate = (repoId: RepoId) => {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation<
+    TagInfo,
+    unknown,
+    { name: string; target?: string; tagType: TagType; message?: string; force?: boolean }
+  >({
+    mutationFn: ({ name, target, tagType, message, force }) =>
+      api.tagCreate(repoId, name, { target, tagType, message, force }),
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: [repoId, "tags"] });
+      void qc.invalidateQueries({ queryKey: [repoId, "refs"] });
+    },
+  });
+};
+
+export const useTagDelete = (repoId: RepoId) => {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation<void, unknown, { name: string }>({
+    mutationFn: ({ name }) => api.tagDelete(repoId, name),
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: [repoId, "tags"] });
+      void qc.invalidateQueries({ queryKey: [repoId, "refs"] });
+    },
+  });
+};
+
+export const useTagPush = (repoId: RepoId) => {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation<void, unknown, { remote: string; name?: string; all?: boolean }>({
+    mutationFn: ({ remote, name, all }) => api.tagPush(repoId, remote, { name, all }),
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: [repoId, "refs"] });
+    },
+  });
+};
+
+export const useTagDeleteRemote = (repoId: RepoId) => {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation<void, unknown, { remote: string; name: string }>({
+    mutationFn: ({ remote, name }) => api.tagDeleteRemote(repoId, remote, name),
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: [repoId, "refs"] });
     },
   });
 };
