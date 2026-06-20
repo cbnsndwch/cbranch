@@ -189,6 +189,23 @@ describe("stash", () => {
     expect(exit._tag).toBe("Failure");
   });
 
+  test("stashPush with stagedOnly — only staged changes are stashed", async () => {
+    const repo = await ws.createRepo("st-staged");
+    await repo.commit({ message: "init", files: { "a.txt": "line1\n", "b.txt": "b\n" } });
+
+    // Stage a change to a.txt but leave b.txt dirty (unstaged)
+    await repo.writeFile("a.txt", "line1\nstaged\n");
+    await repo.stage("a.txt");
+    await repo.writeFile("b.txt", "unstaged change\n");
+
+    const entry = await Effect.runPromise(stashPush(repo.dir, { stagedOnly: true }));
+    expect(entry.index).toBe(0);
+
+    // b.txt should still be dirty (unstaged, not stashed)
+    const statusRaw = await repo.git(["status", "--porcelain"]);
+    expect(statusRaw.stdout).toContain("b.txt");
+  });
+
   test("stashPush branch name is extracted from subject", async () => {
     const repo = await ws.createRepo("st-branch");
     await repo.commit({ message: "init", files: { "a.txt": "a" } });

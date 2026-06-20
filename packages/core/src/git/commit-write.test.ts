@@ -143,4 +143,38 @@ describe("commit-write git operations", () => {
 
     await expect(run(commitLastMessage(repo.dir))).rejects.toThrow();
   });
+
+  test("commitCreate with authorOverride — sets custom author", async () => {
+    const repo = await ws.createRepo("commit-author");
+    await repo.commit({ message: "init", files: { "init.txt": "init\n" } });
+    await repo.writeFile("x.txt", "x\n");
+    await repo.stage("x.txt");
+
+    const input: CommitInput = {
+      ...BASE_INPUT,
+      repoId: "test" as any,
+      subject: "custom author",
+      authorOverride: { name: "Custom User", email: "custom@example.com" },
+    };
+    await run(commitCreate(repo.dir, input));
+
+    const log = await repo.git(["log", "-1", "--format=%an <%ae>"]);
+    expect(log.stdout.trim()).toBe("Custom User <custom@example.com>");
+  });
+
+  test("commitCreate with noVerify — skips pre-commit hooks", async () => {
+    const repo = await ws.createRepo("commit-noverify");
+    await repo.commit({ message: "init", files: { "init.txt": "init\n" } });
+    await repo.writeFile("y.txt", "y\n");
+    await repo.stage("y.txt");
+
+    const input: CommitInput = {
+      ...BASE_INPUT,
+      repoId: "test" as any,
+      subject: "skip hooks",
+      noVerify: true,
+    };
+    const result = await run(commitCreate(repo.dir, input));
+    expect(result.subject).toBe("skip hooks");
+  });
 });
