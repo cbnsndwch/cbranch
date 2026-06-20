@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 import { cn } from "../lib/cn";
 import { useRepoState } from "../rpc/hooks";
@@ -15,6 +15,7 @@ import { DiffPanel } from "./DiffPanel";
 import { DocumentTitle } from "./DocumentTitle";
 import { HistoryPane } from "./HistoryPane";
 import { HistoryStatusStrip } from "./HistoryStatusStrip";
+import { MergeEditor } from "./MergeEditor";
 import { MenuBar } from "./MenuBar";
 import { RepositorySidebar } from "./RepositorySidebar";
 import { StashPanel } from "./StashPanel";
@@ -44,6 +45,9 @@ export function AppShell() {
   const setCommitDialogOpen = useUiStore((s) => s.setCommitDialogOpen);
   // Commit selection writes the URL (D13); the store mirrors it via <SyncRouteToStore>.
   const { selectOid } = useNavigation();
+
+  // The conflicted path open in the 3-way merge editor (UI-B), if any.
+  const [editPath, setEditPath] = useState<string | null>(null);
 
   // Live updates: subscribe to the host invalidation bus for the active repo.
   useInvalidationBus(repoId);
@@ -104,7 +108,7 @@ export function AppShell() {
     }
     switch (activeView) {
       case "solveConflicts":
-        return <ConflictsPanel repoId={repoId} />;
+        return <ConflictsPanel repoId={repoId} onEdit={setEditPath} />;
       case "branches":
         return <BranchesPanel repoId={repoId} />;
       case "worktrees":
@@ -141,6 +145,13 @@ export function AppShell() {
     <>
       <CommandPalette />
       <CommitDialog />
+      {repoId && editPath !== null && (
+        <MergeEditor
+          repoId={repoId}
+          path={editPath}
+          onClose={() => setEditPath(null)}
+        />
+      )}
 
       {/* Headless: reflects the active branch in the browser window title (no in-app title bar). */}
       <DocumentTitle />

@@ -17,6 +17,7 @@ import {
   CommitSummary,
   type ConflictListing,
   type ConflictResolution,
+  type ConflictSides,
   type DiffFile,
   type DiffSpec,
   type FileContentResult,
@@ -982,6 +983,22 @@ export const useConflictList = (
     queryKey: repoId ? queryKeys.conflicts(repoId) : ["inactive"],
     queryFn: () => api.conflictList(repoId as RepoId),
     enabled: repoId !== null,
+  });
+};
+
+/**
+ * One conflicted path's three sides + the working-tree merged seed (REQ-MERGE-011).
+ * Domain `status`: the stages vanish from the index on resolve, so a conflict mutation
+ * invalidates `[repoId,"status"]` and this refetches.
+ */
+export const useConflictSides = (
+  repoId: RepoId,
+  path: string,
+): UseQueryResult<ConflictSides> => {
+  const api = useApi();
+  return useQuery({
+    queryKey: queryKeys.conflictSides(repoId, path),
+    queryFn: () => api.conflictSides(repoId, path),
   });
 };
 
