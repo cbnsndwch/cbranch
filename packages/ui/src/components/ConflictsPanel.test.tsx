@@ -154,13 +154,41 @@ describe("ConflictsPanel", () => {
     expect(screen.queryByText("Take ours")).toBeNull();
   });
 
-  test("a binary conflict hides the Edit (merge-editor) action", async () => {
+  test("a binary conflict hides Edit and explains why (REQ-MERGE-020)", async () => {
     renderPanel(
       makeFakeApi({ conflictList: vi.fn(async () => listing([binary])) }),
     );
+    await screen.findByText("d.bin");
+    expect(screen.getByText(/can't be merged line-by-line/)).toBeTruthy();
     await openRow("d.bin");
     expect(await screen.findByText("Take ours")).toBeTruthy();
     expect(screen.queryByText("Edit…")).toBeNull();
+  });
+
+  test("Delete file is gated by a confirmation dialog (REQ-UX-085)", async () => {
+    const conflictResolve = vi.fn(async () => undefined);
+    renderPanel(
+      makeFakeApi({
+        conflictList: vi.fn(async () => listing([deletedByThem])),
+        conflictResolve,
+      }),
+    );
+    await openRow("c.txt");
+    act(() => fireEvent.click(screen.getByText("Delete file")));
+    expect(
+      await screen.findByText(/will be removed from the working tree/),
+    ).toBeTruthy();
+    expect(conflictResolve).not.toHaveBeenCalled();
+
+    const confirms = screen.getAllByRole("button", { name: "Delete file" });
+    act(() => fireEvent.click(confirms[confirms.length - 1]!));
+    await waitFor(() =>
+      expect(conflictResolve).toHaveBeenCalledWith(
+        repoId,
+        ["c.txt"],
+        "deleteFile",
+      ),
+    );
   });
 
   test("Abort is gated by a confirmation dialog (AC-9)", async () => {

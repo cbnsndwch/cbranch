@@ -80,6 +80,7 @@ export function ConflictsPanel({ repoId, onEdit }: ConflictsPanelProps) {
   const skipMut = useOpSkip(repoId);
 
   const [abortOpen, setAbortOpen] = useState(false);
+  const [deletePath, setDeletePath] = useState<string | null>(null);
   const [message, setMessage] = useState("");
 
   const conflicted = data?.conflicted ?? [];
@@ -180,6 +181,7 @@ export function ConflictsPanel({ repoId, onEdit }: ConflictsPanelProps) {
             file={f}
             onResolve={resolve}
             onEdit={onEdit}
+            onDeleteFile={setDeletePath}
           />
         ))}
       </div>
@@ -191,6 +193,19 @@ export function ConflictsPanel({ repoId, onEdit }: ConflictsPanelProps) {
         description="Resolution progress will be discarded and the repository returns to its pre-operation state."
         confirmLabel="Abort"
         onConfirm={handleAbort}
+      />
+
+      <DestructiveConfirmDialog
+        open={deletePath !== null}
+        onOpenChange={(open) => {
+          if (!open) setDeletePath(null);
+        }}
+        title="Delete file"
+        description={`${deletePath ?? ""} will be removed from the working tree (git rm) to accept the deletion.`}
+        confirmLabel="Delete file"
+        onConfirm={() => {
+          if (deletePath !== null) resolve([deletePath], "deleteFile");
+        }}
       />
     </div>
   );
@@ -288,9 +303,15 @@ interface ConflictRowProps {
     resolution: ConflictResolution,
   ) => void;
   onEdit?: (path: string) => void;
+  onDeleteFile: (path: string) => void;
 }
 
-function ConflictRow({ file, onResolve, onEdit }: ConflictRowProps) {
+function ConflictRow({
+  file,
+  onResolve,
+  onEdit,
+  onDeleteFile,
+}: ConflictRowProps) {
   const deleteModify = isDeleteModify(file.classification);
   const bothDeleted = file.classification === "bothDeleted";
   const canEdit = !file.isBinary && !file.isSubmodule && !deleteModify;
@@ -321,6 +342,12 @@ function ConflictRow({ file, onResolve, onEdit }: ConflictRowProps) {
             </span>
           )}
         </div>
+        {(file.isBinary || file.isSubmodule) && (
+          <p className="text-muted-foreground mt-0.5 text-[10px]">
+            {file.isSubmodule ? "Submodule reference" : "Binary file"} —
+            can&apos;t be merged line-by-line; resolve by taking one whole side.
+          </p>
+        )}
       </div>
       <DropdownMenu>
         <DropdownMenuTrigger
@@ -337,7 +364,7 @@ function ConflictRow({ file, onResolve, onEdit }: ConflictRowProps) {
               </DropdownMenuItem>
               <DropdownMenuItem
                 variant="destructive"
-                onClick={pick("deleteFile")}
+                onClick={() => onDeleteFile(file.path)}
               >
                 Delete file
               </DropdownMenuItem>
@@ -353,7 +380,7 @@ function ConflictRow({ file, onResolve, onEdit }: ConflictRowProps) {
               </DropdownMenuItem>
               <DropdownMenuItem
                 variant="destructive"
-                onClick={pick("deleteFile")}
+                onClick={() => onDeleteFile(file.path)}
               >
                 Delete file
               </DropdownMenuItem>
