@@ -790,10 +790,11 @@ export const useWorktreeAdd = (repoId: RepoId) => {
       branch?: string;
       newBranch?: string;
       startPoint?: string;
+      force?: boolean;
     }
   >({
-    mutationFn: ({ path, branch, newBranch, startPoint }) =>
-      api.worktreeAdd(repoId, path, { branch, newBranch, startPoint }),
+    mutationFn: ({ path, branch, newBranch, startPoint, force }) =>
+      api.worktreeAdd(repoId, path, { branch, newBranch, startPoint, force }),
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: [repoId, "worktrees"] });
     },

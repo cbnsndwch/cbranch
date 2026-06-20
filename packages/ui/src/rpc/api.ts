@@ -192,7 +192,12 @@ export interface CbranchApi {
   worktreeAdd(
     repoId: RepoId,
     path: string,
-    opts?: { branch?: string; newBranch?: string; startPoint?: string },
+    opts?: {
+      branch?: string;
+      newBranch?: string;
+      startPoint?: string;
+      force?: boolean;
+    },
   ): Promise<WorktreeInfo>;
   worktreeRemove(repoId: RepoId, path: string, force?: boolean): Promise<void>;
   worktreePrune(repoId: RepoId): Promise<void>;

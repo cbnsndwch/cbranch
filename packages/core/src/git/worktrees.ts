@@ -73,11 +73,40 @@ export const worktreeList = (
 export const worktreeAdd = (
   cwd: string,
   path: string,
-  opts: { branch?: string; newBranch?: string; startPoint?: string },
+  opts: {
+    branch?: string;
+    newBranch?: string;
+    startPoint?: string;
+    force?: boolean;
+  },
   env?: NodeJS.ProcessEnv,
 ): Effect.Effect<WorktreeInfo, GitError> =>
   Effect.gen(function* () {
+    // When checking out an EXISTING branch (not creating one, not forcing),
+    // refuse up front if it is already live in another worktree and report which
+    // one — DETERMINISTICALLY via `worktree list`, never by parsing localized
+    // stderr prose (NF-GIT-3). `--force` is the explicit override (REQ-P3-WT-003).
+    // Mirrors the branch-checked-out-elsewhere check in branch-ops.ts.
+    if (opts.branch && !opts.force) {
+      const fullRef = `refs/heads/${opts.branch}`;
+      const existing = yield* worktreeList(cwd, env);
+      const holder = existing.find((w) => w.branch === fullRef);
+      if (holder) {
+        return yield* Effect.fail(
+          gitError(
+            "gitFailed",
+            `branch '${opts.branch}' is already checked out in another worktree (${holder.path}); retry with force to override`,
+            {
+              reason: "branchCheckedOutElsewhere",
+              conflictWorktreePath: holder.path,
+            },
+          ),
+        );
+      }
+    }
+
     const args: string[] = ["worktree", "add", "-q"];
+    if (opts.force) args.push("--force");
     if (opts.newBranch) {
       args.push("-b", opts.newBranch, path);
       if (opts.startPoint) args.push(opts.startPoint);

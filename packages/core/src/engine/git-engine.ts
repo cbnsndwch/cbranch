@@ -279,6 +279,7 @@ export interface GitEngineApi {
     branch?: string,
     newBranch?: string,
     startPoint?: string,
+    force?: boolean,
   ) => Effect.Effect<WorktreeInfo, GitError>;
   /** worktree.remove ✎ */
   readonly worktreeRemove: (

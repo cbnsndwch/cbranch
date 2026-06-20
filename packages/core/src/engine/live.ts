@@ -455,13 +455,13 @@ export const makeGitEngine = (
         Effect.flatMap(resolveById(repoId), (repo) =>
           worktreeListGit(repoCwd(repo), env),
         ),
-      worktreeAdd: (repoId, path, branch, newBranch, startPoint) =>
+      worktreeAdd: (repoId, path, branch, newBranch, startPoint, force) =>
         Effect.flatMap(resolveById(repoId), (repo) =>
           locks.withRepoLock(repoId)(
             worktreeAddGit(
               repoCwd(repo),
               path,
-              { branch, newBranch, startPoint },
+              { branch, newBranch, startPoint, force },
               env,
             ),
           ),

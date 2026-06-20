@@ -160,9 +160,9 @@ export const handlersLayer = CbranchRpcs.toLayer({
   // ── worktrees (P3) ────────────────────────────────────────────────────────
   WorktreeList: ({ repoId }) =>
     Effect.flatMap(GitEngine, (engine) => engine.worktreeList(repoId)),
-  WorktreeAdd: ({ repoId, path, branch, newBranch, startPoint }) =>
+  WorktreeAdd: ({ repoId, path, branch, newBranch, startPoint, force }) =>
     Effect.flatMap(GitEngine, (engine) =>
-      engine.worktreeAdd(repoId, path, branch, newBranch, startPoint),
+      engine.worktreeAdd(repoId, path, branch, newBranch, startPoint, force),
     ),
   WorktreeRemove: ({ repoId, path, force }) =>
     Effect.flatMap(GitEngine, (engine) =>

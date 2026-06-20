@@ -368,6 +368,7 @@ export const CbranchRpcs = RpcGroup.make(
       branch: Schema.optional(Schema.String),
       newBranch: Schema.optional(Schema.String),
       startPoint: Schema.optional(Schema.String),
+      force: Schema.optional(Schema.Boolean),
     },
     success: WorktreeInfo,
     error: GitError,

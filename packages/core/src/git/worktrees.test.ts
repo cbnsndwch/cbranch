@@ -254,4 +254,70 @@ describe("worktreeList", () => {
     expect(wt).toBeDefined();
     expect(wt?.isPrunable).toBe(true);
   });
+
+  test("worktreeAdd refuses a branch already checked out in another worktree (WT-003)", async () => {
+    const repo = await ws.createRepo("wt-conflict");
+    await repo.commit({ message: "init", files: { "a.txt": "a" } });
+    await repo.branch("shared");
+    const firstPath = join(ws.root, "wt-conflict-first");
+    const secondPath = join(ws.root, "wt-conflict-second");
+
+    await Effect.runPromise(
+      worktreeAdd(repo.dir, firstPath, { branch: "shared" }),
+    );
+
+    const err = await Effect.runPromise(
+      Effect.flip(worktreeAdd(repo.dir, secondPath, { branch: "shared" })),
+    );
+    expect(err.code).toBe("gitFailed");
+    expect(err.message).toMatch(/already checked out/i);
+    expect((err.detail as { reason?: string }).reason).toBe(
+      "branchCheckedOutElsewhere",
+    );
+    expect(
+      (err.detail as { conflictWorktreePath?: string }).conflictWorktreePath,
+    ).toBe(firstPath);
+
+    // The second worktree must NOT have been created.
+    const list = await Effect.runPromise(worktreeList(repo.dir));
+    expect(list.some((w) => w.path === secondPath)).toBe(false);
+  });
+
+  test("worktreeAdd with force checks out a branch already live in another worktree (WT-003)", async () => {
+    const repo = await ws.createRepo("wt-force-add");
+    await repo.commit({ message: "init", files: { "a.txt": "a" } });
+    await repo.branch("shared2");
+    const firstPath = join(ws.root, "wt-force-add-first");
+    const secondPath = join(ws.root, "wt-force-add-second");
+
+    await Effect.runPromise(
+      worktreeAdd(repo.dir, firstPath, { branch: "shared2" }),
+    );
+
+    const info = await Effect.runPromise(
+      worktreeAdd(repo.dir, secondPath, { branch: "shared2", force: true }),
+    );
+    expect(info.path).toBe(secondPath);
+    expect(info.branch).toBe("refs/heads/shared2");
+
+    const list = await Effect.runPromise(worktreeList(repo.dir));
+    expect(list.some((w) => w.path === secondPath)).toBe(true);
+  });
+
+  test("worktreeAdd — a non-conflict failure still classifies as gitFailed via the fallback", async () => {
+    const repo = await ws.createRepo("wt-add-fail");
+    await repo.commit({ message: "init", files: { "a.txt": "a" } });
+
+    // `-b main` tries to CREATE the already-existing 'main' branch → refused for
+    // a reason other than checked-out-elsewhere, so it uses the generic fallback.
+    const err = await Effect.runPromise(
+      Effect.flip(
+        worktreeAdd(repo.dir, join(ws.root, "wt-add-fail-linked"), {
+          newBranch: "main",
+        }),
+      ),
+    );
+    expect(err.code).toBe("gitFailed");
+    expect((err.detail as { reason?: string }).reason).toBeUndefined();
+  });
 });
