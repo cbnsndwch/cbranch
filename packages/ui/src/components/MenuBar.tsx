@@ -66,8 +66,9 @@ function renderEntry(entry: MenuEntry, key: string, actions: MenuActions): React
     );
   }
 
+  const Icon = entry.icon;
   return (
-    <MenubarItem key={key} disabled={!enabled} onClick={() => actions.run(entry.id)}>
+    <MenubarItem key={key} disabled={!enabled} onClick={() => actions.run(entry.id)} icon={Icon ? <Icon /> : undefined}>
       {entry.label}
       {accel}
     </MenubarItem>

@@ -5,6 +5,20 @@
 // than ad-hoc conditionals. This model is the single source of truth; the revision-grid
 // context menu (later) reuses the same command ids.
 
+import {
+  ArrowLeft,
+  ArrowRight,
+  ChevronDown,
+  ChevronsDown,
+  ChevronsUp,
+  ChevronUp,
+  Crosshair,
+  GitMerge,
+  Hash,
+  type LucideIcon,
+  Search,
+} from "lucide-react";
+
 /** Delivery phase for a command (menu-hierarchy.md §"Phase tags"). `shell` = always-on. */
 export type Phase = "P1" | "P2" | "P3" | "P4" | "P5" | "shell" | "later";
 
@@ -16,6 +30,8 @@ export interface MenuCommand {
   readonly phase: Phase;
   /** Accelerator hint, right-aligned (shown even before the command is live). */
   readonly accelerator?: string;
+  /** Optional icon rendered in the menu's left rail (the column shared with checkmarks). */
+  readonly icon?: LucideIcon;
 }
 
 /** A togglable command bound to a piece of UI state (rendered as a checkbox item). */
@@ -123,18 +139,64 @@ export const MENUS: ReadonlyArray<TopMenu> = [
     label: "Navigate",
     items: [
       { kind: "command", id: "navigate.toggleArtificial", label: "Toggle artificial / HEAD commits", phase: "P2" },
-      { kind: "command", id: "navigate.goToCurrent", label: "Go to current revision", phase: "P1" },
-      { kind: "command", id: "navigate.goToCommit", label: "Go to commit…", phase: "P1", accelerator: "Ctrl+G" },
-      { kind: "command", id: "navigate.goToChild", label: "Go to child commit", phase: "P1" },
-      { kind: "command", id: "navigate.goToParent", label: "Go to parent commit", phase: "P1" },
-      { kind: "command", id: "navigate.goToFirstParent", label: "Go to first parent commit", phase: "P1" },
-      { kind: "command", id: "navigate.goToLastParent", label: "Go to last parent commit", phase: "P1" },
-      { kind: "command", id: "navigate.goToMergeBase", label: "Go to common ancestor (merge base)", phase: "P1" },
+      { kind: "command", id: "navigate.goToCurrent", label: "Go to current revision", phase: "P1", icon: Crosshair },
+      {
+        kind: "command",
+        id: "navigate.goToCommit",
+        label: "Go to commit…",
+        phase: "P1",
+        accelerator: "Ctrl+G",
+        icon: Hash,
+      },
+      { kind: "command", id: "navigate.goToChild", label: "Go to child commit", phase: "P1", icon: ChevronDown },
+      { kind: "command", id: "navigate.goToParent", label: "Go to parent commit", phase: "P1", icon: ChevronUp },
+      {
+        kind: "command",
+        id: "navigate.goToFirstParent",
+        label: "Go to first parent commit",
+        phase: "P1",
+        icon: ChevronsUp,
+      },
+      {
+        kind: "command",
+        id: "navigate.goToLastParent",
+        label: "Go to last parent commit",
+        phase: "P1",
+        icon: ChevronsDown,
+      },
+      {
+        kind: "command",
+        id: "navigate.goToMergeBase",
+        label: "Go to common ancestor (merge base)",
+        phase: "P1",
+        icon: GitMerge,
+      },
       sep,
-      { kind: "command", id: "navigate.back", label: "Navigate backward", phase: "P1", accelerator: "Alt+Left" },
-      { kind: "command", id: "navigate.forward", label: "Navigate forward", phase: "P1", accelerator: "Alt+Right" },
+      {
+        kind: "command",
+        id: "navigate.back",
+        label: "Navigate backward",
+        phase: "P1",
+        accelerator: "Alt+Left",
+        icon: ArrowLeft,
+      },
+      {
+        kind: "command",
+        id: "navigate.forward",
+        label: "Navigate forward",
+        phase: "P1",
+        accelerator: "Alt+Right",
+        icon: ArrowRight,
+      },
       sep,
-      { kind: "command", id: "navigate.quickSearch", label: "Quick search", phase: "P1", accelerator: "Ctrl+F" },
+      {
+        kind: "command",
+        id: "navigate.quickSearch",
+        label: "Quick search",
+        phase: "P1",
+        accelerator: "Ctrl+F",
+        icon: Search,
+      },
       {
         kind: "command",
         id: "navigate.quickSearchPrev",
