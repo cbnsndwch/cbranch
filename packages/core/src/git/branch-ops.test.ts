@@ -74,6 +74,39 @@ describe("branch lifecycle", () => {
     expect(feat?.upstream).toBeDefined();
   });
 
+  test("branchCreate — rejects a duplicate branch name without partial creation (BR-013)", async () => {
+    const repo = await ws.createRepo("bops-dup");
+    await repo.commit({ message: "init", files: { "a.txt": "a" } });
+    await repo.branch("dup");
+
+    const err = await Effect.runPromise(
+      Effect.flip(branchCreate(repo.dir, "dup")),
+    );
+    expect(err.code).toBe("gitFailed");
+
+    // The pre-existing branch is untouched — no duplicate, no partial state.
+    const listing = await Effect.runPromise(branchList(repo.dir));
+    expect(listing.localBranches.filter((b) => b.name === "dup")).toHaveLength(
+      1,
+    );
+  });
+
+  test("branchCreate — rejects an invalid branch name (BR-013)", async () => {
+    const repo = await ws.createRepo("bops-invalid-name");
+    await repo.commit({ message: "init", files: { "a.txt": "a" } });
+
+    // '~' is illegal in a git ref name; git refuses and nothing is created.
+    const err = await Effect.runPromise(
+      Effect.flip(branchCreate(repo.dir, "bad~name")),
+    );
+    expect(err.code).toBe("gitFailed");
+
+    const listing = await Effect.runPromise(branchList(repo.dir));
+    expect(listing.localBranches.some((b) => b.name.includes("bad"))).toBe(
+      false,
+    );
+  });
+
   // ── switch ──────────────────────────────────────────────────────────────────
 
   test("branchSwitch — carry (default) switches HEAD", async () => {
@@ -170,6 +203,48 @@ describe("branch lifecycle", () => {
     expect(err.code).toBe("mergeConflict");
   });
 
+  test("branchSwitch — checks out a remote-tracking branch by creating a local tracking branch (BR-021)", async () => {
+    const origin = await ws.createRepo("bops-rt-origin");
+    await origin.commit({ message: "init", files: { "a.txt": "a" } });
+    // A branch that exists ONLY on the remote.
+    await origin.branch("feature");
+
+    const clone = await ws.createRepo("bops-rt-clone");
+    await clone.addRemote("origin", origin.dir);
+    await clone.fetch("origin");
+
+    // No local `feature` exists; switching by short name must create it from the
+    // unique origin/feature remote-tracking ref and set up tracking.
+    await Effect.runPromise(branchSwitch(clone.dir, "feature"));
+
+    const listing = await Effect.runPromise(branchList(clone.dir));
+    expect(listing.currentBranch).toBe("feature");
+    const feat = listing.localBranches.find((b) => b.name === "feature");
+    expect(feat?.upstream?.name).toContain("origin/feature");
+  });
+
+  test("branchSwitch — carry that would conflict aborts, leaving the working tree unchanged (BR-024)", async () => {
+    const repo = await ws.createRepo("bops-carry-conflict");
+    await repo.commit({ message: "init", files: { "a.txt": "base\n" } });
+    // `other` changes a.txt; back on main we dirty the SAME file so a carrying
+    // switch would have to overwrite local changes — git must refuse.
+    await repo.git(["switch", "-c", "other"]);
+    await repo.commit({ message: "other", files: { "a.txt": "other\n" } });
+    await repo.git(["switch", "main"]);
+    await repo.writeFile("a.txt", "work-in-progress\n");
+
+    const err = await Effect.runPromise(
+      Effect.flip(branchSwitch(repo.dir, "other")),
+    );
+    expect(err.code).toBe("gitFailed");
+
+    // The switch was aborted: still on main, and the WD edit is preserved.
+    const listing = await Effect.runPromise(branchList(repo.dir));
+    expect(listing.currentBranch).toBe("main");
+    const status = await repo.git(["status", "--porcelain"]);
+    expect(status.stdout).toContain("a.txt");
+  });
+
   // ── detached checkout (BR-022) ────────────────────────────────────────────────
 
   test("branchCheckoutDetached — checks out a commit into a detached HEAD", async () => {
@@ -263,6 +338,40 @@ describe("branch lifecycle", () => {
     const listing = await Effect.runPromise(branchList(repo.dir));
     expect(listing.localBranches.some((b) => b.name === "unmerged-force")).toBe(
       false,
+    );
+  });
+
+  test("branchDelete — refuses to delete the currently checked-out branch (BR-041)", async () => {
+    const repo = await ws.createRepo("bops-del-current");
+    await repo.commit({ message: "init", files: { "a.txt": "a" } });
+    // HEAD is on main — neither safe nor force delete may remove it.
+    const err = await Effect.runPromise(
+      Effect.flip(branchDelete(repo.dir, "main", false)),
+    );
+    expect(err.code).toBe("gitFailed");
+    const forceErr = await Effect.runPromise(
+      Effect.flip(branchDelete(repo.dir, "main", true)),
+    );
+    expect(forceErr.code).toBe("gitFailed");
+
+    const listing = await Effect.runPromise(branchList(repo.dir));
+    expect(listing.localBranches.some((b) => b.name === "main")).toBe(true);
+  });
+
+  test("branchDelete — refuses to delete a branch checked out in another worktree (BR-041)", async () => {
+    const repo = await ws.createRepo("bops-del-wt");
+    await repo.commit({ message: "init", files: { "a.txt": "a" } });
+    // A linked worktree holds `wt-branch`.
+    await repo.worktreeAdd("wt", { branch: "wt-branch" });
+
+    const err = await Effect.runPromise(
+      Effect.flip(branchDelete(repo.dir, "wt-branch", false)),
+    );
+    expect(err.code).toBe("gitFailed");
+
+    const listing = await Effect.runPromise(branchList(repo.dir));
+    expect(listing.localBranches.some((b) => b.name === "wt-branch")).toBe(
+      true,
     );
   });
 
