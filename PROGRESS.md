@@ -84,14 +84,14 @@ surfaces. It is not a separate milestone but a prerequisite for all future work.
 ## Blocked / decisions to surface
 - _(none yet)_
 
-## ▶ RESUME HERE (P2 S2–S10 COMPLETE — awaiting user review)
-**P2 core+UI slices are COMPLETE. Gate green: 378 tests, 80.48% branches / 91.85% statements coverage.**
+## ▶ RESUME HERE (P2 COMPLETE — awaiting user review)
+**P2 is COMPLETE. Gate green: 378 tests, 80.48% branches / 91.85% statements coverage. STOP for user review.**
 
-**What was built (P2 so far):** S1 RPC contract (360845b) · S2 porcelain-v2 status (b3183af) · S3 stage/unstage/discard/resetTo (9df6f0f) · S4 partial-stage patch builder (2f1f213) · S5 commitCreate+commitLastMessage (4a5c13e) · S6 UI status helpers+store slices+hooks (dc175a9) · S10 DestructiveConfirmDialog+AlertDialog+menu commands (6fa20be) · S7 StatusPanel (7bd43c9) · watcher coalesce fix (f59d9d4) · S8 WorkingDiffPanel (3d6a0ad) · S9 CommitPanel (eb3bf5f).
+**What was built (P2):** S1 RPC contract (360845b) · S2 porcelain-v2 status (b3183af) · S3 stage/unstage/discard/resetTo (9df6f0f) · S4 partial-stage patch builder (2f1f213) · S5 commitCreate+commitLastMessage (4a5c13e) · S6 UI status helpers+store slices+hooks (dc175a9) · S10 DestructiveConfirmDialog+AlertDialog+menu commands (6fa20be) · S7 StatusPanel (7bd43c9) · watcher coalesce fix (f59d9d4) · S8 WorkingDiffPanel (3d6a0ad) · S9 CommitPanel (eb3bf5f) · AppShell "Changes" tab integration (1087b99).
 
-**NOT YET WIRED:** StatusPanel / WorkingDiffPanel / CommitPanel exist as components but are not yet integrated into the AppShell. The user cannot see the P2 UI from the running app yet.
+**The app runs end-to-end with stage+commit.** Open the "Changes" tab to see staged/unstaged file list, click a file to diff it, stage/unstage hunks, write a commit message, and commit.
 
-**Next step:** AppShell integration — add a "Changes" tab (or sidebar pane) to `packages/ui/src/components/AppShell.tsx` that renders `<StatusPanel>`, `<WorkingDiffPanel>`, and `<CommitPanel>` for the active repo. This is the final wiring step to make P2 functional end-to-end.
+**To run:** `pnpm -r build` then `CBRANCH_CLIENT_DIR=$PWD/packages/ui/dist pnpm --filter @cbranch/web-server start` → http://127.0.0.1:7420.
 
 **To run current build:** `pnpm -r build` then `CBRANCH_CLIENT_DIR=$PWD/packages/ui/dist pnpm --filter @cbranch/web-server start` → http://127.0.0.1:7420.
 
