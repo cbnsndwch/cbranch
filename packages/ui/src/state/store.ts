@@ -13,6 +13,8 @@ import { emptyFilters, type LogFilters } from "../lib/filters";
 import { type DateMode, readDateMode, writeDateMode } from "../lib/format";
 import { applyTheme, readThemePref, type ThemePref } from "../theme/theme";
 
+export type DetailTab = "commit" | "diff" | "filetree" | "gpg" | "console" | "output";
+
 export interface UiState {
   /** The single active repository (cbranch is one-repo-at-a-time, P1-OPEN-4). */
   readonly activeRepoId: RepoId | null;
@@ -28,6 +30,10 @@ export interface UiState {
   readonly dateMode: DateMode;
   /** Inline/side-by-side diff presentation preference (P1-DIFF-3). */
   readonly diffView: DiffView;
+  readonly detailTab: DetailTab;
+  readonly setDetailTab: (tab: DetailTab) => void;
+  readonly knownRefStrings: ReadonlyArray<string>;
+  readonly setKnownRefStrings: (refs: ReadonlyArray<string>) => void;
   readonly setActiveRepoId: (id: RepoId | null) => void;
   readonly setSelectedOid: (oid: Oid | null) => void;
   readonly setPaletteOpen: (open: boolean) => void;
@@ -45,6 +51,8 @@ export const useUiStore = create<UiState>((set) => ({
   filters: emptyFilters,
   dateMode: readDateMode(),
   diffView: readDiffView(),
+  detailTab: "commit",
+  knownRefStrings: [],
   // Switching repositories supersedes the old selection and filters (P1-OPEN-4 / P1-X-4).
   setActiveRepoId: (activeRepoId) => set({ activeRepoId, selectedOid: null, filters: emptyFilters }),
   setSelectedOid: (selectedOid) => set({ selectedOid }),
@@ -62,4 +70,6 @@ export const useUiStore = create<UiState>((set) => ({
     writeDiffView(diffView);
     set({ diffView });
   },
+  setDetailTab: (detailTab) => set({ detailTab }),
+  setKnownRefStrings: (knownRefStrings) => set({ knownRefStrings }),
 }));

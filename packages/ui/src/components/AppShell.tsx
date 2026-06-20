@@ -1,69 +1,83 @@
-import { Group, Panel, Separator } from "react-resizable-panels";
-
 import { useInvalidationBus } from "../rpc/use-invalidation-bus";
 import { useUiStore } from "../state/store";
-import { DetailsPanel } from "./DetailsPanel";
+import { CommandPalette } from "./CommandPalette";
+import { CommitDetailsTabs } from "./CommitDetailsTabs";
+import { CommitTab } from "./CommitTab";
 import { DiffPanel } from "./DiffPanel";
 import { HistoryPane } from "./HistoryPane";
-import { StatusSummary } from "./StatusSummary";
-import { ThemeToggle } from "./ThemeToggle";
+import { HistoryStatusStrip } from "./HistoryStatusStrip";
+import { MenuBar } from "./MenuBar";
+import { RepositorySidebar } from "./RepositorySidebar";
+import { TitleBar } from "./TitleBar";
+import { Toolbar } from "./Toolbar";
 import { Button } from "./ui/button";
+import { Placeholder } from "./ui/placeholder";
 
-// The read-only browse layout (P1-UI-*): a resizable history pane beside a stacked
-// details + diff pane, under a top bar carrying the status summary and the switcher
-// trigger. One repository at a time (P1-OPEN-4).
+// Desktop-style layout: title bar → menu bar → toolbar → main split (sidebar + history/details).
 export function AppShell() {
   const repoId = useUiStore((s) => s.activeRepoId);
   const selectedOid = useUiStore((s) => s.selectedOid);
   const setSelectedOid = useUiStore((s) => s.setSelectedOid);
+  const detailTab = useUiStore((s) => s.detailTab);
   const openPalette = useUiStore((s) => s.setPaletteOpen);
 
-  // Live updates: subscribe to the host invalidation bus for the active repo (spec 15).
+  // Live updates: subscribe to the host invalidation bus for the active repo.
   useInvalidationBus(repoId);
 
-  return (
-    <div className="flex h-dvh flex-col">
-      <header className="flex items-center gap-3 border-b px-3 py-2">
-        <button type="button" onClick={() => openPalette(true)} className="text-sm font-semibold">
-          cbranch
-        </button>
-        {repoId ? (
-          <StatusSummary repoId={repoId} />
-        ) : (
-          <span className="text-muted-foreground text-xs">No repository open</span>
-        )}
-        <div className="ml-auto flex items-center gap-2">
-          <Button onClick={() => openPalette(true)}>Open / switch</Button>
-          <ThemeToggle />
-        </div>
-      </header>
+  const detailContent = (() => {
+    if (!repoId) return <Placeholder>Select a commit to see its details.</Placeholder>;
+    switch (detailTab) {
+      case "commit":
+        return <CommitTab repoId={repoId} oid={selectedOid} onSelectOid={setSelectedOid} />;
+      case "diff":
+        return <DiffPanel repoId={repoId} oid={selectedOid} />;
+      default:
+        return (
+          <Placeholder>
+            {detailTab.charAt(0).toUpperCase() + detailTab.slice(1)} — coming in a later milestone.
+          </Placeholder>
+        );
+    }
+  })();
 
-      <div className="min-h-0 flex-1">
-        {repoId ? (
-          <Group orientation="horizontal" className="h-full">
-            <Panel defaultSize="55%" minSize="30%">
-              <HistoryPane repoId={repoId} selectedOid={selectedOid} onSelectOid={setSelectedOid} />
-            </Panel>
-            <Separator className="bg-border w-px" />
-            <Panel defaultSize="45%" minSize="25%">
-              <Group orientation="vertical" className="h-full">
-                <Panel defaultSize="45%" minSize="20%">
-                  <DetailsPanel repoId={repoId} oid={selectedOid} onSelectOid={setSelectedOid} />
-                </Panel>
-                <Separator className="bg-border h-px" />
-                <Panel defaultSize="55%" minSize="20%">
-                  <DiffPanel repoId={repoId} oid={selectedOid} />
-                </Panel>
-              </Group>
-            </Panel>
-          </Group>
-        ) : (
-          <div className="flex h-full flex-col items-center justify-center gap-3">
-            <p className="text-muted-foreground text-sm">Open a repository to start browsing.</p>
-            <Button onClick={() => openPalette(true)}>Open a repository</Button>
-          </div>
-        )}
+  return (
+    <>
+      <CommandPalette />
+      <div className="grid h-dvh grid-rows-[26px_24px_32px_1fr] overflow-hidden">
+        {/* Row 1: Title bar */}
+        <TitleBar />
+        {/* Row 2: Menu bar */}
+        <MenuBar />
+        {/* Row 3: Toolbar */}
+        <Toolbar />
+        {/* Row 4: Main split */}
+        <div className="grid min-h-0 grid-cols-[265px_1fr]">
+          {/* Left: Repository sidebar */}
+          <RepositorySidebar repoId={repoId} />
+          {/* Right: History + details */}
+          {repoId ? (
+            <div className="grid min-h-0 grid-rows-[46px_minmax(200px,55%)_6px_28px_1fr]">
+              {/* Status strip */}
+              <HistoryStatusStrip repoId={repoId} />
+              {/* History list */}
+              <div className="min-h-0 overflow-hidden">
+                <HistoryPane repoId={repoId} selectedOid={selectedOid} onSelectOid={setSelectedOid} />
+              </div>
+              {/* Splitter visual */}
+              <div className="border-t" />
+              {/* Detail tabs */}
+              <CommitDetailsTabs />
+              {/* Detail content */}
+              <div className="min-h-0 overflow-hidden">{detailContent}</div>
+            </div>
+          ) : (
+            <div className="flex h-full flex-col items-center justify-center gap-3">
+              <p className="text-muted-foreground text-sm">Open a repository to start browsing.</p>
+              <Button onClick={() => openPalette(true)}>Open a repository</Button>
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+    </>
   );
 }

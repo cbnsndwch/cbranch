@@ -7,13 +7,25 @@ import { cn } from "../lib/cn";
 import { type DateMode, formatDate, formatIso, formatRelativeMs, shortOid } from "../lib/format";
 import { findMatches, stepMatch } from "../lib/quick-find";
 import { useLogStream } from "../rpc/hooks";
+import { useUiStore } from "../state/store";
 import { FindBar } from "./FindBar";
 import { GraphCell } from "./GraphCell";
 import { RefChips } from "./RefChips";
 import { Placeholder } from "./ui/placeholder";
 
-const ROW_HEIGHT = 40;
+const ROW_HEIGHT = 26;
 const DEFAULT_PAGE = 10;
+
+const initials = (name: string): string => {
+  const parts = name.trim().split(/\s+/);
+  return (
+    parts
+      .map((p) => p[0] ?? "")
+      .join("")
+      .slice(0, 2)
+      .toUpperCase() || "?"
+  );
+};
 
 // Virtualized streaming history (P1-HIST-1/2/3 + P1-UI-HIST-1): only visible rows render
 // (NF-PERF-3); rows append as the feed streams in. The lane/edge commit graph (spec 10) is
@@ -35,6 +47,12 @@ export function HistoryList({
   readonly onSelectOid: (oid: Oid) => void;
 }) {
   const { rows, status } = useLogStream(query);
+  const setKnownRefStrings = useUiStore((s) => s.setKnownRefStrings);
+  useEffect(() => {
+    const allRefs = [...new Set(rows.flatMap((r) => r.refs))];
+    setKnownRefStrings(allRefs);
+  }, [rows, setKnownRefStrings]);
+
   // Lane layout is append-only and viewport-independent, so recomputing from the streamed
   // window stays stable across scrolling (spec 10 REQ-GRAPH-008/020).
   const graphRows = useMemo(() => layoutCommits(rows.map((r) => ({ oid: r.oid, parents: r.parents }))), [rows]);
@@ -199,7 +217,7 @@ export function HistoryList({
                 onClick={() => onSelectOid(row.oid)}
                 className={cn(
                   "hover:bg-accent absolute top-0 left-0 flex w-full cursor-pointer items-center gap-2 border-b pr-2 text-xs",
-                  selected ? "bg-accent" : "",
+                  selected ? "bg-[var(--color-selection-bg)] text-[var(--color-selection-fg)]" : "",
                   matched ? "bg-status-ahead/10" : "",
                   isCurrentMatch ? "ring-ring ring-1 ring-inset" : "",
                 )}
@@ -208,11 +226,18 @@ export function HistoryList({
                 <GraphCell row={graphRows[item.index]!} columns={columns} height={item.size} selected={selected} />
                 {row.refs.length > 0 ? <RefChips refs={row.refs} /> : null}
                 <span className="flex-1 truncate">{row.subject}</span>
-                <span className="text-muted-foreground w-28 truncate">{row.authorName}</span>
-                <span className="text-muted-foreground w-36 truncate" title={alternate}>
+                <div
+                  className="flex size-[22px] shrink-0 items-center justify-center text-[9px] font-semibold text-white"
+                  style={{ background: "var(--color-status-staged)" }}
+                  aria-hidden="true"
+                >
+                  {initials(row.authorName)}
+                </div>
+                <span className="w-[120px] truncate">{row.authorName}</span>
+                <span className="w-[110px] truncate" title={alternate}>
                   {formatDate(row.authorDate, dateMode)}
                 </span>
-                <span className="text-muted-foreground w-16 font-mono">{shortOid(row.oid)}</span>
+                <span className="w-[80px] font-mono">{shortOid(row.oid)}</span>
               </div>
             );
           })}

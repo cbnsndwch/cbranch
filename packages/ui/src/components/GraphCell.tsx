@@ -56,14 +56,30 @@ export function GraphCell({
           strokeWidth={selected ? 2 : 1.5}
         />
       ))}
-      <circle
-        cx={nodeX}
-        cy={nodeY}
-        r={selected ? NODE_RADIUS + 1 : NODE_RADIUS}
-        style={{ fill: stroke(row.color) }}
-        stroke="var(--color-background)"
-        strokeWidth={1.5}
-      />
+      {selected ? (
+        <>
+          <rect
+            x={nodeX - 5}
+            y={nodeY - 5}
+            width={10}
+            height={10}
+            rx={1}
+            fill="none"
+            stroke="var(--color-selection-bg)"
+            strokeWidth={2}
+          />
+          <circle cx={nodeX} cy={nodeY} r={NODE_RADIUS - 1} style={{ fill: stroke(row.color) }} />
+        </>
+      ) : (
+        <circle
+          cx={nodeX}
+          cy={nodeY}
+          r={NODE_RADIUS}
+          style={{ fill: stroke(row.color) }}
+          stroke="var(--color-background)"
+          strokeWidth={1.5}
+        />
+      )}
     </svg>
   );
 }

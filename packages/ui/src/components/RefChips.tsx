@@ -12,7 +12,7 @@ import { parseRefs, type RefKind, type RefLabel } from "../lib/refs";
 const MAX_VISIBLE = 3;
 
 const kindClass: Record<RefKind, string> = {
-  localBranch: "border-graph-3 text-graph-3",
+  localBranch: "bg-[var(--color-status-staged)] text-black border-0 px-1.5 font-semibold",
   remoteBranch: "border-border text-muted-foreground",
   tag: "border-status-ahead text-status-ahead",
   head: "border-primary text-primary",
