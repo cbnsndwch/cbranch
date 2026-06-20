@@ -28,7 +28,7 @@ export function ConventionalCommitBar({
   onChange,
 }: ConventionalCommitBarProps) {
   return (
-    <div className="flex items-center gap-1.5 border-b px-2 py-1 text-xs">
+    <div className="flex items-center gap-1.5 px-2 py-1 text-xs">
       <select
         value={type}
         onChange={(e) => onChange(e.target.value, scope, breaking)}

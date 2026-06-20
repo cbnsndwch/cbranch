@@ -26,7 +26,7 @@ export function CommitMessageEditor({
 }: CommitMessageEditorProps) {
   const overLimit = subject.length > SUBJECT_SOFT_LIMIT;
   return (
-    <div className="flex flex-col gap-1 px-2 py-1">
+    <div className="flex flex-col gap-1 px-2 pb-1">
       <div className="relative">
         <input
           ref={subjectRef}

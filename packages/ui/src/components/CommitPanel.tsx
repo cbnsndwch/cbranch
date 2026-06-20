@@ -224,7 +224,7 @@ export const CommitPanel = forwardRef<CommitPanelHandle, CommitPanelProps>(
           )}
 
           {/* Options (§4). */}
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t px-2 py-1">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-2 py-1">
             <span className="flex items-center gap-1.5">
               <Switch
                 size="sm"
