@@ -146,6 +146,25 @@
   --color-graph-6: var(--graph-6);
 }
 
+/* Theme react-diff-view through its own CSS variables so the rendered diff follows our
+   light/dark diff tokens instead of its hardcoded light palette (the raw `--diff-*` tokens
+   above already switch per theme). Loaded after the library stylesheet, so these win. */
+:root {
+  --diff-background-color: transparent;
+  --diff-text-color: var(--foreground);
+  --diff-font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --diff-selection-background-color: var(--accent);
+  --diff-gutter-insert-background-color: var(--diff-word-add);
+  --diff-gutter-delete-background-color: var(--diff-word-remove);
+  --diff-gutter-selected-background-color: var(--accent);
+  --diff-code-insert-background-color: var(--diff-add);
+  --diff-code-delete-background-color: var(--diff-remove);
+  --diff-code-insert-edit-background-color: var(--diff-word-add);
+  --diff-code-delete-edit-background-color: var(--diff-word-remove);
+  --diff-code-selected-background-color: var(--accent);
+  --diff-omit-gutter-line-color: var(--border);
+}
+
 @layer base {
   * {
     border-color: var(--color-border);
@@ -154,5 +173,32 @@
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
+  }
+
+  /* Scrollbars blend with the surface instead of using the default OS chrome — subtle
+     thumb in the muted tone, transparent track, for both Firefox and Chromium. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in oklch, var(--color-muted-foreground) 40%, transparent) transparent;
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-track,
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background-color: color-mix(in oklch, var(--color-muted-foreground) 35%, transparent);
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: color-mix(in oklch, var(--color-muted-foreground) 60%, transparent);
   }
 }
