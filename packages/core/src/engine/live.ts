@@ -13,7 +13,6 @@ import { basename } from "node:path";
 
 import {
   type BranchInfo,
-  type BranchListing,
   type GitError,
   type InvalidationEvent,
   type MergeResult,
@@ -28,6 +27,7 @@ import { RepoHandle } from "@cbranch/rpc-contract";
 import { type Cause, Effect, Layer, Queue, Scope, Stream } from "effect";
 
 import { type ConfigStore, makeConfigStore } from "../config/config-store";
+import { branchList } from "../git/branches";
 import { type CatFilePool, makeCatFilePool } from "../git/cat-file-pool";
 import { commitDetail } from "../git/commit";
 import { commitCreate as commitCreateGit, commitLastMessage as commitLastMessageGit } from "../git/commit-write";
@@ -206,11 +206,8 @@ export const makeGitEngine = (opts?: MakeGitEngineOptions): Effect.Effect<GitEng
       objectInfo: (repoId, rev) =>
         Effect.flatMap(resolveById(repoId), (repo) => Effect.flatMap(poolFor(repo), (p) => p.objectInfo(rev))),
 
-      // ── branches (P3, stubs) ───────────────────────────────────────────────
-      branchList: (repoId) =>
-        Effect.flatMap(resolveById(repoId), (_repo) =>
-          Effect.fail(gitError("gitFailed", "P3: branchList not implemented")),
-        ) as Effect.Effect<BranchListing, GitError>,
+      // ── branches (P3) ─────────────────────────────────────────────────────
+      branchList: (repoId) => Effect.flatMap(resolveById(repoId), (repo) => branchList(repoCwd(repo), env)),
       branchCreate: (repoId, _name, _startPoint, _setUpstream, _switchAfter) =>
         Effect.flatMap(resolveById(repoId), (_repo) =>
           Effect.fail(gitError("gitFailed", "P3: branchCreate not implemented")),
