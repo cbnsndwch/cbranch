@@ -1,6 +1,9 @@
 // Branch lifecycle operations: create, switch, rename, delete, set-upstream.
 // (docs/spec/07 REQ-P3-BR-010..051)
 
+import { realpathSync } from "node:fs";
+import { normalize } from "node:path";
+
 import {
   BranchInfo,
   type BranchSwitchStrategy,
@@ -11,6 +14,18 @@ import { Effect } from "effect";
 import { branchList } from "./branches";
 import { gitError } from "./errors";
 import { assertNoLeadingDash, decodeUtf8, runGit, runGitOk } from "./run-git";
+import { worktreeList } from "./worktrees";
+
+// Compare two worktree paths for identity, resolving symlinks and (on win32)
+// drive-letter case so the current-vs-another label stays correct cross-platform
+// (git reports the resolved real path; `normalize` alone does neither).
+function sameWorktreePath(a: string, b: string): boolean {
+  try {
+    return realpathSync.native(a) === realpathSync.native(b);
+  } catch {
+    return normalize(a) === normalize(b);
+  }
+}
 
 // Return the BranchInfo for the named branch from a fresh listing.
 function lookupBranch(
@@ -41,6 +56,30 @@ export const branchCreate = (
 ): Effect.Effect<BranchInfo, GitError> =>
   Effect.gen(function* () {
     const safeName = yield* assertNoLeadingDash(name, "branch name");
+
+    // Surface the SPECIFIC reason a create is refused, DETERMINISTICALLY (an exit
+    // code + a porcelain listing, never localized stderr prose — NF-GIT-3), and
+    // never leave a partial branch behind (REQ-P3-BR-013):
+    //   - `check-ref-format` rejects a malformed name -> invalidRefName
+    //   - the local-branch listing detects a collision -> refExists
+    const fmt = yield* runGit({
+      cwd,
+      args: ["check-ref-format", `refs/heads/${safeName}`],
+      env,
+      read: false,
+    });
+    if (fmt.exitCode !== 0) {
+      return yield* Effect.fail(
+        gitError("invalidRefName", `'${safeName}' is not a valid branch name`),
+      );
+    }
+    const existing = yield* branchList(cwd, env);
+    if (existing.localBranches.some((b) => b.name === safeName)) {
+      return yield* Effect.fail(
+        gitError("refExists", `a branch named '${safeName}' already exists`),
+      );
+    }
+
     const args: string[] = switchAfter
       ? ["switch", "-c", safeName]
       : ["branch", safeName];
@@ -172,6 +211,33 @@ export const branchDelete = (
 ): Effect.Effect<void, GitError> =>
   Effect.gen(function* () {
     const safeName = yield* assertNoLeadingDash(name, "branch name");
+
+    // Refuse to delete a branch that is checked out in ANY worktree — the active
+    // one or a linked one — and report WHICH worktree holds it (REQ-P3-BR-041).
+    // git refuses these itself, but parsing `worktree list --porcelain` lets us
+    // name the holding path deterministically without matching localized stderr.
+    // Every attached worktree (including the main one) emits a `branch` line, so
+    // a single lookup covers both the current-branch and other-worktree cases.
+    const fullRef = `refs/heads/${safeName}`;
+    const worktrees = yield* worktreeList(cwd, env);
+    const holder = worktrees.find((w) => w.branch === fullRef);
+    if (holder) {
+      const here = sameWorktreePath(holder.path, cwd);
+      const where = here
+        ? `the current worktree (${holder.path})`
+        : `another worktree (${holder.path})`;
+      return yield* Effect.fail(
+        gitError(
+          "gitFailed",
+          `cannot delete branch '${safeName}': it is checked out in ${where}`,
+          {
+            reason: "branchCheckedOutElsewhere",
+            conflictWorktreePath: holder.path,
+          },
+        ),
+      );
+    }
+
     const flag = force ? "-D" : "-d";
     yield* runGitOk({
       cwd,

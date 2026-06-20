@@ -82,13 +82,28 @@ describe("branch lifecycle", () => {
     const err = await Effect.runPromise(
       Effect.flip(branchCreate(repo.dir, "dup")),
     );
-    expect(err.code).toBe("gitFailed");
+    expect(err.code).toBe("refExists");
 
     // The pre-existing branch is untouched — no duplicate, no partial state.
     const listing = await Effect.runPromise(branchList(repo.dir));
     expect(listing.localBranches.filter((b) => b.name === "dup")).toHaveLength(
       1,
     );
+  });
+
+  test("branchCreate — switchAfter duplicate is refExists, not partial (BR-013)", async () => {
+    const repo = await ws.createRepo("bops-dup-switch");
+    await repo.commit({ message: "init", files: { "a.txt": "a" } });
+    await repo.branch("dup2");
+
+    const err = await Effect.runPromise(
+      Effect.flip(branchCreate(repo.dir, "dup2", undefined, undefined, true)),
+    );
+    expect(err.code).toBe("refExists");
+
+    // The create-and-switch was refused atomically — HEAD did not move.
+    const listing = await Effect.runPromise(branchList(repo.dir));
+    expect(listing.currentBranch).toBe("main");
   });
 
   test("branchCreate — rejects an invalid branch name (BR-013)", async () => {
@@ -99,7 +114,7 @@ describe("branch lifecycle", () => {
     const err = await Effect.runPromise(
       Effect.flip(branchCreate(repo.dir, "bad~name")),
     );
-    expect(err.code).toBe("gitFailed");
+    expect(err.code).toBe("invalidRefName");
 
     const listing = await Effect.runPromise(branchList(repo.dir));
     expect(listing.localBranches.some((b) => b.name.includes("bad"))).toBe(
@@ -349,6 +364,12 @@ describe("branch lifecycle", () => {
       Effect.flip(branchDelete(repo.dir, "main", false)),
     );
     expect(err.code).toBe("gitFailed");
+    // The refusal names the holding worktree (BR-041) and identifies it as the
+    // active one.
+    expect(err.message).toContain("current worktree");
+    expect((err.detail as { reason?: string }).reason).toBe(
+      "branchCheckedOutElsewhere",
+    );
     const forceErr = await Effect.runPromise(
       Effect.flip(branchDelete(repo.dir, "main", true)),
     );
@@ -368,6 +389,12 @@ describe("branch lifecycle", () => {
       Effect.flip(branchDelete(repo.dir, "wt-branch", false)),
     );
     expect(err.code).toBe("gitFailed");
+    // The refusal names the OTHER worktree that holds the branch (BR-041).
+    expect(err.message).toContain("another worktree");
+    expect(
+      typeof (err.detail as { conflictWorktreePath?: unknown })
+        .conflictWorktreePath,
+    ).toBe("string");
 
     const listing = await Effect.runPromise(branchList(repo.dir));
     expect(listing.localBranches.some((b) => b.name === "wt-branch")).toBe(

@@ -346,7 +346,7 @@ export const CommitPanel = forwardRef<CommitPanelHandle, CommitPanelProps>(
           {/* Persistent commit error (§7) — stays until dismissed or the next attempt. */}
           {commitError && (
             <div className="border-destructive/40 bg-destructive/10 text-destructive flex items-start gap-2 border-t px-2 py-1.5 text-[11px]">
-              <span className="min-w-0 flex-1 break-words whitespace-pre-wrap select-text">
+              <span className="min-w-0 flex-1 wrap-break-word whitespace-pre-wrap select-text">
                 {commitError}
               </span>
               <button
