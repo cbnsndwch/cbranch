@@ -10,7 +10,6 @@
 
 import {
   type GitError,
-  Oid,
   SyncProgressEvent,
   SyncRefUpdate,
 } from "@cbranch/rpc-contract";
@@ -29,10 +28,16 @@ import {
 // fetch/pull ref-update lines (on stderr), e.g.
 //   " * [new branch]      main -> origin/main"
 //   "   a1b2c3..e5f6g7  feat -> origin/feat"
+// NOTE: the gap between the summary and the local ref is a SINGLE `\s+`, not
+// `\s{2,}`: git pads the summary to a fixed column, so a long summary (e.g. a
+// `abc...def` forced-update range, one char wider than a `abc..def` range) can
+// leave only one space before the ref. The wide alignment padding sits between
+// the local ref and `->`, which the later `\s+` absorbs.
 const REF_UPDATE_RE =
-  /^\s*(?:[+ *t!=-])\s+(.+?)\s{2,}([\w./-]+)\s+->\s+([\w./-]+)\s*(?:\((.*?)\))?$/;
-// A sha range in a summary: "abc1234..def5678".
-const OID_RANGE_RE = /^([0-9a-f]{7,40})\.\.([0-9a-f]{7,40})$/;
+  /^\s*(?:[+ *t!=-])\s+(.+?)\s+([\w./-]+)\s+->\s+([\w./-]+)\s*(?:\((.*?)\))?$/;
+// A sha range in a summary: "abc1234..def5678" (fast-forward, two dots) or
+// "abc1234...def5678" (forced update / forced push, three dots).
+const OID_RANGE_RE = /^([0-9a-f]{7,40})\.{2,3}([0-9a-f]{7,40})$/;
 // push `--porcelain` status line: "<flag>\t<from>:<to>\t<summary>".
 const PORCELAIN_RE = /^([ +\-*!=])\t([^\t]+)\t(.*)$/;
 
@@ -40,6 +45,7 @@ const refUpdateFrom = (
   summary: string,
   localRef: string,
   remoteRef: string,
+  status?: string,
 ): SyncRefUpdate => {
   const range = OID_RANGE_RE.exec(summary);
   return new SyncRefUpdate({
@@ -47,8 +53,11 @@ const refUpdateFrom = (
     summary,
     localRef,
     remoteRef,
-    fromOid: range ? (range[1] as Oid) : undefined,
-    toOid: range ? (range[2] as Oid) : undefined,
+    // git abbreviates the range hashes (7–40 hex); surface them as-is, NOT as a
+    // full `Oid` (SY-026).
+    fromAbbrev: range ? range[1] : undefined,
+    toAbbrev: range ? range[2] : undefined,
+    status,
   });
 };
 
@@ -57,7 +66,15 @@ const classifyFetchPullLine = (line: GitLine): SyncEvent[] => {
   const text = line.text;
   const m = REF_UPDATE_RE.exec(text);
   if (m) {
-    return [refUpdateFrom((m[1] ?? "").trim(), m[2] ?? "", m[3] ?? "")];
+    const status = (m[4] ?? "").trim();
+    return [
+      refUpdateFrom(
+        (m[1] ?? "").trim(),
+        m[2] ?? "",
+        m[3] ?? "",
+        status === "" ? undefined : status,
+      ),
+    ];
   }
   // Skip git header lines like "From <url>" / "To <url>".
   if (/^(?:From|To)\s+\S/.test(text)) return [];
@@ -74,11 +91,20 @@ const classifyPushLine = (line: GitLine): SyncEvent[] => {
       // is not a successful update, so emit no refUpdate for it.
       if (flag === "!") return [];
       const fromTo = m[2] ?? "";
-      const summary = m[3] ?? "";
+      const rawSummary = m[3] ?? "";
       const colon = fromTo.indexOf(":");
       const from = colon >= 0 ? fromTo.slice(0, colon) : fromTo;
       const to = colon >= 0 ? fromTo.slice(colon + 1) : fromTo;
-      return [refUpdateFrom(summary, from, to)];
+      // git appends a trailing " (forced update)" / "(non-fast-forward)" to the
+      // porcelain summary; split it off so the range still parses (SY-026) and
+      // the status surfaces, mirroring the fetch/pull path.
+      const paren = rawSummary.match(/\s*\(([^)]*)\)\s*$/);
+      const status = paren?.[1];
+      const summary =
+        paren?.index !== undefined
+          ? rawSummary.slice(0, paren.index).trim()
+          : rawSummary.trim();
+      return [refUpdateFrom(summary, from, to, status)];
     }
     // "To <url>" / "Done" porcelain headers carry no event.
     if (/^(?:To\s+\S|Done$)/.test(line.text)) return [];

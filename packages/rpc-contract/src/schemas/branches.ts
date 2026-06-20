@@ -78,8 +78,17 @@ export class SyncRefUpdate extends Schema.Class<SyncRefUpdate>("SyncRefUpdate")(
     summary: Schema.String,
     localRef: Schema.String,
     remoteRef: Schema.String,
-    fromOid: Schema.optional(Oid),
-    toOid: Schema.optional(Oid),
+    // git's ABBREVIATED old/new tip hashes, parsed from the summary range
+    // ("abc1234..def5678"). Deliberately NOT branded `Oid`: git abbreviates
+    // these to 7+ hex chars, so they are not guaranteed-full object ids. They
+    // surface the new remote tip hash for display (SY-026) without claiming to
+    // be a complete `Oid`.
+    fromAbbrev: Schema.optional(Schema.String),
+    toAbbrev: Schema.optional(Schema.String),
+    // The trailing parenthetical git appends to a ref-update line under LC_ALL=C
+    // ("forced update", "non-fast-forward", …), surfaced verbatim as display
+    // detail only — it never drives control flow (NF-ERR-1).
+    status: Schema.optional(Schema.String),
   },
 ) {}
 

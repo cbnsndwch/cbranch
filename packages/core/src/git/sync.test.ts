@@ -67,9 +67,44 @@ describe("sync streaming", () => {
     expect(ref).toBeDefined();
     if (ref?._tag === "refUpdate") {
       expect(ref.localRef).toBe("main");
-      // The summary is an OID range, so from/to OIDs are parsed.
-      expect(ref.fromOid).toBeDefined();
-      expect(ref.toOid).toBeDefined();
+      // The summary is an abbreviated A..B range, so the abbreviated from/to tip
+      // hashes are parsed. They are git-abbreviated hex, NOT full Oids (SY-026).
+      expect(ref.fromAbbrev).toMatch(/^[0-9a-f]{7,40}$/);
+      expect(ref.toAbbrev).toMatch(/^[0-9a-f]{7,40}$/);
+    }
+  });
+
+  test("fetchStream — forced update surfaces the parenthetical status (SY-026)", async () => {
+    const origin = await ws.createRepo("sync-forced-origin");
+    await origin.commit({ message: "init", files: { "a.txt": "a" } });
+
+    const clone = await ws.createRepo("sync-forced-clone");
+    await clone.addRemote("origin", origin.dir);
+    await clone.fetch("origin");
+    await clone.git(["checkout", "-b", "main", "--track", "origin/main"]);
+
+    // Rewrite origin's only commit so origin/main moves non-fast-forward; the
+    // next fetch reports a "(forced update)" parenthetical on the ref line.
+    await origin.git(["commit", "--amend", "-m", "rewritten"], {
+      env: {
+        GIT_AUTHOR_DATE: fixtureDate(5),
+        GIT_COMMITTER_DATE: fixtureDate(5),
+      },
+    });
+
+    const events = await collect(fetchStream(clone.dir, "origin"));
+    const ref = refUpdates(events).find(
+      (e) => e._tag === "refUpdate" && e.remoteRef === "origin/main",
+    );
+    expect(ref).toBeDefined();
+    if (ref?._tag === "refUpdate") {
+      // The trailing "(forced update)" parenthetical is captured, not discarded.
+      expect(ref.status).toBeDefined();
+      expect(ref.status).toContain("forced update");
+      // A forced range uses THREE dots (abc...def); its abbreviated tip hashes
+      // must still be surfaced (SY-026), not dropped.
+      expect(ref.fromAbbrev).toMatch(/^[0-9a-f]{7,40}$/);
+      expect(ref.toAbbrev).toMatch(/^[0-9a-f]{7,40}$/);
     }
   });
 
@@ -258,11 +293,17 @@ describe("sync streaming", () => {
     const events = await collect(
       pushStream(work.dir, "origin", "main", false, true),
     );
-    expect(
-      refUpdates(events).some(
-        (e) => e._tag === "refUpdate" && e.remoteRef === "refs/heads/main",
-      ),
-    ).toBe(true);
+    const ref = refUpdates(events).find(
+      (e) => e._tag === "refUpdate" && e.remoteRef === "refs/heads/main",
+    );
+    expect(ref).toBeDefined();
+    if (ref?._tag === "refUpdate") {
+      // A forced push reports a three-dot range plus a "(forced update)"
+      // parenthetical in the porcelain summary; both the tip hashes (SY-026) and
+      // the status must be surfaced, not lumped into `summary`.
+      expect(ref.status).toContain("forced update");
+      expect(ref.toAbbrev).toMatch(/^[0-9a-f]{7,40}$/);
+    }
 
     const localTip = await work.revParse("HEAD");
     const remote = await work.git(["ls-remote", "origin", "refs/heads/main"]);
