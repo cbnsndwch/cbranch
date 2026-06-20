@@ -7,7 +7,7 @@ Running checklist for the clean-room build. Legend: ✅ done · 🔄 in-flight �
 > VSCode extension. Verify → commit → status → continue at each boundary; never advance on red.
 
 ## Branch
-- `feat/p0-p1-walking-skeleton` (never main).
+- `main` — P0–P3 all landed here; old `feat/*` branches merged/abandoned.
 
 ## Milestone 0 — bootstrap docs
 - ✅ Feature branch created.
@@ -84,7 +84,15 @@ surfaces. It is not a separate milestone but a prerequisite for all future work.
 ## Blocked / decisions to surface
 - _(none yet)_
 
-## ▶ RESUME HERE — P3 COMPLETE, STOP for review
+## ▶ RESUME HERE — P3 COMPLETE (incl. self-review fixes), STOP for review
+
+**P3 fully complete, including the post-ship self-review.** Original S1–S9 core + UI-A/UI-B
+shipped; then the `P3-REVIEW.md` self-review fixes for groups **A (bugs) / B (missing
+behaviors) / D (UI gaps) / E (tests)** all landed on `main` (commit dialog surface, sync
+non-ff retry, stash preview, richer branches panel, optimistic history, etc.), and the Group E
+test sweep merged via `a8f2813`. Gate green: **590 UI + 354 core/rpc tests, 80.49% branches**.
+Deferred: group **C (robustness, C1–C5)** descoped, and the `14-rpc-contract §7` spec
+reconciliation — both candidates for a future session. **Next major phase: P4.**
 
 **P3 fully complete. Gate green: 505 tests, 80.69% branches.**
 
@@ -99,8 +107,11 @@ S1 contract+stubs (5d31d47) · S2 branch listing (79c81a4) · S3 branch lifecycl
 
 **STOP here — await user review before starting P4.**
 
-### Next: P4 (Diff & Conflict Resolution)
-Per `docs/spec/08-phase4-diff-conflict.md`. Key areas: three-way merge editor, conflict markers, rebase support.
+### Next: P4 (Cherry-pick, Conflicts, Blame & File History)
+Per `docs/spec/08-phase4-cherrypick-conflicts.md` + `11-conflict-merge-kdiff3.md`. Four capability
+groups: cherry-pick (single/range/mainline/no-commit), revert, conflict resolution (detect/take-side/
+take-base/edit/mark-resolved/continue/abort across merge·rebase·cherry-pick·revert), blame + single-file
+history. No P4 plan doc yet — author one first (cf. P2-PLAN.md / P3-PLAN.md slice pattern).
 
 **The app runs end-to-end with stage+commit.** Open the "Changes" tab to see staged/unstaged file list, click a file to diff it, stage/unstage hunks, write a commit message, and commit.
 
@@ -111,6 +122,15 @@ Per `docs/spec/08-phase4-diff-conflict.md`. Key areas: three-way merge editor, c
 **Key context files (gitignored working notes):** `docs/_impl-notes/DECISIONS.md` (D1–D12 locked decisions) + the 8 spec digests. **Verify command:** `pnpm gate`. **Clean-room:** never read `.local/SPEC-AGENT-BRIEF.md`; build only from `docs/spec/`+`LICENSES.md`+`BRANDING.md`+git/lib public docs. Undercover: no AI/model mentions in commits.
 
 ## Log
+- 2026-06-20 — **P3 self-review fixes COMPLETE + Group E test sweep merged.** All `P3-REVIEW.md`
+  groups A/B/D/E landed on `main`: merge/sync/branch correctness (`3cd61e7`/`a1c44d5`/`9fba60b`),
+  worktree switch + branches panel + dense toolbar (`dbe9b0d`/`598cfb6`/`479f629`), commit-dialog
+  surface (`bfb5657`/`d0d77b6`/`4be131b` + UX follow-ups), non-ff push retry (`8166cf0`), stash
+  preview + confirmations (`502eef3`), graph seed-hashed lane colors + default-all-refs + post-commit
+  reactivity (`2a957b9`/`508ec49`/`d864534`), optimistic history prepend (`8f1ec33`), and the Group E
+  test sweep merge (`a8f2813`: core branch-ops/run-git/stash/sync + UI WorktreesPanel tests). Gate
+  green: 590 UI + 354 core/rpc tests, 80.49% branches. Group C (robustness) descoped; `§7` spec
+  reconciliation deferred. **Next: P4 (cherry-pick/conflicts/blame) — author a plan first.**
 - 2026-06-20 — **P2 S2–S10 complete. Gate green: 385 tests.** Core slices (b3183af / 9df6f0f / 2f1f213 / 4a5c13e): porcelain-v2 status parser+statusGet (NUL-sep, `#`/`1`/`2`/`u`/`?`/`!` types), stage/unstage/discard/deleteUntracked/resetTo (per-repo mutex lock, stdin support in run-git), partial-stage patch builder (`buildPatch` pure fn + `stageHunks`/`unstageHunks`/`discardHunks` + `--recount`), commitCreate (stdin F-, amend/signoff/sign, pre-flight guard) + commitLastMessage. All 11 engine stubs replaced in live.ts. UI slices (dc175a9 / 6fa20be / 7bd43c9 / 3d6a0ad / eb3bf5f): S6 status helpers + store slices (commitDraft, selections, selectedDiffFile) + 9 mutation hooks (optimistic stage/unstage); S7 StatusPanel (ChangeListToolbar + StatusChangeList + Checkbox/Separator primitives); S8 WorkingDiffPanel (hunk block + Stage/Unstage/Discard Hunk buttons); S9 CommitPanel (ConventionalCommitBar + CommitMessageEditor + Switch/Select/Tooltip primitives + 7 tests); S10 DestructiveConfirmDialog + AlertDialog primitive + stageAll/unstageAll menu commands. Watcher coalesce widened to 300 ms (Windows NTFS reliability, f59d9d4). Coverage: 80.48% branches / 91.85% statements. **Next: AppShell integration — wire StatusPanel/WorkingDiffPanel/CommitPanel into a "Changes" tab.**
 - 2026-06-20 — **P2 started — slice S1 landed (D15).** RPC write-path contract + full method plumbing as
   typed stubs (`360845b`): `schemas/working-tree.ts` (8 Schema.Class types) + 11 group methods (StatusGet,
