@@ -67,6 +67,13 @@ import {
   remoteSetUrl as remoteSetUrlGit,
 } from "../git/remotes";
 import {
+  cherryPick as cherryPickGit,
+  opAbort as opAbortGit,
+  opContinue as opContinueGit,
+  opSkip as opSkipGit,
+  revert as revertGit,
+} from "../git/sequencer";
+import {
   deleteUntracked as deleteUntrackedGit,
   discardFiles as discardFilesGit,
   resetTo as resetToGit,
@@ -641,11 +648,71 @@ export const makeGitEngine = (
             conflictMarkUnresolvedGit(repoCwd(repo), paths, env),
           ),
         ),
-      cherryPick: () => p4Stub(),
-      revert: () => p4Stub(),
-      opContinue: () => p4Stub(),
-      opAbort: () => p4Stub(),
-      opSkip: () => p4Stub(),
+      cherryPick: (repoId, commits, recordOrigin, mainline, noCommit) =>
+        Effect.flatMap(resolveById(repoId), (repo) =>
+          locks.withRepoLock(repoId)(
+            Effect.suspend(() =>
+              cherryPickGit(
+                repoCwd(repo),
+                repo.gitDir,
+                detectInProgress(repo.gitDir),
+                commits,
+                { recordOrigin, mainline, noCommit },
+                env,
+              ),
+            ),
+          ),
+        ),
+      revert: (repoId, commits, mainline, noCommit, message) =>
+        Effect.flatMap(resolveById(repoId), (repo) =>
+          locks.withRepoLock(repoId)(
+            Effect.suspend(() =>
+              revertGit(
+                repoCwd(repo),
+                repo.gitDir,
+                detectInProgress(repo.gitDir),
+                commits,
+                { mainline, noCommit, message },
+                env,
+              ),
+            ),
+          ),
+        ),
+      opContinue: (repoId, message, allowEmpty) =>
+        Effect.flatMap(resolveById(repoId), (repo) =>
+          locks.withRepoLock(repoId)(
+            Effect.suspend(() =>
+              opContinueGit(
+                repoCwd(repo),
+                repo.gitDir,
+                detectInProgress(repo.gitDir),
+                { message, allowEmpty },
+                env,
+              ),
+            ),
+          ),
+        ),
+      opAbort: (repoId) =>
+        Effect.flatMap(resolveById(repoId), (repo) =>
+          locks.withRepoLock(repoId)(
+            Effect.suspend(() =>
+              opAbortGit(repoCwd(repo), detectInProgress(repo.gitDir), env),
+            ),
+          ),
+        ),
+      opSkip: (repoId) =>
+        Effect.flatMap(resolveById(repoId), (repo) =>
+          locks.withRepoLock(repoId)(
+            Effect.suspend(() =>
+              opSkipGit(
+                repoCwd(repo),
+                repo.gitDir,
+                detectInProgress(repo.gitDir),
+                env,
+              ),
+            ),
+          ),
+        ),
       blame: () => p4Stub(),
       fileHistory: () => p4Stub(),
     };
