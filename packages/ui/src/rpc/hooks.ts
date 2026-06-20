@@ -584,6 +584,23 @@ export const useMergeAbort = (repoId: RepoId) => {
   });
 };
 
+/** Delete a branch (or tag) on the remote via a delete-push (UI-002). */
+export const usePushDeleteRemoteRef = (repoId: RepoId) => {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation<
+    void,
+    unknown,
+    { remote: string; ref: string; refType: "branch" | "tag" }
+  >({
+    mutationFn: ({ remote, ref, refType }) =>
+      api.pushDeleteRemoteRef(repoId, remote, ref, refType),
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: [repoId, "refs"] });
+    },
+  });
+};
+
 // ── P3 remote mutation hooks ──────────────────────────────────────────────────
 
 export const useRemoteAdd = (repoId: RepoId) => {
