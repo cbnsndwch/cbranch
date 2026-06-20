@@ -8,6 +8,7 @@ import { useMemo } from "react";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
 
+import { useApi } from "../../rpc/ApiProvider";
 import { useRecentList } from "../../rpc/hooks";
 import { repoScopeKey } from "../../rpc/query-keys";
 import { useNavigation } from "../../state/navigation";
@@ -38,6 +39,7 @@ export function useMenuActions(): MenuActions {
   const repoId = useUiStore((s) => s.activeRepoId);
   const dateMode = useUiStore((s) => s.dateMode);
   const recentQuery = useRecentList();
+  const api = useApi();
 
   return useMemo(() => {
     // Only wired commands appear here; everything else greys out automatically.
@@ -50,6 +52,16 @@ export function useMenuActions(): MenuActions {
     // Repo-scoped commands need an open repository.
     if (repoId) {
       handlers["repository.refresh"] = () => void queryClient.invalidateQueries({ queryKey: repoScopeKey(repoId) });
+      handlers["commands.stageAll"] = () =>
+        void api
+          .stageFiles(repoId, [], true)
+          .then(() => queryClient.invalidateQueries({ queryKey: [repoId, "status"] }))
+          .catch(() => {});
+      handlers["commands.unstageAll"] = () =>
+        void api
+          .unstageFiles(repoId, [], true)
+          .then(() => queryClient.invalidateQueries({ queryKey: [repoId, "status"] }))
+          .catch(() => {});
     }
     // State-bound checkbox: the date column's relative/absolute mode (P1-HIST-8).
     const checkboxes: Record<string, boolean> = {
@@ -71,5 +83,5 @@ export function useMenuActions(): MenuActions {
       recent,
       favorites: [],
     };
-  }, [navigate, openRepo, queryClient, repoId, dateMode, recentQuery.data]);
+  }, [navigate, openRepo, queryClient, repoId, dateMode, recentQuery.data, api]);
 }

@@ -190,6 +190,9 @@ export const MENUS: ReadonlyArray<TopMenu> = [
     id: "commands",
     label: "Commands",
     items: [
+      { kind: "command", id: "commands.stageAll", label: "Stage all changes", phase: "P2" },
+      { kind: "command", id: "commands.unstageAll", label: "Unstage all changes", phase: "P2" },
+      sep,
       { kind: "command", id: "commands.commit", label: "Commit…", phase: "P2", accelerator: "Ctrl+Enter" },
       { kind: "command", id: "commands.undoLastCommit", label: "Undo last commit…", phase: "P2" },
       { kind: "command", id: "commands.pull", label: "Pull / Fetch…", phase: "P3" },
