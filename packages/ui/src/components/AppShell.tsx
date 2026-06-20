@@ -9,6 +9,7 @@ import { HistoryPane } from "./HistoryPane";
 import { HistoryStatusStrip } from "./HistoryStatusStrip";
 import { MenuBar } from "./MenuBar";
 import { RepositorySidebar } from "./RepositorySidebar";
+import { StagingView } from "./StagingView";
 import { TitleBar } from "./TitleBar";
 import { Toolbar } from "./Toolbar";
 import { Button } from "./ui/button";
@@ -29,6 +30,8 @@ export function AppShell() {
   const detailContent = (() => {
     if (!repoId) return <Placeholder>Select a commit to see its details.</Placeholder>;
     switch (detailTab) {
+      case "changes":
+        return <StagingView repoId={repoId} />;
       case "commit":
         return <CommitTab repoId={repoId} oid={selectedOid} onSelectOid={selectOid} />;
       case "diff":

@@ -13,7 +13,7 @@ import { emptyFilters, type LogFilters } from "../lib/filters";
 import { type DateMode, readDateMode, writeDateMode } from "../lib/format";
 import { applyTheme, readThemePref, type ThemePref } from "../theme/theme";
 
-export type DetailTab = "commit" | "diff" | "filetree" | "gpg" | "console" | "output";
+export type DetailTab = "changes" | "commit" | "diff" | "filetree" | "gpg" | "console" | "output";
 
 export interface CommitDraft {
   subject: string;

@@ -2,6 +2,7 @@ import { cn } from "../lib/cn";
 import { type DetailTab, useUiStore } from "../state/store";
 
 const TABS: ReadonlyArray<readonly [DetailTab, string]> = [
+  ["changes", "Changes"],
   ["commit", "Commit"],
   ["diff", "Diff"],
   ["filetree", "File tree"],
