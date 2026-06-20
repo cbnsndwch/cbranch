@@ -22,6 +22,7 @@ import { fileContentAtRev } from "../git/content";
 import { commitDiff, diffWorkingFile } from "../git/diff";
 import { gitError } from "../git/errors";
 import { makeLogStream } from "../git/history";
+import { statusGet } from "../git/status";
 import { detectGitVersion } from "../git/version";
 import { WatcherRegistry } from "../git/watcher";
 import { type ResolvedRepo, repoCwd, resolveRepo } from "../repo/resolve";
@@ -137,8 +138,8 @@ export const makeGitEngine = (opts?: MakeGitEngineOptions): Effect.Effect<GitEng
       // id→cwd mapping the reads use) so an unknown `repoId` already fails correctly,
       // then fails `gitFailed`. The per-repo mutation lock (`makeRepoLockRegistry`) is
       // instantiated in S3 when the first ✎ body needs `withRepoLock`.
-      statusGet: (repoId) =>
-        Effect.flatMap(resolveById(repoId), () => Effect.fail(gitError("gitFailed", "not implemented"))),
+      statusGet: (repoId, includeIgnored) =>
+        Effect.flatMap(resolveById(repoId), (repo) => statusGet(repoCwd(repo), includeIgnored)),
       stageFiles: (repoId) =>
         Effect.flatMap(resolveById(repoId), () => Effect.fail(gitError("gitFailed", "not implemented"))),
       unstageFiles: (repoId) =>
