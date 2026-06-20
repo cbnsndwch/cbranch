@@ -27,6 +27,7 @@
     "react-diff-view": "^3.3.3",
     "react-dom": "^19.2.0",
     "react-resizable-panels": "^4.11.2",
+    "react-router": "^8",
     "shiki": "^4.2.0",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.6.0",

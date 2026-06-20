@@ -1,4 +1,5 @@
 import { useInvalidationBus } from "../rpc/use-invalidation-bus";
+import { useNavigation } from "../state/navigation";
 import { useUiStore } from "../state/store";
 import { CommandPalette } from "./CommandPalette";
 import { CommitDetailsTabs } from "./CommitDetailsTabs";
@@ -17,9 +18,10 @@ import { Placeholder } from "./ui/placeholder";
 export function AppShell() {
   const repoId = useUiStore((s) => s.activeRepoId);
   const selectedOid = useUiStore((s) => s.selectedOid);
-  const setSelectedOid = useUiStore((s) => s.setSelectedOid);
   const detailTab = useUiStore((s) => s.detailTab);
   const openPalette = useUiStore((s) => s.setPaletteOpen);
+  // Commit selection writes the URL (D13); the store mirrors it via <SyncRouteToStore>.
+  const { selectOid } = useNavigation();
 
   // Live updates: subscribe to the host invalidation bus for the active repo.
   useInvalidationBus(repoId);
@@ -28,7 +30,7 @@ export function AppShell() {
     if (!repoId) return <Placeholder>Select a commit to see its details.</Placeholder>;
     switch (detailTab) {
       case "commit":
-        return <CommitTab repoId={repoId} oid={selectedOid} onSelectOid={setSelectedOid} />;
+        return <CommitTab repoId={repoId} oid={selectedOid} onSelectOid={selectOid} />;
       case "diff":
         return <DiffPanel repoId={repoId} oid={selectedOid} />;
       default:
@@ -61,7 +63,7 @@ export function AppShell() {
               <HistoryStatusStrip repoId={repoId} />
               {/* History list */}
               <div className="min-h-0 overflow-hidden">
-                <HistoryPane repoId={repoId} selectedOid={selectedOid} onSelectOid={setSelectedOid} />
+                <HistoryPane repoId={repoId} selectedOid={selectedOid} onSelectOid={selectOid} />
               </div>
               {/* Splitter visual */}
               <div className="border-t" />

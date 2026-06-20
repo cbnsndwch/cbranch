@@ -67,14 +67,15 @@ Running checklist for the clean-room build. Legend: ✅ done · 🔄 in-flight �
 Routing is a cross-cutting concern that needs to land before the app grows more navigation
 surfaces. It is not a separate milestone but a prerequisite for all future work. See DECISIONS D13.
 
-- ⬜ Add `react-router@^8` to `packages/ui`.
-- ⬜ Define `router.tsx` with the route tree: `/` (landing), `/repos/:repoId` (history),
-  `/repos/:repoId/commits/:oid` (selected commit), plus empty placeholder routes for
-  `/repos/:repoId/branches/:name`, `…/tags/:name`, `…/worktrees/:id`, `…/stash/:index`, `…/blame/:rev/:path`.
-- ⬜ Wrap `<App>` in `<RouterProvider>` in `main.tsx`.
-- ⬜ Migrate `activeRepoId` and `selectedOid` from Zustand-only to URL-driven (route params →
-  store mirror via `syncFromRoute` or a `<SyncRouteToStore>` component).
-- ⬜ Update component tests to wrap navigation-using components in `<MemoryRouter>`.
+- ✅ Add `react-router@^8` to `packages/ui` (8.0.1).
+- ✅ Define `router.tsx` with the route tree: `/` (landing → redirect to last repo or empty state),
+  `/repos/:repoId` (history), `/repos/:repoId/commits/:oid` (selected commit), plus placeholder routes for
+  `/repos/:repoId/branches/:name`, `…/tags/:name`, `…/worktrees/:id`, `…/stash/:index`, `…/blame/:rev/*`.
+- ✅ Wrap the app in `<RouterProvider>` in `main.tsx` (route element renders `<App>`).
+- ✅ Migrate `activeRepoId` and `selectedOid` from Zustand-only to URL-driven: write side uses
+  `useNavigation()` (`navigation.ts`); `<SyncRouteToStore>` mirrors route params → store (`useLayoutEffect`,
+  no first-paint flash) so legacy store subscribers keep working.
+- ✅ Update component tests to wrap navigation-using components in `<MemoryRouter>` (`components.test.tsx`).
 - ⬜ VS Code extension WebView caveat (D13): `MemoryRouter` entry point deferred to VSCode ext milestone.
 
 ## Later (not this milestone)
@@ -100,6 +101,15 @@ verification gate (this commit). Branch `feat/p0-p1-walking-skeleton`.
 **Key context files (gitignored working notes):** `docs/_impl-notes/DECISIONS.md` (D1–D12 locked decisions) + the 8 spec digests. **Verify command:** `pnpm gate`. **Clean-room:** never read `.local/SPEC-AGENT-BRIEF.md`; build only from `docs/spec/`+`LICENSES.md`+`BRANDING.md`+git/lib public docs. Undercover: no AI/model mentions in commits.
 
 ## Log
+- 2026-06-20 — **Client-side routing (D13) landed.** Added `react-router@8.0.1` to `packages/ui`. New
+  `router.tsx` (`createBrowserRouter`): `/` → `<Landing>` (redirect to most-recent repo via `recentList`,
+  else the shell's "Open a repository" empty state), `/repos/:repoId`, `/repos/:repoId/commits/:oid`, +
+  five `<PlaceholderPage>` routes staking the branches/tags/worktrees/stash/blame namespace. URL is now the
+  source of truth for `activeRepoId`/`selectedOid`: write side calls `useNavigation()` (`navigation.ts`,
+  `openRepo`/`selectOid`); `<SyncRouteToStore>` mirrors params → store via `useLayoutEffect` (no first-paint
+  flash) so legacy store subscribers are untouched. `CommandPalette` open + commit selection now navigate
+  instead of mutating the store. Tests wrap nav-using components in `<MemoryRouter>`. Gate green: 253 tests,
+  typecheck/build/coverage/depcheck clean. WebView `MemoryRouter` entry deferred to the VSCode milestone.
 - 2026-06-20 — **P1 verification gate complete.** NF-TEST-11: `@vitest/coverage-v8` wired; root `pnpm coverage`
   (via `vitest.coverage.config.ts`) enforces ≥80% lines+branches on core+rpc-contract; current: 96.27% lines /
   82.13% branches. Per-package configs in `packages/{core,rpc-contract}/vitest.config.ts` for independent

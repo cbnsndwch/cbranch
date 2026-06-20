@@ -13,6 +13,7 @@ import {
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { type ReactNode } from "react";
+import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 import { type CbranchApi, type StreamHandlers } from "../rpc/api";
@@ -72,10 +73,13 @@ const makeFakeApi = (overrides: Partial<CbranchApi> = {}): CbranchApi => ({
 
 const renderWithApi = (ui: ReactNode, api: CbranchApi) => {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  // MemoryRouter supplies the router context that navigation hooks (D13) depend on.
   return render(
-    <QueryClientProvider client={queryClient}>
-      <ApiProvider api={api}>{ui}</ApiProvider>
-    </QueryClientProvider>,
+    <MemoryRouter>
+      <QueryClientProvider client={queryClient}>
+        <ApiProvider api={api}>{ui}</ApiProvider>
+      </QueryClientProvider>
+    </MemoryRouter>,
   );
 };
 

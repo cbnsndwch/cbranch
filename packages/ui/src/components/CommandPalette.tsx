@@ -2,6 +2,7 @@ import { Command } from "cmdk";
 import { type KeyboardEvent, useState } from "react";
 
 import { useOpenRepo, useRecentList } from "../rpc/hooks";
+import { useNavigation } from "../state/navigation";
 import { useUiStore } from "../state/store";
 
 // Repo open / switcher (P1-UI-OPEN-1/4): fuzzy-match recent repositories or type an
@@ -12,17 +13,18 @@ const looksLikePath = (value: string): boolean => value.startsWith("/") || (valu
 export function CommandPalette() {
   const open = useUiStore((s) => s.paletteOpen);
   const setOpen = useUiStore((s) => s.setPaletteOpen);
-  const setActiveRepoId = useUiStore((s) => s.setActiveRepoId);
+  const { openRepo } = useNavigation();
   const recent = useRecentList();
-  const openRepo = useOpenRepo();
+  const openRepoMutation = useOpenRepo();
   const [query, setQuery] = useState("");
 
   if (!open) return null;
 
   const activate = (path: string) =>
-    openRepo.mutate(path, {
+    openRepoMutation.mutate(path, {
       onSuccess: (handle) => {
-        setActiveRepoId(handle.repoId);
+        // Navigate to the repo route; <SyncRouteToStore> mirrors it into the store (D13).
+        openRepo(handle.repoId);
         setOpen(false);
         setQuery("");
       },
@@ -53,7 +55,7 @@ export function CommandPalette() {
             className="placeholder:text-muted-foreground w-full border-b bg-transparent px-3 py-2.5 text-sm outline-none"
           />
           <Command.List className="max-h-80 overflow-auto p-1">
-            {openRepo.isError ? (
+            {openRepoMutation.isError ? (
               <div className="text-destructive px-3 py-2 text-xs">Could not open that path.</div>
             ) : null}
             {looksLikePath(query) ? (

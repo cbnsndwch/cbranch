@@ -1,8 +1,9 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+import { RouterProvider } from "react-router";
 
-import { App } from "./App";
+import { router } from "./router";
 import { makeApi } from "./rpc/api";
 import { ApiProvider } from "./rpc/ApiProvider";
 import { defaultRpcUrl, makeAppRuntime } from "./rpc/client";
@@ -27,7 +28,7 @@ if (rootElement) {
     <StrictMode>
       <QueryClientProvider client={queryClient}>
         <ApiProvider api={api}>
-          <App />
+          <RouterProvider router={router} />
         </ApiProvider>
       </QueryClientProvider>
     </StrictMode>,
