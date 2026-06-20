@@ -62,6 +62,21 @@ Running checklist for the clean-room build. Legend: ✅ done · 🔄 in-flight �
 - ⬜ Perf: NF-PERF-1/2/3 measured on reference repo within budget (`scripts/measure-perf.mjs` ready;
     run against a 50k-commit repo on reference hardware per docs/spec/12).
 
+## Cross-cutting: client-side routing (pre-P2)
+
+Routing is a cross-cutting concern that needs to land before the app grows more navigation
+surfaces. It is not a separate milestone but a prerequisite for all future work. See DECISIONS D13.
+
+- ⬜ Add `react-router@^8` to `packages/ui`.
+- ⬜ Define `router.tsx` with the route tree: `/` (landing), `/repos/:repoId` (history),
+  `/repos/:repoId/commits/:oid` (selected commit), plus empty placeholder routes for
+  `/repos/:repoId/branches/:name`, `…/tags/:name`, `…/worktrees/:id`, `…/stash/:index`, `…/blame/:rev/:path`.
+- ⬜ Wrap `<App>` in `<RouterProvider>` in `main.tsx`.
+- ⬜ Migrate `activeRepoId` and `selectedOid` from Zustand-only to URL-driven (route params →
+  store mirror via `syncFromRoute` or a `<SyncRouteToStore>` component).
+- ⬜ Update component tests to wrap navigation-using components in `<MemoryRouter>`.
+- ⬜ VS Code extension WebView caveat (D13): `MemoryRouter` entry point deferred to VSCode ext milestone.
+
 ## Later (not this milestone)
 - ⬜ P2 (`06`) · P3 (`07`) · P4 (`08`/`11`) · P5 (`09`) · VSCode extension (`13`).
 
