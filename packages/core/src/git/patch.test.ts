@@ -178,6 +178,47 @@ describe("buildPatch", () => {
     const patch = buildPatch(df, sel);
     expect(patch).toContain("\\ No newline at end of file");
   });
+
+  test("deleted file patch — has deleted file mode and /dev/null as target", () => {
+    const hunk = makeHunk(1, 0, [{ kind: "delete", content: "goodbye" }]);
+    const df = makeDiffFile("gone.txt", "deleted", [hunk], { oldMode: "100644" });
+    const sel = new PatchSelection({
+      repoId: "r" as never,
+      path: "gone.txt",
+      hunks: [new HunkSelection({ oldStart: 1, oldLines: 1, newStart: 0, newLines: 0, selectedLines: [] })],
+    });
+    const patch = buildPatch(df, sel);
+    expect(patch).toContain("deleted file mode 100644");
+    expect(patch).toContain("--- a/gone.txt");
+    expect(patch).toContain("+++ /dev/null");
+    expect(patch).toContain("-goodbye");
+  });
+
+  test("deleted file patch — no oldMode omits mode line", () => {
+    const hunk = makeHunk(1, 0, [{ kind: "delete", content: "bye" }]);
+    const df = makeDiffFile("gone.txt", "deleted", [hunk]);
+    const sel = new PatchSelection({
+      repoId: "r" as never,
+      path: "gone.txt",
+      hunks: [new HunkSelection({ oldStart: 1, oldLines: 1, newStart: 0, newLines: 0, selectedLines: [] })],
+    });
+    const patch = buildPatch(df, sel);
+    expect(patch).not.toContain("deleted file mode");
+    expect(patch).toContain("+++ /dev/null");
+  });
+
+  test("mode change — emits old mode / new mode lines", () => {
+    const hunk = makeHunk(1, 1, [{ kind: "context", content: "same" }]);
+    const df = makeDiffFile("script.sh", "modified", [hunk], { oldMode: "100644", newMode: "100755" });
+    const sel = new PatchSelection({
+      repoId: "r" as never,
+      path: "script.sh",
+      hunks: [new HunkSelection({ oldStart: 1, oldLines: 1, newStart: 1, newLines: 1, selectedLines: [] })],
+    });
+    const patch = buildPatch(df, sel);
+    expect(patch).toContain("old mode 100644");
+    expect(patch).toContain("new mode 100755");
+  });
 });
 
 // ── integration tests ─────────────────────────────────────────────────────────
