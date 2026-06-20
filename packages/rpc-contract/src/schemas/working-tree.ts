@@ -85,13 +85,15 @@ export class PatchSelection extends Schema.Class<PatchSelection>(
 /**
  * The input to `commit.create` (14 §7). `sign`/`authorOverride` are optional
  * structured extras; the flags (`amend`/`signoff`/`allowEmpty`/`noVerify`) are always
- * present so the server never guesses a default.
+ * present so the server never guesses a default. `resetAuthor` is honored only with
+ * `amend` (`git commit --amend --reset-author`); absent ⇒ keep the original author.
  */
 export class CommitInput extends Schema.Class<CommitInput>("CommitInput")({
   repoId: RepoId,
   subject: Schema.String,
   body: Schema.optional(Schema.String),
   amend: Schema.Boolean,
+  resetAuthor: Schema.optional(Schema.Boolean),
   signoff: Schema.Boolean,
   sign: Schema.optional(
     Schema.Struct({

@@ -191,6 +191,38 @@ describe("commit-write git operations", () => {
     expect(log.stdout.trim()).toBe("Custom User <custom@example.com>");
   });
 
+  test("commitCreate amend with resetAuthor resets author to the committer", async () => {
+    const repo = await ws.createRepo("commit-reset-author");
+    await repo.commit({ message: "init", files: { "init.txt": "init\n" } });
+    await repo.writeFile("z.txt", "z\n");
+    await repo.stage("z.txt");
+
+    // Author the commit as someone else…
+    await run(
+      commitCreate(repo.dir, {
+        ...BASE_INPUT,
+        repoId: "test" as any,
+        subject: "by custom",
+        authorOverride: { name: "Custom User", email: "custom@example.com" },
+      }),
+    );
+    const before = await repo.git(["log", "-1", "--format=%ae"]);
+    expect(before.stdout.trim()).toBe("custom@example.com");
+
+    // …then amend with reset-author so the author becomes the committer again.
+    await run(
+      commitCreate(repo.dir, {
+        ...BASE_INPUT,
+        repoId: "test" as any,
+        subject: "by custom",
+        amend: true,
+        resetAuthor: true,
+      }),
+    );
+    const after = await repo.git(["log", "-1", "--format=%ae"]);
+    expect(after.stdout.trim()).not.toBe("custom@example.com");
+  });
+
   test("commitCreate with noVerify — skips pre-commit hooks", async () => {
     const repo = await ws.createRepo("commit-noverify");
     await repo.commit({ message: "init", files: { "init.txt": "init\n" } });

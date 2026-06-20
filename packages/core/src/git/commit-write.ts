@@ -35,6 +35,8 @@ export const commitCreate = (
 
     const args: string[] = ["commit", "-F", "-"];
     if (input.amend) args.push("--amend");
+    // `--reset-author` is meaningful only when rewriting the existing commit (amend).
+    if (input.amend && input.resetAuthor === true) args.push("--reset-author");
     if (input.signoff) args.push("--signoff");
     if (input.sign !== undefined) {
       args.push(
