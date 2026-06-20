@@ -14,7 +14,6 @@ import { basename } from "node:path";
 import {
   type GitError,
   type InvalidationEvent,
-  type RemoteInfo,
   type RepoId,
   type StashEntry,
   type TagInfo,
@@ -46,6 +45,13 @@ import {
   stageHunks as stageHunksGit,
   unstageHunks as unstageHunksGit,
 } from "../git/patch";
+import {
+  remoteAdd as remoteAddGit,
+  remoteList as remoteListGit,
+  remoteRemove as remoteRemoveGit,
+  remoteRename as remoteRenameGit,
+  remoteSetUrl as remoteSetUrlGit,
+} from "../git/remotes";
 import {
   deleteUntracked as deleteUntrackedGit,
   discardFiles as discardFilesGit,
@@ -266,26 +272,23 @@ export const makeGitEngine = (opts?: MakeGitEngineOptions): Effect.Effect<GitEng
           locks.withRepoLock(repoId)(pushDeleteRemoteRefGit(repoCwd(repo), remote, ref, env)),
         ),
 
-      // ── remotes (P3, stubs) ───────────────────────────────────────────────
-      remoteList: (repoId) =>
-        Effect.flatMap(resolveById(repoId), (_repo) =>
-          Effect.fail(gitError("gitFailed", "P3: remoteList not implemented")),
-        ) as Effect.Effect<ReadonlyArray<RemoteInfo>, GitError>,
-      remoteAdd: (repoId, _name, _url) =>
-        Effect.flatMap(resolveById(repoId), (_repo) =>
-          Effect.fail(gitError("gitFailed", "P3: remoteAdd not implemented")),
+      // ── remotes (P3) ──────────────────────────────────────────────────────
+      remoteList: (repoId) => Effect.flatMap(resolveById(repoId), (repo) => remoteListGit(repoCwd(repo), env)),
+      remoteAdd: (repoId, name, url) =>
+        Effect.flatMap(resolveById(repoId), (repo) =>
+          locks.withRepoLock(repoId)(remoteAddGit(repoCwd(repo), name, url, env)),
         ),
-      remoteSetUrl: (repoId, _name, _url, _push) =>
-        Effect.flatMap(resolveById(repoId), (_repo) =>
-          Effect.fail(gitError("gitFailed", "P3: remoteSetUrl not implemented")),
+      remoteSetUrl: (repoId, name, url, push) =>
+        Effect.flatMap(resolveById(repoId), (repo) =>
+          locks.withRepoLock(repoId)(remoteSetUrlGit(repoCwd(repo), name, url, push, env)),
         ),
-      remoteRename: (repoId, _oldName, _newName) =>
-        Effect.flatMap(resolveById(repoId), (_repo) =>
-          Effect.fail(gitError("gitFailed", "P3: remoteRename not implemented")),
+      remoteRename: (repoId, oldName, newName) =>
+        Effect.flatMap(resolveById(repoId), (repo) =>
+          locks.withRepoLock(repoId)(remoteRenameGit(repoCwd(repo), oldName, newName, env)),
         ),
-      remoteRemove: (repoId, _name) =>
-        Effect.flatMap(resolveById(repoId), (_repo) =>
-          Effect.fail(gitError("gitFailed", "P3: remoteRemove not implemented")),
+      remoteRemove: (repoId, name) =>
+        Effect.flatMap(resolveById(repoId), (repo) =>
+          locks.withRepoLock(repoId)(remoteRemoveGit(repoCwd(repo), name, env)),
         ),
 
       // ── worktrees (P3, stubs) ─────────────────────────────────────────────

@@ -84,10 +84,17 @@ surfaces. It is not a separate milestone but a prerequisite for all future work.
 ## Blocked / decisions to surface
 - _(none yet)_
 
-## ▶ RESUME HERE (P2 COMPLETE — awaiting user review)
-**P2 is COMPLETE. Gate green: 378 tests, 80.48% branches / 91.85% statements coverage. STOP for user review.**
+## ▶ RESUME HERE (P3 in-flight — S1–S6 landed)
 
-**What was built (P2):** S1 RPC contract (360845b) · S2 porcelain-v2 status (b3183af) · S3 stage/unstage/discard/resetTo (9df6f0f) · S4 partial-stage patch builder (2f1f213) · S5 commitCreate+commitLastMessage (4a5c13e) · S6 UI status helpers+store slices+hooks (dc175a9) · S10 DestructiveConfirmDialog+AlertDialog+menu commands (6fa20be) · S7 StatusPanel (7bd43c9) · watcher coalesce fix (f59d9d4) · S8 WorkingDiffPanel (3d6a0ad) · S9 CommitPanel (eb3bf5f) · AppShell "Changes" tab integration (1087b99).
+**P3-S1 through S6 COMPLETE. Gate green: 453 tests, 80.17% branches.**
+
+Committed: S1 contract+stubs (5d31d47) · S2 branch listing (79c81a4) · S3 branch lifecycle (5b38e4a) · S4 merge (7fdd625) · S5 sync streaming (693c513) · S6 remotes CRUD (this commit).
+
+**P3 plan:** `docs/_impl-notes/P3-PLAN.md`. 33 new RPC methods across 8 domains.
+
+**Remaining core slices:** S7 worktrees · S8 stash · S9 tags. Then UI-A–UI-G panels + AppShell integration.
+
+**Next: P3-S7 — core worktrees** (`git worktree list --porcelain` parser + add/remove/prune, fill live.ts stubs).
 
 **The app runs end-to-end with stage+commit.** Open the "Changes" tab to see staged/unstaged file list, click a file to diff it, stage/unstage hunks, write a commit message, and commit.
 
