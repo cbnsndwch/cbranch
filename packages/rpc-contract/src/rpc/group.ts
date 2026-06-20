@@ -386,6 +386,12 @@ export const CbranchRpcs = RpcGroup.make(
     success: Schema.Void,
     error: GitError,
   }),
+  // worktree.switch ✎ — re-point the active repo context to a worktree (WT-006).
+  Rpc.make("WorktreeSwitch", {
+    payload: { repoId: RepoId, path: Schema.String },
+    success: Schema.Void,
+    error: GitError,
+  }),
 
   // ── P3: stash ──────────────────────────────────────────────────────────────
   Rpc.make("StashPush", {

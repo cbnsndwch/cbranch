@@ -295,6 +295,7 @@ const handlers = CbranchRpcs.toLayer({
   WorktreeAdd: () => Effect.succeed(worktreeInfo),
   WorktreeRemove: () => Effect.void,
   WorktreePrune: () => Effect.void,
+  WorktreeSwitch: () => Effect.void,
 
   // ── P3: stash ───────────────────────────────────────────────────────────────
   StashPush: () => Effect.succeed(stashEntry),
@@ -538,6 +539,7 @@ describe("CbranchRpcs P3 branches/sync/remotes/worktrees/stash/tags method catal
     "WorktreeAdd",
     "WorktreeRemove",
     "WorktreePrune",
+    "WorktreeSwitch",
     // stash
     "StashPush",
     "StashList",

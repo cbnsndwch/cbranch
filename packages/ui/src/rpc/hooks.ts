@@ -681,6 +681,19 @@ export const useWorktreePrune = (repoId: RepoId) => {
   });
 };
 
+export const useWorktreeSwitch = (repoId: RepoId) => {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation<void, unknown, { path: string }>({
+    mutationFn: ({ path }) => api.worktreeSwitch(repoId, path),
+    // The active working tree changed for this repoId — every view (branches,
+    // status, log, refs…) must refetch against the new worktree.
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: [repoId] });
+    },
+  });
+};
+
 // ── P3 stash mutation hooks ───────────────────────────────────────────────────
 
 export const useStashPush = (repoId: RepoId) => {

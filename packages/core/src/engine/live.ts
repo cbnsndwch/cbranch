@@ -476,6 +476,31 @@ export const makeGitEngine = (
         Effect.flatMap(resolveById(repoId), (repo) =>
           locks.withRepoLock(repoId)(worktreePruneGit(repoCwd(repo), env)),
         ),
+      // Re-point the active context to a worktree by re-resolving its path and
+      // updating the cached location (WT-006). Worktrees of one repo share a
+      // `repoId`, so we guard that the target really belongs to this repo, then
+      // persist the choice in the recent list so it survives a cache miss.
+      worktreeSwitch: (repoId, path) =>
+        Effect.gen(function* () {
+          const repo = yield* resolveRepo(path);
+          if (repo.repoId !== repoId) {
+            return yield* Effect.fail(
+              gitError(
+                "repoUnavailable",
+                "path is not a worktree of this repository",
+              ),
+            );
+          }
+          locations.set(repo.repoId, repo);
+          const name =
+            basename(repo.root) === "" ? repo.root : basename(repo.root);
+          yield* configStore.upsertRecent({
+            path: repo.root,
+            name,
+            repoId: repo.repoId,
+            lastOpenedAt: Date.now(),
+          });
+        }),
 
       // ── stash (P3) ───────────────────────────────────────────────────────
       stashPush: (repoId, message, includeUntracked, keepIndex, stagedOnly) =>

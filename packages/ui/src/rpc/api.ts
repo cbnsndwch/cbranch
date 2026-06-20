@@ -196,6 +196,7 @@ export interface CbranchApi {
   ): Promise<WorktreeInfo>;
   worktreeRemove(repoId: RepoId, path: string, force?: boolean): Promise<void>;
   worktreePrune(repoId: RepoId): Promise<void>;
+  worktreeSwitch(repoId: RepoId, path: string): Promise<void>;
   // ── stash (P3) ────────────────────────────────────────────────────────────
   stashPush(
     repoId: RepoId,
@@ -415,6 +416,8 @@ export const makeApi = (runtime: AppRuntime): CbranchApi => {
       ),
     worktreePrune: (repoId) =>
       runtime.runPromise(withClient((c) => c.WorktreePrune({ repoId }))),
+    worktreeSwitch: (repoId, path) =>
+      runtime.runPromise(withClient((c) => c.WorktreeSwitch({ repoId, path }))),
     // ── stash (P3) ──────────────────────────────────────────────────────────
     stashPush: (repoId, opts) =>
       runtime.runPromise(withClient((c) => c.StashPush({ repoId, ...opts }))),

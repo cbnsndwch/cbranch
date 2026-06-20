@@ -170,6 +170,8 @@ export const handlersLayer = CbranchRpcs.toLayer({
     ),
   WorktreePrune: ({ repoId }) =>
     Effect.flatMap(GitEngine, (engine) => engine.worktreePrune(repoId)),
+  WorktreeSwitch: ({ repoId, path }) =>
+    Effect.flatMap(GitEngine, (engine) => engine.worktreeSwitch(repoId, path)),
 
   // ── stash (P3) ────────────────────────────────────────────────────────────
   StashPush: ({ repoId, message, includeUntracked, keepIndex, stagedOnly }) =>

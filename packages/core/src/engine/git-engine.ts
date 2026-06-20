@@ -288,6 +288,15 @@ export interface GitEngineApi {
   ) => Effect.Effect<void, GitError>;
   /** worktree.prune ✎ */
   readonly worktreePrune: (repoId: RepoId) => Effect.Effect<void, GitError>;
+  /**
+   * worktree.switch ✎ — re-point the active repo context to the worktree at
+   * `path` so subsequent views reflect its HEAD/working tree (WT-006). The
+   * worktree shares the repo's `repoId` (and thus its lock).
+   */
+  readonly worktreeSwitch: (
+    repoId: RepoId,
+    path: string,
+  ) => Effect.Effect<void, GitError>;
 
   // ── stash (P3) ─────────────────────────────────────────────────────────────
   /** stash.push ✎ */

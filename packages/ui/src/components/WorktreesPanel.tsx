@@ -7,6 +7,7 @@ import {
   useWorktreeList,
   useWorktreePrune,
   useWorktreeRemove,
+  useWorktreeSwitch,
 } from "../rpc/hooks";
 import { DestructiveConfirmDialog } from "./DestructiveConfirmDialog";
 import {
@@ -36,6 +37,17 @@ export function WorktreesPanel({ repoId }: WorktreesPanelProps) {
   const addMut = useWorktreeAdd(repoId);
   const removeMut = useWorktreeRemove(repoId);
   const pruneMut = useWorktreePrune(repoId);
+  const switchMut = useWorktreeSwitch(repoId);
+
+  const handleSwitch = (path: string) => {
+    switchMut.mutate(
+      { path },
+      {
+        onSuccess: () => toast.success("Switched to worktree"),
+        onError: (err) => toast.error(String(err)),
+      },
+    );
+  };
 
   const [addOpen, setAddOpen] = useState(false);
   const [removeTarget, setRemoveTarget] = useState<string | null>(null);
@@ -135,6 +147,7 @@ export function WorktreesPanel({ repoId }: WorktreesPanelProps) {
             key={wt.path}
             wt={wt}
             onRemove={(path) => setRemoveTarget(path)}
+            onSwitch={handleSwitch}
           />
         ))}
       </div>
@@ -232,9 +245,10 @@ export function WorktreesPanel({ repoId }: WorktreesPanelProps) {
 interface WorktreeRowProps {
   wt: WorktreeInfo;
   onRemove: (path: string) => void;
+  onSwitch: (path: string) => void;
 }
 
-function WorktreeRow({ wt, onRemove }: WorktreeRowProps) {
+function WorktreeRow({ wt, onRemove, onSwitch }: WorktreeRowProps) {
   const shortOid = wt.headOid ? wt.headOid.slice(0, 7) : "—";
   const branchLabel = wt.isDetached
     ? "detached"
@@ -266,6 +280,14 @@ function WorktreeRow({ wt, onRemove }: WorktreeRowProps) {
               locked
             </span>
           )}
+          {wt.isPrunable && (
+            <span
+              className="shrink-0 rounded border border-red-400 px-1 text-[9px] text-red-600"
+              title={wt.prunableReason ?? "prunable"}
+            >
+              prunable
+            </span>
+          )}
         </div>
         <div className="text-muted-foreground mt-0.5 flex gap-3 text-[10px]">
           <span>{branchLabel}</span>
@@ -280,6 +302,9 @@ function WorktreeRow({ wt, onRemove }: WorktreeRowProps) {
           …
         </DropdownMenuTrigger>
         <DropdownMenuContent side="bottom" align="end">
+          <DropdownMenuItem onClick={() => onSwitch(wt.path)}>
+            Switch to this worktree
+          </DropdownMenuItem>
           <DropdownMenuItem onClick={copyPath}>Copy path</DropdownMenuItem>
           {!wt.isMain && (
             <DropdownMenuItem

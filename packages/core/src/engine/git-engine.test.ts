@@ -153,3 +153,50 @@ describe("GitEngine repo.* (P1, core-A)", () => {
     expect(blob?.data.toString("utf8")).toBe("hello\n");
   });
 });
+
+describe("GitEngine worktree.switch (P3, WT-006)", () => {
+  test("switches the active context so views reflect the worktree's HEAD", async () => {
+    const repo = await ws.createRepo("wt-switch");
+    await repo.commit({ message: "init", files: { "a.txt": "a" } });
+    const wtPath = join(ws.root, "wt-switch-linked");
+    const cfg = newCfg();
+
+    const [before, after] = await withEngine(cfg, (e) =>
+      Effect.gen(function* () {
+        const handle = yield* e.open(repo.dir);
+        // A linked worktree checked out on a brand-new branch.
+        yield* e.worktreeAdd(
+          handle.repoId,
+          wtPath,
+          undefined,
+          "wt-branch",
+          undefined,
+        );
+        const main = yield* e.state(handle.repoId);
+        yield* e.worktreeSwitch(handle.repoId, wtPath);
+        const linked = yield* e.state(handle.repoId);
+        return [main.currentBranch, linked.currentBranch] as const;
+      }),
+    );
+
+    expect(before).toBe("main");
+    expect(after).toBe("wt-branch");
+  });
+
+  test("rejects a path that is not a worktree of this repository", async () => {
+    const repo = await ws.createRepo("wt-switch-guard");
+    await repo.commit({ message: "init", files: { "a.txt": "a" } });
+    const other = await ws.createRepo("wt-switch-other");
+    await other.commit({ message: "init", files: { "b.txt": "b" } });
+    const cfg = newCfg();
+
+    const err = await withEngine(cfg, (e) =>
+      Effect.gen(function* () {
+        const handle = yield* e.open(repo.dir);
+        return yield* Effect.flip(e.worktreeSwitch(handle.repoId, other.dir));
+      }),
+    );
+
+    expect(err.code).toBe("repoUnavailable");
+  });
+});
