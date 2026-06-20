@@ -40,4 +40,13 @@ describe("makeRepoLockRegistry (NF-LOCK-1; scaffold for P2 mutations)", () => {
     expect(state.maxActive).toBeGreaterThan(1);
     expect(registry.size()).toBe(3);
   });
+
+  test("reuses existing semaphore when same repoId is locked a second time", async () => {
+    const registry = makeRepoLockRegistry();
+    // Calling withRepoLock twice for the same repoId exercises the semaphore-reuse path.
+    const e1 = registry.withRepoLock(id("x"))(Effect.void);
+    const e2 = registry.withRepoLock(id("x"))(Effect.void);
+    await run(Effect.all([e1, e2], { concurrency: "unbounded" }));
+    expect(registry.size()).toBe(1);
+  });
 });

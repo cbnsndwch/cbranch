@@ -11,14 +11,7 @@
 
 import { basename } from "node:path";
 
-import {
-  type GitError,
-  type InvalidationEvent,
-  type RepoId,
-  type StashEntry,
-  type TagInfo,
-  type WorktreeInfo,
-} from "@cbranch/rpc-contract";
+import { type GitError, type InvalidationEvent, type RepoId } from "@cbranch/rpc-contract";
 import { RepoHandle } from "@cbranch/rpc-contract";
 import { type Cause, Effect, Layer, Queue, Scope, Stream } from "effect";
 
@@ -59,6 +52,15 @@ import {
   stageFiles as stageFilesGit,
   unstageFiles as unstageFilesGit,
 } from "../git/stage";
+import {
+  stashApply as stashApplyGit,
+  stashClear as stashClearGit,
+  stashDrop as stashDropGit,
+  stashList as stashListGit,
+  stashPop as stashPopGit,
+  stashPush as stashPushGit,
+  stashShow as stashShowGit,
+} from "../git/stash";
 import { statusGet } from "../git/status";
 import {
   fetchStream as fetchStreamGit,
@@ -66,8 +68,21 @@ import {
   pushDeleteRemoteRef as pushDeleteRemoteRefGit,
   pushStream as pushStreamGit,
 } from "../git/sync";
+import {
+  tagCreate as tagCreateGit,
+  tagDelete as tagDeleteGit,
+  tagDeleteRemote as tagDeleteRemoteGit,
+  tagList as tagListGit,
+  tagPush as tagPushGit,
+} from "../git/tags";
 import { detectGitVersion } from "../git/version";
 import { WatcherRegistry } from "../git/watcher";
+import {
+  worktreeAdd as worktreeAddGit,
+  worktreeList as worktreeListGit,
+  worktreePrune as worktreePruneGit,
+  worktreeRemove as worktreeRemoveGit,
+} from "../git/worktrees";
 import { type ResolvedRepo, repoCwd, resolveRepo } from "../repo/resolve";
 import { readRepoState } from "../repo/state";
 import { GitEngine, type GitEngineApi } from "./git-engine";
@@ -291,74 +306,64 @@ export const makeGitEngine = (opts?: MakeGitEngineOptions): Effect.Effect<GitEng
           locks.withRepoLock(repoId)(remoteRemoveGit(repoCwd(repo), name, env)),
         ),
 
-      // ── worktrees (P3, stubs) ─────────────────────────────────────────────
-      worktreeList: (repoId) =>
-        Effect.flatMap(resolveById(repoId), (_repo) =>
-          Effect.fail(gitError("gitFailed", "P3: worktreeList not implemented")),
-        ) as Effect.Effect<ReadonlyArray<WorktreeInfo>, GitError>,
-      worktreeAdd: (repoId, _path, _branch, _newBranch, _startPoint) =>
-        Effect.flatMap(resolveById(repoId), (_repo) =>
-          Effect.fail(gitError("gitFailed", "P3: worktreeAdd not implemented")),
-        ) as Effect.Effect<WorktreeInfo, GitError>,
-      worktreeRemove: (repoId, _path, _force) =>
-        Effect.flatMap(resolveById(repoId), (_repo) =>
-          Effect.fail(gitError("gitFailed", "P3: worktreeRemove not implemented")),
+      // ── worktrees (P3) ────────────────────────────────────────────────────
+      worktreeList: (repoId) => Effect.flatMap(resolveById(repoId), (repo) => worktreeListGit(repoCwd(repo), env)),
+      worktreeAdd: (repoId, path, branch, newBranch, startPoint) =>
+        Effect.flatMap(resolveById(repoId), (repo) =>
+          locks.withRepoLock(repoId)(worktreeAddGit(repoCwd(repo), path, { branch, newBranch, startPoint }, env)),
+        ),
+      worktreeRemove: (repoId, path, force) =>
+        Effect.flatMap(resolveById(repoId), (repo) =>
+          locks.withRepoLock(repoId)(worktreeRemoveGit(repoCwd(repo), path, force, env)),
         ),
       worktreePrune: (repoId) =>
-        Effect.flatMap(resolveById(repoId), (_repo) =>
-          Effect.fail(gitError("gitFailed", "P3: worktreePrune not implemented")),
-        ),
+        Effect.flatMap(resolveById(repoId), (repo) => locks.withRepoLock(repoId)(worktreePruneGit(repoCwd(repo), env))),
 
-      // ── stash (P3, stubs) ─────────────────────────────────────────────────
-      stashPush: (repoId, _message, _includeUntracked, _keepIndex, _stagedOnly) =>
-        Effect.flatMap(resolveById(repoId), (_repo) =>
-          Effect.fail(gitError("gitFailed", "P3: stashPush not implemented")),
-        ) as Effect.Effect<StashEntry, GitError>,
-      stashList: (repoId) =>
-        Effect.flatMap(resolveById(repoId), (_repo) =>
-          Effect.fail(gitError("gitFailed", "P3: stashList not implemented")),
-        ) as Effect.Effect<ReadonlyArray<StashEntry>, GitError>,
-      stashShow: (repoId, _ref) =>
-        Effect.flatMap(resolveById(repoId), (_repo) =>
-          Effect.fail(gitError("gitFailed", "P3: stashShow not implemented")),
+      // ── stash (P3) ───────────────────────────────────────────────────────
+      stashPush: (repoId, message, includeUntracked, keepIndex, stagedOnly) =>
+        Effect.flatMap(resolveById(repoId), (repo) =>
+          locks.withRepoLock(repoId)(
+            stashPushGit(
+              repoCwd(repo),
+              { message: message ?? undefined, includeUntracked, keepIndex, stagedOnly },
+              env,
+            ),
+          ),
         ),
-      stashApply: (repoId, _ref) =>
-        Effect.flatMap(resolveById(repoId), (_repo) =>
-          Effect.fail(gitError("gitFailed", "P3: stashApply not implemented")),
+      stashList: (repoId) => Effect.flatMap(resolveById(repoId), (repo) => stashListGit(repoCwd(repo), env)),
+      stashShow: (repoId, ref) => Effect.flatMap(resolveById(repoId), (repo) => stashShowGit(repoCwd(repo), ref, env)),
+      stashApply: (repoId, ref) =>
+        Effect.flatMap(resolveById(repoId), (repo) =>
+          locks.withRepoLock(repoId)(stashApplyGit(repoCwd(repo), ref, env)),
         ),
-      stashPop: (repoId, _ref) =>
-        Effect.flatMap(resolveById(repoId), (_repo) =>
-          Effect.fail(gitError("gitFailed", "P3: stashPop not implemented")),
-        ),
-      stashDrop: (repoId, _ref) =>
-        Effect.flatMap(resolveById(repoId), (_repo) =>
-          Effect.fail(gitError("gitFailed", "P3: stashDrop not implemented")),
+      stashPop: (repoId, ref) =>
+        Effect.flatMap(resolveById(repoId), (repo) => locks.withRepoLock(repoId)(stashPopGit(repoCwd(repo), ref, env))),
+      stashDrop: (repoId, ref) =>
+        Effect.flatMap(resolveById(repoId), (repo) =>
+          locks.withRepoLock(repoId)(stashDropGit(repoCwd(repo), ref, env)),
         ),
       stashClear: (repoId) =>
-        Effect.flatMap(resolveById(repoId), (_repo) =>
-          Effect.fail(gitError("gitFailed", "P3: stashClear not implemented")),
-        ),
+        Effect.flatMap(resolveById(repoId), (repo) => locks.withRepoLock(repoId)(stashClearGit(repoCwd(repo), env))),
 
-      // ── tags (P3, stubs) ──────────────────────────────────────────────────
-      tagList: (repoId) =>
-        Effect.flatMap(resolveById(repoId), (_repo) =>
-          Effect.fail(gitError("gitFailed", "P3: tagList not implemented")),
-        ) as Effect.Effect<ReadonlyArray<TagInfo>, GitError>,
-      tagCreate: (repoId, _name, _target, _tagType, _message, _force) =>
-        Effect.flatMap(resolveById(repoId), (_repo) =>
-          Effect.fail(gitError("gitFailed", "P3: tagCreate not implemented")),
-        ) as Effect.Effect<TagInfo, GitError>,
-      tagDelete: (repoId, _name) =>
-        Effect.flatMap(resolveById(repoId), (_repo) =>
-          Effect.fail(gitError("gitFailed", "P3: tagDelete not implemented")),
+      // ── tags (P3) ────────────────────────────────────────────────────────
+      tagList: (repoId) => Effect.flatMap(resolveById(repoId), (repo) => tagListGit(repoCwd(repo), env)),
+      tagCreate: (repoId, name, target, tagType, message, force) =>
+        Effect.flatMap(resolveById(repoId), (repo) =>
+          locks.withRepoLock(repoId)(
+            tagCreateGit(repoCwd(repo), name, { target, tagType: tagType ?? "lightweight", message, force }, env),
+          ),
         ),
-      tagPush: (repoId, _remote, _name, _all) =>
-        Effect.flatMap(resolveById(repoId), (_repo) =>
-          Effect.fail(gitError("gitFailed", "P3: tagPush not implemented")),
+      tagDelete: (repoId, name) =>
+        Effect.flatMap(resolveById(repoId), (repo) =>
+          locks.withRepoLock(repoId)(tagDeleteGit(repoCwd(repo), name, env)),
         ),
-      tagDeleteRemote: (repoId, _remote, _name) =>
-        Effect.flatMap(resolveById(repoId), (_repo) =>
-          Effect.fail(gitError("gitFailed", "P3: tagDeleteRemote not implemented")),
+      tagPush: (repoId, remote, name, all) =>
+        Effect.flatMap(resolveById(repoId), (repo) =>
+          locks.withRepoLock(repoId)(tagPushGit(repoCwd(repo), remote, { name, all }, env)),
+        ),
+      tagDeleteRemote: (repoId, remote, name) =>
+        Effect.flatMap(resolveById(repoId), (repo) =>
+          locks.withRepoLock(repoId)(tagDeleteRemoteGit(repoCwd(repo), remote, name, env)),
         ),
     };
     return api;

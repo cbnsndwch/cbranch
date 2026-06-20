@@ -140,6 +140,43 @@ describe("parseStatusOutput", () => {
     expect(out.hasConflicts).toBe(false);
   });
 
+  test("deleted staged entry — staged=deleted", () => {
+    const out = parseStatusOutput(
+      buf(
+        "1 D. N... 100644 000000 000000 aaa0000000000000000000000000000000000000000 0000000000000000000000000000000000000000 gone.txt" +
+          NUL,
+      ),
+    );
+    expect(out.entries[0]?.staged).toBe("deleted");
+  });
+
+  test("copied staged entry — staged=copied", () => {
+    const out = parseStatusOutput(
+      buf(
+        "1 C. N... 100644 100644 100644 aaa0000000000000000000000000000000000000000 bbb0000000000000000000000000000000000000000 copy.txt" +
+          NUL,
+      ),
+    );
+    expect(out.entries[0]?.staged).toBe("copied");
+  });
+
+  test("type-changed entry — staged=typeChanged", () => {
+    const out = parseStatusOutput(
+      buf(
+        "1 T. N... 100644 120000 120000 aaa0000000000000000000000000000000000000000 bbb0000000000000000000000000000000000000000 symlink.txt" +
+          NUL,
+      ),
+    );
+    expect(out.entries[0]?.staged).toBe("typeChanged");
+  });
+
+  test("unknown token prefix — skipped without error", () => {
+    const out = parseStatusOutput(buf("X unknown-token.txt" + NUL + "? untracked.txt" + NUL));
+    // The "X" token should be silently skipped; only the untracked entry appears
+    expect(out.entries).toHaveLength(1);
+    expect(out.entries[0]?.path).toBe("untracked.txt");
+  });
+
   test("mode fields parsed — staged mode present, worktree mode 000000 becomes undefined", () => {
     const out = parseStatusOutput(
       buf(

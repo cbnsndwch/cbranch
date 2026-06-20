@@ -161,4 +161,29 @@ describe("branchList", () => {
     expect(main?.tipOid).toMatch(/^[0-9a-f]{40}$/);
     expect(main?.tipSubject).toBe("the subject line");
   });
+
+  test("branch with deleted upstream — upstream is undefined (gone)", async () => {
+    const origin = await ws.createRepo("bl-gone-origin");
+    await origin.commit({ message: "init", files: { "a.txt": "a" } });
+    // Create a feature branch on origin
+    await origin.branch("feat/gone");
+
+    const clone = await ws.createRepo("bl-gone-clone");
+    await clone.addRemote("origin", origin.dir);
+    await clone.fetch("origin");
+    await clone.git(["checkout", "-b", "main", "--track", "origin/main"]);
+    await clone.git(["checkout", "-b", "feat/gone", "--track", "origin/feat/gone"]);
+
+    // Delete the branch on origin
+    await origin.deleteBranch("feat/gone");
+    // Fetch with prune so remote-tracking branch is removed
+    await clone.git(["fetch", "origin", "--prune"]);
+
+    const listing = await Effect.runPromise(branchList(clone.dir));
+
+    // The local feat/gone branch has a [gone] upstream — upstream should be absent
+    const feat = listing.localBranches.find((b) => b.name === "feat/gone");
+    expect(feat).toBeDefined();
+    expect(feat?.upstream).toBeUndefined();
+  });
 });
