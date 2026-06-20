@@ -120,7 +120,7 @@ export function AppShell() {
       {/* Headless: reflects the active branch in the browser window title (no in-app title bar). */}
       <DocumentTitle />
 
-      <div className="grid h-dvh grid-rows-[24px_32px_28px_1fr] overflow-hidden">
+      <div className="grid h-dvh grid-rows-[24px_auto_28px_1fr] overflow-hidden">
         {/* Row 1: Menu bar */}
         <MenuBar />
 
