@@ -3,6 +3,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import {
+  useRemoteList,
   useTagCreate,
   useTagDelete,
   useTagDeleteRemote,
@@ -34,6 +35,7 @@ interface TagsPanelProps {
 
 export function TagsPanel({ repoId }: TagsPanelProps) {
   const { data: tags, isLoading } = useTagList(repoId);
+  const { data: remotes } = useRemoteList(repoId);
   const createMut = useTagCreate(repoId);
   const deleteMut = useTagDelete(repoId);
   const pushMut = useTagPush(repoId);
@@ -41,6 +43,20 @@ export function TagsPanel({ repoId }: TagsPanelProps) {
 
   const [createOpen, setCreateOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  // Tag push / delete-remote let the user pick the remote (UI-011) rather than assuming
+  // `origin`. Opening the picker seeds the choice with the first configured remote.
+  const [remoteAction, setRemoteAction] = useState<{
+    kind: "push" | "deleteRemote";
+    tag: string;
+  } | null>(null);
+  const [selectedRemote, setSelectedRemote] = useState("");
+
+  const remoteList = remotes ?? [];
+
+  const openRemoteAction = (kind: "push" | "deleteRemote", tag: string) => {
+    setSelectedRemote(remoteList[0]?.name ?? "origin");
+    setRemoteAction({ kind, tag });
+  };
 
   const [tagName, setTagName] = useState("");
   const [tagType, setTagType] = useState<TagType>("lightweight");
@@ -89,21 +105,27 @@ export function TagsPanel({ repoId }: TagsPanelProps) {
     );
   };
 
-  const handlePush = (name: string) => {
+  const handlePush = (name: string, remote: string) => {
     pushMut.mutate(
-      { remote: "origin", name },
+      { remote, name },
       {
-        onSuccess: () => toast.success("Tag pushed to origin"),
+        onSuccess: () => {
+          toast.success('Tag pushed to "' + remote + '"');
+          setRemoteAction(null);
+        },
         onError: (err) => toast.error(String(err)),
       },
     );
   };
 
-  const handleDeleteRemote = (name: string) => {
+  const handleDeleteRemote = (name: string, remote: string) => {
     deleteRemoteMut.mutate(
-      { remote: "origin", name },
+      { remote, name },
       {
-        onSuccess: () => toast.success("Tag deleted from origin"),
+        onSuccess: () => {
+          toast.success('Tag deleted from "' + remote + '"');
+          setRemoteAction(null);
+        },
         onError: (err) => toast.error(String(err)),
       },
     );
@@ -140,8 +162,8 @@ export function TagsPanel({ repoId }: TagsPanelProps) {
             key={tag.name}
             tag={tag}
             onDeleteLocal={(name) => setDeleteTarget(name)}
-            onPush={handlePush}
-            onDeleteRemote={handleDeleteRemote}
+            onPush={(name) => openRemoteAction("push", name)}
+            onDeleteRemote={(name) => openRemoteAction("deleteRemote", name)}
           />
         ))}
       </div>
@@ -225,6 +247,85 @@ export function TagsPanel({ repoId }: TagsPanelProps) {
         </AlertDialogContent>
       </AlertDialog>
 
+      {/* Remote picker for push / delete-remote (UI-011) */}
+      <AlertDialog
+        open={remoteAction !== null}
+        onOpenChange={(open) => {
+          if (!open) setRemoteAction(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {remoteAction?.kind === "deleteRemote"
+                ? "Delete tag from remote"
+                : "Push tag to remote"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {remoteAction
+                ? remoteAction.kind === "deleteRemote"
+                  ? 'Delete tag "' +
+                    remoteAction.tag +
+                    '" from the selected remote.'
+                  : 'Push tag "' +
+                    remoteAction.tag +
+                    '" to the selected remote.'
+                : ""}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="py-2">
+            {remoteList.length === 0 ? (
+              <p className="text-muted-foreground text-sm">
+                No remotes configured.
+              </p>
+            ) : (
+              <label className="flex flex-col gap-1">
+                <span className="text-xs font-medium">Remote</span>
+                <select
+                  value={selectedRemote}
+                  onChange={(e) => setSelectedRemote(e.target.value)}
+                  className="h-8 border px-1 text-sm"
+                  aria-label="Remote"
+                >
+                  {remoteList.map((remote) => (
+                    <option key={remote.name} value={remote.name}>
+                      {remote.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogClose onClick={() => setRemoteAction(null)}>
+              Cancel
+            </AlertDialogClose>
+            <AlertDialogAction
+              onClick={() => {
+                if (!remoteAction || !selectedRemote) return;
+                if (remoteAction.kind === "deleteRemote") {
+                  handleDeleteRemote(remoteAction.tag, selectedRemote);
+                } else {
+                  handlePush(remoteAction.tag, selectedRemote);
+                }
+              }}
+              disabled={
+                !selectedRemote ||
+                pushMut.isPending ||
+                deleteRemoteMut.isPending
+              }
+              className={
+                remoteAction?.kind === "deleteRemote"
+                  ? ""
+                  : "bg-primary text-primary-foreground hover:bg-primary/90"
+              }
+            >
+              {remoteAction?.kind === "deleteRemote" ? "Delete" : "Push"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* Delete local confirm */}
       <DestructiveConfirmDialog
         open={deleteTarget !== null}
@@ -284,7 +385,7 @@ function TagRow({ tag, onDeleteLocal, onPush, onDeleteRemote }: TagRowProps) {
         </DropdownMenuTrigger>
         <DropdownMenuContent side="bottom" align="end">
           <DropdownMenuItem onClick={() => onPush(tag.name)}>
-            Push to origin
+            Push to remote…
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem
@@ -297,7 +398,7 @@ function TagRow({ tag, onDeleteLocal, onPush, onDeleteRemote }: TagRowProps) {
             variant="destructive"
             onClick={() => onDeleteRemote(tag.name)}
           >
-            Delete from origin
+            Delete from remote…
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

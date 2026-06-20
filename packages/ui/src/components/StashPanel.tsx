@@ -1,4 +1,8 @@
-import { type StashEntry, type RepoId } from "@cbranch/rpc-contract";
+import {
+  type DiffFile,
+  type StashEntry,
+  type RepoId,
+} from "@cbranch/rpc-contract";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -9,6 +13,7 @@ import {
   useStashList,
   useStashPop,
   useStashPush,
+  useStashShow,
 } from "../rpc/hooks";
 import { DestructiveConfirmDialog } from "./DestructiveConfirmDialog";
 import {
@@ -42,6 +47,10 @@ export function StashPanel({ repoId }: StashPanelProps) {
 
   const [newStashOpen, setNewStashOpen] = useState(false);
   const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
+  // The stash whose diff is shown in the preview pane (UI-010). `stash apply` keeps the
+  // entry, so its selection survives; every list-mutating op clears it because the
+  // `stash@{n}` indices shift underneath a stale ref.
+  const [selectedRef, setSelectedRef] = useState<string | null>(null);
 
   const [stashMessage, setStashMessage] = useState("");
   const [includeUntracked, setIncludeUntracked] = useState(false);
@@ -66,6 +75,7 @@ export function StashPanel({ repoId }: StashPanelProps) {
           setIncludeUntracked(false);
           setKeepIndex(false);
           setStagedOnly(false);
+          setSelectedRef(null);
         },
         onError: (err) => toast.error(String(err)),
       },
@@ -86,7 +96,10 @@ export function StashPanel({ repoId }: StashPanelProps) {
     popMut.mutate(
       { ref },
       {
-        onSuccess: () => toast.success("Stash popped"),
+        onSuccess: () => {
+          toast.success("Stash popped");
+          setSelectedRef(null);
+        },
         onError: (err) => toast.error(String(err)),
       },
     );
@@ -96,7 +109,10 @@ export function StashPanel({ repoId }: StashPanelProps) {
     dropMut.mutate(
       { ref },
       {
-        onSuccess: () => toast.success("Stash dropped"),
+        onSuccess: () => {
+          toast.success("Stash dropped");
+          setSelectedRef(null);
+        },
         onError: (err) => toast.error(String(err)),
       },
     );
@@ -104,7 +120,10 @@ export function StashPanel({ repoId }: StashPanelProps) {
 
   const handleClear = () => {
     clearMut.mutate(undefined, {
-      onSuccess: () => toast.success("All stashes cleared"),
+      onSuccess: () => {
+        toast.success("All stashes cleared");
+        setSelectedRef(null);
+      },
       onError: (err) => toast.error(String(err)),
     });
   };
@@ -150,12 +169,21 @@ export function StashPanel({ repoId }: StashPanelProps) {
           <StashRow
             key={entry.ref}
             entry={entry}
+            selected={entry.ref === selectedRef}
+            onSelect={() => setSelectedRef(entry.ref)}
             onApply={handleApply}
             onPop={handlePop}
             onDrop={handleDrop}
           />
         ))}
       </div>
+
+      {/* Diff preview for the selected stash (UI-010) */}
+      {selectedRef !== null && (
+        <div className="min-h-0 flex-1 overflow-auto border-t">
+          <StashDiffPreview repoId={repoId} stashRef={selectedRef} />
+        </div>
+      )}
 
       {/* New stash dialog */}
       <AlertDialog open={newStashOpen} onOpenChange={setNewStashOpen}>
@@ -233,15 +261,34 @@ export function StashPanel({ repoId }: StashPanelProps) {
 
 interface StashRowProps {
   entry: StashEntry;
+  selected: boolean;
+  onSelect: () => void;
   onApply: (ref: string) => void;
   onPop: (ref: string) => void;
   onDrop: (ref: string) => void;
 }
 
-function StashRow({ entry, onApply, onPop, onDrop }: StashRowProps) {
+function StashRow({
+  entry,
+  selected,
+  onSelect,
+  onApply,
+  onPop,
+  onDrop,
+}: StashRowProps) {
   return (
-    <div className="group hover:bg-accent/50 flex items-center px-3 py-1.5">
-      <div className="min-w-0 flex-1">
+    <div
+      className={
+        "group flex items-center px-3 py-1.5 " +
+        (selected ? "bg-accent" : "hover:bg-accent/50")
+      }
+    >
+      <button
+        type="button"
+        onClick={onSelect}
+        aria-pressed={selected}
+        className="min-w-0 flex-1 text-left"
+      >
         <div className="flex items-center gap-2">
           <span className="text-muted-foreground shrink-0 font-mono text-[10px]">
             {"stash@{" + String(entry.index) + "}"}
@@ -253,7 +300,7 @@ function StashRow({ entry, onApply, onPop, onDrop }: StashRowProps) {
         <div className="text-muted-foreground mt-0.5 text-[10px]">
           {entry.branch}
         </div>
-      </div>
+      </button>
       <DropdownMenu>
         <DropdownMenuTrigger
           className="hover:bg-accent flex h-5 w-5 shrink-0 items-center justify-center text-[11px] opacity-0 group-hover:opacity-100"
@@ -276,6 +323,108 @@ function StashRow({ entry, onApply, onPop, onDrop }: StashRowProps) {
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+    </div>
+  );
+}
+
+interface StashDiffPreviewProps {
+  repoId: RepoId;
+  stashRef: string;
+}
+
+// Read-only diff of a stash entry (UI-010). `stash show -p` is summarised server-side
+// into `DiffFile[]`; here we render each file's hunks with the same add/delete colouring
+// as the working-tree diff, minus the staging controls.
+function StashDiffPreview({ repoId, stashRef }: StashDiffPreviewProps) {
+  const { data: files, isLoading, isError } = useStashShow(repoId, stashRef);
+
+  if (isLoading) {
+    return (
+      <div className="text-muted-foreground px-3 py-2 text-xs">
+        Loading diff…
+      </div>
+    );
+  }
+  if (isError) {
+    return (
+      <div className="text-muted-foreground px-3 py-2 text-xs">
+        Failed to load stash diff.
+      </div>
+    );
+  }
+  if (!files || files.length === 0) {
+    return (
+      <div className="text-muted-foreground px-3 py-2 text-xs">
+        No changes in this stash.
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-2">
+      {files.map((file) => (
+        <StashFileDiff key={file.newPath || file.oldPath} file={file} />
+      ))}
+    </div>
+  );
+}
+
+function StashFileDiff({ file }: { file: DiffFile }) {
+  const path =
+    file.oldPath && file.oldPath !== file.newPath
+      ? file.oldPath + " → " + file.newPath
+      : file.newPath || file.oldPath;
+
+  return (
+    <div className="mb-2 rounded border font-mono text-xs">
+      <div className="bg-muted flex items-center justify-between gap-2 px-2 py-1">
+        <span className="truncate" title={path}>
+          {path}
+        </span>
+        <span className="text-muted-foreground shrink-0">
+          {file.additions !== null && (
+            <span className="text-green-600 dark:text-green-400">
+              {"+" + String(file.additions)}
+            </span>
+          )}{" "}
+          {file.deletions !== null && (
+            <span className="text-red-600 dark:text-red-400">
+              {"-" + String(file.deletions)}
+            </span>
+          )}
+        </span>
+      </div>
+      {file.isBinary ? (
+        <div className="text-muted-foreground px-2 py-1">
+          Binary file — no preview.
+        </div>
+      ) : (
+        file.hunks.map((hunk, i) => (
+          <pre key={i} className="overflow-x-auto p-1">
+            <div className="text-muted-foreground">{hunk.header}</div>
+            {hunk.lines.map((line, j) => {
+              let prefix = " ";
+              let cls = "";
+              if (line.kind === "add") {
+                prefix = "+";
+                cls = "text-green-600 dark:text-green-400";
+              } else if (line.kind === "delete") {
+                prefix = "-";
+                cls = "text-red-600 dark:text-red-400";
+              } else if (line.kind === "noNewlineAtEof") {
+                prefix = "\\";
+                cls = "text-muted-foreground";
+              }
+              return (
+                <div key={j} className={cls}>
+                  {prefix}
+                  {line.content}
+                </div>
+              );
+            })}
+          </pre>
+        ))
+      )}
     </div>
   );
 }

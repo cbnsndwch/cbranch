@@ -44,6 +44,10 @@ export function RemotesManagerDialog({
   const [editState, setEditState] = useState<EditState>(null);
   const [newName, setNewName] = useState("");
   const [newUrl, setNewUrl] = useState("");
+  // Removing a remote is irreversible, so it takes a second click: the first arms the
+  // confirm, the second commits (UI-008). An inline confirm avoids nesting an
+  // AlertDialog inside this one.
+  const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
 
   const handleAdd = () => {
     const name = newName.trim();
@@ -120,7 +124,10 @@ export function RemotesManagerDialog({
     removeMut.mutate(
       { name },
       {
-        onSuccess: () => toast.success("Remote removed"),
+        onSuccess: () => {
+          toast.success("Remote removed");
+          setConfirmRemove(null);
+        },
         onError: (err) => toast.error(String(err)),
       },
     );
@@ -259,14 +266,36 @@ export function RemotesManagerDialog({
                         >
                           Rename
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => handleRemove(remote.name)}
-                          disabled={removeMut.isPending}
-                          className="text-destructive h-6 border px-1.5 text-[10px] disabled:opacity-40"
-                        >
-                          Remove
-                        </button>
+                        {confirmRemove === remote.name ? (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => handleRemove(remote.name)}
+                              disabled={removeMut.isPending}
+                              className="bg-destructive text-destructive-foreground h-6 border px-1.5 text-[10px] disabled:opacity-40"
+                            >
+                              {removeMut.isPending
+                                ? "Removing…"
+                                : "Confirm remove"}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setConfirmRemove(null)}
+                              className="h-6 border px-1.5 text-[10px]"
+                            >
+                              Cancel
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setConfirmRemove(remote.name)}
+                            disabled={editState !== null}
+                            className="text-destructive h-6 border px-1.5 text-[10px] disabled:opacity-40"
+                          >
+                            Remove
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
