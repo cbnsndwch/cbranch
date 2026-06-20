@@ -12,8 +12,26 @@
 // (incoming edges, y 0 -> 0.5) and a bottom half (outgoing edges, y 0.5 -> 1). Parents
 // not yet in the rendered set keep their lane open to the bottom boundary (REQ-GRAPH-007).
 
-/** Number of theme lane colors (`--color-graph-1..6`). Adjacent lanes differ (REQ-GRAPH-009). */
-export const GRAPH_PALETTE_SIZE = 6;
+/** Number of lane colors — the curated Tailwind 500 palette (`--graph-1..16`, REQ-GRAPH-009). */
+export const GRAPH_PALETTE_SIZE = 16;
+
+/**
+ * Deterministic 32-bit FNV-1a hash of a commit oid. Used to map a lane's *seed* (the commit
+ * that opened the lane) to a stable palette color, so a line of development keeps one color
+ * for its whole length and distinct branches get pseudo-randomly different colors.
+ */
+const hashOid = (oid: string): number => {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < oid.length; i++) {
+    h ^= oid.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return h >>> 0;
+};
+
+/** Stable 1-based palette color for a lane, keyed on its seed oid (REQ-GRAPH-010). */
+const colorOfSeed = (seed: string): number =>
+  (hashOid(seed) % GRAPH_PALETTE_SIZE) + 1;
 
 /** A vertical half of an edge within a row cell, in (lane, half-row) coordinates. */
 export interface GraphSegment {
@@ -25,7 +43,7 @@ export interface GraphSegment {
   readonly fromY: 0 | 0.5;
   /** Vertical end: 0.5 = node centre, 1 = bottom boundary. */
   readonly toY: 0.5 | 1;
-  /** 1-based theme palette color index (`--color-graph-N`). */
+  /** 1-based palette color index (`--graph-N`) of the lane this segment belongs to. */
   readonly color: number;
 }
 
@@ -33,16 +51,13 @@ export interface GraphSegment {
 export interface GraphRow {
   /** Lane index of this commit's node (REQ-GRAPH-003). */
   readonly lane: number;
-  /** 1-based palette color of the node's lane. */
+  /** 1-based palette color of the node's lane (hashed from the lane's seed commit). */
   readonly color: number;
   /** Lanes spanning this row (node + incoming + outgoing), for cell width. */
   readonly laneCount: number;
   /** Edge halves to draw in this row's cell. */
   readonly segments: ReadonlyArray<GraphSegment>;
 }
-
-/** Deterministic 1-based palette color for a lane index (constant while the lane exists). */
-const colorOf = (lane: number): number => (lane % GRAPH_PALETTE_SIZE) + 1;
 
 /** First free (null) slot in the lane vector, or the next index past the end. */
 const firstFree = (lanes: ReadonlyArray<string | null>): number => {
@@ -70,9 +85,16 @@ export interface GraphInput {
 export class GraphLayout {
   /** Lane vector: `lanes[i]` is the oid lane `i` is waiting to render, or null if free. */
   private readonly lanes: Array<string | null> = [];
+  /**
+   * Per-lane seed oid: the commit that opened the lane's current line of development. A lane
+   * keeps its seed (and therefore its color) for its whole length; a freed-then-reused lane
+   * takes a fresh seed. Parallel to {@link lanes}.
+   */
+  private readonly seeds: Array<string | null> = [];
 
   push(commit: GraphInput): GraphRow {
     const before = this.lanes.slice();
+    const beforeSeeds = this.seeds.slice();
 
     // Lanes already reserved for this commit (its children reach it here). The leftmost is
     // the node's lane; the rest are merging children's lanes that terminate at the node.
@@ -81,17 +103,30 @@ export class GraphLayout {
       if (before[i] === commit.oid) myLanes.push(i);
     const lane = myLanes.length > 0 ? myLanes[0]! : firstFree(before);
 
-    // Build the lane state for the rows below (`after`): free this commit's lanes, then
-    // route its parents. The first parent continues straight down in the node's lane; each
-    // further parent reuses a lane already awaiting it (shared parent) or takes a free slot.
+    // The node's seed (its color): inherited from the lane a child reached it on, or — if no
+    // child reaches it (a tip with no rendered children) — the commit itself opens a new line.
+    const nodeSeed = myLanes.length > 0 ? beforeSeeds[lane]! : commit.oid;
+
+    // Build the lane state for the rows below (`after`): free this commit's lanes, then route
+    // its parents. The first parent continues straight down in the node's lane, carrying the
+    // node's color onward; each further parent reuses a lane already awaiting it (shared
+    // parent, keeping that lane's color) or opens a fresh lane seeded by the parent oid.
     const after = before.slice();
-    while (after.length <= lane) after.push(null);
-    for (const i of myLanes) after[i] = null;
+    const afterSeeds = beforeSeeds.slice();
+    while (after.length <= lane) {
+      after.push(null);
+      afterSeeds.push(null);
+    }
+    for (const i of myLanes) {
+      after[i] = null;
+      afterSeeds[i] = null;
+    }
 
     const parentLanes: number[] = [];
     commit.parents.forEach((parent, index) => {
       if (index === 0) {
         after[lane] = parent;
+        afterSeeds[lane] = nodeSeed;
         parentLanes.push(lane);
         return;
       }
@@ -101,68 +136,55 @@ export class GraphLayout {
         return;
       }
       const slot = firstFree(after);
-      while (after.length <= slot) after.push(null);
+      while (after.length <= slot) {
+        after.push(null);
+        afterSeeds.push(null);
+      }
       after[slot] = parent;
+      afterSeeds[slot] = parent;
       parentLanes.push(slot);
     });
     const parentLaneSet = new Set(parentLanes);
 
     const segments: GraphSegment[] = [];
 
-    // Top half (incoming, y 0 -> 0.5): each occupied incoming lane either arrives at the
-    // node (it was tracking this commit) or passes straight through.
+    // Top half (incoming, y 0 -> 0.5): each occupied incoming lane either arrives at the node
+    // (it was tracking this commit) or passes straight through, keeping its own lane color.
     for (let i = 0; i < before.length; i++) {
       if (before[i] === null) continue;
+      const color = colorOfSeed(beforeSeeds[i]!);
       if (before[i] === commit.oid) {
-        segments.push({
-          fromLane: i,
-          toLane: lane,
-          fromY: 0,
-          toY: 0.5,
-          color: colorOf(i),
-        });
+        segments.push({ fromLane: i, toLane: lane, fromY: 0, toY: 0.5, color });
       } else {
-        segments.push({
-          fromLane: i,
-          toLane: i,
-          fromY: 0,
-          toY: 0.5,
-          color: colorOf(i),
-        });
+        segments.push({ fromLane: i, toLane: i, fromY: 0, toY: 0.5, color });
       }
     }
 
     // Bottom half (outgoing, y 0.5 -> 1): pass-through reservations continue straight; each
-    // parent destination emanates from the node (diagonally if the lane shifts).
+    // parent destination emanates from the node (diagonally if the lane shifts), colored by
+    // the destination lane's seed so a merged-in side branch carries its own color downward.
     for (let j = 0; j < after.length; j++) {
       if (after[j] === null) continue;
+      const color = colorOfSeed(afterSeeds[j]!);
       const passthrough = before[j] === after[j];
       if (passthrough) {
-        segments.push({
-          fromLane: j,
-          toLane: j,
-          fromY: 0.5,
-          toY: 1,
-          color: colorOf(j),
-        });
+        segments.push({ fromLane: j, toLane: j, fromY: 0.5, toY: 1, color });
       }
       if (parentLaneSet.has(j) && !(passthrough && j === lane)) {
-        segments.push({
-          fromLane: lane,
-          toLane: j,
-          fromY: 0.5,
-          toY: 1,
-          color: colorOf(j),
-        });
+        segments.push({ fromLane: lane, toLane: j, fromY: 0.5, toY: 1, color });
       }
     }
 
     // Commit the new lane state for the next push.
     this.lanes.length = 0;
-    for (const slot of after) this.lanes.push(slot);
+    this.seeds.length = 0;
+    for (let i = 0; i < after.length; i++) {
+      this.lanes.push(after[i] ?? null);
+      this.seeds.push(afterSeeds[i] ?? null);
+    }
 
     const laneCount = Math.max(usedLength(before), usedLength(after), lane + 1);
-    return { lane, color: colorOf(lane), laneCount, segments };
+    return { lane, color: colorOfSeed(nodeSeed), laneCount, segments };
   }
 }
 

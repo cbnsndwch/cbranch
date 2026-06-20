@@ -47,12 +47,29 @@
   --status-untracked: oklch(0.556 0 0);
   --status-ignored: oklch(0.7 0 0);
 
-  --graph-1: oklch(0.62 0.12 165);
-  --graph-2: oklch(0.6 0.13 50);
-  --graph-3: oklch(0.55 0.16 265);
-  --graph-4: oklch(0.6 0.16 330);
-  --graph-5: oklch(0.65 0.15 95);
-  --graph-6: oklch(0.6 0.14 200);
+  /* Commit-graph lane palette: the Tailwind 500 shades (curated vivid hues, grays
+     omitted — they read as disabled lanes against the chrome). Plain `:root` custom
+     properties on purpose: a lane's color is consumed via raw `var(--graph-N)` in an
+     inline SVG style, which Tailwind's class scanner never sees — so these MUST NOT
+     live under `@theme`, where unused theme tokens are tree-shaken out of the build
+     and would resolve to nothing at runtime (fills → black, strokes → none). The 500
+     shades stay legible on both the light and dark surfaces, so they are not themed. */
+  --graph-1: #ef4444; /* red-500 */
+  --graph-2: #f97316; /* orange-500 */
+  --graph-3: #f59e0b; /* amber-500 */
+  --graph-4: #84cc16; /* lime-500 */
+  --graph-5: #22c55e; /* green-500 */
+  --graph-6: #10b981; /* emerald-500 */
+  --graph-7: #14b8a6; /* teal-500 */
+  --graph-8: #06b6d4; /* cyan-500 */
+  --graph-9: #0ea5e9; /* sky-500 */
+  --graph-10: #3b82f6; /* blue-500 */
+  --graph-11: #6366f1; /* indigo-500 */
+  --graph-12: #8b5cf6; /* violet-500 */
+  --graph-13: #a855f7; /* purple-500 */
+  --graph-14: #d946ef; /* fuchsia-500 */
+  --graph-15: #ec4899; /* pink-500 */
+  --graph-16: #f43f5e; /* rose-500 */
   --selection-bg: oklch(0.51 0.17 253);
   --selection-fg: oklch(1 0 0);
 }
@@ -94,12 +111,8 @@
   --status-untracked: oklch(0.708 0 0);
   --status-ignored: oklch(0.5 0 0);
 
-  --graph-1: oklch(0.7 0.13 165);
-  --graph-2: oklch(0.72 0.14 50);
-  --graph-3: oklch(0.68 0.16 265);
-  --graph-4: oklch(0.7 0.16 330);
-  --graph-5: oklch(0.78 0.15 95);
-  --graph-6: oklch(0.7 0.14 200);
+  /* Graph lane colors are theme-independent Tailwind 500 shades (defined once in
+     `:root`); only the selection accent shifts for dark. */
   --selection-bg: oklch(0.58 0.2 253);
   --selection-fg: oklch(1 0 0);
 }
@@ -142,12 +155,6 @@
   --color-status-behind: var(--status-behind);
   --color-status-conflict: var(--status-conflict);
 
-  --color-graph-1: var(--graph-1);
-  --color-graph-2: var(--graph-2);
-  --color-graph-3: var(--graph-3);
-  --color-graph-4: var(--graph-4);
-  --color-graph-5: var(--graph-5);
-  --color-graph-6: var(--graph-6);
   --color-selection-bg: var(--selection-bg);
   --color-selection-fg: var(--selection-fg);
   --color-status-staged: var(--status-staged);

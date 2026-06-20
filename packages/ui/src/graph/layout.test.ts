@@ -128,19 +128,38 @@ describe("GraphLayout — truncation and stability", () => {
   });
 });
 
-describe("GraphLayout — lane colors (REQ-GRAPH-009/010)", () => {
-  test("color is deterministic per lane and adjacent lanes differ", () => {
-    const rows = layoutCommits([
-      c("m", "p1", "p2"),
-      c("p1", "base"),
-      c("p2", "base"),
-      c("base"),
-    ]);
-    // Node color is the 1-based palette index of its lane.
-    expect(rows[0]!.color).toBe(1);
-    for (const row of rows) {
+describe("GraphLayout — lane colors (REQ-GRAPH-009/010/011)", () => {
+  const mergeFixture = [
+    c("m", "p1", "p2"),
+    c("p1", "base"),
+    c("p2", "base"),
+    c("base"),
+  ];
+
+  test("color is deterministic for a given history and within the palette", () => {
+    const a = layoutCommits(mergeFixture);
+    const b = layoutCommits(mergeFixture);
+    expect(a.map((r) => r.color)).toEqual(b.map((r) => r.color));
+    for (const row of a) {
       expect(row.color).toBeGreaterThanOrEqual(1);
       expect(row.color).toBeLessThanOrEqual(GRAPH_PALETTE_SIZE);
     }
+  });
+
+  test("a single line of development keeps one color along its whole length", () => {
+    // A linear chain shares one lane seeded by the tip, so every row is the same color.
+    const rows = layoutCommits([c("a", "b"), c("b", "c"), c("c")]);
+    expect(new Set(rows.map((r) => r.color)).size).toBe(1);
+  });
+
+  test("color follows the line, not the column: the mainline stays one color across a merge", () => {
+    const rows = layoutCommits(mergeFixture);
+    // m (lane 0), p1 (lane 0), base (lane 0) all belong to the mainline seeded by "m".
+    expect(rows[1]!.color).toBe(rows[0]!.color);
+    expect(rows[3]!.color).toBe(rows[0]!.color);
+    // The merged-in side branch p2 is seeded independently (by its own oid).
+    const sideSeg = rows[0]!.segments.find((s) => s.toLane > rows[0]!.lane);
+    expect(sideSeg).toBeDefined();
+    expect(sideSeg!.color).toBe(rows[2]!.color);
   });
 });

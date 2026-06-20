@@ -2,14 +2,18 @@ import { type GraphRow, type GraphSegment } from "../graph/layout";
 
 // The per-row commit-graph cell (spec 10): lane segments, edges, and the commit node for
 // one history row, drawn as SVG. Self-contained per row so it composes with virtualization
-// (REQ-GRAPH-017); lane colors come from the active theme palette (REQ-GRAPH-011). Edges
+// (REQ-GRAPH-017); lane colors come from the Tailwind 500 palette (REQ-GRAPH-011). Edges
 // are split top/bottom at the node centre, so the node sits exactly on its lane mid-row.
 
 export const LANE_WIDTH = 14;
 const NODE_RADIUS = 4;
 
 const laneX = (lane: number): number => lane * LANE_WIDTH + LANE_WIDTH / 2;
-const stroke = (color: number): string => `var(--color-graph-${color})`;
+// Lane colors are plain `:root` custom properties (`--graph-N`), NOT `@theme` tokens: they
+// are read here in an inline SVG style, which Tailwind's class scanner can't see, so a
+// `@theme` token would be tree-shaken from the build and resolve to nothing. The fallback
+// guarantees a visible stroke/fill even if a color ever goes missing (never silent black).
+const stroke = (color: number): string => `var(--graph-${color}, #94a3b8)`;
 
 /** SVG path for one half-edge: a vertical line, or a smooth S-curve when the lane shifts. */
 const segmentPath = (segment: GraphSegment, height: number): string => {

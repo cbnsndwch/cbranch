@@ -75,16 +75,21 @@ Each requirement is testable and observable. Identifiers are stable.
 
 ### Lanes and color
 
-- **REQ-GRAPH-009** — Lanes MUST be visually distinguished by color. Adjacent
-  lanes MUST use distinguishable colors so that two parallel lines of history are
-  not confused.
-- **REQ-GRAPH-010** — A given lane's color MUST remain constant while that lane
-  exists during a session; color assignment MUST be deterministic for a given
-  layout so that re-rendering the same history does not reshuffle colors.
-- **REQ-GRAPH-011** — Lane colors MUST be drawn from the active theme palette and
-  MUST respect light/dark theme selection. Color MUST NOT be the sole carrier of
-  essential information required for correctness (the topology itself is conveyed
-  by node and edge geometry); color is an aid to distinguishing lanes.
+- **REQ-GRAPH-009** — Lanes MUST be visually distinguished by color, drawn from a
+  curated multi-hue palette wide enough that parallel lines of history are readily
+  told apart. Color is assigned pseudo-randomly per branch (see REQ-GRAPH-010), so
+  two simultaneously visible lanes MAY occasionally share a hue; node and edge
+  geometry, not color alone, remains the authoritative disambiguator (REQ-GRAPH-011).
+- **REQ-GRAPH-010** — Color MUST be a stable property of a *line of development*,
+  not of a screen column: a lane's color is derived deterministically by hashing the
+  commit that opened it (its "seed"), so the color stays constant for the lane's
+  whole length, is identical every time the same history is rendered, and a column
+  reused by a later branch takes that branch's own color.
+- **REQ-GRAPH-011** — Lane colors are drawn from a fixed palette (the Tailwind 500
+  shades) chosen to stay legible on both the light and dark surfaces; they are
+  therefore theme-independent. Color MUST NOT be the sole carrier of essential
+  information required for correctness (the topology itself is conveyed by node and
+  edge geometry); color is an aid to distinguishing lanes.
 
 ### Labels (refs)
 
