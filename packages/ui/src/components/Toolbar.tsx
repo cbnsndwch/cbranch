@@ -51,6 +51,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "./ui/tooltip";
 
 type PullMode = "ff-only" | "rebase" | "merge";
 type SyncKind = "fetch" | "pull" | "push";
@@ -92,7 +98,7 @@ interface SyncCallbacks {
 
 // The dense quick-actions bar (docs/design/toolbar-quick-actions.md). Two rows: a
 // primary git-action toolbar and a history filter toolbar. Buttons are icon-first with
-// a tooltip (`title`) whose text is also the accessible name (`aria-label`). The Fetch /
+// a shadcn/Base UI Tooltip whose text is also the accessible name (`aria-label`). The Fetch /
 // Pull / Push split-buttons surface the option dropdowns the review flagged as missing
 // (D7 / UI-005 / UI-006); a Cancel affordance surfaces the otherwise-internal unsubscribe
 // handle while a sync is in flight (XC-004).
@@ -287,264 +293,278 @@ export function Toolbar() {
   const syncBusy = !repoId || syncRunning !== null;
 
   return (
-    <div className="bg-background flex flex-col border-b">
-      {/* Row 1: primary git actions */}
-      <div className="flex h-7 items-center gap-1 px-1">
-        <IconButton
-          icon={RefreshCw}
-          label="Refresh (re-read refs, status, history)"
-          onClick={handleRefresh}
-          disabled={!repoId}
-        />
-        <Separator />
-        {/* Working directory — current repo path, click to switch repo */}
-        <SplitButton
-          icon={FolderGit2}
-          label="Working directory — click to switch repository"
-          onPrimary={() => openPalette(true)}
-          extra={<span className="max-w-40 truncate">{repoRoot}</span>}
-        >
-          <DropdownMenuItem onClick={() => openPalette(true)}>
-            Open another repository…
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => openPalette(true)}>
-            Recent repositories…
-          </DropdownMenuItem>
-        </SplitButton>
-        {/* Branch — current branch + ahead/behind, click to manage branches */}
-        <SplitButton
-          icon={GitBranch}
-          label="Branch — click to manage branches"
-          onPrimary={() => setActiveView("branches")}
-          disabled={!repoId}
-          extra={
-            <span className="flex items-center gap-1">
-              <span className="max-w-32 truncate">{currentBranch}</span>
-              {upstream && (upstream.ahead > 0 || upstream.behind > 0) && (
-                <span
-                  className="flex items-center gap-0.5"
-                  title={
-                    upstream.ahead +
-                    " ahead, " +
-                    upstream.behind +
-                    " behind " +
-                    upstream.name
-                  }
-                >
-                  {upstream.ahead > 0 && (
-                    <span className="text-green-600">
-                      {"↑" + String(upstream.ahead)}
-                    </span>
-                  )}
-                  {upstream.behind > 0 && (
-                    <span className="text-orange-500">
-                      {"↓" + String(upstream.behind)}
-                    </span>
-                  )}
-                </span>
-              )}
-            </span>
-          }
-        >
-          <DropdownMenuItem onClick={() => setActiveView("branches")}>
-            Checkout branch…
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => setActiveView("branches")}>
-            Create branch…
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => setActiveView("branches")}>
-            Merge into current…
-          </DropdownMenuItem>
-        </SplitButton>
-        {/* Worktrees */}
-        <SplitButton
-          icon={FolderTree}
-          label="Worktrees — manage linked worktrees"
-          onPrimary={() => setActiveView("worktrees")}
-          disabled={!repoId}
-        >
-          <DropdownMenuItem onClick={() => setActiveView("worktrees")}>
-            List worktrees
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => setActiveView("worktrees")}>
-            Add worktree…
-          </DropdownMenuItem>
-        </SplitButton>
-        <Separator />
-        {/* Fetch (split: prune / tags / all remotes) */}
-        <SplitButton
-          icon={CloudDownload}
-          label="Fetch"
-          onPrimary={() => handleFetch({})}
-          disabled={syncBusy}
-        >
-          <DropdownMenuItem onClick={() => handleFetch({})}>
-            Fetch
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => handleFetch({ all: true })}>
-            Fetch all remotes
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => handleFetch({ prune: true })}>
-            Fetch and prune
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            onClick={() => handleFetch({ all: true, prune: true })}
+    <TooltipProvider>
+      <div className="bg-background flex flex-col border-b">
+        {/* Row 1: primary git actions */}
+        <div className="flex h-7 items-center gap-1 px-1">
+          <IconButton
+            icon={RefreshCw}
+            label="Refresh (re-read refs, status, history)"
+            onClick={handleRefresh}
+            disabled={!repoId}
+          />
+          <Separator />
+          {/* Working directory — current repo path, click to switch repo */}
+          <SplitButton
+            icon={FolderGit2}
+            label="Working directory — click to switch repository"
+            onPrimary={() => openPalette(true)}
+            extra={<span className="max-w-40 truncate">{repoRoot}</span>}
           >
-            Fetch all and prune
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => handleFetch({ tags: true })}>
-            Fetch tags
-          </DropdownMenuItem>
-        </SplitButton>
-        {/* Pull (split: ff-only / merge / rebase) */}
-        <SplitButton
-          icon={ArrowDownToLine}
-          label={"Pull (" + pullMode + ")"}
-          onPrimary={() => handlePull(pullMode)}
-          disabled={syncBusy}
-        >
-          <DropdownMenuItem onClick={() => handlePull("ff-only")}>
-            Pull (fast-forward only)
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => handlePull("merge")}>
-            Pull (merge)
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => handlePull("rebase")}>
-            Pull (rebase)
-          </DropdownMenuItem>
-        </SplitButton>
-        {/* Push (split: set-upstream / tags / force-with-lease) */}
-        <SplitButton
-          icon={ArrowUpFromLine}
-          label="Push"
-          onPrimary={() => handlePush({})}
-          disabled={syncBusy}
-        >
-          <DropdownMenuItem onClick={() => handlePush({})}>
-            Push
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => handlePush({ setUpstream: true })}>
-            Push and set upstream
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => handlePush({ tags: true })}>
-            Push tags
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem
-            variant="destructive"
-            onClick={() => handlePush({ forceWithLease: true })}
+            <DropdownMenuItem onClick={() => openPalette(true)}>
+              Open another repository…
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => openPalette(true)}>
+              Recent repositories…
+            </DropdownMenuItem>
+          </SplitButton>
+          {/* Branch — current branch + ahead/behind, click to manage branches */}
+          <SplitButton
+            icon={GitBranch}
+            label="Branch — click to manage branches"
+            onPrimary={() => setActiveView("branches")}
+            disabled={!repoId}
+            extra={
+              <span className="flex items-center gap-1">
+                <span className="max-w-32 truncate">{currentBranch}</span>
+                {upstream && (upstream.ahead > 0 || upstream.behind > 0) && (
+                  <span
+                    className="flex items-center gap-0.5"
+                    title={
+                      upstream.ahead +
+                      " ahead, " +
+                      upstream.behind +
+                      " behind " +
+                      upstream.name
+                    }
+                  >
+                    {upstream.ahead > 0 && (
+                      <span className="text-green-600">
+                        {"↑" + String(upstream.ahead)}
+                      </span>
+                    )}
+                    {upstream.behind > 0 && (
+                      <span className="text-orange-500">
+                        {"↓" + String(upstream.behind)}
+                      </span>
+                    )}
+                  </span>
+                )}
+              </span>
+            }
           >
-            Force push (with lease) — overwrites remote history
-          </DropdownMenuItem>
-        </SplitButton>
-        {/* Cancel — only surfaced while a streaming sync is in flight (XC-004) */}
-        {syncRunning !== null && (
-          <button
-            type="button"
-            onClick={handleCancel}
-            title="Cancel the running sync"
-            aria-label="Cancel sync"
-            className="flex h-5.5 items-center gap-0.5 border border-orange-400 px-1.5 text-[11px] text-orange-600"
+            <DropdownMenuItem onClick={() => setActiveView("branches")}>
+              Checkout branch…
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setActiveView("branches")}>
+              Create branch…
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setActiveView("branches")}>
+              Merge into current…
+            </DropdownMenuItem>
+          </SplitButton>
+          {/* Worktrees */}
+          <SplitButton
+            icon={FolderTree}
+            label="Worktrees — manage linked worktrees"
+            onPrimary={() => setActiveView("worktrees")}
+            disabled={!repoId}
           >
-            <X className="size-3" aria-hidden="true" />
-            Cancel
-          </button>
-        )}
-        <Separator />
-        {/* Commit */}
-        <button
-          type="button"
-          onClick={handleCommit}
-          disabled={!repoId}
-          title="Stage & commit changes"
-          aria-label="Stage & commit changes"
-          className="flex h-5.5 items-center gap-0.5 border px-1.5 text-[11px] disabled:opacity-40"
-        >
-          <GitCommitHorizontal className="size-3.5" aria-hidden="true" />
-          {"Commit (" + String(changeCount) + ")"}
-        </button>
-        {/* Stashes */}
-        <SplitButton
-          icon={Archive}
-          label="Stashes — manage shelved changes"
-          onPrimary={() => setActiveView("stash")}
-          disabled={!repoId}
-        >
-          <DropdownMenuItem onClick={() => setActiveView("stash")}>
-            Manage stashes…
-          </DropdownMenuItem>
-        </SplitButton>
-        <div className="flex-1" />
-        <ThemeToggle />
-      </div>
-
-      {/* Row 2: history filter toolbar */}
-      <div className="flex h-6 items-center gap-1 border-t px-1">
-        <select
-          value={filters.refScope === "all" ? "all" : "current"}
-          onChange={(e) => handleScopeChange(e.target.value)}
-          className="h-5 border text-[11px]"
-          aria-label="History ref scope"
-        >
-          <option value="current">Current branch</option>
-          <option value="all">All branches</option>
-        </select>
-        <form onSubmit={handleSubmit} className="flex items-center gap-1">
-          <label className="flex items-center gap-1 text-[11px]">
-            <Search className="size-3" aria-hidden="true" />
-            <input
-              type="text"
-              value={filters.grep}
-              onChange={(e) => handleGrepChange(e.target.value)}
-              placeholder="Filter commits…"
-              className="h-5 w-40 border px-1 text-[11px]"
-              aria-label="Filter commits"
-            />
-          </label>
-          <button type="submit" className="h-5 border px-2 text-[11px]">
-            Apply
-          </button>
-        </form>
-      </div>
-
-      {/* Non-fast-forward push retry dialog (UI-007). */}
-      <AlertDialog
-        open={nonFfOpen}
-        onOpenChange={(open) => {
-          if (!open) setNonFfOpen(false);
-        }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              Push rejected — non-fast-forward
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              The remote has commits you don&apos;t have locally, so the push
-              was rejected. Integrate the remote changes first, then retry the
-              push. A conflicting pull stops here without pushing.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogClose onClick={() => setNonFfOpen(false)}>
-              Cancel
-            </AlertDialogClose>
-            <AlertDialogAction
-              className="bg-primary text-primary-foreground hover:bg-primary/90"
-              onClick={() => handleNonFfRetry("rebase")}
+            <DropdownMenuItem onClick={() => setActiveView("worktrees")}>
+              List worktrees
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setActiveView("worktrees")}>
+              Add worktree…
+            </DropdownMenuItem>
+          </SplitButton>
+          <Separator />
+          {/* Fetch (split: prune / tags / all remotes) */}
+          <SplitButton
+            icon={CloudDownload}
+            label="Fetch"
+            onPrimary={() => handleFetch({})}
+            disabled={syncBusy}
+          >
+            <DropdownMenuItem onClick={() => handleFetch({})}>
+              Fetch
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleFetch({ all: true })}>
+              Fetch all remotes
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleFetch({ prune: true })}>
+              Fetch and prune
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => handleFetch({ all: true, prune: true })}
             >
-              Pull (rebase) &amp; retry
-            </AlertDialogAction>
-            <AlertDialogAction
-              className="bg-primary text-primary-foreground hover:bg-primary/90"
-              onClick={() => handleNonFfRetry("merge")}
+              Fetch all and prune
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleFetch({ tags: true })}>
+              Fetch tags
+            </DropdownMenuItem>
+          </SplitButton>
+          {/* Pull (split: ff-only / merge / rebase) */}
+          <SplitButton
+            icon={ArrowDownToLine}
+            label={"Pull (" + pullMode + ")"}
+            onPrimary={() => handlePull(pullMode)}
+            disabled={syncBusy}
+          >
+            <DropdownMenuItem onClick={() => handlePull("ff-only")}>
+              Pull (fast-forward only)
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handlePull("merge")}>
+              Pull (merge)
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handlePull("rebase")}>
+              Pull (rebase)
+            </DropdownMenuItem>
+          </SplitButton>
+          {/* Push (split: set-upstream / tags / force-with-lease) */}
+          <SplitButton
+            icon={ArrowUpFromLine}
+            label="Push"
+            onPrimary={() => handlePush({})}
+            disabled={syncBusy}
+          >
+            <DropdownMenuItem onClick={() => handlePush({})}>
+              Push
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handlePush({ setUpstream: true })}>
+              Push and set upstream
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handlePush({ tags: true })}>
+              Push tags
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              variant="destructive"
+              onClick={() => handlePush({ forceWithLease: true })}
             >
-              Pull (merge) &amp; retry
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </div>
+              Force push (with lease) — overwrites remote history
+            </DropdownMenuItem>
+          </SplitButton>
+          {/* Cancel — only surfaced while a streaming sync is in flight (XC-004) */}
+          {syncRunning !== null && (
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <button
+                    type="button"
+                    onClick={handleCancel}
+                    aria-label="Cancel sync"
+                    className="flex h-5.5 items-center gap-0.5 border border-orange-400 px-1.5 text-[11px] text-orange-600"
+                  />
+                }
+              >
+                <X className="size-3" aria-hidden="true" />
+                Cancel
+              </TooltipTrigger>
+              <TooltipContent>Cancel the running sync</TooltipContent>
+            </Tooltip>
+          )}
+          <Separator />
+          {/* Commit */}
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <button
+                  type="button"
+                  onClick={handleCommit}
+                  disabled={!repoId}
+                  aria-label="Stage & commit changes"
+                  className="flex h-5.5 items-center gap-0.5 border px-1.5 text-[11px] disabled:opacity-40"
+                />
+              }
+            >
+              <GitCommitHorizontal className="size-3.5" aria-hidden="true" />
+              {"Commit (" + String(changeCount) + ")"}
+            </TooltipTrigger>
+            <TooltipContent>Stage &amp; commit changes</TooltipContent>
+          </Tooltip>
+          {/* Stashes */}
+          <SplitButton
+            icon={Archive}
+            label="Stashes — manage shelved changes"
+            onPrimary={() => setActiveView("stash")}
+            disabled={!repoId}
+          >
+            <DropdownMenuItem onClick={() => setActiveView("stash")}>
+              Manage stashes…
+            </DropdownMenuItem>
+          </SplitButton>
+          <div className="flex-1" />
+          <ThemeToggle />
+        </div>
+
+        {/* Row 2: history filter toolbar */}
+        <div className="flex h-6 items-center gap-1 border-t px-1">
+          <select
+            value={filters.refScope === "all" ? "all" : "current"}
+            onChange={(e) => handleScopeChange(e.target.value)}
+            className="h-5 border text-[11px]"
+            aria-label="History ref scope"
+          >
+            <option value="current">Current branch</option>
+            <option value="all">All branches</option>
+          </select>
+          <form onSubmit={handleSubmit} className="flex items-center gap-1">
+            <label className="flex items-center gap-1 text-[11px]">
+              <Search className="size-3" aria-hidden="true" />
+              <input
+                type="text"
+                value={filters.grep}
+                onChange={(e) => handleGrepChange(e.target.value)}
+                placeholder="Filter commits…"
+                className="h-5 w-40 border px-1 text-[11px]"
+                aria-label="Filter commits"
+              />
+            </label>
+            <button type="submit" className="h-5 border px-2 text-[11px]">
+              Apply
+            </button>
+          </form>
+        </div>
+
+        {/* Non-fast-forward push retry dialog (UI-007). */}
+        <AlertDialog
+          open={nonFfOpen}
+          onOpenChange={(open) => {
+            if (!open) setNonFfOpen(false);
+          }}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>
+                Push rejected — non-fast-forward
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                The remote has commits you don&apos;t have locally, so the push
+                was rejected. Integrate the remote changes first, then retry the
+                push. A conflicting pull stops here without pushing.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogClose onClick={() => setNonFfOpen(false)}>
+                Cancel
+              </AlertDialogClose>
+              <AlertDialogAction
+                className="bg-primary text-primary-foreground hover:bg-primary/90"
+                onClick={() => handleNonFfRetry("rebase")}
+              >
+                Pull (rebase) &amp; retry
+              </AlertDialogAction>
+              <AlertDialogAction
+                className="bg-primary text-primary-foreground hover:bg-primary/90"
+                onClick={() => handleNonFfRetry("merge")}
+              >
+                Pull (merge) &amp; retry
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
+    </TooltipProvider>
   );
 }
 
@@ -561,16 +581,22 @@ interface IconButtonProps {
 
 function IconButton({ icon: Icon, label, onClick, disabled }: IconButtonProps) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      title={label}
-      aria-label={label}
-      className="flex h-5.5 items-center border px-1 py-0.5 disabled:opacity-40"
-    >
-      <Icon className="size-4" aria-hidden="true" />
-    </button>
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <button
+            type="button"
+            onClick={onClick}
+            disabled={disabled}
+            aria-label={label}
+            className="flex h-5.5 items-center border px-1 py-0.5 disabled:opacity-40"
+          />
+        }
+      >
+        <Icon className="size-4" aria-hidden="true" />
+      </TooltipTrigger>
+      <TooltipContent>{label}</TooltipContent>
+    </Tooltip>
   );
 }
 
@@ -596,26 +622,38 @@ function SplitButton({
 }: SplitButtonProps) {
   return (
     <div className={cn("flex h-5.5 items-stretch", disabled && "opacity-40")}>
-      <button
-        type="button"
-        onClick={onPrimary}
-        disabled={disabled}
-        title={label}
-        aria-label={label}
-        className="flex items-center gap-0.5 border-y border-l px-1 text-[11px]"
-      >
-        <Icon className="size-3.5" aria-hidden="true" />
-        {extra}
-      </button>
-      <DropdownMenu>
-        <DropdownMenuTrigger
-          disabled={disabled}
-          title={label + " options"}
-          aria-label={label + " options"}
-          className="flex items-center border px-0.5 text-[11px]"
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <button
+              type="button"
+              onClick={onPrimary}
+              disabled={disabled}
+              aria-label={label}
+              className="flex items-center gap-0.5 border-y border-l px-1 text-[11px]"
+            />
+          }
         >
-          <ChevronDown className="size-3" aria-hidden="true" />
-        </DropdownMenuTrigger>
+          <Icon className="size-3.5" aria-hidden="true" />
+          {extra}
+        </TooltipTrigger>
+        <TooltipContent>{label}</TooltipContent>
+      </Tooltip>
+      <DropdownMenu>
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <DropdownMenuTrigger
+                disabled={disabled}
+                aria-label={label + " options"}
+                className="flex items-center border px-0.5 text-[11px]"
+              />
+            }
+          >
+            <ChevronDown className="size-3" aria-hidden="true" />
+          </TooltipTrigger>
+          <TooltipContent>{label + " options"}</TooltipContent>
+        </Tooltip>
         <DropdownMenuContent side="bottom" align="start">
           {children}
         </DropdownMenuContent>
