@@ -4,6 +4,7 @@ import { toast } from "sonner";
 
 import { cn } from "../lib/cn";
 import { useBranchCreate, useBranchDelete, useBranchList, useBranchRename, useBranchSwitch } from "../rpc/hooks";
+import { RemotesManagerDialog } from "./RemotesManagerDialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -42,6 +43,7 @@ export function BranchesPanel({ repoId }: BranchesPanelProps) {
   const deleteMut = useBranchDelete(repoId);
   const switchMut = useBranchSwitch(repoId);
 
+  const [remotesOpen, setRemotesOpen] = useState(false);
   const [createName, setCreateName] = useState("");
   const [createStart, setCreateStart] = useState("HEAD");
   const [createSwitch, setCreateSwitch] = useState(true);
@@ -164,13 +166,22 @@ export function BranchesPanel({ repoId }: BranchesPanelProps) {
       {/* Header */}
       <div className="flex items-center justify-between border-b px-3 py-1.5">
         <h2 className="text-sm font-medium">Branches</h2>
-        <button
-          type="button"
-          onClick={openCreate}
-          className="hover:bg-accent flex h-[22px] items-center border px-2 text-[11px]"
-        >
-          + New
-        </button>
+        <div className="flex gap-1">
+          <button
+            type="button"
+            onClick={() => setRemotesOpen(true)}
+            className="hover:bg-accent flex h-[22px] items-center border px-2 text-[11px]"
+          >
+            Remotes
+          </button>
+          <button
+            type="button"
+            onClick={openCreate}
+            className="hover:bg-accent flex h-[22px] items-center border px-2 text-[11px]"
+          >
+            + New
+          </button>
+        </div>
       </div>
 
       {/* Branch list */}
@@ -332,6 +343,9 @@ export function BranchesPanel({ repoId }: BranchesPanelProps) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Remotes manager dialog */}
+      <RemotesManagerDialog repoId={repoId} open={remotesOpen} onOpenChange={setRemotesOpen} />
 
       {/* Dirty tree dialog */}
       <AlertDialog

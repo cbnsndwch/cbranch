@@ -12,10 +12,13 @@ import { HistoryStatusStrip } from "./HistoryStatusStrip";
 import { MenuBar } from "./MenuBar";
 import { RepositorySidebar } from "./RepositorySidebar";
 import { StagingView } from "./StagingView";
+import { StashPanel } from "./StashPanel";
+import { TagsPanel } from "./TagsPanel";
 import { TitleBar } from "./TitleBar";
 import { Toolbar } from "./Toolbar";
 import { Button } from "./ui/button";
 import { Placeholder } from "./ui/placeholder";
+import { WorktreesPanel } from "./WorktreesPanel";
 
 const VIEWS: ReadonlyArray<readonly [ActiveView, string]> = [
   ["history", "History"],
@@ -70,11 +73,11 @@ export function AppShell() {
       case "branches":
         return <BranchesPanel repoId={repoId} />;
       case "worktrees":
-        return <Placeholder>Worktrees panel — coming soon.</Placeholder>;
+        return <WorktreesPanel repoId={repoId} />;
       case "stash":
-        return <Placeholder>Stash panel — coming soon.</Placeholder>;
+        return <StashPanel repoId={repoId} />;
       case "tags":
-        return <Placeholder>Tags panel — coming soon.</Placeholder>;
+        return <TagsPanel repoId={repoId} />;
       default:
         return (
           <div className="grid min-h-0 grid-rows-[46px_minmax(200px,55%)_6px_28px_1fr]">
