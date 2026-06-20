@@ -132,12 +132,21 @@ export const tagCreate = (
     const safeName = yield* assertNoLeadingDash(name, "tag name");
 
     const args: string[] = ["tag"];
-    if (opts.tagType === "annotated") {
-      args.push("-a");
-      args.push("-m", opts.message ?? safeName);
-    } else if (opts.tagType === "signed") {
-      args.push("-s");
-      args.push("-m", opts.message ?? safeName);
+    if (opts.tagType === "annotated" || opts.tagType === "signed") {
+      // Annotated (-a) and signed (-s) tags REQUIRE a message
+      // (REQ-P3-TG-003/004). Reject a missing or whitespace-only message
+      // rather than silently defaulting it to the tag name.
+      const message = opts.message ?? "";
+      if (message.trim() === "") {
+        return yield* Effect.fail(
+          gitError(
+            "invalidRefName",
+            opts.tagType + " tags require a non-empty message (-m)",
+          ),
+        );
+      }
+      args.push(opts.tagType === "annotated" ? "-a" : "-s");
+      args.push("-m", message);
     }
     if (opts.force === true) args.push("-f");
     args.push(safeName);

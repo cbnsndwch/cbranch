@@ -154,14 +154,71 @@ describe("tagCreate", () => {
     ).rejects.toMatchObject({ code: "gitFailed" });
   });
 
-  test("signed tag type — fails gracefully with gitFailed when gpg not available", async () => {
+  test("signed tag with a message — fails gracefully when signing is unavailable", async () => {
     const repo = await ws.createRepo("tc-signed");
     await repo.commit({ message: "init", files: { "a.txt": "a" } });
+    // Point gpg.program at a non-existent binary so signing fails deterministically,
+    // regardless of any signing key configured on the host running the tests.
+    await repo.git(["config", "gpg.program", "cbranch-no-such-gpg"]);
 
+    // Validation passes (a message is supplied), so `git tag -s` runs; signing
+    // then fails and git creates NO tag — never an unsigned fallback (TG-004).
     const exit = await Effect.runPromiseExit(
-      tagCreate(repo.dir, "v1.0.0-signed", { tagType: "signed" }),
+      tagCreate(repo.dir, "v1.0.0-signed", {
+        tagType: "signed",
+        message: "Signed release",
+      }),
     );
     expect(exit._tag).toBe("Failure");
+
+    // No tag — signed or otherwise — was left behind.
+    const tags = await Effect.runPromise(tagList(repo.dir));
+    expect(tags).toHaveLength(0);
+  });
+
+  test("annotated tag without a message is rejected with invalidRefName", async () => {
+    const repo = await ws.createRepo("tc-ann-nomsg");
+    await repo.commit({ message: "init", files: { "a.txt": "a" } });
+
+    await expect(
+      Effect.runPromise(
+        tagCreate(repo.dir, "v1.0.0", { tagType: "annotated" }),
+      ),
+    ).rejects.toMatchObject({ code: "invalidRefName" });
+
+    // No tag must have been created.
+    const tags = await Effect.runPromise(tagList(repo.dir));
+    expect(tags).toHaveLength(0);
+  });
+
+  test("annotated tag with a whitespace-only message is rejected", async () => {
+    const repo = await ws.createRepo("tc-ann-blankmsg");
+    await repo.commit({ message: "init", files: { "a.txt": "a" } });
+
+    await expect(
+      Effect.runPromise(
+        tagCreate(repo.dir, "v1.0.0", {
+          tagType: "annotated",
+          message: "   \t  ",
+        }),
+      ),
+    ).rejects.toMatchObject({ code: "invalidRefName" });
+
+    // No tag must have been created.
+    const tags = await Effect.runPromise(tagList(repo.dir));
+    expect(tags).toHaveLength(0);
+  });
+
+  test("signed tag without a message is rejected with invalidRefName (git never invoked)", async () => {
+    const repo = await ws.createRepo("tc-signed-nomsg");
+    await repo.commit({ message: "init", files: { "a.txt": "a" } });
+
+    // Validation fires before git runs, so this fails regardless of GPG setup.
+    await expect(
+      Effect.runPromise(
+        tagCreate(repo.dir, "v1.0.0-signed", { tagType: "signed" }),
+      ),
+    ).rejects.toMatchObject({ code: "invalidRefName" });
   });
 
   test("force-creates overwrites existing tag", async () => {
