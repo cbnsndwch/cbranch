@@ -15,6 +15,8 @@ import {
   type CommitInput,
   type CommitMessage,
   CommitSummary,
+  type ConflictListing,
+  type ConflictResolution,
   type DiffFile,
   type DiffSpec,
   type FileContentResult,
@@ -28,6 +30,7 @@ import {
   type RepoHandle,
   type RepoId,
   type RepoState,
+  type SequencerResult,
   type StashEntry,
   type TagInfo,
   type TagType,
@@ -966,5 +969,114 @@ export const useTagDeleteRemote = (repoId: RepoId) => {
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: [repoId, "refs"] });
     },
+  });
+};
+
+// ── P4 conflict + sequencer hooks ─────────────────────────────────────────────
+
+export const useConflictList = (
+  repoId: RepoId | null,
+): UseQueryResult<ConflictListing> => {
+  const api = useApi();
+  return useQuery({
+    queryKey: repoId ? queryKeys.conflicts(repoId) : ["inactive"],
+    queryFn: () => api.conflictList(repoId as RepoId),
+    enabled: repoId !== null,
+  });
+};
+
+export const useConflictResolve = (repoId: RepoId) => {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation<
+    void,
+    unknown,
+    { paths: ReadonlyArray<string>; resolution: ConflictResolution }
+  >({
+    mutationFn: ({ paths, resolution }) =>
+      api.conflictResolve(repoId, paths, resolution),
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: [repoId, "status"] });
+    },
+  });
+};
+
+export const useConflictMarkResolved = (repoId: RepoId) => {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation<void, unknown, { paths: ReadonlyArray<string> }>({
+    mutationFn: ({ paths }) => api.conflictMarkResolved(repoId, paths),
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: [repoId, "status"] });
+    },
+  });
+};
+
+export const useConflictMarkUnresolved = (repoId: RepoId) => {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation<void, unknown, { paths: ReadonlyArray<string> }>({
+    mutationFn: ({ paths }) => api.conflictMarkUnresolved(repoId, paths),
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: [repoId, "status"] });
+    },
+  });
+};
+
+export const useConflictSaveMerged = (repoId: RepoId) => {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation<
+    void,
+    unknown,
+    { path: string; content: string; encoding: "utf8" | "base64" }
+  >({
+    mutationFn: ({ path, content, encoding }) =>
+      api.conflictSaveMerged(repoId, path, content, encoding),
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: [repoId, "status"] });
+    },
+  });
+};
+
+/** A continue/abort/skip moves HEAD + the sequencer state — invalidate broadly. */
+const invalidateOperation = (
+  qc: ReturnType<typeof useQueryClient>,
+  repoId: RepoId,
+) => {
+  void qc.invalidateQueries({ queryKey: [repoId, "status"] });
+  void qc.invalidateQueries({ queryKey: [repoId, "inProgress"] });
+  void qc.invalidateQueries({ queryKey: [repoId, "refs"] });
+  void qc.invalidateQueries({ queryKey: [repoId, "commits"] });
+};
+
+export const useOpContinue = (repoId: RepoId) => {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation<
+    SequencerResult,
+    unknown,
+    { message?: string; allowEmpty?: boolean }
+  >({
+    mutationFn: (opts) => api.opContinue(repoId, opts),
+    onSettled: () => invalidateOperation(qc, repoId),
+  });
+};
+
+export const useOpAbort = (repoId: RepoId) => {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation<void, unknown, void>({
+    mutationFn: () => api.opAbort(repoId),
+    onSettled: () => invalidateOperation(qc, repoId),
+  });
+};
+
+export const useOpSkip = (repoId: RepoId) => {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation<SequencerResult, unknown, void>({
+    mutationFn: () => api.opSkip(repoId),
+    onSettled: () => invalidateOperation(qc, repoId),
   });
 };

@@ -37,7 +37,8 @@ export type ActiveView =
   | "branches"
   | "worktrees"
   | "stash"
-  | "tags";
+  | "tags"
+  | "solveConflicts";
 
 export interface CommitDraft {
   subject: string;

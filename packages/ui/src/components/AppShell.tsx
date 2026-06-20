@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 
 import { cn } from "../lib/cn";
+import { useRepoState } from "../rpc/hooks";
 import { useInvalidationBus } from "../rpc/use-invalidation-bus";
 import { useNavigation } from "../state/navigation";
 import { type ActiveView, useUiStore } from "../state/store";
@@ -9,6 +10,7 @@ import { CommandPalette } from "./CommandPalette";
 import { CommitDetailsTabs } from "./CommitDetailsTabs";
 import { CommitDialog } from "./CommitDialog";
 import { CommitTab } from "./CommitTab";
+import { ConflictsPanel } from "./ConflictsPanel";
 import { DiffPanel } from "./DiffPanel";
 import { DocumentTitle } from "./DocumentTitle";
 import { HistoryPane } from "./HistoryPane";
@@ -45,6 +47,11 @@ export function AppShell() {
 
   // Live updates: subscribe to the host invalidation bus for the active repo.
   useInvalidationBus(repoId);
+
+  // Surface the Conflicts view whenever an operation that can leave conflicts is in
+  // progress for the active repo (merge / rebase / cherry-pick / revert / am / bisect).
+  const inProgress = useRepoState(repoId).data?.inProgress ?? "none";
+  const showConflicts = inProgress !== "none";
 
   // Global shortcut to open the commit dialog (docs/design/commit-surface.md §6:
   // Ctrl/Cmd+Shift+Enter). Ctrl/Cmd+Enter is reserved for committing inside the dialog.
@@ -96,6 +103,8 @@ export function AppShell() {
       );
     }
     switch (activeView) {
+      case "solveConflicts":
+        return <ConflictsPanel repoId={repoId} />;
       case "branches":
         return <BranchesPanel repoId={repoId} />;
       case "worktrees":
@@ -160,6 +169,20 @@ export function AppShell() {
               {label}
             </button>
           ))}
+          {showConflicts && (
+            <button
+              type="button"
+              onClick={() => setActiveView("solveConflicts")}
+              className={cn(
+                "px-3 py-0.5 text-[11px]",
+                activeView === "solveConflicts"
+                  ? "relative -mb-px border border-b-background bg-background font-medium"
+                  : "text-status-behind hover:bg-accent/50",
+              )}
+            >
+              Conflicts
+            </button>
+          )}
         </div>
         {/* Row 4: Main split */}
         <div className="grid min-h-0 grid-cols-[265px_1fr]">
