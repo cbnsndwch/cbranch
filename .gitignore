@@ -2,6 +2,9 @@
 .local
 docs/_impl-notes/
 
+# claude code session data (worktrees, transcripts)
+.claude/
+
 # dependencies
 node_modules/
 
