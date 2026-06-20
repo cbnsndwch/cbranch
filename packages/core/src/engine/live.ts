@@ -25,6 +25,11 @@ import { gitError } from "../git/errors";
 import { makeLogStream } from "../git/history";
 import { makeRepoLockRegistry } from "../git/locks";
 import {
+  discardHunks as discardHunksGit,
+  stageHunks as stageHunksGit,
+  unstageHunks as unstageHunksGit,
+} from "../git/patch";
+import {
   deleteUntracked as deleteUntrackedGit,
   discardFiles as discardFilesGit,
   resetTo as resetToGit,
@@ -166,11 +171,17 @@ export const makeGitEngine = (opts?: MakeGitEngineOptions): Effect.Effect<GitEng
           locks.withRepoLock(repoId)(resetToGit(repoCwd(repo), mode, target)),
         ),
       stageHunks: (selection) =>
-        Effect.flatMap(resolveById(selection.repoId), () => Effect.fail(gitError("gitFailed", "not implemented"))),
+        Effect.flatMap(resolveById(selection.repoId), (repo) =>
+          locks.withRepoLock(selection.repoId)(stageHunksGit(repoCwd(repo), selection)),
+        ),
       unstageHunks: (selection) =>
-        Effect.flatMap(resolveById(selection.repoId), () => Effect.fail(gitError("gitFailed", "not implemented"))),
+        Effect.flatMap(resolveById(selection.repoId), (repo) =>
+          locks.withRepoLock(selection.repoId)(unstageHunksGit(repoCwd(repo), selection)),
+        ),
       discardHunks: (selection) =>
-        Effect.flatMap(resolveById(selection.repoId), () => Effect.fail(gitError("gitFailed", "not implemented"))),
+        Effect.flatMap(resolveById(selection.repoId), (repo) =>
+          locks.withRepoLock(selection.repoId)(discardHunksGit(repoCwd(repo), selection)),
+        ),
       commitCreate: (input) =>
         Effect.flatMap(resolveById(input.repoId), (repo) =>
           locks.withRepoLock(input.repoId)(commitCreateGit(repoCwd(repo), input)),
