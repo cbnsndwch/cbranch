@@ -12,7 +12,6 @@
 import { basename } from "node:path";
 
 import {
-  type BranchInfo,
   type GitError,
   type InvalidationEvent,
   type MergeResult,
@@ -27,6 +26,13 @@ import { RepoHandle } from "@cbranch/rpc-contract";
 import { type Cause, Effect, Layer, Queue, Scope, Stream } from "effect";
 
 import { type ConfigStore, makeConfigStore } from "../config/config-store";
+import {
+  branchCreate as branchCreateGit,
+  branchDelete as branchDeleteGit,
+  branchRename as branchRenameGit,
+  branchSetUpstream as branchSetUpstreamGit,
+  branchSwitch as branchSwitchGit,
+} from "../git/branch-ops";
 import { branchList } from "../git/branches";
 import { type CatFilePool, makeCatFilePool } from "../git/cat-file-pool";
 import { commitDetail } from "../git/commit";
@@ -208,25 +214,25 @@ export const makeGitEngine = (opts?: MakeGitEngineOptions): Effect.Effect<GitEng
 
       // ── branches (P3) ─────────────────────────────────────────────────────
       branchList: (repoId) => Effect.flatMap(resolveById(repoId), (repo) => branchList(repoCwd(repo), env)),
-      branchCreate: (repoId, _name, _startPoint, _setUpstream, _switchAfter) =>
-        Effect.flatMap(resolveById(repoId), (_repo) =>
-          Effect.fail(gitError("gitFailed", "P3: branchCreate not implemented")),
-        ) as Effect.Effect<BranchInfo, GitError>,
-      branchSwitch: (repoId, _target, _strategy, _stashAndReapply) =>
-        Effect.flatMap(resolveById(repoId), (_repo) =>
-          Effect.fail(gitError("gitFailed", "P3: branchSwitch not implemented")),
+      branchCreate: (repoId, name, startPoint, setUpstream, switchAfter) =>
+        Effect.flatMap(resolveById(repoId), (repo) =>
+          locks.withRepoLock(repoId)(branchCreateGit(repoCwd(repo), name, startPoint, setUpstream, switchAfter, env)),
         ),
-      branchRename: (repoId, _oldName, _newName) =>
-        Effect.flatMap(resolveById(repoId), (_repo) =>
-          Effect.fail(gitError("gitFailed", "P3: branchRename not implemented")),
+      branchSwitch: (repoId, target, strategy, _stashAndReapply) =>
+        Effect.flatMap(resolveById(repoId), (repo) =>
+          locks.withRepoLock(repoId)(branchSwitchGit(repoCwd(repo), target, strategy, env)),
         ),
-      branchDelete: (repoId, _name, _force) =>
-        Effect.flatMap(resolveById(repoId), (_repo) =>
-          Effect.fail(gitError("gitFailed", "P3: branchDelete not implemented")),
+      branchRename: (repoId, oldName, newName) =>
+        Effect.flatMap(resolveById(repoId), (repo) =>
+          locks.withRepoLock(repoId)(branchRenameGit(repoCwd(repo), oldName, newName, env)),
         ),
-      branchSetUpstream: (repoId, _name, _upstream) =>
-        Effect.flatMap(resolveById(repoId), (_repo) =>
-          Effect.fail(gitError("gitFailed", "P3: branchSetUpstream not implemented")),
+      branchDelete: (repoId, name, force) =>
+        Effect.flatMap(resolveById(repoId), (repo) =>
+          locks.withRepoLock(repoId)(branchDeleteGit(repoCwd(repo), name, force, env)),
+        ),
+      branchSetUpstream: (repoId, name, upstream) =>
+        Effect.flatMap(resolveById(repoId), (repo) =>
+          locks.withRepoLock(repoId)(branchSetUpstreamGit(repoCwd(repo), name, upstream, env)),
         ),
 
       // ── merge (P3, stubs) ─────────────────────────────────────────────────

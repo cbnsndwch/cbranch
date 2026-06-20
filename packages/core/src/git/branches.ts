@@ -71,16 +71,15 @@ function parseLine(line: string, isRemote: boolean): BranchInfo | null {
   }
 
   let upstream: BranchUpstream | undefined;
-  if (!isRemote && upstreamRef) {
-    const track = parseTrack(upstreamTrack);
-    if (track !== undefined) {
-      upstream = new BranchUpstream({
-        ref: upstreamRef,
-        name: upstreamShort,
-        ahead: track.ahead,
-        behind: track.behind,
-      });
-    }
+  if (!isRemote && upstreamRef && upstreamTrack !== "[gone]") {
+    // Empty track means parity (0 ahead, 0 behind); only "[gone]" means no upstream object.
+    const track = parseTrack(upstreamTrack) ?? { ahead: 0, behind: 0 };
+    upstream = new BranchUpstream({
+      ref: upstreamRef,
+      name: upstreamShort,
+      ahead: track.ahead,
+      behind: track.behind,
+    });
   }
 
   return new BranchInfo({
