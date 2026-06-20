@@ -1,4 +1,8 @@
-import type { CommitInput } from "@cbranch/rpc-contract";
+import {
+  CommitCreated,
+  type CommitInput,
+  CommitMessage,
+} from "@cbranch/rpc-contract";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 
 import { run } from "../testing/effect-run";
@@ -40,6 +44,9 @@ describe("commit-write git operations", () => {
     };
     const result = await run(commitCreate(repo.dir, input));
 
+    // Must be a real class instance so @effect/rpc can round-trip it (a plain struct
+    // fails the client decode as "Expected CommitCreated, got {…}").
+    expect(result).toBeInstanceOf(CommitCreated);
     expect(result.subject).toBe("add a.txt");
     expect(result.oid).toHaveLength(40);
     expect(result.shortOid.length).toBeGreaterThanOrEqual(4);
@@ -142,6 +149,7 @@ describe("commit-write git operations", () => {
 
     const msg = await run(commitLastMessage(repo.dir));
 
+    expect(msg).toBeInstanceOf(CommitMessage);
     expect(msg.subject).toBe("my subject");
     expect(msg.raw).toContain("my subject");
   });

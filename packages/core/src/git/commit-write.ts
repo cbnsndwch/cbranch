@@ -1,7 +1,7 @@
 import {
-  type CommitCreated,
+  CommitCreated,
   type CommitInput,
-  type CommitMessage,
+  CommitMessage,
   type GitError,
   Oid,
 } from "@cbranch/rpc-contract";
@@ -82,7 +82,10 @@ export const commitCreate = (
     const shortOid = parts[0] ?? "";
     const subject = parts[1] ?? input.subject;
 
-    return { oid: Oid.make(oid), shortOid, subject };
+    // Must be a class instance, not a plain struct: the @effect/rpc encoder needs the
+    // CommitCreated instance to round-trip the Schema.Class (a plain object fails the
+    // client-side decode as "Expected CommitCreated, got {…}").
+    return new CommitCreated({ oid: Oid.make(oid), shortOid, subject });
   });
 
 export const commitLastMessage = (
@@ -108,5 +111,5 @@ export const commitLastMessage = (
             .join("\n")
             .trimEnd()
         : "";
-    return { subject, body, raw };
+    return new CommitMessage({ subject, body, raw });
   });
