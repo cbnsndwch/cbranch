@@ -48,6 +48,7 @@ export interface CbranchApi {
   repoState(repoId: RepoId): Promise<RepoState>;
   commitDetail(repoId: RepoId, oid: Oid): Promise<CommitDetail>;
   commitDiff(spec: DiffSpec): Promise<ReadonlyArray<DiffFile>>;
+  workingFileDiff(repoId: RepoId, path: string, staged: boolean): Promise<DiffFile>;
   fileContentAtRev(repoId: RepoId, path: string, rev: string): Promise<FileContentResult>;
   // ── stage & commit (P2) ─────────────────────────────────────────────────────
   statusGet(repoId: RepoId, includeIgnored?: boolean): Promise<WorkingTreeStatus>;
@@ -91,6 +92,8 @@ export const makeApi = (runtime: AppRuntime): CbranchApi => {
     repoState: (repoId) => runtime.runPromise(withClient((c) => c.RepoState({ repoId }))),
     commitDetail: (repoId, oid) => runtime.runPromise(withClient((c) => c.CommitDetail({ repoId, oid }))),
     commitDiff: (spec) => runtime.runPromise(withClient((c) => c.CommitDiff(spec))),
+    workingFileDiff: (repoId, path, staged) =>
+      runtime.runPromise(withClient((c) => c.DiffWorkingFile({ repoId, path, staged }))),
     fileContentAtRev: (repoId, path, rev) =>
       runtime.runPromise(withClient((c) => c.FileContentAtRev({ repoId, path, rev }))),
     statusGet: (repoId, includeIgnored) =>

@@ -63,9 +63,29 @@ const makeFakeApi = (overrides: Partial<CbranchApi> = {}): CbranchApi => ({
       }),
   ),
   commitDiff: vi.fn(async () => []),
+  workingFileDiff: vi.fn(async () => {
+    throw new Error("not implemented");
+  }),
   fileContentAtRev: vi.fn(
     async () => new FileContent({ path: "a.txt", size: 2, isBinary: false, encoding: "utf8", content: "a" }),
   ),
+  statusGet: vi.fn(async () => {
+    throw new Error("not implemented");
+  }),
+  stageFiles: vi.fn(async () => undefined),
+  unstageFiles: vi.fn(async () => undefined),
+  discardFiles: vi.fn(async () => undefined),
+  deleteUntracked: vi.fn(async () => undefined),
+  resetTo: vi.fn(async () => undefined),
+  stageHunks: vi.fn(async () => undefined),
+  unstageHunks: vi.fn(async () => undefined),
+  discardHunks: vi.fn(async () => undefined),
+  commitCreate: vi.fn(async () => {
+    throw new Error("not implemented");
+  }),
+  commitLastMessage: vi.fn(async () => {
+    throw new Error("not implemented");
+  }),
   logStream: vi.fn(() => () => undefined),
   subscribe: vi.fn(() => () => undefined),
   ...overrides,

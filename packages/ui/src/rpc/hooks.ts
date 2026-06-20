@@ -7,17 +7,22 @@
 // goes through the injected {@link useApi} facade so components stay mockable (NF-TEST-7).
 
 import {
+  type CommitCreated,
   type CommitDetail,
+  type CommitInput,
+  type CommitMessage,
   type CommitSummary,
   type DiffFile,
   type DiffSpec,
   type FileContentResult,
   type LogQuery,
   type Oid,
+  type PatchSelection,
   type RecentRepo,
   type RepoHandle,
   type RepoId,
   type RepoState,
+  type WorkingTreeStatus,
 } from "@cbranch/rpc-contract";
 import { useMutation, useQuery, useQueryClient, type UseQueryResult } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
@@ -148,4 +153,176 @@ export const useLogStream = (query: LogQuery | null): LogStreamResult => {
   }, [api, queryKey]);
 
   return { rows, status, error };
+};
+
+// ── P2 query hooks ────────────────────────────────────────────────────────────
+
+export const useStatus = (repoId: RepoId | null): UseQueryResult<WorkingTreeStatus> => {
+  const api = useApi();
+  return useQuery({
+    queryKey: repoId ? queryKeys.status(repoId) : ["inactive"],
+    queryFn: () => api.statusGet(repoId as RepoId),
+    enabled: repoId !== null,
+  });
+};
+
+export const useWorkingDiff = (
+  repoId: RepoId | null,
+  path: string | null,
+  staged: boolean,
+): UseQueryResult<DiffFile> => {
+  const api = useApi();
+  return useQuery({
+    queryKey: repoId && path ? queryKeys.workingDiff(repoId, path, staged) : ["inactive"],
+    queryFn: () => api.workingFileDiff(repoId as RepoId, path as string, staged),
+    enabled: repoId !== null && path !== null,
+  });
+};
+
+export const useLastMessage = (repoId: RepoId | null): UseQueryResult<CommitMessage> => {
+  const api = useApi();
+  return useQuery({
+    queryKey: repoId ? queryKeys.lastMessage(repoId) : ["inactive"],
+    queryFn: () => api.commitLastMessage(repoId as RepoId),
+    enabled: repoId !== null,
+  });
+};
+
+// ── P2 mutation hooks ─────────────────────────────────────────────────────────
+
+export const useStageFiles = (repoId: RepoId) => {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation<void, unknown, { paths: ReadonlyArray<string>; all?: boolean }>({
+    mutationFn: ({ paths, all }) => api.stageFiles(repoId, paths, all),
+    onMutate: async ({ paths, all }) => {
+      await qc.cancelQueries({ queryKey: queryKeys.status(repoId) });
+      const prev = qc.getQueryData<WorkingTreeStatus>(queryKeys.status(repoId));
+      if (prev && !all) {
+        const pathSet = new Set(paths);
+        qc.setQueryData(queryKeys.status(repoId), {
+          ...prev,
+          entries: prev.entries.map((e) => (pathSet.has(e.path) ? { ...e, staged: e.unstaged } : e)),
+        });
+      }
+      return { prev };
+    },
+    onError: (_err, _vars, ctx) => {
+      const c = ctx as { prev?: WorkingTreeStatus } | undefined;
+      if (c?.prev) qc.setQueryData(queryKeys.status(repoId), c.prev);
+    },
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: [repoId, "status"] });
+    },
+  });
+};
+
+export const useUnstageFiles = (repoId: RepoId) => {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation<void, unknown, { paths: ReadonlyArray<string>; all?: boolean }>({
+    mutationFn: ({ paths, all }) => api.unstageFiles(repoId, paths, all),
+    onMutate: async ({ paths, all }) => {
+      await qc.cancelQueries({ queryKey: queryKeys.status(repoId) });
+      const prev = qc.getQueryData<WorkingTreeStatus>(queryKeys.status(repoId));
+      if (prev && !all) {
+        const pathSet = new Set(paths);
+        qc.setQueryData(queryKeys.status(repoId), {
+          ...prev,
+          entries: prev.entries.map((e) => (pathSet.has(e.path) ? { ...e, staged: "unmodified" } : e)),
+        });
+      }
+      return { prev };
+    },
+    onError: (_err, _vars, ctx) => {
+      const c = ctx as { prev?: WorkingTreeStatus } | undefined;
+      if (c?.prev) qc.setQueryData(queryKeys.status(repoId), c.prev);
+    },
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: [repoId, "status"] });
+    },
+  });
+};
+
+export const useDiscardFiles = (repoId: RepoId) => {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation<void, unknown, { paths: ReadonlyArray<string> }>({
+    mutationFn: ({ paths }) => api.discardFiles(repoId, paths),
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: [repoId, "status"] });
+    },
+  });
+};
+
+export const useDeleteUntracked = (repoId: RepoId) => {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation<void, unknown, { paths: ReadonlyArray<string> }>({
+    mutationFn: ({ paths }) => api.deleteUntracked(repoId, paths),
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: [repoId, "status"] });
+    },
+  });
+};
+
+export const useResetTo = (repoId: RepoId) => {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation<void, unknown, { mode: "soft" | "mixed" | "hard"; target: string }>({
+    mutationFn: ({ mode, target }) => api.resetTo(repoId, mode, target),
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: [repoId, "status"] });
+      void qc.invalidateQueries({ queryKey: [repoId, "commits"] });
+      void qc.invalidateQueries({ queryKey: [repoId, "refs"] });
+      void qc.invalidateQueries({ queryKey: [repoId, "inProgress"] });
+    },
+  });
+};
+
+export const useStageHunks = (repoId: RepoId) => {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation<void, unknown, PatchSelection>({
+    mutationFn: (selection) => api.stageHunks(selection),
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: [repoId, "status"] });
+    },
+  });
+};
+
+export const useUnstageHunks = (repoId: RepoId) => {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation<void, unknown, PatchSelection>({
+    mutationFn: (selection) => api.unstageHunks(selection),
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: [repoId, "status"] });
+    },
+  });
+};
+
+export const useDiscardHunks = (repoId: RepoId) => {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation<void, unknown, PatchSelection>({
+    mutationFn: (selection) => api.discardHunks(selection),
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: [repoId, "status"] });
+    },
+  });
+};
+
+export const useCommitCreate = (repoId: RepoId) => {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation<CommitCreated, unknown, CommitInput>({
+    mutationFn: (input) => api.commitCreate(input),
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: [repoId, "status"] });
+      void qc.invalidateQueries({ queryKey: [repoId, "commits"] });
+      void qc.invalidateQueries({ queryKey: [repoId, "refs"] });
+      void qc.invalidateQueries({ queryKey: [repoId, "inProgress"] });
+    },
+  });
 };

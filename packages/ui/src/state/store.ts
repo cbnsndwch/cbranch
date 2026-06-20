@@ -15,6 +15,15 @@ import { applyTheme, readThemePref, type ThemePref } from "../theme/theme";
 
 export type DetailTab = "commit" | "diff" | "filetree" | "gpg" | "console" | "output";
 
+export interface CommitDraft {
+  subject: string;
+  body: string;
+  amend: boolean;
+  signoff: boolean;
+}
+
+const DEFAULT_DRAFT: CommitDraft = { subject: "", body: "", amend: false, signoff: false };
+
 export interface UiState {
   /** The single active repository (cbranch is one-repo-at-a-time, P1-OPEN-4). */
   readonly activeRepoId: RepoId | null;
@@ -41,6 +50,21 @@ export interface UiState {
   readonly setFilters: (filters: LogFilters) => void;
   readonly setDateMode: (mode: DateMode) => void;
   readonly setDiffView: (view: DiffView) => void;
+  // ── P2: commit draft ────────────────────────────────────────────────────────
+  readonly commitDraft: CommitDraft;
+  readonly updateCommitDraft: (patch: Partial<CommitDraft>) => void;
+  readonly resetCommitDraft: () => void;
+  // ── P2: file selection (staged / unstaged panels) ───────────────────────────
+  readonly stagedSelection: ReadonlySet<string>;
+  readonly unstagedSelection: ReadonlySet<string>;
+  readonly toggleStagedSelection: (path: string) => void;
+  readonly toggleUnstagedSelection: (path: string) => void;
+  readonly setStagedSelection: (paths: ReadonlyArray<string>) => void;
+  readonly setUnstagedSelection: (paths: ReadonlyArray<string>) => void;
+  readonly clearSelection: () => void;
+  // ── P2: which file the WorkingDiffPanel shows ───────────────────────────────
+  readonly selectedDiffFile: { path: string; staged: boolean } | null;
+  readonly setSelectedDiffFile: (f: { path: string; staged: boolean } | null) => void;
 }
 
 export const useUiStore = create<UiState>((set) => ({
@@ -53,8 +77,20 @@ export const useUiStore = create<UiState>((set) => ({
   diffView: readDiffView(),
   detailTab: "commit",
   knownRefStrings: [],
+  commitDraft: DEFAULT_DRAFT,
+  stagedSelection: new Set(),
+  unstagedSelection: new Set(),
+  selectedDiffFile: null,
   // Switching repositories supersedes the old selection and filters (P1-OPEN-4 / P1-X-4).
-  setActiveRepoId: (activeRepoId) => set({ activeRepoId, selectedOid: null, filters: emptyFilters }),
+  setActiveRepoId: (activeRepoId) =>
+    set({
+      activeRepoId,
+      selectedOid: null,
+      filters: emptyFilters,
+      stagedSelection: new Set(),
+      unstagedSelection: new Set(),
+      selectedDiffFile: null,
+    }),
   setSelectedOid: (selectedOid) => set({ selectedOid }),
   setPaletteOpen: (paletteOpen) => set({ paletteOpen }),
   setTheme: (theme) => {
@@ -72,4 +108,24 @@ export const useUiStore = create<UiState>((set) => ({
   },
   setDetailTab: (detailTab) => set({ detailTab }),
   setKnownRefStrings: (knownRefStrings) => set({ knownRefStrings }),
+  updateCommitDraft: (patch) => set((s) => ({ commitDraft: { ...s.commitDraft, ...patch } })),
+  resetCommitDraft: () => set({ commitDraft: DEFAULT_DRAFT }),
+  toggleStagedSelection: (path) =>
+    set((s) => {
+      const next = new Set(s.stagedSelection);
+      if (next.has(path)) next.delete(path);
+      else next.add(path);
+      return { stagedSelection: next };
+    }),
+  toggleUnstagedSelection: (path) =>
+    set((s) => {
+      const next = new Set(s.unstagedSelection);
+      if (next.has(path)) next.delete(path);
+      else next.add(path);
+      return { unstagedSelection: next };
+    }),
+  setStagedSelection: (paths) => set({ stagedSelection: new Set(paths) }),
+  setUnstagedSelection: (paths) => set({ unstagedSelection: new Set(paths) }),
+  clearSelection: () => set({ stagedSelection: new Set(), unstagedSelection: new Set() }),
+  setSelectedDiffFile: (selectedDiffFile) => set({ selectedDiffFile }),
 }));
