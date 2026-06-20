@@ -75,7 +75,11 @@ const fakeApi = (
           subject: "s",
           body: "",
           messageRaw: "s",
-          stats: { filesChanged: files.length, additions: 1, deletions: 0 },
+          stats: {
+            filesChanged: files.length,
+            additions: 1,
+            deletions: 0,
+          },
         }),
     ),
   }) as unknown as CbranchApi;
@@ -168,7 +172,11 @@ describe("DiffPanel (P1-DIFF-*)", () => {
   });
 
   test("large diffs are deferred behind Load anyway (P1-DIFF-9)", async () => {
-    const big = file({ newPath: "big.ts", additions: 3000, deletions: 100 });
+    const big = file({
+      newPath: "big.ts",
+      additions: 3000,
+      deletions: 100,
+    });
     renderWithApi(<DiffPanel repoId={repoId} oid={oid} />, fakeApi([big], []));
     expect(await screen.findByText("Large diff deferred")).toBeTruthy();
     fireEvent.click(screen.getByText("Load anyway"));

@@ -93,7 +93,10 @@ const getHighlighter = async (lang: string): Promise<ShikiHighlighter> => {
     // pass can switch to `createHighlighterCore` with fine-grained per-language imports to
     // shrink it. It is already isolated in its own on-demand chunk (REQ-STACK-019).
     highlighterPromise = import("shiki").then((m) =>
-      m.createHighlighter({ themes: [LIGHT_THEME, DARK_THEME], langs: [lang] }),
+      m.createHighlighter({
+        themes: [LIGHT_THEME, DARK_THEME],
+        langs: [lang],
+      }),
     ) as Promise<ShikiHighlighter>;
     return highlighterPromise;
   }

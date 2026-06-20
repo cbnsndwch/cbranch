@@ -77,7 +77,9 @@ const renderPanel = (
   api: CbranchApi,
   ui: ReactNode = <StatusPanel repoId={repoId} />,
 ) => {
-  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const qc = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
   return render(
     <MemoryRouter>
       <QueryClientProvider client={qc}>
@@ -177,7 +179,9 @@ describe("StatusPanel", () => {
     });
     renderPanel(makeFakeApi({ statusGet: vi.fn(async () => status) }));
 
-    const fileBtn = await screen.findByRole("button", { name: /changed\.ts/ });
+    const fileBtn = await screen.findByRole("button", {
+      name: /changed\.ts/,
+    });
     fireEvent.click(fileBtn);
 
     const stored = useUiStore.getState().selectedDiffFile;

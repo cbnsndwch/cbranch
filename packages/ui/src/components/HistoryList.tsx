@@ -278,7 +278,9 @@ export function HistoryList({
                 <span className="flex-1 truncate">{row.subject}</span>
                 <div
                   className="flex size-[22px] shrink-0 items-center justify-center text-[9px] font-semibold text-white"
-                  style={{ background: "var(--color-status-staged)" }}
+                  style={{
+                    background: "var(--color-status-staged)",
+                  }}
                   aria-hidden="true"
                 >
                   {initials(row.authorName)}

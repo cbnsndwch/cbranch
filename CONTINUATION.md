@@ -30,9 +30,15 @@ Gate: **GREEN — 505 tests, 80.69% branches**
 | 4c28f5c | P3 query+mutation hooks (28 new hooks) · `activeView` Zustand state · AppShell view nav tabs (History/Branches/Worktrees/Stash/Tags) · BranchesPanel (local/remote groups, create/rename/delete/dirty-tree dialogs, dropdown menus) |
 | 1b5ba77 | Fetch/Pull/Push streaming buttons in Toolbar (Sonner progress toasts) · RemotesManagerDialog (CRUD table) · WorktreesPanel (list + add/remove/prune) · StashPanel (list + new-stash/apply/pop/drop/clear) · TagsPanel (list + create/delete/push actions) |
 
-### ▶ NEXT TASK: P4 — Diff & Conflict Resolution
+### ▶ NEXT TASK: P3 self-review (in progress), then P4
 
 **STOP — await user review/approval of P3 before starting P4.**
+
+At the STOP gate the user chose **"Review P3 first"**. A four-agent parallel audit of
+P3 core (branch / sync / worktree-stash-tag) + UI against
+`docs/spec/07-phase3-branches-sync.md` REQ-IDs is underway. On resume: collect/​re-run
+the audit, synthesize a P3 review report, present gaps to the user, and fix any
+agreed-upon issues (gate-green commit each) before P4.
 
 When the user approves, read `docs/spec/08-phase4-diff-conflict.md` and plan P4.
 

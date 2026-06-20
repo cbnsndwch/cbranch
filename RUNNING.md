@@ -15,7 +15,7 @@ pnpm -r build          # builds core, rpc-contract, the UI bundle, and the serve
 
 ```bash
 # Serve the built UI bundle from the host service, bound to loopback.
-CBRANCH_CLIENT_DIR="$PWD/packages/ui/dist" pnpm --filter @cbranch/web-server start
+CBRANCH_CLIENT_DIR="$PWD/packages/ui/build/client" pnpm --filter @cbranch/web-server start
 # → cbranch web-server starting on http://127.0.0.1:7420
 ```
 

@@ -84,7 +84,10 @@ export const describeFilters = (
   if (trimmed(filters.path))
     chips.push({ key: "path", label: `path: ${filters.path.trim()}` });
   if (trimmed(filters.author))
-    chips.push({ key: "author", label: `author: ${filters.author.trim()}` });
+    chips.push({
+      key: "author",
+      label: `author: ${filters.author.trim()}`,
+    });
   if (trimmed(filters.grep))
     chips.push({ key: "grep", label: `msg: ${filters.grep.trim()}` });
   if (trimmed(filters.since))

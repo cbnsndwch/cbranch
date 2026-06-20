@@ -200,7 +200,10 @@ describe("WorkingDiffPanel", () => {
     await userEvent.click(stagedBtn);
     await waitFor(() => {
       const state = useUiStore.getState();
-      expect(state.selectedDiffFile).toEqual({ path: "a.txt", staged: true });
+      expect(state.selectedDiffFile).toEqual({
+        path: "a.txt",
+        staged: true,
+      });
     });
   });
 });

@@ -90,7 +90,9 @@ export function FileAtRevision({
                 from,
                 to,
                 Decoration.mark({
-                  attributes: { style: `color:${token.color}` },
+                  attributes: {
+                    style: `color:${token.color}`,
+                  },
                 }),
               );
             }

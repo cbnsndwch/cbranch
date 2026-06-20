@@ -7,6 +7,7 @@ import { CommandPalette } from "./CommandPalette";
 import { CommitDetailsTabs } from "./CommitDetailsTabs";
 import { CommitTab } from "./CommitTab";
 import { DiffPanel } from "./DiffPanel";
+import { DocumentTitle } from "./DocumentTitle";
 import { HistoryPane } from "./HistoryPane";
 import { HistoryStatusStrip } from "./HistoryStatusStrip";
 import { MenuBar } from "./MenuBar";
@@ -14,7 +15,6 @@ import { RepositorySidebar } from "./RepositorySidebar";
 import { StagingView } from "./StagingView";
 import { StashPanel } from "./StashPanel";
 import { TagsPanel } from "./TagsPanel";
-import { TitleBar } from "./TitleBar";
 import { Toolbar } from "./Toolbar";
 import { Button } from "./ui/button";
 import { Placeholder } from "./ui/placeholder";
@@ -28,7 +28,8 @@ const VIEWS: ReadonlyArray<readonly [ActiveView, string]> = [
   ["tags", "Tags"],
 ];
 
-// Desktop-style layout: title bar → menu bar → toolbar → view nav → main split (sidebar + content).
+// Web layout: menu bar → toolbar → view nav → main split (sidebar + content). There is no
+// in-app title bar — <DocumentTitle> reflects the active branch in the browser window title.
 export function AppShell() {
   const repoId = useUiStore((s) => s.activeRepoId);
   const selectedOid = useUiStore((s) => s.selectedOid);
@@ -115,14 +116,18 @@ export function AppShell() {
   return (
     <>
       <CommandPalette />
-      <div className="grid h-dvh grid-rows-[26px_24px_32px_28px_1fr] overflow-hidden">
-        {/* Row 1: Title bar */}
-        <TitleBar />
-        {/* Row 2: Menu bar */}
+
+      {/* Headless: reflects the active branch in the browser window title (no in-app title bar). */}
+      <DocumentTitle />
+
+      <div className="grid h-dvh grid-rows-[24px_32px_28px_1fr] overflow-hidden">
+        {/* Row 1: Menu bar */}
         <MenuBar />
-        {/* Row 3: Toolbar */}
+
+        {/* Row 2: Toolbar */}
         <Toolbar />
-        {/* Row 4: View nav tabs */}
+
+        {/* Row 3: View nav tabs */}
         <div className="bg-muted flex items-end border-b">
           {VIEWS.map(([view, label]) => (
             <button
@@ -140,7 +145,7 @@ export function AppShell() {
             </button>
           ))}
         </div>
-        {/* Row 5: Main split */}
+        {/* Row 4: Main split */}
         <div className="grid min-h-0 grid-cols-[265px_1fr]">
           {/* Left: Repository sidebar */}
           <RepositorySidebar repoId={repoId} />

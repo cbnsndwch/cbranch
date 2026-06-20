@@ -30,7 +30,11 @@ vi.mock("../lib/shiki-highlighter", () => ({
 vi.mock("@codemirror/state", () => ({
   EditorState: {
     create: ({ doc }: { doc?: string }) => ({
-      doc: { _text: doc ?? "", lines: 1, line: () => ({ from: 0, to: 0 }) },
+      doc: {
+        _text: doc ?? "",
+        lines: 1,
+        line: () => ({ from: 0, to: 0 }),
+      },
     }),
     readOnly: { of: () => ({}) },
   },

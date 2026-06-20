@@ -127,12 +127,12 @@ export const MENUS: ReadonlyArray<TopMenu> = [
         phase: "P1",
         accelerator: "F5",
       },
-      {
-        kind: "command",
-        id: "repository.fileExplorer",
-        label: "File Explorer",
-        phase: "shell",
-      },
+      // {
+      //   kind: "command",
+      //   id: "repository.fileExplorer",
+      //   label: "File Explorer",
+      //   phase: "shell",
+      // },
       sep,
       {
         kind: "command",
@@ -610,7 +610,12 @@ export const MENUS: ReadonlyArray<TopMenu> = [
         label: "Merge branches…",
         phase: "P3",
       },
-      { kind: "command", id: "commands.rebase", label: "Rebase…", phase: "P5" },
+      {
+        kind: "command",
+        id: "commands.rebase",
+        label: "Rebase…",
+        phase: "P5",
+      },
       {
         kind: "command",
         id: "commands.solveConflicts",
@@ -649,7 +654,12 @@ export const MENUS: ReadonlyArray<TopMenu> = [
         label: "Checkout revision…",
         phase: "P3",
       },
-      { kind: "command", id: "commands.bisect", label: "Bisect…", phase: "P5" },
+      {
+        kind: "command",
+        id: "commands.bisect",
+        label: "Bisect…",
+        phase: "P5",
+      },
       {
         kind: "command",
         id: "commands.reflog",
@@ -788,7 +798,12 @@ export const MENUS: ReadonlyArray<TopMenu> = [
         label: "Check for updates",
         phase: "later",
       },
-      { kind: "command", id: "help.about", label: "About", phase: "shell" },
+      {
+        kind: "command",
+        id: "help.about",
+        label: "About",
+        phase: "shell",
+      },
     ],
   },
 ];

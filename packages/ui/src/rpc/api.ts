@@ -143,7 +143,12 @@ export interface CbranchApi {
   // ── sync streaming (P3) ───────────────────────────────────────────────────
   fetchStream(
     repoId: RepoId,
-    opts: { remote?: string; all?: boolean; prune?: boolean; tags?: boolean },
+    opts: {
+      remote?: string;
+      all?: boolean;
+      prune?: boolean;
+      tags?: boolean;
+    },
     handlers: StreamHandlers<SyncEvent>,
   ): Unsubscribe;
   pullStream(
@@ -327,7 +332,12 @@ export const makeApi = (runtime: AppRuntime): CbranchApi => {
     branchSwitch: (repoId, target, strategy, stashAndReapply) =>
       runtime.runPromise(
         withClient((c) =>
-          c.BranchSwitch({ repoId, target, strategy, stashAndReapply }),
+          c.BranchSwitch({
+            repoId,
+            target,
+            strategy,
+            stashAndReapply,
+          }),
         ),
       ),
     branchRename: (repoId, oldName, newName) =>

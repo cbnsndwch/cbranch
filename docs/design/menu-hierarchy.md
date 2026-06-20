@@ -47,7 +47,7 @@ Repo-wide maintenance and configuration for the currently open repo.
 ```txt
 Repository
   Refresh                      P1   Re-read refs/status/history from disk.
-  File Explorer                —    Reveal the repo's working dir in the host file browser (host-side).
+  # File Explorer                —    Reveal the repo's working dir in the host file browser (host-side).
   ---
   Remote repositories...       P3   Manage remotes (add/edit/remove URLs, fetch refspecs).
   ---

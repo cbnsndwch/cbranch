@@ -42,7 +42,13 @@ const PROD_ALLOWLIST = new Set([
 // `@tailwindcss/vite` (REQ-STACK-013) and of Vite. It runs only during the build to
 // transform CSS; it is NOT linked into or emitted in the shipped browser bundle, so
 // MPL-2.0's file-level copyleft does not reach cbranch's MIT-licensed artifacts.
-const DEV_EXTRA = new Set(["MPL-2.0"]);
+// `CC-BY-4.0` covers ONLY the `caniuse-lite` browser-compatibility DATA table, an
+// unavoidable transitive build-time dependency of `browserslist` (pulled in by the
+// Vite/react-router dev tooling). It is a data file consumed during the build to
+// target browsers; no `caniuse-lite` code or data is linked into or emitted in the
+// shipped browser bundle, so CC-BY-4.0's attribution terms do not reach cbranch's
+// MIT-licensed artifacts. Documented in LICENSES.md.
+const DEV_EXTRA = new Set(["MPL-2.0", "CC-BY-4.0"]);
 const DEV_ALLOWLIST = new Set([...PROD_ALLOWLIST, ...DEV_EXTRA]);
 
 // Strong copyleft / network-copyleft — rejected EVERYWHERE, even in dev tooling.

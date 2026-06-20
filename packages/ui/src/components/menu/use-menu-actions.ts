@@ -55,19 +55,25 @@ export function useMenuActions(): MenuActions {
     // Repo-scoped commands need an open repository.
     if (repoId) {
       handlers["repository.refresh"] = () =>
-        void queryClient.invalidateQueries({ queryKey: repoScopeKey(repoId) });
+        void queryClient.invalidateQueries({
+          queryKey: repoScopeKey(repoId),
+        });
       handlers["commands.stageAll"] = () =>
         void api
           .stageFiles(repoId, [], true)
           .then(() =>
-            queryClient.invalidateQueries({ queryKey: [repoId, "status"] }),
+            queryClient.invalidateQueries({
+              queryKey: [repoId, "status"],
+            }),
           )
           .catch(() => {});
       handlers["commands.unstageAll"] = () =>
         void api
           .unstageFiles(repoId, [], true)
           .then(() =>
-            queryClient.invalidateQueries({ queryKey: [repoId, "status"] }),
+            queryClient.invalidateQueries({
+              queryKey: [repoId, "status"],
+            }),
           )
           .catch(() => {});
     }

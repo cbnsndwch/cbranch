@@ -163,7 +163,12 @@ export const buildFileTree = (
       .toSorted(([a], [b]) => a.localeCompare(b))
       .map(([name, child]) => {
         const path = prefix === "" ? name : `${prefix}/${name}`;
-        return { type: "dir", name, path, children: toNodes(child, path) };
+        return {
+          type: "dir",
+          name,
+          path,
+          children: toNodes(child, path),
+        };
       });
     const fileNodes = dir.files.toSorted((a, b) =>
       a.name.localeCompare(b.name),

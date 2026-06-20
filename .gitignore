@@ -13,6 +13,9 @@ dist/
 build/
 coverage/
 
+# react-router framework-mode generated route types (typegen)
+.react-router/
+
 # tsc project-references incremental cache
 *.tsbuildinfo
 

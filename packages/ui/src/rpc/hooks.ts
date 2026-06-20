@@ -112,7 +112,9 @@ export const useOpenRepo = () => {
   return useMutation<RepoHandle, unknown, string>({
     mutationFn: (path: string) => api.repoOpen(path),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.recentList() });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.recentList(),
+      });
     },
   });
 };
@@ -628,7 +630,12 @@ export const useWorktreeAdd = (repoId: RepoId) => {
   return useMutation<
     WorktreeInfo,
     unknown,
-    { path: string; branch?: string; newBranch?: string; startPoint?: string }
+    {
+      path: string;
+      branch?: string;
+      newBranch?: string;
+      startPoint?: string;
+    }
   >({
     mutationFn: ({ path, branch, newBranch, startPoint }) =>
       api.worktreeAdd(repoId, path, { branch, newBranch, startPoint }),

@@ -41,7 +41,9 @@ export const useInvalidationBus = (repoId: RepoId | null): void => {
       },
       onError: () => {
         // Reconnect resnapshot (NF-ERR-6): refetch everything mounted for the repo.
-        void queryClient.invalidateQueries({ queryKey: repoScopeKey(repoId) });
+        void queryClient.invalidateQueries({
+          queryKey: repoScopeKey(repoId),
+        });
         scheduleReconnect();
       },
       onComplete: () => {

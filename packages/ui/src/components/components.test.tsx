@@ -214,7 +214,10 @@ describe("useInvalidationBus (spec 15 §2 / NF-ERR-6)", () => {
     );
     act(() =>
       captured?.onItem(
-        new InvalidationEvent({ repoId, domains: ["status", "commits"] }),
+        new InvalidationEvent({
+          repoId,
+          domains: ["status", "commits"],
+        }),
       ),
     );
     expect(spy).toHaveBeenCalledWith({ queryKey: [repoId, "status"] });

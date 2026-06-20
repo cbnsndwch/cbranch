@@ -69,7 +69,11 @@ export function DiffView({
       if (cancelled || !refractor) return;
       try {
         setTokens(
-          tokenize(parsedFile.hunks, { highlight: true, refractor, language }),
+          tokenize(parsedFile.hunks, {
+            highlight: true,
+            refractor,
+            language,
+          }),
         );
       } catch {
         // highlighting is best-effort; fall back to plain text

@@ -1,13 +1,19 @@
 import { fileURLToPath } from "node:url";
 
+import { reactRouter } from "@react-router/dev/vite";
 import tailwindcss from "@tailwindcss/vite";
-import react from "@vitejs/plugin-react";
+import { reactRouterDevTools } from "react-router-devtools";
 import { defineConfig } from "vite";
 
-// Vite 8 (Rolldown is the default bundler). Tailwind v4 via @tailwindcss/vite only
-// (no PostCSS, no tailwind.config.js). React 19 via @vitejs/plugin-react.
+// Vite 8 (Rolldown is the default bundler) driving React Router 8 in framework mode.
+// `reactRouter()` owns the React/JSX pipeline here — `@vitejs/plugin-react` is NOT used
+// (it would double-transform). SPA-only behaviour is set in `react-router.config.ts`.
+//
+// `reactRouterDevTools()` MUST come before `reactRouter()`. In dev it augments the JSX
+// transform so every rendered element carries its source location — inspect any tag in
+// the browser and you see the originating file and line — and mounts the in-app dev panel.
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
+  plugins: [reactRouterDevTools(), reactRouter(), tailwindcss()],
   // `@/*` → src is the shadcn `base-lyra` import alias (components.json); keep it in sync
   // with tsconfig `paths` and the root vitest config so vendored/generated UI resolves.
   resolve: {
@@ -20,8 +26,15 @@ export default defineConfig({
     // The backend's Origin allowlist checks hostnames only (port-stripped), so
     // `Origin: http://localhost:5173` passes as `localhost` — always in the allowlist.
     proxy: {
-      "/rpc": { target: "ws://localhost:7420", ws: true, changeOrigin: true },
-      "/sidechannel": { target: "http://localhost:7420", changeOrigin: true },
+      "/rpc": {
+        target: "ws://localhost:7420",
+        ws: true,
+        changeOrigin: true,
+      },
+      "/sidechannel": {
+        target: "http://localhost:7420",
+        changeOrigin: true,
+      },
     },
   },
   build: {

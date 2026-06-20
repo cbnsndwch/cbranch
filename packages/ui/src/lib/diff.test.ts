@@ -63,7 +63,11 @@ describe("classification helpers", () => {
   });
 
   test("changedLineCount sums numstat, large-diff gate respects the threshold (P1-DIFF-9)", () => {
-    const big = mkFile({ newPath: "big.ts", additions: 1500, deletions: 600 });
+    const big = mkFile({
+      newPath: "big.ts",
+      additions: 1500,
+      deletions: 600,
+    });
     expect(changedLineCount(big)).toBe(2100);
     expect(isLargeDiff(big)).toBe(true);
     expect(isLargeDiff(big, 5000)).toBe(false);

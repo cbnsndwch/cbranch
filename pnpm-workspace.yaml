@@ -1,3 +1,12 @@
 packages:
   - packages/*
   - apps/*
+
+packageExtensions:
+  react-router-devtools:
+    dependencies:
+      vite-node: ^6.0.0
+
+onlyBuiltDependencies:
+  - esbuild
+  - msgpackr-extract

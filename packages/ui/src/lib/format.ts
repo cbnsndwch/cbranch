@@ -54,7 +54,9 @@ export const formatRelativeMs = (
   const deltaMs = epochMs - nowMs;
   const abs = Math.abs(deltaMs);
   if (abs < 1000) return "just now";
-  const formatter = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" });
+  const formatter = new Intl.RelativeTimeFormat(undefined, {
+    numeric: "auto",
+  });
   for (const [unit, ms] of RELATIVE_UNITS) {
     if (abs >= ms) return formatter.format(Math.round(deltaMs / ms), unit);
   }

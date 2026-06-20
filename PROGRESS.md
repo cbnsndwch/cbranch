@@ -104,9 +104,9 @@ Per `docs/spec/08-phase4-diff-conflict.md`. Key areas: three-way merge editor, c
 
 **The app runs end-to-end with stage+commit.** Open the "Changes" tab to see staged/unstaged file list, click a file to diff it, stage/unstage hunks, write a commit message, and commit.
 
-**To run:** `pnpm -r build` then `CBRANCH_CLIENT_DIR=$PWD/packages/ui/dist pnpm --filter @cbranch/web-server start` → http://127.0.0.1:7420.
+**To run:** `pnpm -r build` then `CBRANCH_CLIENT_DIR=$PWD/packages/ui/build/client pnpm --filter @cbranch/web-server start` → http://127.0.0.1:7420.
 
-**To run current build:** `pnpm -r build` then `CBRANCH_CLIENT_DIR=$PWD/packages/ui/dist pnpm --filter @cbranch/web-server start` → http://127.0.0.1:7420.
+**To run current build:** `pnpm -r build` then `CBRANCH_CLIENT_DIR=$PWD/packages/ui/build/client pnpm --filter @cbranch/web-server start` → http://127.0.0.1:7420.
 
 **Key context files (gitignored working notes):** `docs/_impl-notes/DECISIONS.md` (D1–D12 locked decisions) + the 8 spec digests. **Verify command:** `pnpm gate`. **Clean-room:** never read `.local/SPEC-AGENT-BRIEF.md`; build only from `docs/spec/`+`LICENSES.md`+`BRANDING.md`+git/lib public docs. Undercover: no AI/model mentions in commits.
 

@@ -41,8 +41,10 @@ describe("buildLogQuery (P1-FILT-1..6; spec 05 §2.4)", () => {
 
   test("a ref pattern is only emitted in pattern scope", () => {
     expect(
-      buildLogQuery(repoId, { ...emptyFilters, refPattern: "refs/heads/*" })
-        .refPattern,
+      buildLogQuery(repoId, {
+        ...emptyFilters,
+        refPattern: "refs/heads/*",
+      }).refPattern,
     ).toBeUndefined();
     expect(
       buildLogQuery(repoId, {

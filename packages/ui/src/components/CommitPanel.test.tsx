@@ -81,7 +81,9 @@ const makeApi = (overrides: Partial<CbranchApi> = {}): CbranchApi => ({
 });
 
 const renderPanel = (api: CbranchApi) => {
-  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const qc = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
   return render(
     <MemoryRouter>
       <QueryClientProvider client={qc}>
@@ -164,7 +166,9 @@ describe("CommitPanel", () => {
     await waitFor(() => expect(api.statusGet).toHaveBeenCalled());
     const subjectInput = screen.getByLabelText("Commit subject");
     await act(async () => {
-      fireEvent.change(subjectInput, { target: { value: "add feature" } });
+      fireEvent.change(subjectInput, {
+        target: { value: "add feature" },
+      });
     });
     const commitBtn = Array.from(document.querySelectorAll("button")).find(
       (b) => b.textContent?.trim() === "Commit",
@@ -197,7 +201,9 @@ describe("CommitPanel", () => {
     renderPanel(api);
     // Wait for the button to become enabled (data loaded)
     const reuseBtn = await waitFor(() => {
-      const btn = screen.getByRole("button", { name: /reuse last message/i });
+      const btn = screen.getByRole("button", {
+        name: /reuse last message/i,
+      });
       expect((btn as HTMLButtonElement).disabled).toBe(false);
       return btn;
     });

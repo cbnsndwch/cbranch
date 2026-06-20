@@ -98,6 +98,18 @@ into the shipped browser artifact. `MIT-0` is added to the permissive allow-list
 `scripts/license-audit.mjs` (it is non-copyleft and MIT-compatible); the bundled
 verdict above is unaffected.
 
+### Build-time tooling note — `caniuse-lite` (CC-BY-4.0)
+
+The Vite / react-router dev tooling pulls in **`browserslist`** transitively, which
+in turn depends on **`caniuse-lite`** — a browser-compatibility **data table**
+licensed **CC-BY-4.0**. `caniuse-lite` is **build-time-only**: it is consulted
+during `vite build` to resolve browser targets and is **not** linked into, embedded
+in, or emitted as part of the shipped browser bundle. CC-BY-4.0's attribution terms
+therefore do not reach cbranch's MIT-licensed artifacts. It is treated as an allowed
+**dev/build** license (REQ-STACK-033), not a bundled one — the bundled-dependency
+verdict above is unaffected. The license-audit gate (`scripts/license-audit.mjs`)
+adds `CC-BY-4.0` to the **dev** allow-list only.
+
 ---
 
 ## External processes (arm's-length, NOT bundled)

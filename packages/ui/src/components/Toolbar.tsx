@@ -5,7 +5,7 @@ import {
   RefreshCw,
   Upload,
 } from "lucide-react";
-import { type FormEvent, useEffect, useRef, useState } from "react";
+import { type SubmitEvent, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { type RefScope } from "../lib/filters";
@@ -57,7 +57,9 @@ export function Toolbar() {
         onItem: (item) => {
           const ev = item as { _tag: string; text?: string };
           if (ev._tag === "progress" && ev.text) {
-            toast.loading(ev.text.trim() || "Fetching…", { id: toastId });
+            toast.loading(ev.text.trim() || "Fetching…", {
+              id: toastId,
+            });
           }
         },
         onComplete: () => {
@@ -68,7 +70,9 @@ export function Toolbar() {
         onError: (err) => {
           setSyncRunning(null);
           syncUnsubRef.current = null;
-          toast.error("Fetch failed: " + String(err), { id: toastId });
+          toast.error("Fetch failed: " + String(err), {
+            id: toastId,
+          });
         },
       },
     );
@@ -89,7 +93,9 @@ export function Toolbar() {
         onItem: (item) => {
           const ev = item as { _tag: string; text?: string };
           if (ev._tag === "progress" && ev.text) {
-            toast.loading(ev.text.trim() || "Pulling…", { id: toastId });
+            toast.loading(ev.text.trim() || "Pulling…", {
+              id: toastId,
+            });
           }
         },
         onComplete: () => {
@@ -121,7 +127,9 @@ export function Toolbar() {
         onItem: (item) => {
           const ev = item as { _tag: string; text?: string };
           if (ev._tag === "progress" && ev.text) {
-            toast.loading(ev.text.trim() || "Pushing…", { id: toastId });
+            toast.loading(ev.text.trim() || "Pushing…", {
+              id: toastId,
+            });
           }
         },
         onComplete: () => {
@@ -149,7 +157,8 @@ export function Toolbar() {
     );
   };
 
-  const handleSubmit = (event: FormEvent) => {
+  // oxlint-disable-next-line unicorn/consistent-function-scoping
+  const handleSubmit = (event: SubmitEvent) => {
     event.preventDefault();
   };
 
@@ -168,24 +177,24 @@ export function Toolbar() {
       <button
         type="button"
         onClick={() => openPalette(true)}
-        className="flex h-[22px] items-center border px-1 py-0.5"
+        className="flex h-5.5 items-center border px-1 py-0.5"
         aria-label="Open repository"
       >
         <FolderOpen className="size-4" aria-hidden="true" />
       </button>
       <button
         type="button"
-        className="flex h-[22px] items-center border px-1 py-0.5"
+        className="flex h-5.5 items-center border px-1 py-0.5"
         aria-label="Refresh"
       >
         <RefreshCw className="size-4" aria-hidden="true" />
       </button>
       {/* Repo path */}
-      <span className="flex h-[22px] max-w-[200px] items-center truncate border px-1 text-[11px]">
+      <span className="flex h-5.5 max-w-50 items-center truncate border px-1 text-[11px]">
         {repoRoot}
       </span>
       {/* Current branch */}
-      <span className="flex h-[22px] items-center border px-1 text-[11px]">
+      <span className="flex h-5.5 items-center border px-1 text-[11px]">
         {currentBranch}
       </span>
       <div className="flex-1" />
@@ -193,7 +202,7 @@ export function Toolbar() {
       <select
         value={filters.refScope === "all" ? "all" : "current"}
         onChange={(e) => handleScopeChange(e.target.value)}
-        className="h-[22px] border text-[11px]"
+        className="h-5.5 border text-[11px]"
       >
         <option value="current">Current branch</option>
         <option value="all">All branches</option>
@@ -206,15 +215,15 @@ export function Toolbar() {
             type="text"
             value={filters.grep}
             onChange={(e) => handleGrepChange(e.target.value)}
-            className="h-[22px] w-28 border px-1 text-[11px]"
+            className="h-5.5 w-28 border px-1 text-[11px]"
           />
         </label>
-        <button type="submit" className="h-[22px] border px-2 text-[11px]">
+        <button type="submit" className="h-5.5 border px-2 text-[11px]">
           Apply
         </button>
       </form>
       {/* Commit button (inert placeholder) */}
-      <button type="button" className="h-[22px] border px-2 text-[11px]">
+      <button type="button" className="h-5.5 border px-2 text-[11px]">
         Commit (0)
       </button>
       {/* Sync buttons */}
@@ -222,17 +231,17 @@ export function Toolbar() {
         type="button"
         disabled={!repoId || syncRunning !== null}
         onClick={handleFetch}
-        className="flex h-[22px] items-center gap-0.5 border px-1.5 text-[11px] disabled:opacity-40"
+        className="flex h-5.5 items-center gap-0.5 border px-1.5 text-[11px] disabled:opacity-40"
         aria-label="Fetch"
       >
         <Download className="size-3" aria-hidden="true" />
         {syncRunning === "fetch" ? "…" : "Fetch"}
       </button>
-      <div className="flex h-[22px] items-center gap-0">
+      <div className="flex h-5.5 items-center gap-0">
         <select
           value={pullMode}
           onChange={(e) => setPullMode(e.target.value as PullMode)}
-          className="h-[22px] border-y border-l text-[11px]"
+          className="h-5.5 border-y border-l text-[11px]"
           disabled={!repoId || syncRunning !== null}
           aria-label="Pull mode"
         >
@@ -244,7 +253,7 @@ export function Toolbar() {
           type="button"
           disabled={!repoId || syncRunning !== null}
           onClick={handlePull}
-          className="flex h-[22px] items-center gap-0.5 border px-1.5 text-[11px] disabled:opacity-40"
+          className="flex h-5.5 items-center gap-0.5 border px-1.5 text-[11px] disabled:opacity-40"
           aria-label="Pull"
         >
           <ArrowDownUp className="size-3" aria-hidden="true" />
@@ -255,7 +264,7 @@ export function Toolbar() {
         type="button"
         disabled={!repoId || syncRunning !== null}
         onClick={handlePush}
-        className="flex h-[22px] items-center gap-0.5 border px-1.5 text-[11px] disabled:opacity-40"
+        className="flex h-5.5 items-center gap-0.5 border px-1.5 text-[11px] disabled:opacity-40"
         aria-label="Push"
       >
         <Upload className="size-3" aria-hidden="true" />

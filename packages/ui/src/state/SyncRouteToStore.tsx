@@ -1,6 +1,6 @@
 // Mirror the URL's route params into the Zustand store (D13). The URL is the source of truth
-// for `activeRepoId` / `selectedOid`; this bridge keeps the legacy store subscribers (TitleBar,
-// Toolbar, AppShell, …) working without rewiring each one to read params directly.
+// for `activeRepoId` / `selectedOid`; this bridge keeps the legacy store subscribers
+// (DocumentTitle, Toolbar, AppShell, …) working without rewiring each one to read params directly.
 //
 // `useLayoutEffect` runs before paint so the store is consistent with the URL on the first
 // frame of a deep-link load — no flash of the empty/previous state.
