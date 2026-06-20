@@ -90,8 +90,10 @@ export class ConflictListing extends Schema.Class<ConflictListing>(
   operation: OperationKind,
   progress: Schema.optional(OperationProgress),
   conflicted: Schema.Array(ConflictFile),
+  // The authoritative still-conflicted count (= conflicted.length). "Resolved" is
+  // relative to the operation's initial set, which only the client tracks, so it is
+  // derived there (initial − stillConflicted), not reported here.
   conflictedCount: Schema.Number,
-  resolvedCount: Schema.Number,
   // canContinue = kind ∈ {merge,rebase,cherryPick,revert} && conflictedCount == 0;
   // canSkip = kind == rebase (am/bisect/none → both false; Phase-5 surface).
   canContinue: Schema.Boolean,

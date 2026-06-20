@@ -35,6 +35,7 @@ import {
   commitCreate as commitCreateGit,
   commitLastMessage as commitLastMessageGit,
 } from "../git/commit-write";
+import { conflictList as conflictListGit } from "../git/conflicts";
 import { fileContentAtRev } from "../git/content";
 import { commitDiff, diffWorkingFile } from "../git/diff";
 import { gitError } from "../git/errors";
@@ -95,7 +96,7 @@ import {
   worktreeRemove as worktreeRemoveGit,
 } from "../git/worktrees";
 import { type ResolvedRepo, repoCwd, resolveRepo } from "../repo/resolve";
-import { readRepoState } from "../repo/state";
+import { detectInProgress, readRepoState } from "../repo/state";
 import { GitEngine, type GitEngineApi } from "./git-engine";
 
 /**
@@ -584,10 +585,21 @@ export const makeGitEngine = (
           ),
         ),
 
-      // ── conflicts / sequencer / blame / file history (P4, S1 stubs) ─────────
-      // Real bodies land per slice (S2–S7); these compile-complete the interface
-      // so `toLayer` stays exhaustive and the gate is green at S1.
-      conflictList: () => p4Stub(),
+      // ── conflicts / sequencer / blame / file history (P4) ───────────────────
+      // Remaining stubs land per slice (S3–S7); each compile-completes the
+      // interface so `toLayer` stays exhaustive and the gate is green.
+      conflictList: (repoId) =>
+        Effect.flatMap(resolveById(repoId), (repo) =>
+          Effect.flatMap(poolFor(repo), (pool) =>
+            conflictListGit(
+              repoCwd(repo),
+              repo.gitDir,
+              detectInProgress(repo.gitDir),
+              pool,
+              env,
+            ),
+          ),
+        ),
       conflictSides: () => p4Stub(),
       conflictResolve: () => p4Stub(),
       conflictSaveMerged: () => p4Stub(),

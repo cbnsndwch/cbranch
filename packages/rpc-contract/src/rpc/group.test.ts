@@ -243,7 +243,6 @@ const conflictListing = new ConflictListing({
     }),
   ],
   conflictedCount: 1,
-  resolvedCount: 0,
   canContinue: false,
   canSkip: false,
 });
