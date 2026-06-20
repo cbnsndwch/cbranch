@@ -20,6 +20,7 @@ import { RepoHandle } from "@cbranch/rpc-contract";
 import { type Cause, Effect, Layer, Queue, Scope, Stream } from "effect";
 
 import { type ConfigStore, makeConfigStore } from "../config/config-store";
+import { blame as blameGit } from "../git/blame";
 import {
   branchCheckoutDetached as branchCheckoutDetachedGit,
   branchCreate as branchCreateGit,
@@ -713,7 +714,18 @@ export const makeGitEngine = (
             ),
           ),
         ),
-      blame: () => p4Stub(),
+      blame: (repoId, path, rev, startLine, endLine, force) =>
+        Effect.flatMap(resolveById(repoId), (repo) =>
+          Effect.flatMap(poolFor(repo), (pool) =>
+            blameGit(
+              repoCwd(repo),
+              pool,
+              path,
+              { rev, startLine, endLine, force },
+              env,
+            ),
+          ),
+        ),
       fileHistory: () => p4Stub(),
     };
     return api;
