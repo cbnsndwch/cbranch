@@ -98,6 +98,14 @@ import { type ResolvedRepo, repoCwd, resolveRepo } from "../repo/resolve";
 import { readRepoState } from "../repo/state";
 import { GitEngine, type GitEngineApi } from "./git-engine";
 
+/**
+ * S1 placeholder for the P4 engine methods. Each slice (S2–S7) replaces the
+ * matching stub with its real body; until then the method fails fast rather than
+ * faking success. `Effect<never, …>` is assignable to every method's success type.
+ */
+const p4Stub = (): Effect.Effect<never, GitError> =>
+  Effect.fail(gitError("gitFailed", "P4 method not implemented yet"));
+
 export interface MakeGitEngineOptions {
   /** Override the settings file path (tests / `CBRANCH_CONFIG` semantics). */
   readonly configPath?: string;
@@ -575,6 +583,23 @@ export const makeGitEngine = (
             tagDeleteRemoteGit(repoCwd(repo), remote, name, env),
           ),
         ),
+
+      // ── conflicts / sequencer / blame / file history (P4, S1 stubs) ─────────
+      // Real bodies land per slice (S2–S7); these compile-complete the interface
+      // so `toLayer` stays exhaustive and the gate is green at S1.
+      conflictList: () => p4Stub(),
+      conflictSides: () => p4Stub(),
+      conflictResolve: () => p4Stub(),
+      conflictSaveMerged: () => p4Stub(),
+      conflictMarkResolved: () => p4Stub(),
+      conflictMarkUnresolved: () => p4Stub(),
+      cherryPick: () => p4Stub(),
+      revert: () => p4Stub(),
+      opContinue: () => p4Stub(),
+      opAbort: () => p4Stub(),
+      opSkip: () => p4Stub(),
+      blame: () => p4Stub(),
+      fileHistory: () => p4Stub(),
     };
     return api;
   });

@@ -36,6 +36,15 @@ import {
 } from "../schemas/domain";
 import { GitError } from "../schemas/errors";
 import { InvalidationEvent } from "../schemas/live";
+import {
+  BlameResult,
+  ConflictListing,
+  ConflictResolution,
+  ConflictSides,
+  ContentEncoding,
+  FileHistoryPage,
+  SequencerResult,
+} from "../schemas/phase4";
 import { Oid, RepoId } from "../schemas/primitives";
 import { DiffSpec, LogQuery } from "../schemas/queries";
 import {
@@ -473,6 +482,128 @@ export const CbranchRpcs = RpcGroup.make(
   Rpc.make("TagDeleteRemote", {
     payload: { repoId: RepoId, remote: Schema.String, name: Schema.String },
     success: Schema.Void,
+    error: GitError,
+  }),
+
+  // ── P4: conflicts (docs/spec/08 + 11) ──────────────────────────────────────
+  // conflict.list — in-progress op summary + every conflicted path (READ).
+  Rpc.make("ConflictList", {
+    payload: { repoId: RepoId },
+    success: ConflictListing,
+    error: GitError,
+  }),
+  // conflict.sides — base/ours/theirs + working-tree merged seed for one path (READ).
+  Rpc.make("ConflictSides", {
+    payload: { repoId: RepoId, path: Schema.String },
+    success: ConflictSides,
+    error: GitError,
+  }),
+  // conflict.resolve ✎ — whole-file resolution (ours/theirs/base/keep/delete), bulk.
+  Rpc.make("ConflictResolve", {
+    payload: {
+      repoId: RepoId,
+      paths: Schema.Array(Schema.String),
+      resolution: ConflictResolution,
+    },
+    success: Schema.Void,
+    error: GitError,
+  }),
+  // conflict.saveMerged ✎ — write byte-faithful merged result + stage.
+  Rpc.make("ConflictSaveMerged", {
+    payload: {
+      repoId: RepoId,
+      path: Schema.String,
+      content: Schema.String,
+      encoding: ContentEncoding,
+    },
+    success: Schema.Void,
+    error: GitError,
+  }),
+  // conflict.markResolved ✎ — stage the working-tree content as resolved.
+  Rpc.make("ConflictMarkResolved", {
+    payload: { repoId: RepoId, paths: Schema.Array(Schema.String) },
+    success: Schema.Void,
+    error: GitError,
+  }),
+  // conflict.markUnresolved ✎ — recreate the conflicted merge for a path.
+  Rpc.make("ConflictMarkUnresolved", {
+    payload: { repoId: RepoId, paths: Schema.Array(Schema.String) },
+    success: Schema.Void,
+    error: GitError,
+  }),
+
+  // ── P4: cherry-pick / revert + continuation ────────────────────────────────
+  // cherryPick ✎ — single or oldest→newest list; -x/-m N/--no-commit.
+  Rpc.make("CherryPick", {
+    payload: {
+      repoId: RepoId,
+      commits: Schema.Array(Oid),
+      recordOrigin: Schema.optional(Schema.Boolean),
+      mainline: Schema.optional(Schema.Number),
+      noCommit: Schema.optional(Schema.Boolean),
+    },
+    success: SequencerResult,
+    error: GitError,
+  }),
+  // revert ✎ — single or list; -m N/--no-commit; optional custom message.
+  Rpc.make("Revert", {
+    payload: {
+      repoId: RepoId,
+      commits: Schema.Array(Oid),
+      mainline: Schema.optional(Schema.Number),
+      noCommit: Schema.optional(Schema.Boolean),
+      message: Schema.optional(Schema.String),
+    },
+    success: SequencerResult,
+    error: GitError,
+  }),
+  // op.continue ✎ — resume the in-progress op (verb from detected op kind).
+  Rpc.make("OpContinue", {
+    payload: {
+      repoId: RepoId,
+      message: Schema.optional(Schema.String),
+      allowEmpty: Schema.optional(Schema.Boolean),
+    },
+    success: SequencerResult,
+    error: GitError,
+  }),
+  // op.abort ✎ — restore the pre-operation state.
+  Rpc.make("OpAbort", {
+    payload: { repoId: RepoId },
+    success: Schema.Void,
+    error: GitError,
+  }),
+  // op.skip ✎ — drop the current commit (rebase/cherry-pick/revert).
+  Rpc.make("OpSkip", {
+    payload: { repoId: RepoId },
+    success: SequencerResult,
+    error: GitError,
+  }),
+
+  // ── P4: blame & file history ───────────────────────────────────────────────
+  // blame — per-line authorship (READ); inline or a too-large cap arm.
+  Rpc.make("Blame", {
+    payload: {
+      repoId: RepoId,
+      path: Schema.String,
+      rev: Schema.optional(Schema.String),
+      startLine: Schema.optional(Schema.Number),
+      endLine: Schema.optional(Schema.Number),
+      force: Schema.optional(Schema.Boolean),
+    },
+    success: BlameResult,
+    error: GitError,
+  }),
+  // file.history — single-path revision list with rename following (READ, paginated).
+  Rpc.make("FileHistory", {
+    payload: {
+      repoId: RepoId,
+      path: Schema.String,
+      limit: Schema.Number,
+      cursor: Schema.optional(Schema.String),
+      startRev: Schema.optional(Schema.String),
+    },
+    success: FileHistoryPage,
     error: GitError,
   }),
 );

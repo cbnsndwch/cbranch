@@ -78,4 +78,21 @@ export const queryKeys = {
     [repoId, "stash", ref, "diff"] as const,
   /** `tag.list` (domain: `tags`). */
   tags: (repoId: RepoId) => [repoId, "tags", "list"] as const,
+  /**
+   * `conflict.list` — in-progress op + conflicted paths (domain: `status`; every
+   * conflict mutation touches the index). Drives the banner + panel.
+   */
+  conflicts: (repoId: RepoId) => [repoId, "status", "conflicts"] as const,
+  /** `conflict.sides` — one path's three sides + merged seed (domain: `status`). */
+  conflictSides: (repoId: RepoId, path: string) =>
+    [repoId, "status", "conflict", path, "sides"] as const,
+  /**
+   * `blame` — immutable, content-addressed by a concrete rev (never invalidated;
+   * spec 15 §8). The caller resolves a default HEAD to a concrete oid for caching.
+   */
+  blame: (repoId: RepoId, rev: string, path: string) =>
+    [repoId, "blame", rev, path] as const,
+  /** `file.history` — single-path revision list (domain: `commits`; paginated). */
+  fileHistory: (repoId: RepoId, path: string) =>
+    [repoId, "commits", "fileHistory", path] as const,
 };

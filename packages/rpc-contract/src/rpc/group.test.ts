@@ -36,6 +36,20 @@ import {
 } from "../schemas/domain";
 import { GitError } from "../schemas/errors";
 import { InvalidationEvent } from "../schemas/live";
+import {
+  BlameCommit,
+  BlameData,
+  BlameLine,
+  BlameResult,
+  BlameTooLarge,
+  ConflictFile,
+  ConflictListing,
+  ConflictSides,
+  ConflictStage,
+  FileHistoryEntry,
+  FileHistoryPage,
+  SequencerResult,
+} from "../schemas/phase4";
 import { Oid, RepoId } from "../schemas/primitives";
 import { LogQuery } from "../schemas/queries";
 import {
@@ -205,6 +219,88 @@ const tagInfo = new TagInfo({
   isAnnotated: false,
 });
 
+// --- P4 sample data ---
+const conflictStage = (present: boolean) =>
+  new ConflictStage({
+    present,
+    isBinary: false,
+    encoding: "utf8",
+    content: present ? "hello\n" : "",
+    oid: present ? oid1 : undefined,
+    size: present ? 6 : 0,
+  });
+const conflictListing = new ConflictListing({
+  operation: "merge",
+  conflicted: [
+    new ConflictFile({
+      path: "a.txt",
+      classification: "bothModified",
+      hasBase: true,
+      hasOurs: true,
+      hasTheirs: true,
+      isBinary: false,
+      isSubmodule: false,
+    }),
+  ],
+  conflictedCount: 1,
+  resolvedCount: 0,
+  canContinue: false,
+  canSkip: false,
+});
+const conflictSides = new ConflictSides({
+  path: "a.txt",
+  classification: "bothModified",
+  isBinary: false,
+  isSubmodule: false,
+  base: conflictStage(true),
+  ours: conflictStage(true),
+  theirs: conflictStage(true),
+  merged: conflictStage(true),
+  mergeable: true,
+});
+const sequencerResult = new SequencerResult({
+  outcome: "completed",
+  operation: "cherryPick",
+  committed: 1,
+  newCommitOid: oid1,
+});
+const blameData = new BlameData({
+  path: "a.txt",
+  rev: "HEAD",
+  commits: [
+    new BlameCommit({
+      oid: oid1,
+      authorName: "Ada Lovelace",
+      authorEmail: "ada@example.io",
+      authorTime: 1_700_000_000,
+      authorTzMinutes: -300,
+      summary: "init",
+      filename: "a.txt",
+    }),
+  ],
+  lines: [
+    new BlameLine({
+      ownerOid: oid1,
+      finalLineNo: 1,
+      origLineNo: 1,
+      content: "hello",
+    }),
+  ],
+});
+const fileHistoryPage = new FileHistoryPage({
+  entries: [
+    new FileHistoryEntry({
+      oid: oid1,
+      authorName: "Ada Lovelace",
+      authorEmail: "ada@example.io",
+      authorDate: "2023-11-14T22:13:20-05:00",
+      subject: "init",
+      path: "a.txt",
+      status: "modified",
+    }),
+  ],
+});
+
 // --- stub handlers: schema-valid data, plus payload-driven error injection ---
 const handlers = CbranchRpcs.toLayer({
   RepoOpen: ({ path }) =>
@@ -312,6 +408,31 @@ const handlers = CbranchRpcs.toLayer({
   TagDelete: () => Effect.void,
   TagPush: () => Effect.void,
   TagDeleteRemote: () => Effect.void,
+
+  // ── P4: conflicts / sequencer / blame / file history ──────────────────────────
+  ConflictList: () => Effect.succeed(conflictListing),
+  ConflictSides: () => Effect.succeed(conflictSides),
+  ConflictResolve: () => Effect.void,
+  ConflictSaveMerged: () => Effect.void,
+  ConflictMarkResolved: () => Effect.void,
+  ConflictMarkUnresolved: () => Effect.void,
+  CherryPick: () => Effect.succeed(sequencerResult),
+  Revert: () => Effect.succeed(sequencerResult),
+  OpContinue: () => Effect.succeed(sequencerResult),
+  OpAbort: () => Effect.void,
+  OpSkip: () => Effect.succeed(sequencerResult),
+  Blame: ({ force }) =>
+    force === true
+      ? Effect.succeed(blameData)
+      : Effect.succeed(
+          new BlameTooLarge({
+            path: "a.txt",
+            rev: "HEAD",
+            byteSize: 20_000_000,
+            lineCount: 0,
+          }),
+        ),
+  FileHistory: () => Effect.succeed(fileHistoryPage),
 });
 
 describe("CbranchRpcs P1 contract (in-memory RpcTest round-trip)", () => {
@@ -554,6 +675,133 @@ describe("CbranchRpcs P3 branches/sync/remotes/worktrees/stash/tags method catal
     "TagDelete",
     "TagPush",
     "TagDeleteRemote",
+  ])("exposes the %s wire tag", (tag) => {
+    expect(CbranchRpcs.requests.has(tag)).toBe(true);
+  });
+});
+
+describe("CbranchRpcs P4 conflicts/sequencer/blame/file-history round-trip", () => {
+  test("every P4 method round-trips schema-valid data", async () => {
+    const program = Effect.gen(function* () {
+      const client = yield* RpcTest.makeClient(CbranchRpcs);
+
+      const conflicts = yield* client.ConflictList({ repoId });
+      const sides = yield* client.ConflictSides({ repoId, path: "a.txt" });
+      const resolved = yield* client.ConflictResolve({
+        repoId,
+        paths: ["a.txt"],
+        resolution: "ours",
+      });
+      const saved = yield* client.ConflictSaveMerged({
+        repoId,
+        path: "a.txt",
+        content: "merged\n",
+        encoding: "utf8",
+      });
+      const marked = yield* client.ConflictMarkResolved({
+        repoId,
+        paths: ["a.txt"],
+      });
+      const unmarked = yield* client.ConflictMarkUnresolved({
+        repoId,
+        paths: ["a.txt"],
+      });
+      const picked = yield* client.CherryPick({ repoId, commits: [oid1] });
+      const reverted = yield* client.Revert({ repoId, commits: [oid1] });
+      const continued = yield* client.OpContinue({ repoId });
+      const aborted = yield* client.OpAbort({ repoId });
+      const skipped = yield* client.OpSkip({ repoId });
+      const blameInline = yield* client.Blame({
+        repoId,
+        path: "a.txt",
+        force: true,
+      });
+      const blameLarge = yield* client.Blame({ repoId, path: "a.txt" });
+      const history = yield* client.FileHistory({
+        repoId,
+        path: "a.txt",
+        limit: 50,
+      });
+
+      return {
+        conflicts,
+        sides,
+        resolved,
+        saved,
+        marked,
+        unmarked,
+        picked,
+        reverted,
+        continued,
+        aborted,
+        skipped,
+        blameInline,
+        blameLarge,
+        history,
+      };
+    }).pipe(Effect.provide(handlers), Effect.scoped);
+
+    const r = await Effect.runPromise(program);
+
+    expect(r.conflicts.operation).toBe("merge");
+    expect(r.conflicts.conflicted[0]?.classification).toBe("bothModified");
+    expect(r.sides.base.present).toBe(true);
+    expect(r.sides.mergeable).toBe(true);
+    expect(r.resolved).toBeUndefined();
+    expect(r.saved).toBeUndefined();
+    expect(r.marked).toBeUndefined();
+    expect(r.unmarked).toBeUndefined();
+    expect(r.picked.outcome).toBe("completed");
+    expect(r.reverted.operation).toBe("cherryPick");
+    expect(r.continued.committed).toBe(1);
+    expect(r.aborted).toBeUndefined();
+    expect(r.skipped.newCommitOid).toBe(oid1);
+    // BlameResult union decodes unambiguously on its disjoint required fields.
+    expect("lines" in r.blameInline).toBe(true);
+    if ("lines" in r.blameInline) {
+      expect(r.blameInline.lines[0]?.content).toBe("hello");
+    }
+    expect("byteSize" in r.blameLarge).toBe(true);
+    expect(r.history.entries[0]?.path).toBe("a.txt");
+  });
+
+  test("BlameResult decodes both arms unambiguously (RPC-032)", () => {
+    const dataExit = Schema.decodeUnknownExit(BlameResult)({
+      path: "a.txt",
+      rev: "HEAD",
+      commits: [],
+      lines: [],
+    });
+    const largeExit = Schema.decodeUnknownExit(BlameResult)({
+      path: "a.txt",
+      rev: "HEAD",
+      byteSize: 20_000_000,
+      lineCount: 0,
+    });
+
+    expect(Exit.isSuccess(dataExit)).toBe(true);
+    expect(Exit.isSuccess(largeExit)).toBe(true);
+  });
+});
+
+describe("CbranchRpcs P4 conflicts/sequencer/blame/file-history method catalog (DECISIONS D1 wire tags)", () => {
+  test.each([
+    // conflicts
+    "ConflictList",
+    "ConflictSides",
+    "ConflictResolve",
+    "ConflictSaveMerged",
+    "ConflictMarkResolved",
+    "ConflictMarkUnresolved",
+    // cherry-pick / revert + continuation
+    "CherryPick",
+    "Revert",
+    "OpContinue",
+    "OpAbort",
+    "OpSkip",
+    // blame & file history
+    "Blame",
+    "FileHistory",
   ])("exposes the %s wire tag", (tag) => {
     expect(CbranchRpcs.requests.has(tag)).toBe(true);
   });

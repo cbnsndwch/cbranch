@@ -34,6 +34,9 @@ export * from "./schemas/working-tree";
 // P3 branch/sync/remote/worktree/stash/tag Schemas.
 export * from "./schemas/branches";
 
+// P4 conflict / sequencer / blame / file-history Schemas.
+export * from "./schemas/phase4";
+
 // The P1 method catalog.
 export * from "./rpc/group";
 

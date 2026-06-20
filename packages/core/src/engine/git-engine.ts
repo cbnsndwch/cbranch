@@ -12,6 +12,7 @@
 // core-B stubs so the interface is COMPLETE and core-B only fills bodies.
 
 import {
+  type BlameResult,
   type BranchInfo,
   type BranchListing,
   type BranchSwitchStrategy,
@@ -19,8 +20,13 @@ import {
   type CommitDetail,
   type CommitInput,
   type CommitMessage,
+  type ConflictListing,
+  type ConflictResolution,
+  type ConflictSides,
+  type ContentEncoding,
   type DiffFile,
   type FileContentResult,
+  type FileHistoryPage,
   type GitError,
   type InvalidationEvent,
   type LogQuery,
@@ -33,6 +39,7 @@ import {
   type RepoHandle,
   type RepoId,
   type RepoState,
+  type SequencerResult,
   type CommitSummary,
   type DiffSpec,
   type StashEntry,
@@ -367,6 +374,87 @@ export interface GitEngineApi {
     remote: string,
     name: string,
   ) => Effect.Effect<void, GitError>;
+
+  // ── conflicts (P4, S2–S4) ──────────────────────────────────────────────────
+  /** conflict.list — in-progress op summary + conflicted paths. READ. core-S2. */
+  readonly conflictList: (
+    repoId: RepoId,
+  ) => Effect.Effect<ConflictListing, GitError>;
+  /** conflict.sides — base/ours/theirs + merged seed for one path. READ. core-S3. */
+  readonly conflictSides: (
+    repoId: RepoId,
+    path: string,
+  ) => Effect.Effect<ConflictSides, GitError>;
+  /** conflict.resolve ✎ — whole-file resolution (bulk-capable). core-S4. */
+  readonly conflictResolve: (
+    repoId: RepoId,
+    paths: ReadonlyArray<string>,
+    resolution: ConflictResolution,
+  ) => Effect.Effect<void, GitError>;
+  /** conflict.saveMerged ✎ — byte-faithful merged write + stage. core-S4. */
+  readonly conflictSaveMerged: (
+    repoId: RepoId,
+    path: string,
+    content: string,
+    encoding: ContentEncoding,
+  ) => Effect.Effect<void, GitError>;
+  /** conflict.markResolved ✎ — stage the working-tree content. core-S4. */
+  readonly conflictMarkResolved: (
+    repoId: RepoId,
+    paths: ReadonlyArray<string>,
+  ) => Effect.Effect<void, GitError>;
+  /** conflict.markUnresolved ✎ — recreate the conflicted merge. core-S4. */
+  readonly conflictMarkUnresolved: (
+    repoId: RepoId,
+    paths: ReadonlyArray<string>,
+  ) => Effect.Effect<void, GitError>;
+
+  // ── cherry-pick / revert + continuation (P4, S5) ────────────────────────────
+  /** cherryPick ✎ — single or oldest→newest list; -x/-m N/--no-commit. core-S5. */
+  readonly cherryPick: (
+    repoId: RepoId,
+    commits: ReadonlyArray<Oid>,
+    recordOrigin?: boolean,
+    mainline?: number,
+    noCommit?: boolean,
+  ) => Effect.Effect<SequencerResult, GitError>;
+  /** revert ✎ — single or list; -m N/--no-commit; optional message. core-S5. */
+  readonly revert: (
+    repoId: RepoId,
+    commits: ReadonlyArray<Oid>,
+    mainline?: number,
+    noCommit?: boolean,
+    message?: string,
+  ) => Effect.Effect<SequencerResult, GitError>;
+  /** op.continue ✎ — resume the in-progress op (verb from detected kind). core-S5. */
+  readonly opContinue: (
+    repoId: RepoId,
+    message?: string,
+    allowEmpty?: boolean,
+  ) => Effect.Effect<SequencerResult, GitError>;
+  /** op.abort ✎ — restore the pre-operation state. core-S5. */
+  readonly opAbort: (repoId: RepoId) => Effect.Effect<void, GitError>;
+  /** op.skip ✎ — drop the current commit (rebase/cherry-pick/revert). core-S5. */
+  readonly opSkip: (repoId: RepoId) => Effect.Effect<SequencerResult, GitError>;
+
+  // ── blame & file history (P4, S6–S7) ────────────────────────────────────────
+  /** blame — per-line authorship; inline or a too-large cap arm. READ. core-S6. */
+  readonly blame: (
+    repoId: RepoId,
+    path: string,
+    rev?: string,
+    startLine?: number,
+    endLine?: number,
+    force?: boolean,
+  ) => Effect.Effect<BlameResult, GitError>;
+  /** file.history — single-path revisions, rename-following, paginated. READ. core-S7. */
+  readonly fileHistory: (
+    repoId: RepoId,
+    path: string,
+    limit: number,
+    cursor?: string,
+    startRev?: string,
+  ) => Effect.Effect<FileHistoryPage, GitError>;
 
   // ── object-read infrastructure (internal; for core-B) ──────────────────────
   /** Read a full object via the repo's `cat-file --batch` pool (`null` if missing). */

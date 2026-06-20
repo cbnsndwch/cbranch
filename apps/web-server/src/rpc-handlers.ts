@@ -214,4 +214,54 @@ export const handlersLayer = CbranchRpcs.toLayer({
     Effect.flatMap(GitEngine, (engine) =>
       engine.tagDeleteRemote(repoId, remote, name),
     ),
+
+  // ── conflicts (P4) ──────────────────────────────────────────────────────────
+  ConflictList: ({ repoId }) =>
+    Effect.flatMap(GitEngine, (engine) => engine.conflictList(repoId)),
+  ConflictSides: ({ repoId, path }) =>
+    Effect.flatMap(GitEngine, (engine) => engine.conflictSides(repoId, path)),
+  ConflictResolve: ({ repoId, paths, resolution }) =>
+    Effect.flatMap(GitEngine, (engine) =>
+      engine.conflictResolve(repoId, paths, resolution),
+    ),
+  ConflictSaveMerged: ({ repoId, path, content, encoding }) =>
+    Effect.flatMap(GitEngine, (engine) =>
+      engine.conflictSaveMerged(repoId, path, content, encoding),
+    ),
+  ConflictMarkResolved: ({ repoId, paths }) =>
+    Effect.flatMap(GitEngine, (engine) =>
+      engine.conflictMarkResolved(repoId, paths),
+    ),
+  ConflictMarkUnresolved: ({ repoId, paths }) =>
+    Effect.flatMap(GitEngine, (engine) =>
+      engine.conflictMarkUnresolved(repoId, paths),
+    ),
+
+  // ── cherry-pick / revert + continuation (P4) ──────────────────────────────
+  CherryPick: ({ repoId, commits, recordOrigin, mainline, noCommit }) =>
+    Effect.flatMap(GitEngine, (engine) =>
+      engine.cherryPick(repoId, commits, recordOrigin, mainline, noCommit),
+    ),
+  Revert: ({ repoId, commits, mainline, noCommit, message }) =>
+    Effect.flatMap(GitEngine, (engine) =>
+      engine.revert(repoId, commits, mainline, noCommit, message),
+    ),
+  OpContinue: ({ repoId, message, allowEmpty }) =>
+    Effect.flatMap(GitEngine, (engine) =>
+      engine.opContinue(repoId, message, allowEmpty),
+    ),
+  OpAbort: ({ repoId }) =>
+    Effect.flatMap(GitEngine, (engine) => engine.opAbort(repoId)),
+  OpSkip: ({ repoId }) =>
+    Effect.flatMap(GitEngine, (engine) => engine.opSkip(repoId)),
+
+  // ── blame & file history (P4) ─────────────────────────────────────────────
+  Blame: ({ repoId, path, rev, startLine, endLine, force }) =>
+    Effect.flatMap(GitEngine, (engine) =>
+      engine.blame(repoId, path, rev, startLine, endLine, force),
+    ),
+  FileHistory: ({ repoId, path, limit, cursor, startRev }) =>
+    Effect.flatMap(GitEngine, (engine) =>
+      engine.fileHistory(repoId, path, limit, cursor, startRev),
+    ),
 });

@@ -8,6 +8,7 @@
 // React Query error state); a stream's per-item error reaches `onError`.
 
 import {
+  type BlameResult,
   type BranchInfo,
   type BranchListing,
   type BranchSwitchStrategy,
@@ -16,9 +17,14 @@ import {
   type CommitInput,
   type CommitMessage,
   type CommitSummary,
+  type ConflictListing,
+  type ConflictResolution,
+  type ConflictSides,
+  type ContentEncoding,
   type DiffFile,
   type DiffSpec,
   type FileContentResult,
+  type FileHistoryPage,
   type InvalidationEvent,
   type LogQuery,
   type MergeMode,
@@ -30,6 +36,7 @@ import {
   type RepoHandle,
   type RepoId,
   type RepoState,
+  type SequencerResult,
   type StashEntry,
   type SyncEvent,
   type TagInfo,
@@ -237,6 +244,61 @@ export interface CbranchApi {
     opts?: { name?: string; all?: boolean },
   ): Promise<void>;
   tagDeleteRemote(repoId: RepoId, remote: string, name: string): Promise<void>;
+  // ── conflicts (P4) ────────────────────────────────────────────────────────
+  conflictList(repoId: RepoId): Promise<ConflictListing>;
+  conflictSides(repoId: RepoId, path: string): Promise<ConflictSides>;
+  conflictResolve(
+    repoId: RepoId,
+    paths: ReadonlyArray<string>,
+    resolution: ConflictResolution,
+  ): Promise<void>;
+  conflictSaveMerged(
+    repoId: RepoId,
+    path: string,
+    content: string,
+    encoding: ContentEncoding,
+  ): Promise<void>;
+  conflictMarkResolved(
+    repoId: RepoId,
+    paths: ReadonlyArray<string>,
+  ): Promise<void>;
+  conflictMarkUnresolved(
+    repoId: RepoId,
+    paths: ReadonlyArray<string>,
+  ): Promise<void>;
+  // ── cherry-pick / revert + continuation (P4) ──────────────────────────────
+  cherryPick(
+    repoId: RepoId,
+    commits: ReadonlyArray<Oid>,
+    opts?: { recordOrigin?: boolean; mainline?: number; noCommit?: boolean },
+  ): Promise<SequencerResult>;
+  revert(
+    repoId: RepoId,
+    commits: ReadonlyArray<Oid>,
+    opts?: { mainline?: number; noCommit?: boolean; message?: string },
+  ): Promise<SequencerResult>;
+  opContinue(
+    repoId: RepoId,
+    opts?: { message?: string; allowEmpty?: boolean },
+  ): Promise<SequencerResult>;
+  opAbort(repoId: RepoId): Promise<void>;
+  opSkip(repoId: RepoId): Promise<SequencerResult>;
+  // ── blame & file history (P4) ─────────────────────────────────────────────
+  blame(
+    repoId: RepoId,
+    path: string,
+    opts?: {
+      rev?: string;
+      startLine?: number;
+      endLine?: number;
+      force?: boolean;
+    },
+  ): Promise<BlameResult>;
+  fileHistory(
+    repoId: RepoId,
+    path: string,
+    opts: { limit: number; cursor?: string; startRev?: string },
+  ): Promise<FileHistoryPage>;
 }
 
 /** Back a {@link CbranchApi} with the single app runtime. */
@@ -454,6 +516,51 @@ export const makeApi = (runtime: AppRuntime): CbranchApi => {
     tagDeleteRemote: (repoId, remote, name) =>
       runtime.runPromise(
         withClient((c) => c.TagDeleteRemote({ repoId, remote, name })),
+      ),
+    // ── conflicts (P4) ────────────────────────────────────────────────────────
+    conflictList: (repoId) =>
+      runtime.runPromise(withClient((c) => c.ConflictList({ repoId }))),
+    conflictSides: (repoId, path) =>
+      runtime.runPromise(withClient((c) => c.ConflictSides({ repoId, path }))),
+    conflictResolve: (repoId, paths, resolution) =>
+      runtime.runPromise(
+        withClient((c) => c.ConflictResolve({ repoId, paths, resolution })),
+      ),
+    conflictSaveMerged: (repoId, path, content, encoding) =>
+      runtime.runPromise(
+        withClient((c) =>
+          c.ConflictSaveMerged({ repoId, path, content, encoding }),
+        ),
+      ),
+    conflictMarkResolved: (repoId, paths) =>
+      runtime.runPromise(
+        withClient((c) => c.ConflictMarkResolved({ repoId, paths })),
+      ),
+    conflictMarkUnresolved: (repoId, paths) =>
+      runtime.runPromise(
+        withClient((c) => c.ConflictMarkUnresolved({ repoId, paths })),
+      ),
+    // ── cherry-pick / revert + continuation (P4) ──────────────────────────────
+    cherryPick: (repoId, commits, opts) =>
+      runtime.runPromise(
+        withClient((c) => c.CherryPick({ repoId, commits, ...opts })),
+      ),
+    revert: (repoId, commits, opts) =>
+      runtime.runPromise(
+        withClient((c) => c.Revert({ repoId, commits, ...opts })),
+      ),
+    opContinue: (repoId, opts) =>
+      runtime.runPromise(withClient((c) => c.OpContinue({ repoId, ...opts }))),
+    opAbort: (repoId) =>
+      runtime.runPromise(withClient((c) => c.OpAbort({ repoId }))),
+    opSkip: (repoId) =>
+      runtime.runPromise(withClient((c) => c.OpSkip({ repoId }))),
+    // ── blame & file history (P4) ─────────────────────────────────────────────
+    blame: (repoId, path, opts) =>
+      runtime.runPromise(withClient((c) => c.Blame({ repoId, path, ...opts }))),
+    fileHistory: (repoId, path, opts) =>
+      runtime.runPromise(
+        withClient((c) => c.FileHistory({ repoId, path, ...opts })),
       ),
   };
 };
