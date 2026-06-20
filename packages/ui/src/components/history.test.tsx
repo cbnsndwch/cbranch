@@ -8,6 +8,7 @@ import {
   screen,
   waitFor,
 } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { type ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
@@ -45,8 +46,14 @@ const fakeApi = (rows: ReadonlyArray<CommitSummary>): CbranchApi =>
     ),
   }) as unknown as CbranchApi;
 
-const renderWithApi = (ui: ReactNode, api: CbranchApi) =>
-  render(<ApiProvider api={api}>{ui}</ApiProvider>);
+const renderWithApi = (ui: ReactNode, api: CbranchApi) => {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(
+    <QueryClientProvider client={qc}>
+      <ApiProvider api={api}>{ui}</ApiProvider>
+    </QueryClientProvider>,
+  );
+};
 
 beforeEach(() => {
   // jsdom has no layout; @tanstack/react-virtual measures the scroll element via a

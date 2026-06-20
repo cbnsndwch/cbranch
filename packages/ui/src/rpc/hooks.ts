@@ -146,6 +146,23 @@ export const useLogStream = (query: LogQuery | null): LogStreamResult => {
   // Restart only when a meaningful query field changes, not on every render's new object.
   const queryKey = query === null ? null : JSON.stringify(query);
 
+  // This is a stream, not a TanStack query, so `commits`-domain invalidations (from the
+  // commit/merge/pull mutations AND the WS invalidation bus) don't reach it on their own.
+  // Bridge them in: a sentinel query under the log key (`queryKeys.log` lives in the
+  // `commits` domain) refetches whenever that domain is invalidated, bumping
+  // `dataUpdatedAt`; restarting the subscription on that value re-snapshots the history.
+  const refreshToken = useQuery({
+    queryKey: query ? queryKeys.log(query) : ["inactive", "log"],
+    queryFn: () => null,
+    enabled: query !== null,
+    // Seeded + never-stale, so it does NOT fetch on mount (which would double-subscribe
+    // the stream); only an explicit `commits`-domain invalidation refetches it.
+    initialData: null,
+    staleTime: Infinity,
+    refetchOnWindowFocus: false,
+    gcTime: 0,
+  }).dataUpdatedAt;
+
   useEffect(() => {
     if (query === null) {
       setRows([]);
@@ -186,8 +203,9 @@ export const useLogStream = (query: LogQuery | null): LogStreamResult => {
     });
     return unsubscribe;
     // `queryKey` captures the meaningful query fields; `query` is intentionally read inside.
+    // `refreshToken` restarts the stream when the `commits` domain is invalidated.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [api, queryKey]);
+  }, [api, queryKey, refreshToken]);
 
   return { rows, status, error };
 };
@@ -379,6 +397,33 @@ export const useCommitCreate = (repoId: RepoId) => {
   const qc = useQueryClient();
   return useMutation<CommitCreated, unknown, CommitInput>({
     mutationFn: (input) => api.commitCreate(input),
+    // Optimistically clear the just-committed (staged) changes so the dialog's changes
+    // list empties immediately instead of after the status refetch round-trip. A commit
+    // moves the staged portion into the new commit: reset every entry's `staged` to
+    // unmodified, then drop entries that become fully clean (keeping ones that still
+    // have unstaged edits, are untracked, or are conflicted). Reconciled in onSettled;
+    // rolled back in onError. Same shape as stage/unstage (the value is a transient
+    // plain object, not a WorkingTreeStatus instance).
+    onMutate: async () => {
+      await qc.cancelQueries({ queryKey: queryKeys.status(repoId) });
+      const prev = qc.getQueryData<WorkingTreeStatus>(queryKeys.status(repoId));
+      if (prev) {
+        const entries = prev.entries
+          .map((e) =>
+            e.staged === "unmodified" ? e : { ...e, staged: "unmodified" },
+          )
+          .filter(
+            (e) =>
+              e.unstaged !== "unmodified" || e.isUntracked || e.isConflicted,
+          );
+        qc.setQueryData(queryKeys.status(repoId), { ...prev, entries });
+      }
+      return { prev };
+    },
+    onError: (_err, _vars, ctx) => {
+      const c = ctx as { prev?: WorkingTreeStatus } | undefined;
+      if (c?.prev) qc.setQueryData(queryKeys.status(repoId), c.prev);
+    },
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: [repoId, "status"] });
       void qc.invalidateQueries({ queryKey: [repoId, "commits"] });
