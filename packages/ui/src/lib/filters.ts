@@ -29,9 +29,10 @@ export interface LogFilters {
   readonly until: string;
 }
 
-/** The default filter set: current branch, no other constraints (P1-FILT-1 default). */
+/** The default filter set: all refs (so every branch's lane + chips show), no other
+ * constraints. "all" is the baseline scope, not a narrowing filter, so it carries no chip. */
 export const emptyFilters: LogFilters = {
-  refScope: "current",
+  refScope: "all",
   refPattern: "",
   path: "",
   author: "",
@@ -73,8 +74,9 @@ export const describeFilters = (
   filters: LogFilters,
 ): ReadonlyArray<FilterChip> => {
   const chips: FilterChip[] = [];
-  if (filters.refScope === "all")
-    chips.push({ key: "refScope", label: "refs: all" });
+  // "all" is the default scope (no chip); narrowing to the current branch is the constraint.
+  if (filters.refScope === "current")
+    chips.push({ key: "refScope", label: "refs: current branch" });
   if (filters.refScope === "pattern" && trimmed(filters.refPattern)) {
     chips.push({
       key: "refPattern",
@@ -107,7 +109,7 @@ export const clearFilter = (
   key: keyof LogFilters,
 ): LogFilters => {
   if (key === "refScope" || key === "refPattern") {
-    return { ...filters, refScope: "current", refPattern: "" };
+    return { ...filters, refScope: "all", refPattern: "" };
   }
   return { ...filters, [key]: "" };
 };

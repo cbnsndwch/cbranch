@@ -12,9 +12,9 @@ import {
 const repoId = RepoId.make("repo-1");
 
 describe("buildLogQuery (P1-FILT-1..6; spec 05 §2.4)", () => {
-  test("the default scope is the current branch with no other constraints", () => {
+  test("the default scope is all refs with no other constraints", () => {
     const q = buildLogQuery(repoId, emptyFilters);
-    expect(q.refScope).toBe("current");
+    expect(q.refScope).toBe("all");
     expect(q.path).toBeUndefined();
     expect(q.author).toBeUndefined();
     expect(q.grep).toBeUndefined();
@@ -62,18 +62,24 @@ describe("describeFilters / hasActiveFilters (P1-FILT-6)", () => {
     expect(hasActiveFilters(emptyFilters)).toBe(false);
   });
 
-  test("one chip per active constraint", () => {
+  test("one chip per active constraint; narrowing to the current branch is a constraint", () => {
     const filters = {
       ...emptyFilters,
-      refScope: "all" as const,
+      refScope: "current" as const,
       author: "ada",
       path: "src",
     };
     const labels = describeFilters(filters).map((c) => c.label);
-    expect(labels).toContain("refs: all");
+    expect(labels).toContain("refs: current branch");
     expect(labels).toContain("author: ada");
     expect(labels).toContain("path: src");
     expect(hasActiveFilters(filters)).toBe(true);
+  });
+
+  test("the default all-refs scope is not itself a chip", () => {
+    expect(
+      describeFilters({ ...emptyFilters, refScope: "all" }).map((c) => c.label),
+    ).not.toContain("refs: all");
   });
 });
 
@@ -84,12 +90,12 @@ describe("clearFilter (P1-FILT-6)", () => {
     ).toBe("");
   });
 
-  test("clearing the ref scope returns to current + blank pattern", () => {
+  test("clearing the ref scope returns to the all-refs default + blank pattern", () => {
     const cleared = clearFilter(
       { ...emptyFilters, refScope: "pattern", refPattern: "x" },
       "refPattern",
     );
-    expect(cleared.refScope).toBe("current");
+    expect(cleared.refScope).toBe("all");
     expect(cleared.refPattern).toBe("");
   });
 });
