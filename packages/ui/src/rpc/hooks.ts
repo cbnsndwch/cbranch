@@ -14,7 +14,7 @@ import {
   type CommitDetail,
   type CommitInput,
   type CommitMessage,
-  type CommitSummary,
+  CommitSummary,
   type DiffFile,
   type DiffSpec,
   type FileContentResult,
@@ -40,8 +40,9 @@ import {
   useQueryClient,
   type UseQueryResult,
 } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
+import { useUiStore } from "../state/store";
 import { useApi } from "./ApiProvider";
 import { queryKeys } from "./query-keys";
 
@@ -143,8 +144,20 @@ export const useLogStream = (query: LogQuery | null): LogStreamResult => {
   const [rows, setRows] = useState<ReadonlyArray<CommitSummary>>([]);
   const [status, setStatus] = useState<LogStreamStatus>("idle");
   const [error, setError] = useState<unknown>(null);
+  const optimisticCommits = useUiStore((s) => s.optimisticCommits);
+  const confirmOptimisticCommits = useUiStore(
+    (s) => s.confirmOptimisticCommits,
+  );
   // Restart only when a meaningful query field changes, not on every render's new object.
   const queryKey = query === null ? null : JSON.stringify(query);
+
+  // A repo/filter change re-scopes the log, so optimistic rows from the old scope no
+  // longer belong; drop them. A fresh commit keeps `queryKey` stable (only `refreshToken`
+  // below changes), so the optimistic row survives the post-commit restart until the
+  // re-snapshotted history confirms it.
+  useEffect(() => {
+    useUiStore.getState().clearOptimisticCommits();
+  }, [queryKey]);
 
   // This is a stream, not a TanStack query, so `commits`-domain invalidations (from the
   // commit/merge/pull mutations AND the WS invalidation bus) don't reach it on their own.
@@ -207,7 +220,43 @@ export const useLogStream = (query: LogQuery | null): LogStreamResult => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [api, queryKey, refreshToken]);
 
-  return { rows, status, error };
+  // Drop optimistic rows the streamed history now contains (the real commit has arrived).
+  useEffect(() => {
+    if (optimisticCommits.length === 0) return;
+    const confirmed = optimisticCommits
+      .filter((c) => rows.some((r) => r.oid === c.oid))
+      .map((c) => c.oid);
+    if (confirmed.length > 0) confirmOptimisticCommits(confirmed);
+  }, [rows, optimisticCommits, confirmOptimisticCommits]);
+
+  // Prepend not-yet-streamed optimistic commits so a fresh commit appears at the top
+  // immediately. A synthesized row has no author (the client doesn't know the configured
+  // identity), so borrow it from the current top row — the same person, in practice — for
+  // the moment before the real row replaces it.
+  const merged = useMemo<ReadonlyArray<CommitSummary>>(() => {
+    if (optimisticCommits.length === 0) return rows;
+    const streamed = new Set(rows.map((r) => r.oid));
+    const top = rows[0];
+    const pending = optimisticCommits
+      .filter((c) => !streamed.has(c.oid))
+      .map((c) =>
+        c.authorName === "" && top
+          ? new CommitSummary({
+              oid: c.oid,
+              parents: c.parents,
+              authorName: top.authorName,
+              authorEmail: top.authorEmail,
+              authorDate: c.authorDate,
+              committerDate: c.committerDate,
+              subject: c.subject,
+              refs: c.refs,
+            })
+          : c,
+      );
+    return pending.length === 0 ? rows : [...pending, ...rows];
+  }, [rows, optimisticCommits]);
+
+  return { rows: merged, status, error };
 };
 
 // ── P2 query hooks ────────────────────────────────────────────────────────────
@@ -395,6 +444,7 @@ export const useDiscardHunks = (repoId: RepoId) => {
 export const useCommitCreate = (repoId: RepoId) => {
   const api = useApi();
   const qc = useQueryClient();
+  const addOptimisticCommit = useUiStore((s) => s.addOptimisticCommit);
   return useMutation<CommitCreated, unknown, CommitInput>({
     mutationFn: (input) => api.commitCreate(input),
     // Optimistically clear the just-committed (staged) changes so the dialog's changes
@@ -407,6 +457,11 @@ export const useCommitCreate = (repoId: RepoId) => {
     onMutate: async () => {
       await qc.cancelQueries({ queryKey: queryKeys.status(repoId) });
       const prev = qc.getQueryData<WorkingTreeStatus>(queryKeys.status(repoId));
+      // Capture HEAD before the commit moves it — it becomes the new commit's parent,
+      // letting the optimistic graph row connect to the right lane (read pre-invalidation).
+      const prevHead = qc.getQueryData<RepoState>(
+        queryKeys.repoState(repoId),
+      )?.headOid;
       if (prev) {
         const entries = prev.entries
           .map((e) =>
@@ -418,11 +473,31 @@ export const useCommitCreate = (repoId: RepoId) => {
           );
         qc.setQueryData(queryKeys.status(repoId), { ...prev, entries });
       }
-      return { prev };
+      return { prev, prevHead };
     },
     onError: (_err, _vars, ctx) => {
       const c = ctx as { prev?: WorkingTreeStatus } | undefined;
       if (c?.prev) qc.setQueryData(queryKeys.status(repoId), c.prev);
+    },
+    onSuccess: (created, variables, ctx) => {
+      // Amend rewrites HEAD in place rather than adding a row, so there is nothing to
+      // prepend — the stream restart updates the existing top row. Only a real new commit
+      // gets an optimistic row, shown until the re-snapshotted history confirms it.
+      if (variables.amend) return;
+      const prevHead = (ctx as { prevHead?: Oid } | undefined)?.prevHead;
+      const now = new Date().toISOString();
+      addOptimisticCommit(
+        new CommitSummary({
+          oid: created.oid,
+          parents: prevHead ? [prevHead] : [],
+          authorName: variables.authorOverride?.name ?? "",
+          authorEmail: variables.authorOverride?.email ?? "",
+          authorDate: now,
+          committerDate: now,
+          subject: created.subject,
+          refs: [],
+        }),
+      );
     },
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: [repoId, "status"] });

@@ -5,7 +5,11 @@
 // the command palette is open, and the theme preference. Selection resets when the
 // active repository changes (P1-OPEN-4 / P1-X-4).
 
-import { type Oid, type RepoId } from "@cbranch/rpc-contract";
+import {
+  type CommitSummary,
+  type Oid,
+  type RepoId,
+} from "@cbranch/rpc-contract";
 import { create } from "zustand";
 
 import {
@@ -120,6 +124,19 @@ export interface UiState {
   readonly setSelectedDiffFile: (
     f: { path: string; staged: boolean } | null,
   ) => void;
+  // ── P2: optimistic history ───────────────────────────────────────────────────
+  /**
+   * Locally-created commits shown at the top of the log instantly, before the
+   * restarted log stream re-snapshots the real history (the stream is not a query, so
+   * it can't be set optimistically the way React Query caches can). Reconciled by oid:
+   * each entry is dropped once the streamed history confirms it, and the whole channel
+   * is cleared whenever the log is re-scoped (repo/filter change).
+   */
+  readonly optimisticCommits: ReadonlyArray<CommitSummary>;
+  readonly addOptimisticCommit: (commit: CommitSummary) => void;
+  /** Drop optimistic rows the streamed history has now confirmed (by oid). */
+  readonly confirmOptimisticCommits: (oids: ReadonlyArray<string>) => void;
+  readonly clearOptimisticCommits: () => void;
   // ── P3: main view switching ──────────────────────────────────────────────────
   readonly activeView: ActiveView;
   readonly setActiveView: (view: ActiveView) => void;
@@ -142,6 +159,7 @@ export const useUiStore = create<UiState>((set) => ({
   stagedSelection: new Set(),
   unstagedSelection: new Set(),
   selectedDiffFile: null,
+  optimisticCommits: [],
   activeView: "history",
   // Switching repositories supersedes the old selection and filters (P1-OPEN-4 / P1-X-4).
   setActiveRepoId: (activeRepoId) =>
@@ -152,6 +170,7 @@ export const useUiStore = create<UiState>((set) => ({
       stagedSelection: new Set(),
       unstagedSelection: new Set(),
       selectedDiffFile: null,
+      optimisticCommits: [],
     }),
   setSelectedOid: (selectedOid) => set({ selectedOid }),
   setPaletteOpen: (paletteOpen) => set({ paletteOpen }),
@@ -201,5 +220,26 @@ export const useUiStore = create<UiState>((set) => ({
   clearSelection: () =>
     set({ stagedSelection: new Set(), unstagedSelection: new Set() }),
   setSelectedDiffFile: (selectedDiffFile) => set({ selectedDiffFile }),
+  addOptimisticCommit: (commit) =>
+    set((s) => ({
+      optimisticCommits: [
+        commit,
+        ...s.optimisticCommits.filter((c) => c.oid !== commit.oid),
+      ],
+    })),
+  confirmOptimisticCommits: (oids) =>
+    set((s) => {
+      if (s.optimisticCommits.length === 0) return s;
+      const confirmed = new Set(oids);
+      const next = s.optimisticCommits.filter((c) => !confirmed.has(c.oid));
+      // Return the same state ref when nothing changed so subscribers don't re-render.
+      return next.length === s.optimisticCommits.length
+        ? s
+        : { optimisticCommits: next };
+    }),
+  clearOptimisticCommits: () =>
+    set((s) =>
+      s.optimisticCommits.length === 0 ? s : { optimisticCommits: [] },
+    ),
   setActiveView: (activeView) => set({ activeView }),
 }));

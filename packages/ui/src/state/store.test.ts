@@ -1,7 +1,19 @@
-import { Oid, RepoId } from "@cbranch/rpc-contract";
+import { CommitSummary, Oid, RepoId } from "@cbranch/rpc-contract";
 import { beforeEach, describe, expect, test } from "vitest";
 
 import { useUiStore } from "./store";
+
+const commit = (oid: string, subject = "x"): CommitSummary =>
+  new CommitSummary({
+    oid: Oid.make(oid),
+    parents: [],
+    authorName: "",
+    authorEmail: "",
+    authorDate: "2026-01-01T00:00:00Z",
+    committerDate: "2026-01-01T00:00:00Z",
+    subject,
+    refs: [],
+  });
 
 beforeEach(() => {
   useUiStore.setState({
@@ -13,6 +25,7 @@ beforeEach(() => {
     stagedSelection: new Set(),
     unstagedSelection: new Set(),
     selectedDiffFile: null,
+    optimisticCommits: [],
   });
 });
 
@@ -90,5 +103,49 @@ describe("useUiStore", () => {
     useUiStore.getState().toggleUnstagedSelection("b.ts");
     expect(useUiStore.getState().unstagedSelection.has("b.ts")).toBe(true);
     expect(useUiStore.getState().stagedSelection.has("b.ts")).toBe(false);
+  });
+
+  // ── P2: optimistic history ──────────────────────────────────────────────────
+
+  test("addOptimisticCommit prepends and dedupes by oid", () => {
+    const { addOptimisticCommit } = useUiStore.getState();
+    addOptimisticCommit(commit("a".repeat(40)));
+    addOptimisticCommit(commit("b".repeat(40)));
+    addOptimisticCommit(commit("a".repeat(40), "again"));
+    const oids = useUiStore.getState().optimisticCommits.map((c) => c.oid);
+    expect(oids).toEqual(["a".repeat(40), "b".repeat(40)]);
+    expect(useUiStore.getState().optimisticCommits[0]!.subject).toBe("again");
+  });
+
+  test("confirmOptimisticCommits drops only the confirmed oids", () => {
+    const { addOptimisticCommit, confirmOptimisticCommits } =
+      useUiStore.getState();
+    addOptimisticCommit(commit("a".repeat(40)));
+    addOptimisticCommit(commit("b".repeat(40)));
+    confirmOptimisticCommits(["a".repeat(40)]);
+    expect(useUiStore.getState().optimisticCommits.map((c) => c.oid)).toEqual([
+      "b".repeat(40),
+    ]);
+  });
+
+  test("confirmOptimisticCommits keeps the same array reference when nothing matches", () => {
+    const { addOptimisticCommit, confirmOptimisticCommits } =
+      useUiStore.getState();
+    addOptimisticCommit(commit("a".repeat(40)));
+    const before = useUiStore.getState().optimisticCommits;
+    confirmOptimisticCommits(["c".repeat(40)]);
+    expect(useUiStore.getState().optimisticCommits).toBe(before);
+  });
+
+  test("clearOptimisticCommits empties the channel", () => {
+    useUiStore.getState().addOptimisticCommit(commit("a".repeat(40)));
+    useUiStore.getState().clearOptimisticCommits();
+    expect(useUiStore.getState().optimisticCommits).toEqual([]);
+  });
+
+  test("setActiveRepoId clears optimistic commits (log re-scoped)", () => {
+    useUiStore.getState().addOptimisticCommit(commit("a".repeat(40)));
+    useUiStore.getState().setActiveRepoId(RepoId.make("repo-3"));
+    expect(useUiStore.getState().optimisticCommits).toEqual([]);
   });
 });
