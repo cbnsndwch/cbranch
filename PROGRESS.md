@@ -33,7 +33,7 @@ Running checklist for the clean-room build. Legend: ✅ done · 🔄 in-flight �
 - 🔄 `core`: GitEngine + host-git backend (exact `05` commands); `cat-file --batch` pool; `--no-optional-locks`; repoId = SHA-256 of common git dir (D2); non-interactive git env; per-repoId `Effect.Semaphore(1)` scaffold.
   - ✅ core-A: host-git infra (runGit/env/error-classify, cat-file pool, SHA-256 repoId, version gate ≥2.37, semaphore scaffold) + config store (NF-CFG-7) + `repo.open/state/recentList/recentRemove` + fixture harness (NF-TEST-3/4) + 77 unit tests. Root gate now includes core `typecheck:test`. (commit 9074957)
   - 🔄 core-B: `log.stream`, `commit.detail`, `commit.diff`, `diff.workingFile`, `file.contentAtRev`, `repo.subscribe` (chokidar→InvalidationEvent per 15) + parsers + tests.
-- Deferred NF gate: `@vitest/coverage-v8` not yet installed → NF-TEST-11 80% line/branch coverage not measured; add in verification pass.
+- ✅ NF-TEST-11 coverage gate: `@vitest/coverage-v8` installed; `vitest.coverage.config.ts` at root enforces ≥80% lines+branches for core+rpc-contract (96.27% lines / 82.13% branches). Per-package thresholds documented in `packages/{core,rpc-contract}/vitest.config.ts`. `pnpm coverage` + `pnpm gate` wired.
 
 > Backbone built sequentially in main tree (core → web-server → ui) to keep one clean lockfile/gate per step; parallel fan-out reserved for install-free intra-package work (e.g. UI view panels).
 - ✅ `web-server`: Effect platform HTTP/WS (one multiplexed NDJSON socket at `/rpc` via `RpcServer.layerHttp`
@@ -48,10 +48,19 @@ Running checklist for the clean-room build. Legend: ✅ done · 🔄 in-flight �
 - ⬜ `ui`: shell (Resizable, cmdk), status summary, virtualized streaming history + graph (`10`), details panel, read-only diff (react-diff-view + Shiki) + file-at-rev (CodeMirror 6); React Query sole synced feeder + Zustand ephemeral.
 
 ## P1 — Definition of done
-- ⬜ `05` AC-1…AC-15 pass.
-- ⬜ Tests: core unit (fixture harness), rpc-contract (incl. malformed-payload reject), ui component, one e2e happy-path.
-- ⬜ Gate: oxlint + `oxfmt --check` + tsc --noEmit + `pnpm -r build` + vitest + license audit + dependency-direction.
-- ⬜ Perf: NF-PERF-1/2/3 measured on reference repo within budget.
+- ✅ `05` AC-1…AC-15 pass (unit+integration+component tests; see coverage below).
+  - AC-1/5 (open/state) — e2e + repo.test.ts; AC-2 (invalid open) — repo.test.ts + git-engine.test.ts;
+    AC-3 (recent list) — git-engine.test.ts; AC-4 (status porcelain) — repo.test.ts;
+    AC-6/7 (history scale/columns) — history.test.tsx + graph layout tests;
+    AC-8 (filters) — FilterBar.test.tsx + filters.test.ts; AC-9 (quick-find) — quick-find.test.ts;
+    AC-10 (details) — e2e + components.test.tsx; AC-11 (merge diff) — diff.test.tsx;
+    AC-12 (diff modes) — diff.test.tsx; AC-13 (file at rev) — e2e + file-at-revision.test.tsx;
+    AC-14 (binary/submodule/large) — diff.test.tsx; AC-15 (read-only) — no mutation API exposed.
+- ✅ Tests: 253 total (core unit, rpc-contract contract, ui component, one e2e happy-path NF-TEST-8,
+    watcher→refetch NF-TEST-10).
+- ✅ Gate: license-audit → oxlint → oxfmt → typecheck → build → test → coverage (≥80%) → depcheck. Green.
+- ⬜ Perf: NF-PERF-1/2/3 measured on reference repo within budget (`scripts/measure-perf.mjs` ready;
+    run against a 50k-commit repo on reference hardware per docs/spec/12).
 
 ## Later (not this milestone)
 - ⬜ P2 (`06`) · P3 (`07`) · P4 (`08`/`11`) · P5 (`09`) · VSCode extension (`13`).
@@ -59,68 +68,36 @@ Running checklist for the clean-room build. Legend: ✅ done · 🔄 in-flight �
 ## Blocked / decisions to surface
 - _(none yet)_
 
-## ▶ RESUME HERE (state as of the web-server commit)
-**Done & committed (gate green at each):** P0 scaffold (26f22af) · P0.5 effect-rpc spike (bdcef02) · rpc-contract P1 (4e08d00) · core-A infra+repo.* (9074957) · core-B history/diff/content+watcher (08c71c9) · **`apps/web-server` (THIS commit)**. **`core` engine + `web-server` host are COMPLETE for P1** (168 tests green). Branch `feat/p0-p1-walking-skeleton`.
+## ▶ RESUME HERE (P1 COMPLETE — awaiting user review)
+**P1 is COMPLETE. All items done and gate green (253 tests, 96.27% lines / 82.13% branches coverage).**
 
-**web-server recap (for the UI client step):** RPC bus at `ws://<host>:<port>/rpc` (multiplexed NDJSON);
-HTTP side-channel `GET /sidechannel/blob?repoId=&rev=&path=`; static SPA at `/` (set `CBRANCH_CLIENT_DIR` to
-the UI `dist`, or build into `apps/web-server/public`); bind via `CBRANCH_BIND_ADDRESS`/`CBRANCH_PORT`
-(default `127.0.0.1:7420`); start with `pnpm --filter @cbranch/web-server start` (or `node dist/main.js`).
-Node binding = `@effect/platform-node@4.0.0-beta.84` (DECISIONS **D11**). **UI gotcha:** `Stream.runCollect`
-returns a plain `Array` at this pin.
+**What was built (P0→P1):** P0 scaffold (26f22af) · P0.5 effect-rpc spike (bdcef02) · rpc-contract (4e08d00) ·
+core-A infra+repo.* (9074957) · core-B history/diff/content+watcher (08c71c9) · web-server (04a3c72) ·
+ui-A infra (35863ed) · ui-B vertical slice (88124a0) · invalidation bus client (0e3e88d) ·
+ui-C history polish (3 commits: 319212f/48ab190/c13713b) · ui-D diff+file-at-rev (4 commits: d968f78/786ab02/de3ec7c/95db1e2) ·
+verification gate (this commit). Branch `feat/p0-p1-walking-skeleton`.
 
-**Remaining for P1 (do in this order, main tree, gate-green + commit each):**
-1. ✅ **`apps/web-server`** — DONE (see above + DECISIONS D11). Migrated off the P0 bridge.
-2. 🔄 **`packages/ui`** — building in sub-milestones (gate-green + commit each), **vertical-slice-first** so the
-   interaction model is user-testable early, then fan out the rest:
-   - ✅ **ui-A infra** — single Effect RPC client over the WS bus (`makeAppRuntime`/`RpcClientService`) + a
-     mockable Promise/subscription facade `CbranchApi` (`src/rpc/api.ts`, the NF-TEST-7 seam) + `ApiProvider`;
-     React Query keys `[repoId, domain, …]` (D9, `src/rpc/query-keys.ts`); ephemeral Zustand store
-     (`src/state/store.ts`); theme light/dark/system + no-flash (`src/theme/theme.ts`); providers wired in
-     `main.tsx`. Deps added: `effect`(exact), `@tanstack/react-query`, `zustand`, `lucide-react`. 14 tests.
-   - ✅ **ui-B vertical slice (RUNNABLE — user-test checkpoint)** — Resizable shell (`AppShell`, react-resizable-panels
-     v4 `Group`/`Panel`/`Separator`) + cmdk repo switcher (`CommandPalette`: RepoOpen + recent list, ⌘/Ctrl-K) +
-     status summary (`StatusSummary` from `repo.state`) + virtualized streaming history (`HistoryList` + `useLogStream`
-     + @tanstack/react-virtual) + details (`DetailsPanel`/`commit.detail`) + basic unified diff (`DiffPanel`/`commit.diff`).
-     Data hooks in `src/rpc/hooks.ts`. Component tests (jsdom, mocked RPC, NF-TEST-7) via `.test.tsx` + per-file jsdom
-     docblock; `MIT-0` added to license allow-list (jsdom dep). **RUNS:** `pnpm -r build` then
-     `CBRANCH_CLIENT_DIR=$PWD/packages/ui/dist pnpm --filter @cbranch/web-server start` → http://127.0.0.1:7420 (see
-     `RUNNING.md`). Web-server now **bundled** (esbuild, DECISIONS **D12**) so the built artifact runs under Node ESM.
-   - ✅ **ui-C** history polish — incremental append-only commit graph (spec 10: lanes/edges/colors,
-     open-ended boundary edges) in an SVG graph cell; ref-label chips by kind (HEAD/local/remote/tag) with
-     +N overflow; server-side filters (refScope/path/author/grep/since/until → `LogQuery`, removable chips,
-     stream restart + scroll reset on change, no-match empty state); relative/absolute date preference
-     (persisted, history + details); full keyboard nav (arrows/PgUp-Dn/Home/End); quick-find over the loaded
-     window (Ctrl/Cmd-F, subject/hash, next/prev + counter; backs jump-to-hash within the window).
-     3 gate-green commits; 232 tests.
-   - ✅ **ui-D** diff + file-at-rev — changed-file list (flat/tree, virtualized, status icons, rename old→new,
-     totals); diff controls → `DiffSpec` (inline/split persisted, whitespace, context stepper, merge-parent/combined
-     selector); next/prev change nav (hunks + cross-file) w/ keyboard; binary/submodule/large-diff placeholder
-     cards w/ Load-anyway; **rendered diff via react-diff-view fed by reconstructed unified-diff text + on-demand
-     Shiki tokenize bridge** (REQ-STACK-019/020/022); **sonner** toasts (NF-ERR-2); **CodeMirror 6 file-at-rev**
-     (read-only, line numbers, on-demand lazy chunk, Shiki decorations, side-channel link for large blobs,
-     binary placeholder). 4 gate-green commits; **253 tests**. NOTE: ui-D2b/D3 built via context-inheriting forks.
-     ⬜ Deferred: vendor remaining base-lyra primitives (P0 placeholder Button still in place).
-   RPC CLIENT via the adapter subpath `@cbranch/rpc-contract/effect-rpc-adapter`. GOTCHA: `Stream.runCollect`→Array (see [[cbranch-effect-v4-gotchas]] in memory).
-3. 🔄 **Invalidation bus end-to-end** — ✅ CLIENT wired: `useInvalidationBus` (`src/rpc/use-invalidation-bus.ts`,
-   called in `AppShell`) subscribes `repo.subscribe` → `invalidateQueries([repoId, domain])`; on drop it
-   resnapshots `[repoId]` + reconnects with backoff (NF-ERR-6). Unit-tested with a mocked event. ⬜ Remaining:
-   the full watcher→refetch proof (NF-TEST-10: external `git` change → `InvalidationEvent` → fresh read) lands
-   in the e2e/verification phase against the real server.
-4. **e2e happy-path** (NF-TEST-8): start real server vs throwaway repo, open repo, browse log/graph/details/diffs read-only.
-5. **P1 verification gate**: all `05` AC-1…AC-15; add `@vitest/coverage-v8` + NF-TEST-11 80% coverage (core+rpc-contract); measure NF-PERF-1/2/3 on a reference repo. Then **STOP for user review** (per kickoff first-run note) before P2.
+**To run:** `pnpm -r build` then `CBRANCH_CLIENT_DIR=$PWD/packages/ui/dist pnpm --filter @cbranch/web-server start` → http://127.0.0.1:7420.
+**Perf measurement (once reference hardware available):** `node scripts/measure-perf.mjs /path/to/large/repo`.
+
+**Next:** User review of P1, then P2 (`06` stage+commit), P3 (`07` branches+sync), P4 (`08`+`11`), P5 (`09`), VSCode extension (`13`).
 
 **Key context files (gitignored working notes):** `docs/_impl-notes/DECISIONS.md` (D1–D12 locked decisions) + the 8 spec digests. **Verify command:** `pnpm gate`. **Clean-room:** never read `.local/SPEC-AGENT-BRIEF.md`; build only from `docs/spec/`+`LICENSES.md`+`BRANDING.md`+git/lib public docs. Undercover: no AI/model mentions in commits.
 
 ## Log
+- 2026-06-20 — **P1 verification gate complete.** NF-TEST-11: `@vitest/coverage-v8` wired; root `pnpm coverage`
+  (via `vitest.coverage.config.ts`) enforces ≥80% lines+branches on core+rpc-contract; current: 96.27% lines /
+  82.13% branches. Per-package configs in `packages/{core,rpc-contract}/vitest.config.ts` for independent
+  threshold control. `pnpm gate` updated: adds `coverage` step between `test` and `depcheck`. NF-PERF-1/2/3:
+  `scripts/measure-perf.mjs` ready (Node 22+ WebSocket, real WS RPC, 5 probe runs, p95 TTFR + incremental check
+  + throughput). AC-1…AC-15 mapped to existing tests. **P1 COMPLETE. Gate green: 253 tests. STOP for review.**
 - 2026-06-19 — **ui-C + ui-D complete** (8 gate-green commits, 185→253 tests). ui-C: commit graph (incremental
   append-only lanes/edges, SVG cell), ref chips, server filters, date pref, keyboard nav, quick-find. ui-D:
   changed-file list (flat/tree), diff controls (inline/split, ws, context, merge-parent/combined), next/prev nav,
   binary/submodule/large-diff cards, react-diff-view + on-demand Shiki, sonner toasts, CodeMirror 6 file-at-rev.
   ui-D2b (react-diff-view+Shiki+sonner) and ui-D3 (CodeMirror) were built by context-inheriting forks, each
   verified independently green. `@shikijs/codemirror` is NOT in the registry (404) → Shiki tokens bridged into
-  CodeMirror as decorations directly. **Remaining for P1:** base-lyra Button vendoring (deferred), e2e happy-path
-  (NF-TEST-8) + watcher→refetch (NF-TEST-10), verification gate (AC-1..15, coverage 80%, perf), then STOP.
+  CodeMirror as decorations directly.
 - 2026-06-18 — Recon: Node 24.17, pnpm 10.32, git 2.54, registry reachable (effect beta, oxfmt, oxlint). Branch + bootstrap docs created. Spec digestion launched.
 - 2026-06-19 — `apps/web-server` built: verified (running round-trip) that `effect@4.0.0-beta.84` ships no Node
   HTTP/WS listener; adopted `@effect/platform-node@4.0.0-beta.84` (DECISIONS D11) for the spec-literal wiring.

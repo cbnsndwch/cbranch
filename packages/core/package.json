@@ -19,7 +19,8 @@
   "scripts": {
     "build": "tsc -b tsconfig.json",
     "typecheck": "tsc -b tsconfig.json",
-    "typecheck:test": "tsc -p tsconfig.test.json"
+    "typecheck:test": "tsc -p tsconfig.test.json",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "@cbranch/rpc-contract": "workspace:*",
