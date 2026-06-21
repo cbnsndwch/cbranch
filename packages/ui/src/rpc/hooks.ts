@@ -45,7 +45,7 @@ import {
   useQueryClient,
   type UseQueryResult,
 } from "@tanstack/react-query";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { useUiStore } from "../state/store";
 import { useApi } from "./ApiProvider";
@@ -183,6 +183,11 @@ export const useLogStream = (query: LogQuery | null): LogStreamResult => {
   const confirmOptimisticCommits = useUiStore(
     (s) => s.confirmOptimisticCommits,
   );
+  // A monotonic id for the live subscription run. `api.logStream`'s unsubscribe interrupts
+  // the Effect fiber asynchronously (fire-and-forget), so a superseded run's fiber can emit
+  // one more item, and a microtask flush queued before the restart can still fire — both
+  // would clobber the new run's rows. Every callback checks it is still the current run.
+  const runIdRef = useRef(0);
   // Restart only when a meaningful query field changes, not on every render's new object.
   const queryKey = query === null ? null : JSON.stringify(query);
 
@@ -212,6 +217,10 @@ export const useLogStream = (query: LogQuery | null): LogStreamResult => {
   }).dataUpdatedAt;
 
   useEffect(() => {
+    // Supersede any prior run up front (even on the null transition) so a just-interrupted
+    // fiber's late item or a flush queued before this run can no longer touch state.
+    const myRun = ++runIdRef.current;
+    const isCurrent = () => runIdRef.current === myRun;
     if (query === null) {
       setRows([]);
       setStatus("idle");
@@ -226,7 +235,7 @@ export const useLogStream = (query: LogQuery | null): LogStreamResult => {
     let scheduled = false;
     const flush = () => {
       scheduled = false;
-      setRows(buffer.slice());
+      if (isCurrent()) setRows(buffer.slice());
     };
     const schedule = () => {
       if (scheduled) return;
@@ -236,15 +245,18 @@ export const useLogStream = (query: LogQuery | null): LogStreamResult => {
 
     const unsubscribe = api.logStream(query, {
       onItem: (row) => {
+        if (!isCurrent()) return;
         buffer.push(row);
         setStatus("streaming");
         schedule();
       },
       onComplete: () => {
+        if (!isCurrent()) return;
         flush();
         setStatus("done");
       },
       onError: (e) => {
+        if (!isCurrent()) return;
         setError(e);
         setStatus("error");
       },
@@ -493,6 +505,7 @@ export const useCommitCreate = (repoId: RepoId) => {
   const api = useApi();
   const qc = useQueryClient();
   const addOptimisticCommit = useUiStore((s) => s.addOptimisticCommit);
+  const clearOptimisticCommits = useUiStore((s) => s.clearOptimisticCommits);
   return useMutation<CommitCreated, unknown, CommitInput>({
     mutationFn: (input) => api.commitCreate(input),
     // Optimistically clear the just-committed (staged) changes so the dialog's changes
@@ -531,7 +544,15 @@ export const useCommitCreate = (repoId: RepoId) => {
       // Amend rewrites HEAD in place rather than adding a row, so there is nothing to
       // prepend — the stream restart updates the existing top row. Only a real new commit
       // gets an optimistic row, shown until the re-snapshotted history confirms it.
-      if (variables.amend) return;
+      //
+      // An amend also rewrites the oid (HEAD → HEAD'), so any optimistic row still pending
+      // from a just-made commit can never be confirmed (the stream now shows HEAD', not the
+      // old oid) and would linger as a phantom row. Clear it; the post-amend stream restart
+      // re-snapshots the real history, so nothing real is lost.
+      if (variables.amend) {
+        clearOptimisticCommits();
+        return;
+      }
       const prevHead = (ctx as { prevHead?: Oid } | undefined)?.prevHead;
       const now = new Date().toISOString();
       addOptimisticCommit(
