@@ -1,103 +1,96 @@
-# cbranch — Continuation Prompt
+# cbranch — Session Continuation Prompt
 
-_Read by the assistant at the start of every resumed autonomous session._
+> A previous session handed off here. When the user says "continue", read this
+> file, then resume autonomously. (Supersedes the prior UI-B-era version.)
 
-## State as of 2026-06-20 (P3 fully complete)
+## What this is
+Autonomous, clean-room build of **cbranch** (browser-based Git GUI). **On branch
+`feat/p4`**, working dir `D:\GIT_REPOS\DEVOPS\cbranch`. Phase: **P4** — cherry-pick/revert,
+conflict resolution + 3-way merge editor, blame, single-file history.
 
-Branch: `feat/p0-p1-walking-skeleton`
-Gate: **GREEN — 505 tests, 80.69% branches**
+## Operating mode (carry forward)
+- **Autonomous / ultracode:** keep going; make a gate-green commit at each slice. Run
+  `pnpm gate` before every commit; never advance on red. `pnpm format` first (oxfmt @ 80).
+- **Undercover commits:** conventional messages; NO AI/model mentions, no co-authored-by,
+  no internal tool/codenames.
+- **Clean-room:** build only from `docs/spec/**`, `docs/design/**`, `LICENSES.md`,
+  `BRANDING.md`, git/library public docs. NEVER read `.local/SPEC-AGENT-BRIEF.md`.
+- **Context protocol:** stay under **30%** of the 1M window; check with
+  `node "C:\Users\serge\AppData\Local\claude-profiles\c\hooks\context-usage.mjs"`. Over 30%
+  → rewrite this file, ping via **`telegram-notify`**, STOP. (This handoff triggered at 38.1%.)
+- **Per-slice loop that worked:** scout patterns → implement the slice yourself → `pnpm format`
+  + `pnpm gate` → run an **adversarial review Workflow** (4 dims → per-finding skeptic verify)
+  → fix confirmed findings + add tests → re-gate → undercover commit. Reuse it.
 
-### What was built in P3
+## State — P4 plan at `docs/_impl-notes/P4-PLAN.md` (gitignored). Core S1–S7 + UI-A/B/C landed on `feat/p4`:
+- S1 contract+plumbing `09724e1` · S2 conflict.list `61d0f9c` · S3 conflict.sides `28af0be` ·
+  S4 conflict mutations `e463129` · S5 cherry-pick/revert/continuation `7ecc0ad` · S6 blame `ec5d591` ·
+  S7 file history `89217e4`.
+- UI-A conflict panel + in-progress banner `c622199`.
+- UI-B 3-way merge editor `47522b4` + `9287eca`.
+- **UI-C (this session) — cherry-pick / revert / empty-result dialogs:** `1e795b1`
+  (`feat(ui): cherry-pick and revert dialogs with empty-result prompt`). Gate green, branches **80.51%**.
+  Files: `lib/sequencer-outcome.ts`(+test, pure result→action router), `components/SequencerDialogs.tsx`
+  (+test; `CherryPickDialog`/`RevertDialog`/`EmptyPickDialog` + the `PickDialogs` host + a shared
+  `usePickTarget` hook), `state/store.ts` (`pickDialog` discriminated state + `setPickDialog`),
+  `rpc/hooks.ts` (`useCherryPick`/`useRevert`), `menu/menu-model.ts` (`commands.revert`),
+  `menu/use-menu-actions.ts` (wired cherryPick/revert on the selected commit), `AppShell.tsx`
+  (renders `<PickDialogs/>`), `CommitTab.tsx` (detail-view buttons), `HistoryList.tsx` (row actions menu).
+  - **Design:** `store.pickDialog = {cherryPick|revert} commits[] | {empty} mode+offender+message | null`.
+    Mainline `<select>` (native) shown only for a single merge commit (parents≥2 from `useCommitDetail`),
+    **gates submit** (AC-3/5); `usePickTarget` gates on `detail.isSuccess` so a failed detail load can't
+    skip the gate. `-x` + don't-commit checkboxes; editable single-commit revert message (git-style
+    default), **preserved through the empty prompt** (threaded into `OpContinue{allowEmpty,message}`).
+    Outcome routing (`planSequencerAction`): completed/staged→toast+close, conflicts→`solveConflicts`
+    view, empty→EmptyPickDialog (Skip=`OpSkip` / Commit-anyway=`OpContinue{allowEmpty}`); empty dialog
+    dismiss routes to `solveConflicts` so the in-progress banner is reachable. Errors→`toast.error`,
+    dialog stays open (REQ-UX-011).
+  - **Reviewed via the adversarial Workflow: 8 confirmed findings (all LOW), ALL fixed** (detail-error
+    gate, empty Cancel→banner, revert message through empty, mainline shows parent shortOids, dedup via
+    `usePickTarget`, multi-commit deferral note).
 
-**Core (S1-S9)** — 33 new RPC methods across refs, config, worktrees, stash, tags domains:
+## KEY GOTCHAS (verified across UI-A/B/C)
+- **Base UI `Checkbox`/`Switch` label trap:** the control renders a button AND a hidden form input, so a
+  `<label htmlFor>` labels BOTH → `getByLabelText` finds 2. Use **`aria-label` on the control** + a plain
+  `<span>` for text (see `CheckboxField`); query/click via `getByLabelText`.
+- **Base UI `Select` is unproven in this repo** (only the wrapper exists, no consumer). For the mainline
+  picker UI-C used a **native `<select>`** (spec REQ-UX-002 permits "Select or numeric input") — robust +
+  trivially testable via `fireEvent.change`. Prefer that over the vendored Select until one is proven.
+- **`@shikijs/codemirror` is a 404 in this registry** — bridge Shiki tokens into CodeMirror as decorations
+  (FileAtRevision pattern). Only `@codemirror/merge` was added in UI-B.
+- **UI vitest MUST run via the ROOT config:** `pnpm exec vitest run <file>` — NOT `pnpm --filter @cbranch/ui`.
+- **depcheck recognizes dynamic `import()`** (a lazy `import("@codemirror/merge")` satisfies it).
+- **Tooling escape trap:** Write/Edit content JSON-decodes; never put a literal `\n`/`\r\n`/`\\` in written
+  CODE strings — use `String.fromCharCode(10)` (repo convention; see `NL` in SequencerDialogs.tsx).
+- **Component tests:** fake `CbranchApi` via `makeApi(over) as unknown as CbranchApi` (only the methods the
+  component calls), wrap in `QueryClientProvider`+`ApiProvider`, drive store with `useUiStore.setState`,
+  mock `sonner` to assert toasts. `// @vitest-environment jsdom` header; Base UI dialogs/menus render in jsdom.
+- **`toHaveBeenCalledWith` ignores `undefined`-valued keys** (`{a:true,b:undefined}` ≡ `{a:true}`); use
+  `expect.objectContaining` when an opts object may carry undefined fields.
 
-| Slice | Commit | What |
-|-------|--------|------|
-| S1    | 5d31d47 | RPC contract (33 methods: branches/merge/sync/remotes/worktrees/stash/tags) |
-| S2    | 79c81a4 | Branch listing via `git for-each-ref` (ahead/behind, upstream, detached HEAD) |
-| S3    | 5b38e4a | Branch lifecycle: create, switch (carry/stash/discard), rename, delete, set-upstream |
-| S4    | 7fdd625 | Merge: ff / no-ff / squash + abort; conflict detection |
-| S5    | 693c513 | Sync streaming: fetch / pull / push (Stream<SyncEvent>), pushDeleteRemoteRef |
-| S6    | c0d36e9 | Remotes CRUD: list / add / set-url / rename / remove |
-| S7    | 9273602 | Worktrees: list (porcelain parser) / add / remove / prune |
-| S8    | 63902b7 | Stash: push / list / show / apply / pop / drop / clear |
-| S9    | 0aabe44 | Tags: list / create (lw/annotated/signed) / delete / push / delete-remote |
+## NEXT — do in order, gate-green + undercover commit each
+1. **UI-D — Blame view** (core S6 ready). `BlamePanel` (virtualized line-aligned gutter, fixed ROW_HEIGHT),
+   `BlameGutter`, `BlameBlock` (client-side contiguous same-owner grouping), `BlameCommitPopover`, `useBlame`
+   (content-addressed; resolve HEAD→oid for cacheability). Blame-previous back-stack via the porcelain
+   `previous` header (re-call `blame` at `previousOid`/`previousPath`); disable at root/no-parent.
+   `BlameTooLarge` empty-state (+ `force:true`, + "proceed without highlighting" = Shiki-off toggle).
+   Route `/repos/:repoId/blame/:rev/:path` (D13 reserved). Entry: file context menu + diff toolbar.
+   `shadcn add popover skeleton` (MISSING — run it). REQ-UX-009/011/012, REQ-BL-003..006, REQ-EDGE-010, AC-11/12(08).
+2. **UI-E — File history view** (core S7 ready). `FileHistoryPanel` (Table: SHA/author/date/subject +
+   rename indicator w/ prior path), `FileHistoryRow`, `useFileHistory` (`useInfiniteQuery`, `nextCursor`,
+   Load more). Per-revision actions reuse viewers: View diff (`commitDiff` paths=[path]), View file at rev
+   (`fileContentAtRev`), Blame at rev (`blame` rev=oid → reuses UI-D). `shadcn add table` (+ skeleton). AC-13(08).
+3. **UI-F (kdiff3 client) + UI-G (companion agent) = DEFERRED/optional per D17** — skip by default.
+4. **P4 close-out:** self-review pass, then `DECISIONS.md` **D17** (the batched P4 entry) + **backfill the
+   missing P3 D16** (sync-streaming; `branches.ts` forward-references it) — both in one edit (P4-PLAN
+   "DECISIONS to record").
 
-**UI (UI-A + UI-B)**:
+## Run / verify
+- **Gate:** `pnpm gate` (license-audit → lint → format:check → typecheck → build → test → coverage → depcheck).
+- **Run app:** `pnpm -r build` then
+  `CBRANCH_CLIENT_DIR=$PWD/packages/ui/build/client pnpm --filter @cbranch/web-server start` → http://127.0.0.1:7420.
 
-| Commit | What |
-|--------|------|
-| 4c28f5c | P3 query+mutation hooks (28 new hooks) · `activeView` Zustand state · AppShell view nav tabs (History/Branches/Worktrees/Stash/Tags) · BranchesPanel (local/remote groups, create/rename/delete/dirty-tree dialogs, dropdown menus) |
-| 1b5ba77 | Fetch/Pull/Push streaming buttons in Toolbar (Sonner progress toasts) · RemotesManagerDialog (CRUD table) · WorktreesPanel (list + add/remove/prune) · StashPanel (list + new-stash/apply/pop/drop/clear) · TagsPanel (list + create/delete/push actions) |
-
-### ▶ NEXT TASK: P3 spec-conformance fixes (Groups 1–9), then P4
-
-**P3 self-review is DONE** → full report at `docs/_impl-notes/P3-REVIEW.md` (gaps grouped
-A=4 critical bugs, B=8 missing behaviors, C=robustness [NOT in scope], D=9 UI gaps,
-E=tests). User approved fixing **A, B, D, E** in grouped gate-green commits; toolbar
-work must follow `docs/design/toolbar-quick-actions.md` (dense 2-row icon toolbar w/
-split-button dropdowns).
-
-**Interlude (done 2026-06-20):** a concurrent react-router framework-mode migration
-landed mid-review. It + a global printWidth-120→80 reformat were committed as two clean
-commits: `960f31e` (style: reformat + pin oxfmt) and `fb32969` (refactor(ui): react-router).
-Formatter is now settled on **oxfmt 0.55.0 @ printWidth 80**; the VS Code oxc extension is
-pinned to the workspace binary (`oxc.path.oxfmt` + `oxc.useExecPath`). Gate green: 505+323
-tests, 80.69% branches.
-
-**Resume protocol for the fixes:**
-1. `pnpm gate` to confirm baseline green on current `main`.
-2. **Group 1 (merge A2/B1/B2/B3) is implemented but STALE in `git stash@{0}`** (captured
-   pre-80-reformat at 120-width + a junk git-engine.ts reflow). **Do NOT pop it** — it would
-   conflict on every line. Instead **re-derive Group 1 fresh** on the current base (use the
-   stash as a spec reference; the agent prompt that worked is preserved in the transcript).
-   Then drop the stale stash.
-3. Work Groups 1–9 (session task list), one gate-green thematic commit each. Core groups
-   (1–4) share contract/`live.ts` → run sequentially. Groups:
-   1 merge (A2/B1/B2/B3) · 2 sync lock+non-ff+streaming (A1/A4/B4/B7/B8) ·
-   3 branch reapply+detached (A3/B5) · 4 worktree context switch (B6/D8) ·
-   5 UI branches panel (D1/D5/D6) · 6 UI toolbar redesign (D7) ·
-   7 UI palette+non-ff dialog (D2/D3) · 8 UI stash preview+confirmations (D4/D6/D9) ·
-   9 test sweep (E).
-   Delegation pattern that worked: 1 sub-agent per vertical slice (contract→core→engine→
-   server→UI hook + tests), get `pnpm gate` green, report concise summary; orchestrator
-   commits with an undercover message.
-
-When all groups land, read `docs/spec/08-phase4-diff-conflict.md` and plan P4 (three-way
-conflict editor, conflict-marker resolution UI, rebase, cherry-pick/revert).
-
-### Key files added in P3
-
-| Purpose | Path |
-|---------|------|
-| P3 UI hooks | `packages/ui/src/rpc/hooks.ts` (P3 section at bottom) |
-| Store (activeView) | `packages/ui/src/state/store.ts` |
-| AppShell (view nav) | `packages/ui/src/components/AppShell.tsx` |
-| BranchesPanel | `packages/ui/src/components/BranchesPanel.tsx` |
-| WorktreesPanel | `packages/ui/src/components/WorktreesPanel.tsx` |
-| StashPanel | `packages/ui/src/components/StashPanel.tsx` |
-| TagsPanel | `packages/ui/src/components/TagsPanel.tsx` |
-| RemotesManagerDialog | `packages/ui/src/components/RemotesManagerDialog.tsx` |
-| P3 core (branches) | `packages/core/src/git/branches.ts`, `branch-ops.ts` |
-| P3 core (merge/sync) | `packages/core/src/git/merge.ts`, `sync.ts` |
-| P3 core (remotes) | `packages/core/src/git/remotes.ts` |
-| P3 core (worktrees) | `packages/core/src/git/worktrees.ts` |
-| P3 core (stash) | `packages/core/src/git/stash.ts` |
-| P3 core (tags) | `packages/core/src/git/tags.ts` |
-| P3 implementation plan | `docs/_impl-notes/P3-PLAN.md` |
-
-### Operating constraints
-
-- **UNDERCOVER**: No AI/model mentions in commits. No co-authored-by lines.
-- **Effect v4 only**: `effect@4.0.0-beta.84`. Never propose Effect v3 fallback.
-- **Base UI**: `@base-ui/react@^1` (stable). Old `@base-ui-components/react` is deprecated.
-- **Clean-room**: Never read `.local/SPEC-AGENT-BRIEF.md`. Build from `docs/spec/` + public docs only.
-- **Gate must be green** before every commit.
-- **Context budget**: Stay <30% of the 1M window. Measure with `node <profile>/c/hooks/context-usage.mjs`. Hand off when over (send Telegram ping, write a new CONTINUATION.md first).
-
-### Resume protocol
-
-1. Read this file.
-2. Read `PROGRESS.md` → find the ▶ RESUME HERE section.
-3. Run `pnpm gate` to confirm baseline (expected: green, 505+ tests, ≥80% branches).
-4. Continue from the NEXT TASK above.
+## First action on resume
+1. `pnpm gate` — confirm green at `1e795b1` (head of `feat/p4`).
+2. `git status` — `CONTINUATION.md` may be the only change; commit it as `docs:` if so.
+3. Start **UI-D** (Blame view). Run the adversarial review Workflow before committing.
