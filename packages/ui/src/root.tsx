@@ -46,12 +46,28 @@ const queryClient = new QueryClient({
   },
 });
 
+// Blocking inline script that applies the persisted theme to <html> BEFORE first paint —
+// the real no-flash guarantee (NF-THEME-6). It runs when the browser parses the prerendered
+// `index.html`, i.e. before the render-blocking CSS and long before the deferred app bundle
+// (where `applyStoredTheme` used to run, which is only "before hydration", not before paint).
+// It is a self-contained mirror of `resolveDark`/`readThemePref`/`prefersDark` in theme.ts
+// (KEEP IN SYNC) since an inline script cannot import. React hydrates this <script> node as-is
+// and never re-runs it, so the theme is applied exactly once.
+const THEME_SCRIPT = `(function(){try{var k="cbranch.ui.theme";var p=localStorage.getItem(k);if(p!=="light"&&p!=="dark"&&p!=="system")p="system";var dark=p==="dark"||(p==="system"&&typeof matchMedia==="function"&&matchMedia("(prefers-color-scheme: dark)").matches);document.documentElement.classList.toggle("dark",dark);}catch(e){}})();`;
+
 export function Layout({ children }: { readonly children: React.ReactNode }) {
   return (
-    <html lang="en">
+    // The prerendered `index.html` shell is built in Node with no `.dark` class (the build
+    // can't know the user's stored preference), but THEME_SCRIPT (below) toggles it on the
+    // live <html> before first paint. That makes the live `<html class>` legitimately differ
+    // from the shell, so suppress the (expected) hydration mismatch on this one element —
+    // React adopts the live attribute rather than stripping it.
+    <html lang="en" suppressHydrationWarning>
       <head>
         <meta charSet="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        {/* Must run before <Links> so the right theme is active when the CSS applies. */}
+        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
         <title>cbranch</title>
         <Meta />
         <Links />

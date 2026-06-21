@@ -1,16 +1,13 @@
-// Client entry (React Router 8 framework mode). RR would synthesize a default entry, but
-// we provide our own to apply the persisted theme BEFORE hydration — keeping the
-// no-flash-of-wrong-theme guarantee (NF-THEME-6) that the old `main.tsx` had — and to keep
-// rendering under `<StrictMode>`.
+// Client entry (React Router 8 framework mode). RR would synthesize a default entry, but we
+// provide our own to keep rendering under `<StrictMode>`. The no-flash theme application
+// (NF-THEME-6) is owned by the blocking inline `THEME_SCRIPT` in `root.tsx`'s <head>, which
+// runs before first paint — earlier than this deferred bundle ever could — so there is no
+// `applyStoredTheme()` call here. Runtime theme changes still flow through the store (`setTheme`
+// → `applyTheme`); `applyStoredTheme` remains for tests and any non-prerendered entry path.
 
 import { startTransition, StrictMode } from "react";
 import { hydrateRoot } from "react-dom/client";
 import { HydratedRouter } from "react-router/dom";
-
-import { applyStoredTheme } from "./theme/theme";
-
-// Toggle the root `.dark` class from the stored preference before the first paint.
-applyStoredTheme();
 
 startTransition(() => {
   hydrateRoot(
