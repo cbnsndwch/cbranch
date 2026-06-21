@@ -7,13 +7,21 @@ import { defineConfig } from "vite";
 
 // Vite 8 (Rolldown is the default bundler) driving React Router 8 in framework mode.
 // `reactRouter()` owns the React/JSX pipeline here — `@vitejs/plugin-react` is NOT used
-// (it would double-transform). SPA-only behaviour is set in `react-router.config.ts`.
+// (it would double-transform). SPA-only behavior is set in `react-router.config.ts`.
 //
 // `reactRouterDevTools()` MUST come before `reactRouter()`. In dev it augments the JSX
 // transform so every rendered element carries its source location — inspect any tag in
 // the browser and you see the originating file and line — and mounts the in-app dev panel.
 export default defineConfig({
-  plugins: [reactRouterDevTools(), reactRouter(), tailwindcss()],
+  // Vitest loads THIS config when a test run is launched from inside the package (an IDE
+  // test explorer, `pnpm --filter`, or a bare `vitest` in `packages/ui`). The React Router
+  // plugin prepends a React-Refresh preamble guard to every JSX module that throws under
+  // jsdom ("can't detect preamble") because there is no RR dev server to install the flag.
+  // Skip the framework plugins under vitest so package-scoped runs work; the canonical root
+  // runner (`vitest.config.ts`) carries no plugins, so root runs are unaffected either way.
+  plugins: process.env.VITEST
+    ? []
+    : [reactRouterDevTools(), reactRouter(), tailwindcss()],
   // `@/*` → src is the shadcn `base-lyra` import alias (components.json); keep it in sync
   // with tsconfig `paths` and the root vitest config so vendored/generated UI resolves.
   resolve: {
