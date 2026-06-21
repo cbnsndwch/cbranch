@@ -40,6 +40,35 @@ export type ActiveView =
   | "tags"
   | "solveConflicts";
 
+/** A commit targeted by a cherry-pick / revert dialog (P4 UI-C, REQ-UX-001). */
+export interface PickCommit {
+  readonly oid: Oid;
+  readonly subject: string;
+}
+
+/**
+ * The cherry-pick / revert / empty-result dialog surface (P4 UI-C). `null` = no dialog
+ * open. The `cherryPick`/`revert` forms carry the target commit(s) in application order;
+ * the `empty` form is the follow-up prompt git stops on when a pick produces no changes
+ * (REQ-UX-008), carrying the offending commit so it can be skipped or committed empty.
+ *
+ * `commits` is an array for the multi-commit listing of REQ-UX-001, but every UI-C launch
+ * point (context menu / detail view / menu) targets a single commit; range cherry-pick /
+ * multi-revert (REQ-CP-002 / REQ-RV-004) await a multi-select source in a later slice.
+ */
+export type PickDialogState =
+  | { readonly kind: "cherryPick"; readonly commits: ReadonlyArray<PickCommit> }
+  | { readonly kind: "revert"; readonly commits: ReadonlyArray<PickCommit> }
+  | {
+      readonly kind: "empty";
+      readonly mode: "cherryPick" | "revert";
+      readonly currentOid?: Oid;
+      readonly currentSubject?: string;
+      /** A user-edited revert message to preserve on "Commit anyway" (REQ-RV-001). */
+      readonly message?: string;
+    }
+  | null;
+
 export interface CommitDraft {
   subject: string;
   body: string;
@@ -141,6 +170,9 @@ export interface UiState {
   // ── P3: main view switching ──────────────────────────────────────────────────
   readonly activeView: ActiveView;
   readonly setActiveView: (view: ActiveView) => void;
+  // ── P4: cherry-pick / revert / empty-result dialog ───────────────────────────
+  readonly pickDialog: PickDialogState;
+  readonly setPickDialog: (state: PickDialogState) => void;
 }
 
 export const useUiStore = create<UiState>((set) => ({
@@ -162,6 +194,7 @@ export const useUiStore = create<UiState>((set) => ({
   selectedDiffFile: null,
   optimisticCommits: [],
   activeView: "history",
+  pickDialog: null,
   // Switching repositories supersedes the old selection and filters (P1-OPEN-4 / P1-X-4).
   setActiveRepoId: (activeRepoId) =>
     set({
@@ -172,6 +205,7 @@ export const useUiStore = create<UiState>((set) => ({
       unstagedSelection: new Set(),
       selectedDiffFile: null,
       optimisticCommits: [],
+      pickDialog: null,
     }),
   setSelectedOid: (selectedOid) => set({ selectedOid }),
   setPaletteOpen: (paletteOpen) => set({ paletteOpen }),
@@ -243,4 +277,5 @@ export const useUiStore = create<UiState>((set) => ({
       s.optimisticCommits.length === 0 ? s : { optimisticCommits: [] },
     ),
   setActiveView: (activeView) => set({ activeView }),
+  setPickDialog: (pickDialog) => set({ pickDialog }),
 }));

@@ -3,6 +3,7 @@ import { type Oid, type RepoId } from "@cbranch/rpc-contract";
 import { formatEpoch, formatInstant, shortOid } from "../lib/format";
 import { useCommitDetail } from "../rpc/hooks";
 import { useUiStore } from "../state/store";
+import { Button } from "./ui/button";
 import { Placeholder } from "./ui/placeholder";
 
 const initials = (name: string): string => {
@@ -28,6 +29,7 @@ export function CommitTab({
   const { data, isLoading, isError } = useCommitDetail(repoId, oid);
   const dateMode = useUiStore((s) => s.dateMode);
   const knownRefStrings = useUiStore((s) => s.knownRefStrings);
+  const setPickDialog = useUiStore((s) => s.setPickDialog);
 
   if (oid === null)
     return <Placeholder>Select a commit to see its details.</Placeholder>;
@@ -100,6 +102,33 @@ export function CommitTab({
         {/* Subject strip */}
         <div className="bg-muted mt-2 px-2 py-1.5 text-[12px]">
           {data.subject}
+        </div>
+        {/* Commit actions (REQ-UX-001): cherry-pick / revert this commit. */}
+        <div className="mt-2 flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() =>
+              setPickDialog({
+                kind: "cherryPick",
+                commits: [{ oid: data.oid, subject: data.subject }],
+              })
+            }
+          >
+            Cherry-pick…
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() =>
+              setPickDialog({
+                kind: "revert",
+                commits: [{ oid: data.oid, subject: data.subject }],
+              })
+            }
+          >
+            Revert…
+          </Button>
         </div>
         {/* Contained in branches */}
         <div className="mt-2">

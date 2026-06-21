@@ -37,6 +37,7 @@ export function useMenuActions(): MenuActions {
   const { openRepo } = useNavigation();
   const queryClient = useQueryClient();
   const repoId = useUiStore((s) => s.activeRepoId);
+  const selectedOid = useUiStore((s) => s.selectedOid);
   const dateMode = useUiStore((s) => s.dateMode);
   const recentQuery = useRecentList();
   const api = useApi();
@@ -80,6 +81,20 @@ export function useMenuActions(): MenuActions {
       handlers["commands.commit"] = () =>
         useUiStore.getState().setCommitDialogOpen(true);
     }
+    // Cherry-pick / revert act on the selected commit (REQ-UX-001); the dialog fetches
+    // the commit's subject + parents (for the merge-commit mainline gate).
+    if (repoId && selectedOid) {
+      handlers["commands.cherryPick"] = () =>
+        useUiStore.getState().setPickDialog({
+          kind: "cherryPick",
+          commits: [{ oid: selectedOid, subject: "" }],
+        });
+      handlers["commands.revert"] = () =>
+        useUiStore.getState().setPickDialog({
+          kind: "revert",
+          commits: [{ oid: selectedOid, subject: "" }],
+        });
+    }
     // State-bound checkbox: the date column's relative/absolute mode (P1-HIST-8).
     const checkboxes: Record<string, boolean> = {
       "view.showRelativeDate": dateMode === "relative",
@@ -107,6 +122,7 @@ export function useMenuActions(): MenuActions {
     openRepo,
     queryClient,
     repoId,
+    selectedOid,
     dateMode,
     recentQuery.data,
     api,

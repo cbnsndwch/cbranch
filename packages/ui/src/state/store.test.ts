@@ -148,4 +148,26 @@ describe("useUiStore", () => {
     useUiStore.getState().setActiveRepoId(RepoId.make("repo-3"));
     expect(useUiStore.getState().optimisticCommits).toEqual([]);
   });
+
+  // ── P4: cherry-pick / revert dialog ─────────────────────────────────────────
+
+  test("setPickDialog opens then clears the cherry-pick dialog (P4 UI-C)", () => {
+    const commits = [{ oid: Oid.make("c0ffee"), subject: "x" }];
+    useUiStore.getState().setPickDialog({ kind: "cherryPick", commits });
+    expect(useUiStore.getState().pickDialog).toEqual({
+      kind: "cherryPick",
+      commits,
+    });
+    useUiStore.getState().setPickDialog(null);
+    expect(useUiStore.getState().pickDialog).toBeNull();
+  });
+
+  test("setActiveRepoId dismisses an open pick dialog", () => {
+    useUiStore.getState().setPickDialog({
+      kind: "revert",
+      commits: [{ oid: Oid.make("deadbeef"), subject: "y" }],
+    });
+    useUiStore.getState().setActiveRepoId(RepoId.make("repo-4"));
+    expect(useUiStore.getState().pickDialog).toBeNull();
+  });
 });

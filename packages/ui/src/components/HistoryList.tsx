@@ -24,6 +24,12 @@ import { useUiStore } from "../state/store";
 import { FindBar } from "./FindBar";
 import { GraphCell } from "./GraphCell";
 import { RefChips } from "./RefChips";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "./ui/dropdown-menu";
 import { Placeholder } from "./ui/placeholder";
 
 const ROW_HEIGHT = 26;
@@ -61,6 +67,7 @@ export function HistoryList({
 }) {
   const { rows, status } = useLogStream(query);
   const setKnownRefStrings = useUiStore((s) => s.setKnownRefStrings);
+  const setPickDialog = useUiStore((s) => s.setPickDialog);
   useEffect(() => {
     const allRefs = [...new Set(rows.flatMap((r) => r.refs))];
     setKnownRefStrings(allRefs);
@@ -256,7 +263,7 @@ export function HistoryList({
                 aria-selected={selected}
                 onClick={() => onSelectOid(row.oid)}
                 className={cn(
-                  "hover:bg-accent absolute top-0 left-0 flex w-full cursor-pointer items-center gap-2 border-b pr-2 text-xs",
+                  "group hover:bg-accent absolute top-0 left-0 flex w-full cursor-pointer items-center gap-2 border-b pr-2 text-xs",
                   selected
                     ? "bg-[var(--color-selection-bg)] text-[var(--color-selection-fg)]"
                     : "",
@@ -290,6 +297,37 @@ export function HistoryList({
                   {formatDate(row.authorDate, dateMode)}
                 </span>
                 <span className="w-[80px] font-mono">{shortOid(row.oid)}</span>
+                <DropdownMenu>
+                  <DropdownMenuTrigger
+                    onClick={(e) => e.stopPropagation()}
+                    aria-label={`Actions for ${shortOid(row.oid)}`}
+                    className="hover:bg-accent flex size-5 shrink-0 items-center justify-center opacity-0 group-hover:opacity-100 data-[popup-open]:opacity-100"
+                  >
+                    …
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent side="bottom" align="end">
+                    <DropdownMenuItem
+                      onClick={() =>
+                        setPickDialog({
+                          kind: "cherryPick",
+                          commits: [{ oid: row.oid, subject: row.subject }],
+                        })
+                      }
+                    >
+                      Cherry-pick…
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() =>
+                        setPickDialog({
+                          kind: "revert",
+                          commits: [{ oid: row.oid, subject: row.subject }],
+                        })
+                      }
+                    >
+                      Revert…
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             );
           })}

@@ -645,6 +645,12 @@ export const MENUS: ReadonlyArray<TopMenu> = [
       },
       {
         kind: "command",
+        id: "commands.revert",
+        label: "Revert commit…",
+        phase: "P4",
+      },
+      {
+        kind: "command",
         id: "commands.archive",
         label: "Archive revision…",
         phase: "later",

@@ -1097,3 +1097,43 @@ export const useOpSkip = (repoId: RepoId) => {
     onSettled: () => invalidateOperation(qc, repoId),
   });
 };
+
+/** Cherry-pick one or more commits (oldest→newest); the result is an outcome (D17). */
+export const useCherryPick = (repoId: RepoId) => {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation<
+    SequencerResult,
+    unknown,
+    {
+      commits: ReadonlyArray<Oid>;
+      recordOrigin?: boolean;
+      mainline?: number;
+      noCommit?: boolean;
+    }
+  >({
+    mutationFn: ({ commits, recordOrigin, mainline, noCommit }) =>
+      api.cherryPick(repoId, commits, { recordOrigin, mainline, noCommit }),
+    onSettled: () => invalidateOperation(qc, repoId),
+  });
+};
+
+/** Revert one or more commits; a single-commit revert may carry a custom message. */
+export const useRevert = (repoId: RepoId) => {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation<
+    SequencerResult,
+    unknown,
+    {
+      commits: ReadonlyArray<Oid>;
+      mainline?: number;
+      noCommit?: boolean;
+      message?: string;
+    }
+  >({
+    mutationFn: ({ commits, mainline, noCommit, message }) =>
+      api.revert(repoId, commits, { mainline, noCommit, message }),
+    onSettled: () => invalidateOperation(qc, repoId),
+  });
+};

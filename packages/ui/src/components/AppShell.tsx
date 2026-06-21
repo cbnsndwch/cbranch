@@ -18,6 +18,7 @@ import { HistoryStatusStrip } from "./HistoryStatusStrip";
 import { MergeEditor } from "./MergeEditor";
 import { MenuBar } from "./MenuBar";
 import { RepositorySidebar } from "./RepositorySidebar";
+import { PickDialogs } from "./SequencerDialogs";
 import { StashPanel } from "./StashPanel";
 import { TagsPanel } from "./TagsPanel";
 import { Toolbar } from "./Toolbar";
@@ -145,6 +146,7 @@ export function AppShell() {
     <>
       <CommandPalette />
       <CommitDialog />
+      <PickDialogs />
       {repoId && editPath !== null && (
         <MergeEditor
           repoId={repoId}
