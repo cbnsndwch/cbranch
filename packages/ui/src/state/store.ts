@@ -47,6 +47,16 @@ export interface PickCommit {
 }
 
 /**
+ * The file + revision the blame overlay is open on (P4 UI-D; REQ-UX-009/012). `null` = no
+ * blame view. `rev` is a concrete oid (resolved for cacheability — spec 15 §8), `path` the
+ * file at that revision; the blame-previous back-stack lives inside the panel, seeded here.
+ */
+export interface BlameTarget {
+  readonly rev: string;
+  readonly path: string;
+}
+
+/**
  * The cherry-pick / revert / empty-result dialog surface (P4 UI-C). `null` = no dialog
  * open. The `cherryPick`/`revert` forms carry the target commit(s) in application order;
  * the `empty` form is the follow-up prompt git stops on when a pick produces no changes
@@ -173,6 +183,9 @@ export interface UiState {
   // ── P4: cherry-pick / revert / empty-result dialog ───────────────────────────
   readonly pickDialog: PickDialogState;
   readonly setPickDialog: (state: PickDialogState) => void;
+  // ── P4: blame overlay ────────────────────────────────────────────────────────
+  readonly blameTarget: BlameTarget | null;
+  readonly setBlameTarget: (target: BlameTarget | null) => void;
 }
 
 export const useUiStore = create<UiState>((set) => ({
@@ -195,6 +208,7 @@ export const useUiStore = create<UiState>((set) => ({
   optimisticCommits: [],
   activeView: "history",
   pickDialog: null,
+  blameTarget: null,
   // Switching repositories supersedes the old selection and filters (P1-OPEN-4 / P1-X-4).
   setActiveRepoId: (activeRepoId) =>
     set({
@@ -206,6 +220,7 @@ export const useUiStore = create<UiState>((set) => ({
       selectedDiffFile: null,
       optimisticCommits: [],
       pickDialog: null,
+      blameTarget: null,
     }),
   setSelectedOid: (selectedOid) => set({ selectedOid }),
   setPaletteOpen: (paletteOpen) => set({ paletteOpen }),
@@ -278,4 +293,5 @@ export const useUiStore = create<UiState>((set) => ({
     ),
   setActiveView: (activeView) => set({ activeView }),
   setPickDialog: (pickDialog) => set({ pickDialog }),
+  setBlameTarget: (blameTarget) => set({ blameTarget }),
 }));

@@ -106,7 +106,7 @@ beforeEach(() => {
   });
   if (!Element.prototype.scrollIntoView)
     Element.prototype.scrollIntoView = () => undefined;
-  useUiStore.setState({ diffView: "inline" });
+  useUiStore.setState({ diffView: "inline", blameTarget: null });
 });
 afterEach(() => {
   cleanup();
@@ -129,6 +129,21 @@ describe("ChangedFileList (P1-UI-DIFF-1)", () => {
     expect(screen.getByText("+2")).toBeTruthy();
     fireEvent.click(await screen.findByText("src/a.ts"));
     expect(onSelect).toHaveBeenCalledWith("src/a.ts");
+  });
+
+  test("a file row's … menu blames that file (REQ-UX-012)", async () => {
+    const onBlame = vi.fn();
+    render(
+      <ChangedFileList
+        files={[file({ newPath: "src/a.ts" })]}
+        selectedPath={null}
+        onSelect={vi.fn()}
+        onBlame={onBlame}
+      />,
+    );
+    fireEvent.click(await screen.findByLabelText("Actions for src/a.ts"));
+    fireEvent.click(await screen.findByText("Blame"));
+    expect(onBlame).toHaveBeenCalledWith("src/a.ts");
   });
 });
 
@@ -181,6 +196,19 @@ describe("DiffPanel (P1-DIFF-*)", () => {
     expect(await screen.findByText("Large diff deferred")).toBeTruthy();
     fireEvent.click(screen.getByText("Load anyway"));
     expect(await screen.findByText(/added line/)).toBeTruthy();
+  });
+
+  test("the toolbar Blame button blames the active file at the commit (REQ-UX-012)", async () => {
+    renderWithApi(
+      <DiffPanel repoId={repoId} oid={oid} />,
+      fakeApi([file({ newPath: "a.ts" })], []),
+    );
+    await screen.findByText(/added line/);
+    fireEvent.click(screen.getByText("Blame"));
+    expect(useUiStore.getState().blameTarget).toEqual({
+      rev: oid,
+      path: "a.ts",
+    });
   });
 
   test("the layout toggle switches react-diff-view between unified and split", async () => {

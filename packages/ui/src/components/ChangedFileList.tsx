@@ -22,6 +22,12 @@ import {
   flatRows,
   treeRows,
 } from "../lib/diff";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "./ui/dropdown-menu";
 
 // Changed-file list (P1-DIFF-2 / P1-UI-DIFF-1): flat or directory-tree view, each entry a
 // Lucide status icon and (for renames/copies) old → new paths; virtualized for large change
@@ -84,10 +90,13 @@ export function ChangedFileList({
   files,
   selectedPath,
   onSelect,
+  onBlame,
 }: {
   readonly files: ReadonlyArray<DiffFile>;
   readonly selectedPath: string | null;
   readonly onSelect: (path: string) => void;
+  /** When set, each file row gains a "…" actions menu (Blame) — REQ-UX-012. */
+  readonly onBlame?: (path: string) => void;
 }) {
   const [mode, setMode] = useState<"flat" | "tree">("flat");
   const tree = useMemo(() => buildFileTree(files), [files]);
@@ -198,22 +207,42 @@ export function ChangedFileList({
                     <span className="truncate">{row.name}</span>
                   </button>
                 ) : (
-                  <button
-                    type="button"
-                    onClick={() => onSelect(row.path)}
-                    style={{ paddingLeft: indent }}
+                  <div
                     className={cn(
-                      "hover:bg-accent flex h-full w-full items-center gap-1.5 pr-2 text-left",
+                      "group hover:bg-accent flex h-full w-full items-center",
                       isSelected ? "bg-accent" : "",
                     )}
                   >
-                    <StatusIcon status={row.file!.status} />
-                    {mode === "tree" ? (
-                      <span className="truncate">{row.name}</span>
-                    ) : (
-                      <FileLabel file={row.file!} />
+                    <button
+                      type="button"
+                      onClick={() => onSelect(row.path)}
+                      style={{ paddingLeft: indent }}
+                      className="flex h-full min-w-0 flex-1 items-center gap-1.5 pr-2 text-left"
+                    >
+                      <StatusIcon status={row.file!.status} />
+                      {mode === "tree" ? (
+                        <span className="truncate">{row.name}</span>
+                      ) : (
+                        <FileLabel file={row.file!} />
+                      )}
+                    </button>
+                    {onBlame && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger
+                          onClick={(e) => e.stopPropagation()}
+                          aria-label={`Actions for ${row.path}`}
+                          className="hover:bg-accent mr-1 flex size-5 shrink-0 items-center justify-center opacity-0 group-hover:opacity-100 data-[popup-open]:opacity-100"
+                        >
+                          …
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent side="bottom" align="end">
+                          <DropdownMenuItem onClick={() => onBlame(row.path)}>
+                            Blame
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     )}
-                  </button>
+                  </div>
                 )}
               </div>
             );

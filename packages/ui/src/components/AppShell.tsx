@@ -5,6 +5,7 @@ import { useRepoState } from "../rpc/hooks";
 import { useInvalidationBus } from "../rpc/use-invalidation-bus";
 import { useNavigation } from "../state/navigation";
 import { type ActiveView, useUiStore } from "../state/store";
+import { BlamePanel } from "./BlamePanel";
 import { BranchesPanel } from "./BranchesPanel";
 import { CommandPalette } from "./CommandPalette";
 import { CommitDetailsTabs } from "./CommitDetailsTabs";
@@ -44,6 +45,8 @@ export function AppShell() {
   const setActiveView = useUiStore((s) => s.setActiveView);
   const openPalette = useUiStore((s) => s.setPaletteOpen);
   const setCommitDialogOpen = useUiStore((s) => s.setCommitDialogOpen);
+  const blameTarget = useUiStore((s) => s.blameTarget);
+  const setBlameTarget = useUiStore((s) => s.setBlameTarget);
   // Commit selection writes the URL (D13); the store mirrors it via <SyncRouteToStore>.
   const { selectOid } = useNavigation();
 
@@ -152,6 +155,15 @@ export function AppShell() {
           repoId={repoId}
           path={editPath}
           onClose={() => setEditPath(null)}
+        />
+      )}
+      {repoId && blameTarget !== null && (
+        <BlamePanel
+          repoId={repoId}
+          rev={blameTarget.rev}
+          path={blameTarget.path}
+          onClose={() => setBlameTarget(null)}
+          onOpenCommit={selectOid}
         />
       )}
 

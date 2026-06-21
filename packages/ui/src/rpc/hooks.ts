@@ -7,6 +7,7 @@
 // goes through the injected {@link useApi} facade so components stay mockable (NF-TEST-7).
 
 import {
+  type BlameResult,
   type BranchInfo,
   type BranchListing,
   type BranchSwitchStrategy,
@@ -106,6 +107,36 @@ export const useFileContentAtRev = (
         : ["inactive"],
     queryFn: () =>
       api.fileContentAtRev(repoId as RepoId, path as string, rev as string),
+    enabled: repoId !== null && rev !== null && path !== null,
+  });
+};
+
+/**
+ * Per-line blame for a file at a revision (P4 UI-D; REQ-BL-001/006, REQ-UX-011). Immutable
+ * and content-addressed by a concrete oid (the caller passes a resolved rev, never "HEAD",
+ * so the result caches forever — spec 15 §8). `force` re-requests past the large-file cap
+ * (REQ-EDGE-010); since it changes the response, it keys a distinct cache entry rather than
+ * mutating the canonical one.
+ */
+export const useBlame = (
+  repoId: RepoId | null,
+  rev: string | null,
+  path: string | null,
+  force = false,
+): UseQueryResult<BlameResult> => {
+  const api = useApi();
+  return useQuery({
+    queryKey:
+      repoId && rev && path
+        ? force
+          ? [...queryKeys.blame(repoId, rev, path), "force"]
+          : queryKeys.blame(repoId, rev, path)
+        : ["inactive"],
+    queryFn: () =>
+      api.blame(repoId as RepoId, path as string, {
+        rev: rev as string,
+        force,
+      }),
     enabled: repoId !== null && rev !== null && path !== null,
   });
 };
@@ -238,7 +269,6 @@ export const useLogStream = (query: LogQuery | null): LogStreamResult => {
   // identity), so borrow it from the current top row — the same person, in practice — for
   // the moment before the real row replaces it.
   const merged = useMemo<ReadonlyArray<CommitSummary>>(() => {
-    if (optimisticCommits.length === 0) return rows;
     const streamed = new Set(rows.map((r) => r.oid));
     const top = rows[0];
     const pending = optimisticCommits
@@ -257,7 +287,21 @@ export const useLogStream = (query: LogQuery | null): LogStreamResult => {
             })
           : c,
       );
-    return pending.length === 0 ? rows : [...pending, ...rows];
+    const combined = pending.length === 0 ? rows : [...pending, ...rows];
+    // A commit must appear at most once: the list renders with `key={row.oid}`, and a
+    // duplicate oid would break React's reconciliation. The producers above provably can't
+    // emit one (git log dedups its walk; `pending` is oid-unique and disjoint from `rows`
+    // since `streamed` is derived from the same `rows` we spread), so this only guards an
+    // upstream re-delivery — a single subscription replaying an oid across a transport
+    // reconnect. Keep the original array reference when already unique to avoid re-renders.
+    const seen = new Set<string>();
+    const unique: CommitSummary[] = [];
+    for (const r of combined) {
+      if (seen.has(r.oid)) continue;
+      seen.add(r.oid);
+      unique.push(r);
+    }
+    return unique.length === combined.length ? combined : unique;
   }, [rows, optimisticCommits]);
 
   return { rows: merged, status, error };

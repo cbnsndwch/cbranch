@@ -39,6 +39,7 @@ export function DiffPanel({
 }) {
   const diffView = useUiStore((s) => s.diffView);
   const setDiffView = useUiStore((s) => s.setDiffView);
+  const setBlameTarget = useUiStore((s) => s.setBlameTarget);
   const [options, setOptions] = useState<DiffOptions>(defaultDiffOptions);
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const [activeHunk, setActiveHunk] = useState(0);
@@ -84,6 +85,10 @@ export function DiffPanel({
     files.findIndex((f) => filePath(f) === selectedPath),
   );
   const active = files[activeIndex]!;
+
+  // Blame the active file at this commit (REQ-UX-012). `oid` is narrowed to a concrete oid
+  // by the guard above, so the blame read is content-addressed/cacheable (spec 15 §8).
+  const openBlame = (path: string) => setBlameTarget({ rev: oid, path });
 
   const goToHunk = (fileIndex: number, hunkIndex: number) => {
     const file = files[fileIndex]!;
@@ -141,6 +146,7 @@ export function DiffPanel({
             files={files}
             selectedPath={filePath(active)}
             onSelect={setSelectedPath}
+            onBlame={openBlame}
           />
         </div>
         <div className="flex min-h-0 flex-1 flex-col">
@@ -148,8 +154,15 @@ export function DiffPanel({
             <span className="truncate font-mono">{filePath(active)}</span>
             <button
               type="button"
-              onClick={() => setViewingFile((v) => !v)}
+              onClick={() => openBlame(filePath(active))}
               className="hover:bg-accent ml-auto shrink-0 border px-1.5"
+            >
+              Blame
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewingFile((v) => !v)}
+              className="hover:bg-accent shrink-0 border px-1.5"
             >
               {viewingFile ? "Back to diff" : "View at revision"}
             </button>
