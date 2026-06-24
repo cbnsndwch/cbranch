@@ -39,6 +39,14 @@ export interface ContinueOptions {
 const opVerb = (op: OperationKind): string =>
   op === "cherryPick" ? "cherry-pick" : op;
 
+// The kinds whose continue/abort this engine drives (D17): merge, rebase, cherry-pick,
+// revert. am/bisect are a Phase-5 surface — guard them out so `opContinue`/`opAbort`
+// never silently run `git am`/`git bisect --continue`/`--abort` for a state the UI
+// doesn't support (the UI gates continue/skip via canContinue/canSkip, so this is the
+// matching engine-side floor).
+const isContinuable = (op: OperationKind): boolean =>
+  op === "merge" || op === "rebase" || op === "cherryPick" || op === "revert";
+
 /** The marker ref naming the commit an operation stopped on. */
 const opHeadRef = (op: OperationKind): string =>
   op === "cherryPick"
@@ -386,6 +394,13 @@ export const opContinue = (
       return yield* Effect.fail(
         gitError("gitFailed", "no operation in progress to continue"),
       );
+    if (!isContinuable(operation))
+      return yield* Effect.fail(
+        gitError(
+          "gitFailed",
+          `continue is not available for the ${operation} operation`,
+        ),
+      );
     const e = seqEnv(env);
     const message = opts.message;
     const allowEmpty = opts.allowEmpty === true;
@@ -468,17 +483,27 @@ export const opAbort = (
   cwd: string,
   operation: OperationKind,
   env?: NodeJS.ProcessEnv,
-): Effect.Effect<void, GitError> =>
-  operation === "none"
-    ? Effect.fail(gitError("gitFailed", "no operation in progress to abort"))
-    : Effect.asVoid(
-        runGitOk({
-          cwd,
-          args: [opVerb(operation), "--abort"],
-          env: seqEnv(env),
-          read: false,
-        }),
-      );
+): Effect.Effect<void, GitError> => {
+  if (operation === "none")
+    return Effect.fail(
+      gitError("gitFailed", "no operation in progress to abort"),
+    );
+  if (!isContinuable(operation))
+    return Effect.fail(
+      gitError(
+        "gitFailed",
+        `abort is not available for the ${operation} operation`,
+      ),
+    );
+  return Effect.asVoid(
+    runGitOk({
+      cwd,
+      args: [opVerb(operation), "--abort"],
+      env: seqEnv(env),
+      read: false,
+    }),
+  );
+};
 
 /** Skip the current commit (rebase / cherry-pick / revert only). */
 export const opSkip = (

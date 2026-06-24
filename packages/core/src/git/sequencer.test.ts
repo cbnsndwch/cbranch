@@ -267,7 +267,7 @@ describe("continue / abort / skip (REQ-CN-007/008/009; AC-8/9/10(08))", () => {
     expect(existsSync(join(gd(repo), "CHERRY_PICK_HEAD"))).toBe(false);
   });
 
-  test("skip is rejected for a merge; abort/continue reject when idle", async () => {
+  test("skip rejected for merge; continue/abort reject idle and am/bisect", async () => {
     const repo = await ws.createRepo("seq-guards");
     await repo.commit({ message: "init", files: { "a.txt": "a\n" } });
 
@@ -275,6 +275,15 @@ describe("continue / abort / skip (REQ-CN-007/008/009; AC-8/9/10(08))", () => {
     expect(skipErr.code).toBe("gitFailed");
     const abortErr = await run(Effect.flip(opAbort(repo.dir, "none")));
     expect(abortErr.code).toBe("gitFailed");
+
+    // am/bisect are a Phase-5 surface — continue/abort must refuse them (D17), never
+    // silently run `git am`/`git bisect --continue`/`--abort`.
+    const contAm = await run(
+      Effect.flip(opContinue(repo.dir, gd(repo), "am", {})),
+    );
+    expect(contAm.code).toBe("gitFailed");
+    const abortBisect = await run(Effect.flip(opAbort(repo.dir, "bisect")));
+    expect(abortBisect.code).toBe("gitFailed");
   });
 });
 
