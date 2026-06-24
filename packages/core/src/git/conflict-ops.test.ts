@@ -170,6 +170,18 @@ describe("conflictSaveMerged (byte fidelity; REQ-MERGE-016/019)", () => {
     expect(readFileSync(join(repo.dir, "f.txt")).equals(raw)).toBe(true);
     expect(await isUnmerged(repo, "f.txt")).toBe(false);
   });
+
+  test("refuses a path that is no longer conflicted (REQ-EDGE-008)", async () => {
+    const repo = await ws.createRepo("save-clean");
+    await repo.commit({ message: "init", files: { "a.txt": "a\n" } });
+
+    const err = await runScoped(
+      Effect.flip(conflictSaveMerged(repo.dir, "a.txt", "clobber\n", "utf8")),
+    );
+    expect(err.code).toBe("gitFailed");
+    // the byte-clobbering write never happened
+    expect(readFileSync(join(repo.dir, "a.txt"), "utf8")).toBe("a\n");
+  });
 });
 
 describe("mark resolved / unresolved (REQ-CN-005/REQ-MERGE-018)", () => {
@@ -181,6 +193,19 @@ describe("mark resolved / unresolved (REQ-CN-005/REQ-MERGE-018)", () => {
     await runScoped(conflictMarkResolved(repo.dir, ["f.txt"]));
     expect(await staged(repo, "f.txt")).toBe("hand merged\n");
     expect(await isUnmerged(repo, "f.txt")).toBe(false);
+  });
+
+  test("markResolved refuses a path that is no longer conflicted (REQ-EDGE-008)", async () => {
+    const repo = await ws.createRepo("mark-resolved-clean");
+    await repo.commit({ message: "init", files: { "a.txt": "a\n" } });
+    await repo.writeFile("a.txt", "edited\n");
+
+    const err = await runScoped(
+      Effect.flip(conflictMarkResolved(repo.dir, ["a.txt"])),
+    );
+    expect(err.code).toBe("gitFailed");
+    // nothing staged: the index still matches HEAD
+    expect(await staged(repo, "a.txt")).toBe("a\n");
   });
 
   test("markUnresolved restores the conflict after a resolution", async () => {

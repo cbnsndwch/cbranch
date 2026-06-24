@@ -1,10 +1,13 @@
 // Conflict-resolution mutations (docs/spec/08 + 11; DECISIONS D17). Every method
 // mutates the index/working tree and runs under the per-repo lock (held by the
-// engine). The acting methods first re-verify the target is still unmerged, so a path
+// engine). The resolving methods — `conflictResolve` / `conflictSaveMerged` /
+// `conflictMarkResolved` — first re-verify the target is still unmerged, so a path
 // resolved or changed outside cbranch fails safely instead of clobbering live state
-// (REQ-EDGE-008). Paths flow through NUL/`--` end to end; the base side is read BY OID
-// through the cat-file pool (never `:n:PATH`); the merged write is byte-faithful (no
-// EOL/BOM normalization — REQ-MERGE-019 / REQ-KDIFF-057).
+// (REQ-EDGE-008). `conflictMarkUnresolved` is exempt by design: it recreates a conflict
+// on an already-resolved path, so an unmerged precondition would be self-defeating.
+// Paths flow through NUL/`--` end to end; the base side is read BY OID through the
+// cat-file pool (never `:n:PATH`); the merged write is byte-faithful (no EOL/BOM
+// normalization — REQ-MERGE-019 / REQ-KDIFF-057).
 
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -121,7 +124,9 @@ export const conflictResolve = (
 
 /**
  * conflict.saveMerged — write the editor's exact Result bytes to the working tree
- * (byte-faithful) and stage the path, marking it resolved (REQ-MERGE-016).
+ * (byte-faithful) and stage the path, marking it resolved (REQ-MERGE-016). Refuses if
+ * the path is no longer unmerged, so a stale editor buffer can't clobber live state
+ * (REQ-EDGE-008).
  */
 export const conflictSaveMerged = (
   cwd: string,
@@ -131,6 +136,7 @@ export const conflictSaveMerged = (
   env?: NodeJS.ProcessEnv,
 ): Effect.Effect<void, GitError> =>
   Effect.gen(function* () {
+    yield* requireUnmerged(cwd, [path], env);
     const bytes = Buffer.from(
       content,
       encoding === "base64" ? "base64" : "utf8",
@@ -139,13 +145,21 @@ export const conflictSaveMerged = (
     yield* mutate(cwd, ["add", "--", path], env);
   });
 
-/** conflict.markResolved — stage the current working-tree content for each path. */
+/**
+ * conflict.markResolved — stage the current working-tree content for each path. Refuses
+ * if any path is no longer unmerged (REQ-EDGE-008).
+ */
 export const conflictMarkResolved = (
   cwd: string,
   paths: ReadonlyArray<string>,
   env?: NodeJS.ProcessEnv,
 ): Effect.Effect<void, GitError> =>
-  paths.length === 0 ? Effect.void : mutate(cwd, ["add", "--", ...paths], env);
+  paths.length === 0
+    ? Effect.void
+    : Effect.gen(function* () {
+        yield* requireUnmerged(cwd, paths, env);
+        yield* mutate(cwd, ["add", "--", ...paths], env);
+      });
 
 /** conflict.markUnresolved — recreate the conflicted merge for each path. */
 export const conflictMarkUnresolved = (
