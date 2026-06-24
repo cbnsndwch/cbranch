@@ -13,16 +13,13 @@ import {
   defaultDiffOptions,
   type DiffOptions,
   filePath,
-  isLargeDiff,
-  isSubmodule,
 } from "../lib/diff";
 import { useCommitDetail, useCommitDiff } from "../rpc/hooks";
 import { useUiStore } from "../state/store";
 import { ChangedFileList } from "./ChangedFileList";
 import { DiffControls } from "./DiffControls";
-import { BinaryCard, LargeDiffCard, SubmoduleCard } from "./DiffPlaceholders";
-import { DiffView } from "./DiffView";
 import { FileAtRevision } from "./FileAtRevision";
+import { RenderedDiffFile } from "./RenderedDiffFile";
 import { Placeholder } from "./ui/placeholder";
 
 // Read-only diff (P1-DIFF-*): the changed-file list, the diff controls, and the selected
@@ -40,6 +37,7 @@ export function DiffPanel({
   const diffView = useUiStore((s) => s.diffView);
   const setDiffView = useUiStore((s) => s.setDiffView);
   const setBlameTarget = useUiStore((s) => s.setBlameTarget);
+  const setHistoryTarget = useUiStore((s) => s.setHistoryTarget);
   const [options, setOptions] = useState<DiffOptions>(defaultDiffOptions);
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const [activeHunk, setActiveHunk] = useState(0);
@@ -89,6 +87,11 @@ export function DiffPanel({
   // Blame the active file at this commit (REQ-UX-012). `oid` is narrowed to a concrete oid
   // by the guard above, so the blame read is content-addressed/cacheable (spec 15 §8).
   const openBlame = (path: string) => setBlameTarget({ rev: oid, path });
+
+  // Open this file's history starting at the viewed commit (REQ-FH-005 / REQ-UX-012);
+  // `oid` (concrete) keys a cacheable listing.
+  const openHistory = (path: string) =>
+    setHistoryTarget({ path, startRev: oid });
 
   const goToHunk = (fileIndex: number, hunkIndex: number) => {
     const file = files[fileIndex]!;
@@ -147,6 +150,7 @@ export function DiffPanel({
             selectedPath={filePath(active)}
             onSelect={setSelectedPath}
             onBlame={openBlame}
+            onHistory={openHistory}
           />
         </div>
         <div className="flex min-h-0 flex-1 flex-col">
@@ -158,6 +162,13 @@ export function DiffPanel({
               className="hover:bg-accent ml-auto shrink-0 border px-1.5"
             >
               Blame
+            </button>
+            <button
+              type="button"
+              onClick={() => openHistory(filePath(active))}
+              className="hover:bg-accent shrink-0 border px-1.5"
+            >
+              History
             </button>
             <button
               type="button"
@@ -179,19 +190,15 @@ export function DiffPanel({
                 rev={oid}
                 path={filePath(active)}
               />
-            ) : active.isBinary ? (
-              <BinaryCard file={active} />
-            ) : isSubmodule(active) ? (
-              <SubmoduleCard file={active} />
-            ) : isLargeDiff(active) && !forced.has(filePath(active)) ? (
-              <LargeDiffCard
+            ) : (
+              <RenderedDiffFile
                 file={active}
-                onLoad={() =>
+                diffView={diffView}
+                forced={forced.has(filePath(active))}
+                onForce={() =>
                   setForced((prev) => new Set(prev).add(filePath(active)))
                 }
               />
-            ) : (
-              <DiffView file={active} diffView={diffView} />
             )}
           </div>
         </div>

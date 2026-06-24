@@ -57,6 +57,17 @@ export interface BlameTarget {
 }
 
 /**
+ * The file the history overlay is open on (P4 UI-E; REQ-FH-001/005, REQ-UX-010/012). `null` =
+ * no history view. `startRev`, when set, is a concrete oid to start the `--follow` walk from
+ * (the revision whose diff the user opened history from), so the listing is cacheable; absent
+ * = the current branch tip. Per-revision actions (diff / file-at-rev / blame) live in the panel.
+ */
+export interface HistoryTarget {
+  readonly path: string;
+  readonly startRev?: string;
+}
+
+/**
  * The cherry-pick / revert / empty-result dialog surface (P4 UI-C). `null` = no dialog
  * open. The `cherryPick`/`revert` forms carry the target commit(s) in application order;
  * the `empty` form is the follow-up prompt git stops on when a pick produces no changes
@@ -186,6 +197,9 @@ export interface UiState {
   // ── P4: blame overlay ────────────────────────────────────────────────────────
   readonly blameTarget: BlameTarget | null;
   readonly setBlameTarget: (target: BlameTarget | null) => void;
+  // ── P4: file-history overlay ─────────────────────────────────────────────────
+  readonly historyTarget: HistoryTarget | null;
+  readonly setHistoryTarget: (target: HistoryTarget | null) => void;
 }
 
 export const useUiStore = create<UiState>((set) => ({
@@ -209,6 +223,7 @@ export const useUiStore = create<UiState>((set) => ({
   activeView: "history",
   pickDialog: null,
   blameTarget: null,
+  historyTarget: null,
   // Switching repositories supersedes the old selection and filters (P1-OPEN-4 / P1-X-4).
   setActiveRepoId: (activeRepoId) =>
     set({
@@ -221,6 +236,7 @@ export const useUiStore = create<UiState>((set) => ({
       optimisticCommits: [],
       pickDialog: null,
       blameTarget: null,
+      historyTarget: null,
     }),
   setSelectedOid: (selectedOid) => set({ selectedOid }),
   setPaletteOpen: (paletteOpen) => set({ paletteOpen }),
@@ -294,4 +310,5 @@ export const useUiStore = create<UiState>((set) => ({
   setActiveView: (activeView) => set({ activeView }),
   setPickDialog: (pickDialog) => set({ pickDialog }),
   setBlameTarget: (blameTarget) => set({ blameTarget }),
+  setHistoryTarget: (historyTarget) => set({ historyTarget }),
 }));

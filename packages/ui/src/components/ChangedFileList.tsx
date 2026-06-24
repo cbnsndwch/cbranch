@@ -91,12 +91,15 @@ export function ChangedFileList({
   selectedPath,
   onSelect,
   onBlame,
+  onHistory,
 }: {
   readonly files: ReadonlyArray<DiffFile>;
   readonly selectedPath: string | null;
   readonly onSelect: (path: string) => void;
-  /** When set, each file row gains a "…" actions menu (Blame) — REQ-UX-012. */
+  /** When set, each file row's "…" actions menu offers Blame — REQ-UX-012. */
   readonly onBlame?: (path: string) => void;
+  /** When set, each file row's "…" actions menu offers File history — REQ-UX-012. */
+  readonly onHistory?: (path: string) => void;
 }) {
   const [mode, setMode] = useState<"flat" | "tree">("flat");
   const tree = useMemo(() => buildFileTree(files), [files]);
@@ -226,7 +229,7 @@ export function ChangedFileList({
                         <FileLabel file={row.file!} />
                       )}
                     </button>
-                    {onBlame && (
+                    {(onBlame || onHistory) && (
                       <DropdownMenu>
                         <DropdownMenuTrigger
                           onClick={(e) => e.stopPropagation()}
@@ -236,9 +239,18 @@ export function ChangedFileList({
                           …
                         </DropdownMenuTrigger>
                         <DropdownMenuContent side="bottom" align="end">
-                          <DropdownMenuItem onClick={() => onBlame(row.path)}>
-                            Blame
-                          </DropdownMenuItem>
+                          {onBlame && (
+                            <DropdownMenuItem onClick={() => onBlame(row.path)}>
+                              Blame
+                            </DropdownMenuItem>
+                          )}
+                          {onHistory && (
+                            <DropdownMenuItem
+                              onClick={() => onHistory(row.path)}
+                            >
+                              File history
+                            </DropdownMenuItem>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     )}

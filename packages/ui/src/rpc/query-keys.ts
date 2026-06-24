@@ -33,8 +33,9 @@ export const queryKeys = {
     [repoId, "commit", oid, "detail"] as const,
   /**
    * `commit.diff` — immutable, content-addressed by target plus the options that change the
-   * computed patch (base/whitespace/context/combined), so toggling a control caches
-   * independently. Never invalidated (spec 15 §8).
+   * computed patch (base/whitespace/context/combined/paths), so toggling a control caches
+   * independently. `paths` distinguishes a path-scoped diff (file history's "view diff",
+   * REQ-FH-003) from the whole-commit diff of the same target. Never invalidated (spec 15 §8).
    */
   commitDiff: (spec: DiffSpec) =>
     [
@@ -47,6 +48,7 @@ export const queryKeys = {
         whitespace: spec.whitespace,
         context: spec.context,
         combined: spec.combined,
+        paths: spec.paths,
       },
     ] as const,
   /** `file.contentAtRev` — immutable blob at a fixed rev (never invalidated). */
@@ -92,7 +94,16 @@ export const queryKeys = {
    */
   blame: (repoId: RepoId, rev: string, path: string) =>
     [repoId, "blame", rev, path] as const,
-  /** `file.history` — single-path revision list (domain: `commits`; paginated). */
-  fileHistory: (repoId: RepoId, path: string) =>
-    [repoId, "commits", "fileHistory", path] as const,
+  /**
+   * `file.history` — single-path revision list, paginated. A walk pinned to a concrete
+   * `startRev` is immutable (it only ever walks that commit's ancestors), so — like `blame`
+   * and `commitDiff` — it lives under a non-domain prefix and is NEVER invalidated (spec 15
+   * §8): a background commit can't change it, so refetching every loaded page on each
+   * `commits` event would be pure waste. The tip case (no `startRev`) tracks the branch head,
+   * so it stays under the `commits` domain to refresh when new commits land.
+   */
+  fileHistory: (repoId: RepoId, path: string, startRev?: string) =>
+    startRev
+      ? ([repoId, "fileHistory", path, startRev] as const)
+      : ([repoId, "commits", "fileHistory", path] as const),
 };

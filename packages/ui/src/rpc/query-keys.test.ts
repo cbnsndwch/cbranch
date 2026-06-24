@@ -48,13 +48,54 @@ describe("query keys (D9 / spec 15 §2)", () => {
       "commit",
       "abc123",
       "diff",
-      { base: "^1", whitespace: "show", context: 3, combined: false },
+      {
+        base: "^1",
+        whitespace: "show",
+        context: 3,
+        combined: false,
+        paths: undefined,
+      },
     ]);
     expect(queryKeys.fileContentAtRev(repoId, "abc123", "src/a.ts")).toEqual([
       repoId,
       "blob",
       "abc123",
       "src/a.ts",
+    ]);
+  });
+
+  test("a path-scoped diff keys distinctly from the whole-commit diff (REQ-FH-003)", () => {
+    const base = {
+      repoId,
+      target: "abc123",
+      cached: false,
+      whitespace: "show",
+      context: 3,
+      renames: true,
+      combined: false,
+    } as const;
+    const whole = queryKeys.commitDiff(new DiffSpec(base));
+    const scoped = queryKeys.commitDiff(
+      new DiffSpec({ ...base, paths: ["src/a.ts"] }),
+    );
+    expect(scoped).not.toEqual(whole);
+    expect(scoped[4]).toMatchObject({ paths: ["src/a.ts"] });
+  });
+
+  test("fileHistory: tip under commits domain, startRev-pinned is content-addressed (REQ-FH-004)", () => {
+    // Tip case tracks the branch head → invalidatable `commits` domain.
+    expect(queryKeys.fileHistory(repoId, "src/a.ts")).toEqual([
+      repoId,
+      "commits",
+      "fileHistory",
+      "src/a.ts",
+    ]);
+    // Pinned to a concrete rev → immutable, non-domain prefix (never invalidated, like blame).
+    expect(queryKeys.fileHistory(repoId, "src/a.ts", "abc123")).toEqual([
+      repoId,
+      "fileHistory",
+      "src/a.ts",
+      "abc123",
     ]);
   });
 });

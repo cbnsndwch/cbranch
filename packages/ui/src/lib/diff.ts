@@ -54,16 +54,22 @@ export const defaultDiffOptions: DiffOptions = {
   combined: false,
 };
 
-/** Build the server `DiffSpec` for a target commit and the active options. */
+/**
+ * Build the server `DiffSpec` for a target commit and the active options. `paths`, when
+ * given, scopes the diff to those pathspecs (file history's "view diff of this path at this
+ * revision", REQ-FH-003) — left undefined for the whole-commit diff.
+ */
 export const buildDiffSpec = (
   repoId: RepoId,
   target: string,
   options: DiffOptions,
+  paths?: ReadonlyArray<string>,
 ): DiffSpec =>
   new DiffSpec({
     repoId,
     target,
     base: options.combined ? undefined : options.base,
+    paths,
     cached: false,
     whitespace: options.whitespace,
     context: options.context,

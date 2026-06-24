@@ -14,6 +14,7 @@ import { CommitTab } from "./CommitTab";
 import { ConflictsPanel } from "./ConflictsPanel";
 import { DiffPanel } from "./DiffPanel";
 import { DocumentTitle } from "./DocumentTitle";
+import { FileHistoryPanel } from "./FileHistoryPanel";
 import { HistoryPane } from "./HistoryPane";
 import { HistoryStatusStrip } from "./HistoryStatusStrip";
 import { MergeEditor } from "./MergeEditor";
@@ -47,6 +48,8 @@ export function AppShell() {
   const setCommitDialogOpen = useUiStore((s) => s.setCommitDialogOpen);
   const blameTarget = useUiStore((s) => s.blameTarget);
   const setBlameTarget = useUiStore((s) => s.setBlameTarget);
+  const historyTarget = useUiStore((s) => s.historyTarget);
+  const setHistoryTarget = useUiStore((s) => s.setHistoryTarget);
   // Commit selection writes the URL (D13); the store mirrors it via <SyncRouteToStore>.
   const { selectOid } = useNavigation();
 
@@ -164,6 +167,16 @@ export function AppShell() {
           path={blameTarget.path}
           onClose={() => setBlameTarget(null)}
           onOpenCommit={selectOid}
+        />
+      )}
+      {repoId && historyTarget !== null && (
+        <FileHistoryPanel
+          repoId={repoId}
+          path={historyTarget.path}
+          startRev={historyTarget.startRev}
+          onClose={() => setHistoryTarget(null)}
+          onOpenCommit={selectOid}
+          onBlame={setBlameTarget}
         />
       )}
 

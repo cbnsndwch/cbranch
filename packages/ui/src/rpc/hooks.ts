@@ -22,6 +22,7 @@ import {
   type DiffFile,
   type DiffSpec,
   type FileContentResult,
+  type FileHistoryPage,
   type LogQuery,
   type MergeMode,
   type MergeResult,
@@ -40,6 +41,9 @@ import {
   type WorktreeInfo,
 } from "@cbranch/rpc-contract";
 import {
+  type InfiniteData,
+  useInfiniteQuery,
+  type UseInfiniteQueryResult,
   useMutation,
   useQuery,
   useQueryClient,
@@ -138,6 +142,40 @@ export const useBlame = (
         force,
       }),
     enabled: repoId !== null && rev !== null && path !== null,
+  });
+};
+
+/** A file-history page request size (REQ-FH-004 — incremental load, never the full log up front). */
+export const FILE_HISTORY_PAGE_SIZE = 50;
+
+/**
+ * Single-path commit history with rename following (P4 UI-E; REQ-FH-001/002/004). Paginated
+ * via `useInfiniteQuery`: each page carries `nextCursor` (a server token), and `Load more`
+ * fetches the next page. A concrete `startRev` (the revision history was opened from) keys a
+ * distinct, cacheable leaf; absent = the current branch tip.
+ */
+export const useFileHistory = (
+  repoId: RepoId | null,
+  path: string | null,
+  startRev?: string,
+): UseInfiniteQueryResult<
+  InfiniteData<FileHistoryPage, string | undefined>
+> => {
+  const api = useApi();
+  return useInfiniteQuery({
+    queryKey:
+      repoId && path
+        ? queryKeys.fileHistory(repoId, path, startRev)
+        : ["inactive"],
+    queryFn: ({ pageParam }) =>
+      api.fileHistory(repoId as RepoId, path as string, {
+        limit: FILE_HISTORY_PAGE_SIZE,
+        cursor: pageParam,
+        startRev,
+      }),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (last) => last.nextCursor,
+    enabled: repoId !== null && path !== null,
   });
 };
 
