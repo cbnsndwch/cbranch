@@ -1,10 +1,10 @@
 {
   "name": "cbranch",
-  "description": "A cross-platform, browser-based Git GUI",
   "version": "0.0.0",
-  "type": "module",
   "private": true,
+  "description": "A cross-platform, browser-based Git GUI",
   "license": "MIT",
+  "type": "module",
   "scripts": {
     "lint": "oxlint",
     "format": "oxfmt",
