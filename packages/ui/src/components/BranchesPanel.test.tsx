@@ -170,7 +170,12 @@ describe("BranchesPanel (UI-001/002/004)", () => {
   test("discard switch path requires a second explicit confirmation", async () => {
     const branchSwitch = vi
       .fn()
-      .mockRejectedValueOnce(new Error("dirtyWorkingTree"))
+      // The engine returns a typed GitError; the client branches on `.code`, not text.
+      .mockRejectedValueOnce({
+        _tag: "GitError",
+        code: "dirtyWorkingTree",
+        message: "local changes to these paths would be overwritten",
+      })
       .mockResolvedValue(undefined);
     renderPanel(makeFakeApi({ branchSwitch }));
     await screen.findByText("feature");

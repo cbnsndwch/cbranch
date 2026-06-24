@@ -249,15 +249,13 @@ export function BranchesPanel({ repoId }: BranchesPanelProps) {
       { target },
       {
         onError: (err) => {
-          const msg = String(err);
-          if (
-            msg.includes("would be overwritten") ||
-            msg.includes("dirtyWorkingTree")
-          ) {
+          // The engine machine-detects a dirty-tree refusal and returns a typed
+          // `dirtyWorkingTree` (NF-GIT-3) — branch on the error CODE, not git's stderr.
+          if ((err as { code?: unknown }).code === "dirtyWorkingTree") {
             setStashReapply(true);
             setDialog({ kind: "dirtyTree", target });
           } else {
-            toast.error(msg);
+            toast.error(String(err));
           }
         },
       },

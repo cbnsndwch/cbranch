@@ -251,13 +251,120 @@ describe("branch lifecycle", () => {
     const err = await Effect.runPromise(
       Effect.flip(branchSwitch(repo.dir, "other")),
     );
-    expect(err.code).toBe("gitFailed");
+    // Machine-classified (NF-GIT-3), not the generic gitFailed: a typed dirtyWorkingTree
+    // naming the offending path, so the client can offer carry/stash/discard by code.
+    expect(err.code).toBe("dirtyWorkingTree");
+    expect((err.detail as { paths: string[] }).paths).toContain("a.txt");
 
     // The switch was aborted: still on main, and the WD edit is preserved.
     const listing = await Effect.runPromise(branchList(repo.dir));
     expect(listing.currentBranch).toBe("main");
     const status = await repo.git(["status", "--porcelain"]);
     expect(status.stdout).toContain("a.txt");
+  });
+
+  test("branchSwitch — carry blocked by an untracked file in the target is dirtyWorkingTree", async () => {
+    const repo = await ws.createRepo("bops-carry-untracked");
+    await repo.commit({ message: "init", files: { "a.txt": "a\n" } });
+    await repo.git(["switch", "-c", "other"]);
+    await repo.commit({
+      message: "add new",
+      files: { "new.txt": "from-other\n" },
+    });
+    await repo.git(["switch", "main"]);
+    // main has no new.txt; an untracked local new.txt collides with `other`'s tracked
+    // version, so a carrying switch would overwrite it — git refuses (untracked class).
+    await repo.writeFile("new.txt", "untracked-local\n");
+
+    const err = await Effect.runPromise(
+      Effect.flip(branchSwitch(repo.dir, "other")),
+    );
+    expect(err.code).toBe("dirtyWorkingTree");
+    expect((err.detail as { paths: string[] }).paths).toContain("new.txt");
+  });
+
+  test("branchSwitch — untracked file inside a NEW target directory is dirtyWorkingTree", async () => {
+    const repo = await ws.createRepo("bops-carry-untracked-dir");
+    await repo.commit({ message: "init", files: { "a.txt": "a\n" } });
+    await repo.git(["switch", "-c", "other"]);
+    await repo.commit({
+      message: "add dir",
+      files: { "sub/foo.txt": "from-other\n" },
+    });
+    await repo.git(["switch", "main"]);
+    // `sub/` is entirely untracked on main, so git's default status collapses it to a
+    // single `sub/` entry — detection must use --untracked-files=all to see the file.
+    await repo.writeFile("sub/foo.txt", "untracked-local\n");
+
+    const err = await Effect.runPromise(
+      Effect.flip(branchSwitch(repo.dir, "other")),
+    );
+    expect(err.code).toBe("dirtyWorkingTree");
+    expect((err.detail as { paths: string[] }).paths).toContain("sub/foo.txt");
+  });
+
+  test("branchSwitch — an untracked file whose name is a target directory is dirtyWorkingTree", async () => {
+    const repo = await ws.createRepo("bops-carry-file-vs-dir");
+    await repo.commit({ message: "init", files: { "a.txt": "a\n" } });
+    await repo.git(["switch", "-c", "other"]);
+    await repo.commit({
+      message: "add foo/",
+      files: { "foo/bar": "tracked\n" },
+    });
+    await repo.git(["switch", "main"]);
+    // main has no `foo`; an untracked FILE named `foo` collides with `other`'s `foo/` dir.
+    await repo.writeFile("foo", "untracked-file\n");
+
+    const err = await Effect.runPromise(
+      Effect.flip(branchSwitch(repo.dir, "other")),
+    );
+    expect(err.code).toBe("dirtyWorkingTree");
+    expect((err.detail as { paths: string[] }).paths).toContain("foo");
+  });
+
+  test("branchSwitch — a locally-modified file renamed away in the target is dirtyWorkingTree", async () => {
+    const repo = await ws.createRepo("bops-carry-rename");
+    await repo.commit({ message: "init", files: { "a.txt": "base\n" } });
+    await repo.git(["switch", "-c", "other"]);
+    await repo.git(["mv", "a.txt", "b.txt"]);
+    await repo.git(["commit", "-q", "-m", "rename a->b"]);
+    await repo.git(["switch", "main"]);
+    // git's plain switch does NO rename detection — it deletes a.txt — so a dirty a.txt
+    // would be overwritten; detection must use --no-renames to still see a.txt.
+    await repo.writeFile("a.txt", "work-in-progress\n");
+
+    const err = await Effect.runPromise(
+      Effect.flip(branchSwitch(repo.dir, "other")),
+    );
+    expect(err.code).toBe("dirtyWorkingTree");
+    expect((err.detail as { paths: string[] }).paths).toContain("a.txt");
+  });
+
+  test("branchSwitch — an unmerged index refusal stays gitFailed, not a dead-end dirtyWorkingTree", async () => {
+    const repo = await ws.createRepo("bops-switch-unmerged");
+    await repo.commit({ message: "base", files: { "f.txt": "base\n" } });
+    await repo.git(["switch", "-c", "other"]);
+    await repo.commit({ message: "other", files: { "f.txt": "other\n" } });
+    await repo.git(["switch", "main"]);
+    await repo.commit({ message: "mine", files: { "f.txt": "mine\n" } });
+    // A conflicting merge leaves an unmerged index; a switch is then refused on the
+    // index-resolution check — NOT a would-be-overwritten case, so it must stay gitFailed.
+    await repo.git(["merge", "other"], { allowFailure: true });
+
+    const err = await Effect.runPromise(
+      Effect.flip(branchSwitch(repo.dir, "other")),
+    );
+    expect(err.code).toBe("gitFailed");
+  });
+
+  test("branchSwitch — a non-dirty failure (unknown target) stays gitFailed", async () => {
+    const repo = await ws.createRepo("bops-switch-unknown");
+    await repo.commit({ message: "init", files: { "a.txt": "a\n" } });
+
+    const err = await Effect.runPromise(
+      Effect.flip(branchSwitch(repo.dir, "no-such-branch")),
+    );
+    expect(err.code).toBe("gitFailed");
   });
 
   // ── detached checkout (BR-022) ────────────────────────────────────────────────
