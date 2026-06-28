@@ -8,6 +8,8 @@
 // React Query error state); a stream's per-item error reaches `onError`.
 
 import {
+  type ArchiveDescriptor,
+  type ArchiveFormat,
   type BlameResult,
   type BranchInfo,
   type BranchListing,
@@ -320,6 +322,16 @@ export interface CbranchApi {
     directories: boolean,
     ignored: boolean,
   ): Promise<CleanResult>;
+  // ── archive export (P5) ───────────────────────────────────────────────────
+  archivePrepare(
+    repoId: RepoId,
+    opts: {
+      format: ArchiveFormat;
+      treeish: string;
+      prefix?: string;
+      subPath?: string;
+    },
+  ): Promise<ArchiveDescriptor>;
 }
 
 /** Back a {@link CbranchApi} with the single app runtime. */
@@ -594,6 +606,11 @@ export const makeApi = (runtime: AppRuntime): CbranchApi => {
     clean: (repoId, paths, directories, ignored) =>
       runtime.runPromise(
         withClient((c) => c.Clean({ repoId, paths, directories, ignored })),
+      ),
+    // ── archive export (P5) ─────────────────────────────────────────────────
+    archivePrepare: (repoId, opts) =>
+      runtime.runPromise(
+        withClient((c) => c.ArchivePrepare({ repoId, ...opts })),
       ),
   };
 };

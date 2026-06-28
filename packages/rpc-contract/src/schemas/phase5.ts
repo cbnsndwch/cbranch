@@ -49,3 +49,25 @@ export class CleanPreview extends Schema.Class<CleanPreview>("CleanPreview")({
 export class CleanResult extends Schema.Class<CleanResult>("CleanResult")({
   removed: Schema.Number,
 }) {}
+
+// ─── S3: archive export ──────────────────────────────────────────────────────────
+
+/** A host-git archive format (REQ-P5-AR-002). `tar.gz` is the supported compressed tar. */
+export const ArchiveFormat = Schema.Literals(["zip", "tar", "tar.gz"]);
+export type ArchiveFormat = typeof ArchiveFormat.Type;
+
+/**
+ * A server-minted pointer to a streamed archive download (REQ-P5-AR-004). A sibling of
+ * {@link DownloadDescriptor} but **without `size`** — an archive's byte length is
+ * unknowable before it streams (D18); the UI reports the size from the downloaded blob.
+ * The bytes travel over the HTTP side-channel (`GET /sidechannel/archive`), never the
+ * WS/NDJSON bus.
+ */
+export class ArchiveDescriptor extends Schema.Class<ArchiveDescriptor>(
+  "ArchiveDescriptor",
+)({
+  url: Schema.String,
+  filename: Schema.String,
+  contentType: Schema.String,
+  format: ArchiveFormat,
+}) {}

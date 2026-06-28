@@ -25,6 +25,8 @@ import {
   type ConflictSides,
   type ContentEncoding,
   type DiffFile,
+  type ArchiveDescriptor,
+  type ArchiveFormat,
   type CleanPreview,
   type CleanResult,
   type FileContentResult,
@@ -482,6 +484,28 @@ export interface GitEngineApi {
     directories: boolean,
     ignored: boolean,
   ) => Effect.Effect<CleanResult, GitError>;
+
+  // ── archive export (P5, S3) ─────────────────────────────────────────────────
+  /** archive.prepare — validate tree-ish + mint a streamed-download descriptor. READ. REQ-P5-AR-001. */
+  readonly archivePrepare: (
+    repoId: RepoId,
+    treeish: string,
+    format: ArchiveFormat,
+    prefix?: string,
+    subPath?: string,
+  ) => Effect.Effect<ArchiveDescriptor, GitError>;
+  /**
+   * archiveStream — raw archive bytes for the `GET /sidechannel/archive` route. INTERNAL
+   * (route-only, NOT an RPC / not in the group), like {@link readObject}; the bytes
+   * travel over the HTTP side-channel, never the WS/NDJSON bus.
+   */
+  readonly archiveStream: (
+    repoId: RepoId,
+    treeish: string,
+    format: ArchiveFormat,
+    prefix?: string,
+    subPath?: string,
+  ) => Stream.Stream<Uint8Array, GitError>;
 
   // ── object-read infrastructure (internal; for core-B) ──────────────────────
   /** Read a full object via the repo's `cat-file --batch` pool (`null` if missing). */

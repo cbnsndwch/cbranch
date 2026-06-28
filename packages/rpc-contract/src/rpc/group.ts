@@ -46,6 +46,8 @@ import {
   SequencerResult,
 } from "../schemas/phase4";
 import {
+  ArchiveDescriptor,
+  ArchiveFormat,
   CleanPreview,
   CleanResult,
   GcPrune,
@@ -646,6 +648,21 @@ export const CbranchRpcs = RpcGroup.make(
       ignored: Schema.Boolean,
     },
     success: CleanResult,
+    error: GitError,
+  }),
+
+  // ── P5: archive export ─────────────────────────────────────────────────────
+  // archive.prepare — validate a tree-ish + mint a streamed-download descriptor
+  // (READ; bytes travel over GET /sidechannel/archive, not this RPC). REQ-P5-AR-001/005.
+  Rpc.make("ArchivePrepare", {
+    payload: {
+      repoId: RepoId,
+      treeish: Schema.String,
+      format: ArchiveFormat,
+      prefix: Schema.optional(Schema.String),
+      subPath: Schema.optional(Schema.String),
+    },
+    success: ArchiveDescriptor,
     error: GitError,
   }),
 );

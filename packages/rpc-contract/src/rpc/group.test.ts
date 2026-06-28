@@ -51,6 +51,8 @@ import {
   SequencerResult,
 } from "../schemas/phase4";
 import {
+  ArchiveDescriptor,
+  ArchiveFormat,
   CleanEntry,
   CleanPreview,
   CleanResult,
@@ -319,6 +321,12 @@ const cleanPreview = new CleanPreview({
   ],
 });
 const cleanResult = new CleanResult({ removed: 2 });
+const archiveDescriptor = new ArchiveDescriptor({
+  url: "/sidechannel/archive?repoId=x&treeish=HEAD&format=zip",
+  filename: "cbranch-HEAD.zip",
+  contentType: "application/zip",
+  format: "zip",
+});
 
 // --- stub handlers: schema-valid data, plus payload-driven error injection ---
 const handlers = CbranchRpcs.toLayer({
@@ -459,6 +467,9 @@ const handlers = CbranchRpcs.toLayer({
   // ── P5: clean working directory ───────────────────────────────────────────────
   CleanPreview: () => Effect.succeed(cleanPreview),
   Clean: () => Effect.succeed(cleanResult),
+
+  // ── P5: archive export ────────────────────────────────────────────────────────
+  ArchivePrepare: () => Effect.succeed(archiveDescriptor),
 });
 
 describe("CbranchRpcs P1 contract (in-memory RpcTest round-trip)", () => {
@@ -879,6 +890,26 @@ describe("CbranchRpcs P5 power-features round-trip", () => {
     expect(preview.entries[1]?.isDirectory).toBe(true);
     expect(result.removed).toBe(2);
   });
+
+  test("ArchivePrepare round-trips a descriptor; ArchiveFormat is closed", async () => {
+    const program = Effect.gen(function* () {
+      const client = yield* RpcTest.makeClient(CbranchRpcs);
+      return yield* client.ArchivePrepare({
+        repoId,
+        treeish: "HEAD",
+        format: "zip",
+      });
+    }).pipe(Effect.provide(handlers), Effect.scoped);
+
+    const descriptor = await Effect.runPromise(program);
+
+    expect(descriptor.format).toBe("zip");
+    expect(descriptor.url).toContain("/sidechannel/archive");
+    expect(descriptor.filename).toBe("cbranch-HEAD.zip");
+    expect(Exit.isFailure(Schema.decodeUnknownExit(ArchiveFormat)("rar"))).toBe(
+      true,
+    );
+  });
 });
 
 // Per-feature P5 slices APPEND their tags to this catalog block (D18); gc opens it.
@@ -889,6 +920,8 @@ describe("CbranchRpcs P5 power-features method catalog (DECISIONS D1 wire tags)"
     // clean
     "CleanPreview",
     "Clean",
+    // archive
+    "ArchivePrepare",
   ])("exposes the %s wire tag", (tag) => {
     expect(CbranchRpcs.requests.has(tag)).toBe(true);
   });

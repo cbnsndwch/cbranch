@@ -22,6 +22,7 @@ import {
 import * as NodeHttpServer from "@effect/platform-node/NodeHttpServer";
 import { Layer } from "effect";
 
+import { archiveChannelRoute } from "./archive-channel";
 import { type ServerConfig } from "./config";
 import { makeOriginGuard } from "./origin-guard";
 import { handlersLayer } from "./rpc-handlers";
@@ -59,6 +60,7 @@ export const buildServerLive = (
       spa: true,
     }),
     sideChannelRoute,
+    archiveChannelRoute,
   ).pipe(
     Layer.provide(handlersLayer),
     Layer.provide(RpcSerialization.layerNdjson),

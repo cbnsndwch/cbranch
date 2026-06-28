@@ -7,6 +7,8 @@
 // goes through the injected {@link useApi} facade so components stay mockable (NF-TEST-7).
 
 import {
+  type ArchiveDescriptor,
+  type ArchiveFormat,
   type BlameResult,
   type BranchInfo,
   type BranchListing,
@@ -1285,6 +1287,27 @@ export const useCleanPreview = (
     queryKey: queryKeys.cleanPreview(repoId, directories, ignored),
     queryFn: () => api.cleanPreview(repoId, directories, ignored),
     enabled,
+  });
+};
+
+/**
+ * Validate a tree-ish + mint an archive descriptor (REQ-P5-AR-001/005). Pure mutation —
+ * no cached read, no invalidation; the dialog then fetches `descriptor.url` over the HTTP
+ * side-channel and triggers a browser download.
+ */
+export const useArchivePrepare = (repoId: RepoId) => {
+  const api = useApi();
+  return useMutation<
+    ArchiveDescriptor,
+    unknown,
+    {
+      format: ArchiveFormat;
+      treeish: string;
+      prefix?: string;
+      subPath?: string;
+    }
+  >({
+    mutationFn: (opts) => api.archivePrepare(repoId, opts),
   });
 };
 

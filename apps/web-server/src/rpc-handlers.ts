@@ -278,4 +278,10 @@ export const handlersLayer = CbranchRpcs.toLayer({
     Effect.flatMap(GitEngine, (engine) =>
       engine.clean(repoId, paths, directories, ignored),
     ),
+
+  // ── archive export (P5) — bytes stream over GET /sidechannel/archive, not here ──
+  ArchivePrepare: ({ repoId, treeish, format, prefix, subPath }) =>
+    Effect.flatMap(GitEngine, (engine) =>
+      engine.archivePrepare(repoId, treeish, format, prefix, subPath),
+    ),
 });

@@ -51,6 +51,10 @@ import { commitDiff, diffWorkingFile } from "../git/diff";
 import { gitError } from "../git/errors";
 import { fileHistory as fileHistoryGit } from "../git/file-history";
 import {
+  archivePrepare as archivePrepareGit,
+  archiveStreamGit,
+} from "../git/archive";
+import {
   clean as cleanGit,
   cleanPreview as cleanPreviewGit,
 } from "../git/clean";
@@ -746,6 +750,25 @@ export const makeGitEngine = (
         Effect.flatMap(resolveById(repoId), (repo) =>
           locks.withRepoLock(repoId)(
             cleanGit(repoCwd(repo), paths, directories, ignored),
+          ),
+        ),
+
+      // ── archive export (P5) ─────────────────────────────────────────────────
+      archivePrepare: (repoId, treeish, format, prefix, subPath) =>
+        Effect.flatMap(resolveById(repoId), (repo) =>
+          archivePrepareGit(
+            repoCwd(repo),
+            repoId,
+            treeish,
+            format,
+            prefix,
+            subPath,
+          ),
+        ),
+      archiveStream: (repoId, treeish, format, prefix, subPath) =>
+        Stream.unwrap(
+          Effect.map(resolveById(repoId), (repo) =>
+            archiveStreamGit(repoCwd(repo), treeish, format, prefix, subPath),
           ),
         ),
     };

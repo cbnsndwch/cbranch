@@ -1,4 +1,5 @@
 import { mkdtempSync } from "node:fs";
+import { writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -20,6 +21,7 @@ import {
   runGit,
   runGitOk,
   streamGit,
+  streamGitBytes,
 } from "./run-git";
 
 let ws: FixtureWorkspace;
@@ -143,6 +145,74 @@ describe("streamGit (REQ-P3-XC-004 — real-time streaming + cancel)", () => {
         yield* Effect.sleep("150 millis");
         // Interrupting returns once the scope's SIGKILL cleanup has run; if the
         // stream were uninterruptible this would never resolve.
+        return yield* Fiber.interrupt(fiber);
+      }).pipe(Effect.timeout("5 seconds")),
+    );
+    expect(exit._tag).toBe("Success");
+  });
+});
+
+describe("streamGitBytes (raw binary, no decode/line-split)", () => {
+  test("round-trips arbitrary binary byte-for-byte (NUL/CR/LF preserved)", async () => {
+    const repo = await ws.createRepo("bytes-fidelity");
+    await repo.commit({ message: "init", files: { "a.txt": "a\n" } });
+    // Bytes that streamGit (decode + CR/LF split) would corrupt: NUL, CR, LF, 0xFF.
+    const original = Buffer.from([
+      0x50, 0x4b, 0x03, 0x04, 0x00, 0x0d, 0x0a, 0xff, 0x01, 0x00, 0x80, 0x0a,
+      0x0d, 0x00,
+    ]);
+    await writeFile(join(repo.dir, "bin.dat"), original);
+    const hashed = await repo.git(["hash-object", "-w", "--", "bin.dat"]);
+    const oid = hashed.stdout.trim();
+
+    const chunks = await run(
+      Stream.runCollect(
+        streamGitBytes({
+          cwd: repo.dir,
+          args: ["cat-file", "blob", oid],
+          read: false,
+        }),
+      ),
+    ).then((c) => [...c]);
+    const bytes = Buffer.concat(chunks.map((u) => Buffer.from(u)));
+
+    expect(bytes.equals(original)).toBe(true);
+  });
+
+  test("fails the stream on a non-zero exit (classifyExit → gitFailed)", async () => {
+    const repo = await ws.createRepo("bytes-fail");
+    await repo.commit({ message: "init", files: { "a.txt": "a" } });
+
+    const err = await run(
+      Effect.flip(
+        Stream.runCollect(
+          streamGitBytes({
+            cwd: repo.dir,
+            args: ["cat-file", "blob", "0".repeat(40)],
+            read: false,
+          }),
+        ),
+      ),
+    );
+    expect(err.code).toBe("gitFailed");
+  });
+
+  test("is cancelable — interrupting a blocked byte stream terminates promptly", async () => {
+    const repo = await ws.createRepo("bytes-cancel");
+    await repo.commit({ message: "init", files: { "a.txt": "a" } });
+
+    const exit = await runExit(
+      Effect.gen(function* () {
+        const fiber = yield* Effect.forkChild(
+          Stream.runDrain(
+            streamGitBytes({
+              cwd: repo.dir,
+              args: ["cat-file", "--batch"],
+              read: false,
+            }),
+          ),
+        );
+        yield* Effect.sleep("150 millis");
         return yield* Fiber.interrupt(fiber);
       }).pipe(Effect.timeout("5 seconds")),
     );

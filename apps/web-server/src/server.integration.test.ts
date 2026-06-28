@@ -62,6 +62,17 @@ const fetchProbe = (url: string, init?: RequestInit) =>
     };
   });
 
+const fetchBytes = (url: string, init?: RequestInit) =>
+  Effect.promise(async () => {
+    const res = await fetch(url, init);
+    return {
+      status: res.status,
+      contentType: res.headers.get("content-type"),
+      disposition: res.headers.get("content-disposition"),
+      bytes: Buffer.from(await res.arrayBuffer()),
+    };
+  });
+
 describe("web-server end-to-end (NF-TEST-8)", () => {
   test("serves the RPC bus, static SPA, and side-channel, and rejects forged Origin (NF-SEC-3)", async () => {
     const config = resolveServerConfig({
@@ -142,6 +153,21 @@ describe("web-server end-to-end (NF-TEST-8)", () => {
         },
       );
 
+      // --- archive side-channel (REQ-P5-AR-004/005) ---
+      const archiveOk = yield* fetchBytes(
+        `${base}/sidechannel/archive?repoId=${repoId}&treeish=HEAD&format=zip`,
+      );
+      const archiveBadTree = yield* fetchBytes(
+        `${base}/sidechannel/archive?repoId=${repoId}&treeish=no-such-ref&format=zip`,
+      );
+      const archiveBadPrefix = yield* fetchBytes(
+        `${base}/sidechannel/archive?repoId=${repoId}&treeish=HEAD&format=zip&prefix=../evil`,
+      );
+      const forbiddenArchive = yield* fetchBytes(
+        `${base}/sidechannel/archive?repoId=${repoId}&treeish=HEAD&format=zip`,
+        { headers: { origin: "http://evil.example.com" } },
+      );
+
       return {
         rpc,
         root,
@@ -151,6 +177,10 @@ describe("web-server end-to-end (NF-TEST-8)", () => {
         traversal,
         forbidden,
         forbiddenBlob,
+        archiveOk,
+        archiveBadTree,
+        archiveBadPrefix,
+        forbiddenArchive,
       };
     }).pipe(Effect.provide(serverLive), Effect.scoped);
 
@@ -199,5 +229,22 @@ describe("web-server end-to-end (NF-TEST-8)", () => {
     // NF-SEC-3: forged Origin rejected (HTTP route + side-channel) before any engine call.
     expect(r.forbidden.status).toBe(403);
     expect(r.forbiddenBlob.status).toBe(403);
+
+    // REQ-P5-AR-004/005: archive streams a zip with attachment disposition; an invalid
+    // tree-ish or traversal prefix is 400 with NO archive bytes (no partial download);
+    // a forged Origin is rejected before any engine call.
+    expect(r.archiveOk.status).toBe(200);
+    expect(r.archiveOk.contentType).toContain("application/zip");
+    expect(r.archiveOk.disposition).toContain("attachment");
+    expect(r.archiveOk.disposition).toContain("cbranch-HEAD.zip");
+    expect([...r.archiveOk.bytes.subarray(0, 4)]).toEqual([
+      0x50, 0x4b, 0x03, 0x04,
+    ]);
+    expect(r.archiveBadTree.status).toBe(400);
+    expect([...r.archiveBadTree.bytes.subarray(0, 4)]).not.toEqual([
+      0x50, 0x4b, 0x03, 0x04,
+    ]);
+    expect(r.archiveBadPrefix.status).toBe(400);
+    expect(r.forbiddenArchive.status).toBe(403);
   }, 30_000);
 });

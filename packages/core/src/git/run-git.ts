@@ -288,6 +288,85 @@ export const streamGit = (
     ),
   );
 
+/**
+ * Spawn `git` and emit its stdout as a stream of RAW `Uint8Array` chunks — no decode,
+ * no line-splitting (unlike {@link streamGit}, which is lossy for binary: it decodes
+ * UTF-8 and splits on CR/LF, corrupting archive/blob bytes). On a zero exit the stream
+ * ends; on a non-zero exit it fails via {@link classifyExit} over the captured stderr.
+ * The child is bound to the stream's scope: completing OR interrupting SIGKILLs and
+ * reaps it (mirrors {@link runGit}'s interruption safety). Used by `git archive`.
+ */
+export const streamGitBytes = (
+  opts: RunGitOptions,
+): Stream.Stream<Uint8Array, GitError> =>
+  Stream.callback<Uint8Array, GitError>((queue) =>
+    Effect.acquireRelease(
+      Effect.sync(() => {
+        const args =
+          opts.read === false ? [...opts.args] : [...READ_FLAGS, ...opts.args];
+
+        const handle: {
+          settled: boolean;
+          child: ChildProcessWithoutNullStreams | undefined;
+        } = { settled: false, child: undefined };
+
+        let child: ChildProcessWithoutNullStreams;
+        try {
+          child = spawn("git", args, {
+            cwd: opts.cwd,
+            env: nonInteractiveEnv(opts.env),
+            windowsHide: true,
+          });
+        } catch (err) {
+          handle.settled = true;
+          Queue.failCauseUnsafe(queue, Cause.fail(classifyGitSpawnError(err)));
+          return handle;
+        }
+        handle.child = child;
+
+        if (opts.stdin !== undefined) {
+          child.stdin.write(opts.stdin);
+          child.stdin.end();
+        }
+
+        // stderr is captured (not streamed) purely to classify a non-zero exit.
+        const stderr: Buffer[] = [];
+        child.stdout.on("data", (chunk: Buffer) =>
+          Queue.offerUnsafe(queue, new Uint8Array(chunk)),
+        );
+        child.stderr.on("data", (chunk: Buffer) => stderr.push(chunk));
+
+        child.on("error", (err) => {
+          if (handle.settled) return;
+          handle.settled = true;
+          Queue.failCauseUnsafe(queue, Cause.fail(classifyGitSpawnError(err)));
+        });
+
+        child.on("close", (code) => {
+          if (handle.settled) return;
+          handle.settled = true;
+          if (code === 0) {
+            Queue.endUnsafe(queue);
+          } else {
+            Queue.failCauseUnsafe(
+              queue,
+              Cause.fail(classifyExit(code, decodeUtf8(Buffer.concat(stderr)))),
+            );
+          }
+        });
+
+        return handle;
+      }),
+      (handle) =>
+        Effect.sync(() => {
+          if (!handle.settled && handle.child !== undefined) {
+            handle.settled = true;
+            handle.child.kill("SIGKILL");
+          }
+        }),
+    ),
+  );
+
 // ── argument-safety helpers (NF-SEC-5/6) ────────────────────────────────────
 
 /**
