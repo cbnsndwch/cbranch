@@ -42,14 +42,12 @@ function Chip({ label }: { readonly label: RefLabel }) {
     <span
       title={label.raw}
       className={cn(
-        "inline-flex max-w-[12rem] items-center gap-1 border px-1 text-[10px] leading-4",
+        "inline-flex max-w-48 items-center gap-1 border px-1 text-[10px] leading-4",
         chipClass(label),
       )}
     >
       {label.isHead && label.kind !== "head" ? (
-        <span className="bg-primary text-white px-0.5 font-semibold">
-          HEAD
-        </span>
+        <span className="bg-primary text-white px-0.5 font-bold">HEAD</span>
       ) : null}
       {kindIcon[label.kind]}
       <span className="truncate">{label.name}</span>
