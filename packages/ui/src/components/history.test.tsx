@@ -178,6 +178,33 @@ describe("HistoryList (P1-HIST-1/2/3; spec 10)", () => {
     expect(onSelect).toHaveBeenCalledWith(oid("c"));
   });
 
+  test("right-click opens a commit context menu instead of the browser default", async () => {
+    const onSelect = vi.fn();
+    const api = fakeApi([summary("a", ["b"]), summary("b", [])]);
+    renderWithApi(
+      <HistoryList
+        query={defaultQuery}
+        dateMode="relative"
+        filtersActive={false}
+        selectedOid={null}
+        onSelectOid={onSelect}
+      />,
+      api,
+    );
+    const row = (await screen.findByText("commit a")).closest(
+      "[role=option]",
+    ) as HTMLElement;
+    // fireEvent returns false when the handler called preventDefault — i.e. the browser's
+    // own context menu is suppressed in favor of ours.
+    let notCancelled = true;
+    act(() => {
+      notCancelled = fireEvent.contextMenu(row);
+    });
+    expect(notCancelled).toBe(false);
+    expect(await screen.findByText("Cherry-pick…")).toBeTruthy();
+    expect(screen.getByText("Revert…")).toBeTruthy();
+  });
+
   test("quick-find opens on Ctrl+F and selects the first match (P1-FILT-7)", async () => {
     const onSelect = vi.fn();
     const api = fakeApi([

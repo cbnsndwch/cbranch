@@ -25,6 +25,12 @@ import { FindBar } from "./FindBar";
 import { GraphCell } from "./GraphCell";
 import { RefChips } from "./RefChips";
 import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+} from "./ui/context-menu";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -197,6 +203,13 @@ export function HistoryList({
     if (next !== null) selectIndex(next);
   };
 
+  // The same two commit operations back both the hover `…` dropdown and the right-click
+  // context menu, so a row's actions stay identical however the user reaches them.
+  const cherryPickCommit = (target: Oid, subject: string) =>
+    setPickDialog({ kind: "cherryPick", commits: [{ oid: target, subject }] });
+  const revertCommit = (target: Oid, subject: string) =>
+    setPickDialog({ kind: "revert", commits: [{ oid: target, subject }] });
+
   if (status === "error")
     return <Placeholder tone="danger">Could not load history.</Placeholder>;
 
@@ -257,78 +270,85 @@ export function HistoryList({
                 ? formatIso(row.authorDate)
                 : formatRelativeMs(date.getTime());
             return (
-              <div
-                key={row.oid}
-                role="option"
-                aria-selected={selected}
-                onClick={() => onSelectOid(row.oid)}
-                className={cn(
-                  "group hover:bg-accent absolute top-0 left-0 flex w-full cursor-pointer items-center gap-2 border-b pr-2 text-xs",
-                  selected
-                    ? "bg-[var(--color-selection-bg)] text-[var(--color-selection-fg)]"
-                    : "",
-                  matched ? "bg-status-ahead/10" : "",
-                  isCurrentMatch ? "ring-ring ring-1 ring-inset" : "",
-                )}
-                style={{
-                  height: item.size,
-                  transform: `translateY(${item.start}px)`,
-                }}
-              >
-                <GraphCell
-                  row={graphRows[item.index]!}
-                  columns={columns}
-                  height={item.size}
-                  selected={selected}
-                />
-                {row.refs.length > 0 ? <RefChips refs={row.refs} /> : null}
-                <span className="flex-1 truncate">{row.subject}</span>
-                <div
-                  className="flex size-[22px] shrink-0 items-center justify-center text-[9px] font-semibold text-white"
-                  style={{
-                    background: "var(--color-status-staged)",
-                  }}
-                  aria-hidden="true"
+              <ContextMenu key={row.oid}>
+                <ContextMenuTrigger
+                  render={
+                    <div
+                      role="option"
+                      aria-selected={selected}
+                      onClick={() => onSelectOid(row.oid)}
+                      className={cn(
+                        "group hover:bg-accent absolute top-0 left-0 flex w-full cursor-pointer items-center gap-2 border-b pr-2 text-xs",
+                        selected
+                          ? "bg-(--color-selection-bg) text-(--color-selection-fg)"
+                          : "",
+                        matched ? "bg-status-ahead/10" : "",
+                        isCurrentMatch ? "ring-ring ring-1 ring-inset" : "",
+                      )}
+                      style={{
+                        height: item.size,
+                        transform: `translateY(${item.start}px)`,
+                      }}
+                    />
+                  }
                 >
-                  {initials(row.authorName)}
-                </div>
-                <span className="w-[120px] truncate">{row.authorName}</span>
-                <span className="w-[110px] truncate" title={alternate}>
-                  {formatDate(row.authorDate, dateMode)}
-                </span>
-                <span className="w-[80px] font-mono">{shortOid(row.oid)}</span>
-                <DropdownMenu>
-                  <DropdownMenuTrigger
-                    onClick={(e) => e.stopPropagation()}
-                    aria-label={`Actions for ${shortOid(row.oid)}`}
-                    className="hover:bg-accent flex size-5 shrink-0 items-center justify-center opacity-0 group-hover:opacity-100 data-[popup-open]:opacity-100"
+                  <GraphCell
+                    row={graphRows[item.index]!}
+                    columns={columns}
+                    height={item.size}
+                    selected={selected}
+                  />
+                  {row.refs.length > 0 ? <RefChips refs={row.refs} /> : null}
+                  <span className="flex-1 truncate">{row.subject}</span>
+                  <div
+                    className="flex size-5.5 shrink-0 items-center justify-center text-[9px] font-semibold text-white"
+                    style={{
+                      background: "var(--color-status-staged)",
+                    }}
+                    aria-hidden="true"
                   >
-                    …
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent side="bottom" align="end">
-                    <DropdownMenuItem
-                      onClick={() =>
-                        setPickDialog({
-                          kind: "cherryPick",
-                          commits: [{ oid: row.oid, subject: row.subject }],
-                        })
-                      }
+                    {initials(row.authorName)}
+                  </div>
+                  <span className="w-30 truncate">{row.authorName}</span>
+                  <span className="w-27.5 truncate" title={alternate}>
+                    {formatDate(row.authorDate, dateMode)}
+                  </span>
+                  <span className="w-20 font-mono">{shortOid(row.oid)}</span>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger
+                      onClick={(e) => e.stopPropagation()}
+                      aria-label={`Actions for ${shortOid(row.oid)}`}
+                      className="hover:bg-accent flex size-5 shrink-0 items-center justify-center opacity-0 group-hover:opacity-100 data-popup-open:opacity-100"
                     >
-                      Cherry-pick…
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() =>
-                        setPickDialog({
-                          kind: "revert",
-                          commits: [{ oid: row.oid, subject: row.subject }],
-                        })
-                      }
-                    >
-                      Revert…
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
+                      …
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent side="bottom" align="end">
+                      <DropdownMenuItem
+                        onClick={() => cherryPickCommit(row.oid, row.subject)}
+                      >
+                        Cherry-pick…
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => revertCommit(row.oid, row.subject)}
+                      >
+                        Revert…
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </ContextMenuTrigger>
+                <ContextMenuContent>
+                  <ContextMenuItem
+                    onClick={() => cherryPickCommit(row.oid, row.subject)}
+                  >
+                    Cherry-pick…
+                  </ContextMenuItem>
+                  <ContextMenuItem
+                    onClick={() => revertCommit(row.oid, row.subject)}
+                  >
+                    Revert…
+                  </ContextMenuItem>
+                </ContextMenuContent>
+              </ContextMenu>
             );
           })}
         </div>
