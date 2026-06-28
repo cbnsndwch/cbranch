@@ -653,7 +653,7 @@ export const MENUS: ReadonlyArray<TopMenu> = [
         kind: "command",
         id: "commands.archive",
         label: "Archive revision…",
-        phase: "later",
+        phase: "P5",
       },
       {
         kind: "command",

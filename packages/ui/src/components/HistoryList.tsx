@@ -74,6 +74,7 @@ export function HistoryList({
   const { rows, status } = useLogStream(query);
   const setKnownRefStrings = useUiStore((s) => s.setKnownRefStrings);
   const setPickDialog = useUiStore((s) => s.setPickDialog);
+  const setArchiveDialog = useUiStore((s) => s.setArchiveDialog);
   useEffect(() => {
     const allRefs = [...new Set(rows.flatMap((r) => r.refs))];
     setKnownRefStrings(allRefs);
@@ -209,6 +210,7 @@ export function HistoryList({
     setPickDialog({ kind: "cherryPick", commits: [{ oid: target, subject }] });
   const revertCommit = (target: Oid, subject: string) =>
     setPickDialog({ kind: "revert", commits: [{ oid: target, subject }] });
+  const archiveCommit = (target: Oid) => setArchiveDialog({ treeish: target });
 
   if (status === "error")
     return <Placeholder tone="danger">Could not load history.</Placeholder>;
@@ -333,6 +335,9 @@ export function HistoryList({
                       >
                         Revert…
                       </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => archiveCommit(row.oid)}>
+                        Archive revision…
+                      </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </ContextMenuTrigger>
@@ -346,6 +351,9 @@ export function HistoryList({
                     onClick={() => revertCommit(row.oid, row.subject)}
                   >
                     Revert…
+                  </ContextMenuItem>
+                  <ContextMenuItem onClick={() => archiveCommit(row.oid)}>
+                    Archive revision…
                   </ContextMenuItem>
                 </ContextMenuContent>
               </ContextMenu>

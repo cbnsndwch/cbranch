@@ -212,6 +212,14 @@ export interface UiState {
   /** Whether the clean-working-directory modal is open (REQ-P5-CL-001). */
   readonly cleanDialogOpen: boolean;
   readonly setCleanDialogOpen: (open: boolean) => void;
+  // ── P5: archive export dialog ────────────────────────────────────────────────
+  /**
+   * The archive-export dialog, or `null` when closed. `treeish` is the pre-seeded
+   * target — empty when launched from the menu (user types a ref), or the commit's oid
+   * when launched from a commit's "Archive revision…" (REQ-P5-AR-001).
+   */
+  readonly archiveDialog: { readonly treeish: string } | null;
+  readonly setArchiveDialog: (state: { treeish: string } | null) => void;
 }
 
 export const useUiStore = create<UiState>((set) => ({
@@ -239,6 +247,7 @@ export const useUiStore = create<UiState>((set) => ({
   historyTarget: null,
   gcDialogOpen: false,
   cleanDialogOpen: false,
+  archiveDialog: null,
   // Switching repositories supersedes the old selection and filters (P1-OPEN-4 / P1-X-4).
   setActiveRepoId: (activeRepoId) =>
     set({
@@ -254,6 +263,7 @@ export const useUiStore = create<UiState>((set) => ({
       historyTarget: null,
       gcDialogOpen: false,
       cleanDialogOpen: false,
+      archiveDialog: null,
     }),
   setSelectedOid: (selectedOid) => set({ selectedOid }),
   setPaletteOpen: (paletteOpen) => set({ paletteOpen }),
@@ -334,4 +344,5 @@ export const useUiStore = create<UiState>((set) => ({
   setHistoryTarget: (historyTarget) => set({ historyTarget }),
   setGcDialogOpen: (gcDialogOpen) => set({ gcDialogOpen }),
   setCleanDialogOpen: (cleanDialogOpen) => set({ cleanDialogOpen }),
+  setArchiveDialog: (archiveDialog) => set({ archiveDialog }),
 }));

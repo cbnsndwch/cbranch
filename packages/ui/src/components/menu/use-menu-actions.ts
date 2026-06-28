@@ -86,6 +86,10 @@ export function useMenuActions(): MenuActions {
       // Commands → Clean… opens the clean-working-directory dialog (REQ-P5-CL-001).
       handlers["commands.clean"] = () =>
         useUiStore.getState().setCleanDialogOpen(true);
+      // Commands → Archive revision… opens the archive dialog, pre-seeding the selected
+      // commit when there is one, else empty (the user types a ref). REQ-P5-AR-001.
+      handlers["commands.archive"] = () =>
+        useUiStore.getState().setArchiveDialog({ treeish: selectedOid ?? "" });
     }
     // Cherry-pick / revert act on the selected commit (REQ-UX-001); the dialog fetches
     // the commit's subject + parents (for the merge-commit mainline gate).

@@ -101,10 +101,17 @@ Per-feature vertical slices, easiest-first (D18). Each = a `core` commit then a 
   Preview, would-remove list, destructive `DestructiveConfirmDialog` gated on previewed-options==current ∧
   entries>0 ∧ !fetching, empty-state) + `cleanDialogOpen` slice + wired `commands.clean` + StatusPanel
   "Clean…". REQ-P5-CL-001..005.
-- ⬜ S3 archive · ⬜ S4 reflog · ⬜ S5 bisect · ⬜ S6 submodules · ⬜ S7 settings/config ·
-  ⬜ S8 interactive rebase.
+- ✅ **S3 — archive.** core: `ArchiveFormat`/`ArchiveDescriptor` (no size); `ArchivePrepare` (read) RPC;
+  new `streamGitBytes` raw-byte runner (byte-fidelity vs the lossy `streamGit`); `git/archive.ts`
+  (format table, prefix/sub-path sanitizers, argv); internal route-only `archiveStream` engine method
+  (not in the group) + `GET /sidechannel/archive` streamed route (re-validates tree-ish before 200, no
+  partial download; inherits the Origin/Host guard) with end-to-end integration probes; api facade +
+  `useArchivePrepare`. ui: `ArchiveDialog` (treeish/format/prefix/subpath, fetch→blob→`<a download>`,
+  inline "Exported …(N bytes)", invalid→inline error no download) + `archiveDialog` store slice + wired
+  `commands.archive` (retag P5) + commit-context "Archive revision…". REQ-P5-AR-001..005.
+- ⬜ S4 reflog · ⬜ S5 bisect · ⬜ S6 submodules · ⬜ S7 settings/config · ⬜ S8 interactive rebase.
 
-## ▶ RESUME HERE — P5 IN PROGRESS (S1 gc ✅, S2 clean ✅; S3 archive next)
+## ▶ RESUME HERE — P5 IN PROGRESS (S1 gc ✅, S2 clean ✅, S3 archive ✅; S4 reflog next)
 
 **P0–P4 all landed on `main`.** P4 (cherry-pick / revert / conflicts / blame / single-file
 history) shipped core + UI: `conflict.list/sides`, take-side / save-merged / mark-resolved,
