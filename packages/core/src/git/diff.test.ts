@@ -176,4 +176,31 @@ describe("buildDiffFiles", () => {
     expect(files[1]!.hunks).toHaveLength(0);
     expect(files[1]!.oldOid).toBeUndefined(); // all-zero oid ⇒ absent
   });
+
+  test("name-status superset (whitespace-only file dropped under -w) doesn't shift hunks", () => {
+    // Under `-w`, `name-status` keeps the whitespace-only `ws.txt` but `numstat`/`patch`
+    // drop it. Ordered before the real change, a position-zip would graft `z.txt`'s hunk
+    // onto `ws.txt` and emit a phantom `z.txt`. Keying status by path avoids both.
+    const nameStatus = parseNameStatus(
+      Buffer.from("M\0ws.txt\0M\0z.txt\0", "utf8"),
+    );
+    const numstat = parseNumstat(Buffer.from("1\t1\tz.txt\0", "utf8"));
+    const patch = parsePatch(
+      [
+        "diff --git a/z.txt b/z.txt",
+        "index aaaaaaa..bbbbbbb 100644",
+        "--- a/z.txt",
+        "+++ b/z.txt",
+        "@@ -1 +1 @@",
+        "-x",
+        "+y",
+        "",
+      ].join("\n"),
+    );
+    const files = buildDiffFiles(nameStatus, numstat, patch);
+    expect(files).toHaveLength(1); // ws.txt suppressed, no phantom
+    expect(files[0]!.newPath).toBe("z.txt");
+    expect(files[0]!.oldOid).toBe("aaaaaaa"); // z.txt kept its own patch metadata
+    expect(files[0]!.hunks).toHaveLength(1);
+  });
 });

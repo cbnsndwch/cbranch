@@ -2,11 +2,14 @@
 // DM-060/061/062; DECISIONS D7).
 //
 // A per-file diff is assembled from THREE parallel git outputs over the same tree pair
-// and the same rename/whitespace flags (so all three stay aligned, one entry per file in
-// the same order):
-//   • `--name-status -z` → authoritative status letter + old/new path (renames/copies),
+// and the same rename/whitespace flags:
+//   • `--name-status -z` → status letter + old/new path (renames/copies),
 //   • `--numstat -z`     → additions/deletions (binary ⇒ `-`/`-`) + binary detection,
 //   • `-p` unified patch → modes, blob oids, and the addressable hunks/lines.
+// `--numstat` and `-p` honor the whitespace flags identically — a whitespace-only change
+// under `-w`/`-b` is dropped from BOTH — so they stay index-aligned. `--name-status` does
+// NOT drop a whitespace-suppressed file, so it can be a strict superset; the assembly keys
+// status off path rather than position to absorb that (see `buildDiffFiles`).
 // Binary files carry empty hunks and `additions`/`deletions = null`; gitlinks surface via
 // the `160000` mode; a root commit diffs against the empty tree (`--root`).
 
@@ -291,31 +294,41 @@ export const parsePatch = (text: string): ReadonlyArray<PatchFile> => {
 const oidOrUndefined = (oid: string | undefined) =>
   oid === undefined || ZERO_OID.test(oid) ? undefined : OidBrand.make(oid);
 
-/** Zip the three aligned outputs into ordered {@link DiffFile}s (DM-060). */
+/**
+ * Zip the three outputs into ordered {@link DiffFile}s (DM-060).
+ *
+ * Driven off `numstat` (co-aligned with `patch` by index), with the status letter looked
+ * up from `name-status` by path. `name-status` can be a strict superset under `-w`/`-b`
+ * (it keeps whitespace-only files that `numstat`/`patch` both drop), so position-zipping
+ * it would emit phantom rows and — worse — shift `patch[i]` onto the wrong file. Keying by
+ * path drops the suppressed files and keeps every real change aligned to its own hunks.
+ */
 export const buildDiffFiles = (
   nameStatus: ReadonlyArray<NameStatusEntry>,
   numstat: ReadonlyArray<NumstatEntry>,
   patch: ReadonlyArray<PatchFile>,
-): ReadonlyArray<DiffFile> =>
-  nameStatus.map((ns, i) => {
-    const num = numstat[i];
+): ReadonlyArray<DiffFile> => {
+  const statusByPath = new Map<string, NameStatusEntry>();
+  for (const ns of nameStatus) statusByPath.set(ns.newPath, ns);
+  return numstat.map((num, i) => {
     const pf = patch[i];
-    const isBinary =
-      (num !== undefined && num.additions === null) || (pf?.isBinary ?? false);
+    const ns = statusByPath.get(num.newPath);
+    const isBinary = num.additions === null || (pf?.isBinary ?? false);
     return new DiffFile({
-      oldPath: ns.oldPath,
-      newPath: ns.newPath,
-      status: ns.status,
+      oldPath: ns?.oldPath ?? num.oldPath,
+      newPath: ns?.newPath ?? num.newPath,
+      status: ns?.status ?? "modified",
       isBinary,
       oldMode: pf?.oldMode,
       newMode: pf?.newMode,
       oldOid: oidOrUndefined(pf?.oldOid),
       newOid: oidOrUndefined(pf?.newOid),
-      additions: isBinary ? null : (num?.additions ?? 0),
-      deletions: isBinary ? null : (num?.deletions ?? 0),
+      additions: isBinary ? null : (num.additions ?? 0),
+      deletions: isBinary ? null : (num.deletions ?? 0),
       hunks: isBinary ? [] : (pf?.hunks ?? []),
     });
   });
+};
 
 // ── command building ───────────────────────────────────────────────────────────
 
