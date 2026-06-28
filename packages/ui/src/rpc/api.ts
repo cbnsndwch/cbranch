@@ -10,6 +10,8 @@
 import {
   type ArchiveDescriptor,
   type ArchiveFormat,
+  type BisectMark,
+  type BisectStatus,
   type BlameResult,
   type BranchInfo,
   type BranchListing,
@@ -338,6 +340,14 @@ export interface CbranchApi {
     repoId: RepoId,
     opts: { ref?: string; limit: number; cursor?: string },
   ): Promise<ReflogPage>;
+  // ── bisect (P5) ───────────────────────────────────────────────────────────
+  bisectStart(
+    repoId: RepoId,
+    opts?: { bad?: Oid; good?: ReadonlyArray<Oid> },
+  ): Promise<BisectStatus>;
+  bisectMark(repoId: RepoId, mark: BisectMark): Promise<BisectStatus>;
+  bisectReset(repoId: RepoId): Promise<void>;
+  bisectStatus(repoId: RepoId): Promise<BisectStatus>;
 }
 
 /** Back a {@link CbranchApi} with the single app runtime. */
@@ -621,5 +631,14 @@ export const makeApi = (runtime: AppRuntime): CbranchApi => {
     // ── reflog viewer (P5) ──────────────────────────────────────────────────
     reflogList: (repoId, opts) =>
       runtime.runPromise(withClient((c) => c.ReflogList({ repoId, ...opts }))),
+    // ── bisect (P5) ─────────────────────────────────────────────────────────
+    bisectStart: (repoId, opts) =>
+      runtime.runPromise(withClient((c) => c.BisectStart({ repoId, ...opts }))),
+    bisectMark: (repoId, mark) =>
+      runtime.runPromise(withClient((c) => c.BisectMark({ repoId, mark }))),
+    bisectReset: (repoId) =>
+      runtime.runPromise(withClient((c) => c.BisectReset({ repoId }))),
+    bisectStatus: (repoId) =>
+      runtime.runPromise(withClient((c) => c.BisectStatus({ repoId }))),
   };
 };

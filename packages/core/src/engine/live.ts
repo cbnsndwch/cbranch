@@ -22,6 +22,12 @@ import { type Cause, Effect, Layer, Queue, Scope, Stream } from "effect";
 import { type ConfigStore, makeConfigStore } from "../config/config-store";
 import { blame as blameGit } from "../git/blame";
 import {
+  bisectMark as bisectMarkGit,
+  bisectReset as bisectResetGit,
+  bisectStart as bisectStartGit,
+  bisectStatus as bisectStatusGit,
+} from "../git/bisect";
+import {
   branchCheckoutDetached as branchCheckoutDetachedGit,
   branchCreate as branchCreateGit,
   branchDelete as branchDeleteGit,
@@ -777,6 +783,30 @@ export const makeGitEngine = (
       reflogList: (repoId, limit, ref, cursor) =>
         Effect.flatMap(resolveById(repoId), (repo) =>
           reflogListGit(repoCwd(repo), limit, ref, cursor, env),
+        ),
+
+      // ── bisect (P5) ─────────────────────────────────────────────────────────
+      // Mutations hold the repo lock; the idle/in-progress precheck runs inside the
+      // git fn (post-lock fs read). Status is a lockless read.
+      bisectStart: (repoId, bad, good) =>
+        Effect.flatMap(resolveById(repoId), (repo) =>
+          locks.withRepoLock(repoId)(
+            bisectStartGit(repoCwd(repo), repo.gitDir, bad, good, env),
+          ),
+        ),
+      bisectMark: (repoId, mark) =>
+        Effect.flatMap(resolveById(repoId), (repo) =>
+          locks.withRepoLock(repoId)(
+            bisectMarkGit(repoCwd(repo), repo.gitDir, mark, env),
+          ),
+        ),
+      bisectReset: (repoId) =>
+        Effect.flatMap(resolveById(repoId), (repo) =>
+          locks.withRepoLock(repoId)(bisectResetGit(repoCwd(repo), env)),
+        ),
+      bisectStatus: (repoId) =>
+        Effect.flatMap(resolveById(repoId), (repo) =>
+          bisectStatusGit(repoCwd(repo), repo.gitDir, env),
         ),
     };
     return api;

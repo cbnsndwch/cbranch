@@ -290,4 +290,16 @@ export const handlersLayer = CbranchRpcs.toLayer({
     Effect.flatMap(GitEngine, (engine) =>
       engine.reflogList(repoId, limit, ref, cursor),
     ),
+
+  // ── bisect (P5) ─────────────────────────────────────────────────────────────
+  BisectStart: ({ repoId, bad, good }) =>
+    Effect.flatMap(GitEngine, (engine) =>
+      engine.bisectStart(repoId, bad, good),
+    ),
+  BisectMark: ({ repoId, mark }) =>
+    Effect.flatMap(GitEngine, (engine) => engine.bisectMark(repoId, mark)),
+  BisectReset: ({ repoId }) =>
+    Effect.flatMap(GitEngine, (engine) => engine.bisectReset(repoId)),
+  BisectStatus: ({ repoId }) =>
+    Effect.flatMap(GitEngine, (engine) => engine.bisectStatus(repoId)),
 });

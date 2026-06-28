@@ -9,6 +9,8 @@
 import {
   type ArchiveDescriptor,
   type ArchiveFormat,
+  type BisectMark,
+  type BisectStatus,
   type BlameResult,
   type BranchInfo,
   type BranchListing,
@@ -1352,5 +1354,57 @@ export const useClean = (repoId: RepoId) => {
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: [repoId, "status"] });
     },
+  });
+};
+
+// ── bisect (P5) ───────────────────────────────────────────────────────────────
+
+/**
+ * Machine-derived bisect status (REQ-P5-BS-002/006). Keyed under `inProgress`; stays
+ * enabled (the engine read is a cheap `existsSync` fast-path when inactive) so a
+ * pre-existing session shows on repo open.
+ */
+export const useBisectStatus = (
+  repoId: RepoId | null,
+): UseQueryResult<BisectStatus> => {
+  const api = useApi();
+  return useQuery({
+    queryKey: repoId ? queryKeys.bisect(repoId) : ["inactive"],
+    queryFn: () => api.bisectStatus(repoId as RepoId),
+    enabled: repoId !== null,
+  });
+};
+
+/** Start a bisect session, optionally seeding bad/good (REQ-P5-BS-001). */
+export const useBisectStart = (repoId: RepoId) => {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation<
+    BisectStatus,
+    unknown,
+    { bad?: Oid; good?: ReadonlyArray<Oid> }
+  >({
+    mutationFn: (opts) => api.bisectStart(repoId, opts),
+    onSettled: () => invalidateOperation(qc, repoId),
+  });
+};
+
+/** Mark the current revision good/bad/skip (REQ-P5-BS-003). */
+export const useBisectMark = (repoId: RepoId) => {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation<BisectStatus, unknown, BisectMark>({
+    mutationFn: (mark) => api.bisectMark(repoId, mark),
+    onSettled: () => invalidateOperation(qc, repoId),
+  });
+};
+
+/** End the bisect session, restoring the original HEAD (REQ-P5-BS-005). */
+export const useBisectReset = (repoId: RepoId) => {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation<void, unknown, void>({
+    mutationFn: () => api.bisectReset(repoId),
+    onSettled: () => invalidateOperation(qc, repoId),
   });
 };

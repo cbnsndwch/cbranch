@@ -53,6 +53,7 @@ import {
 import {
   ArchiveDescriptor,
   ArchiveFormat,
+  BisectStatus,
   CleanEntry,
   CleanPreview,
   CleanResult,
@@ -340,6 +341,14 @@ const reflogPage = new ReflogPage({
   ],
   nextCursor: "cursor-1",
 });
+const bisectStatus = new BisectStatus({
+  state: "bisecting",
+  current: commitSummary("midpoint"),
+  badTerm: "bad",
+  goodTerm: "good",
+  revisionsRemaining: 3,
+  stepsRemaining: 2,
+});
 
 // --- stub handlers: schema-valid data, plus payload-driven error injection ---
 const handlers = CbranchRpcs.toLayer({
@@ -486,6 +495,12 @@ const handlers = CbranchRpcs.toLayer({
 
   // ── P5: reflog viewer ─────────────────────────────────────────────────────────
   ReflogList: () => Effect.succeed(reflogPage),
+
+  // ── P5: bisect ────────────────────────────────────────────────────────────────
+  BisectStart: () => Effect.succeed(bisectStatus),
+  BisectMark: () => Effect.succeed(bisectStatus),
+  BisectReset: () => Effect.void,
+  BisectStatus: () => Effect.succeed(bisectStatus),
 });
 
 describe("CbranchRpcs P1 contract (in-memory RpcTest round-trip)", () => {
@@ -940,6 +955,25 @@ describe("CbranchRpcs P5 power-features round-trip", () => {
     expect(page.entries[0]?.oid).toBe(oid1);
     expect(page.nextCursor).toBe("cursor-1");
   });
+
+  test("bisect quartet round-trips status (start/mark/status) + Void reset", async () => {
+    const program = Effect.gen(function* () {
+      const client = yield* RpcTest.makeClient(CbranchRpcs);
+      const started = yield* client.BisectStart({ repoId });
+      const marked = yield* client.BisectMark({ repoId, mark: "bad" });
+      const reset = yield* client.BisectReset({ repoId });
+      const status = yield* client.BisectStatus({ repoId });
+      return { started, marked, reset, status };
+    }).pipe(Effect.provide(handlers), Effect.scoped);
+
+    const r = await Effect.runPromise(program);
+
+    expect(r.started.state).toBe("bisecting");
+    expect(r.started.revisionsRemaining).toBe(3);
+    expect(r.marked.current?.subject).toBe("midpoint");
+    expect(r.reset).toBeUndefined();
+    expect(r.status.goodTerm).toBe("good");
+  });
 });
 
 // Per-feature P5 slices APPEND their tags to this catalog block (D18); gc opens it.
@@ -954,6 +988,11 @@ describe("CbranchRpcs P5 power-features method catalog (DECISIONS D1 wire tags)"
     "ArchivePrepare",
     // reflog
     "ReflogList",
+    // bisect
+    "BisectStart",
+    "BisectMark",
+    "BisectReset",
+    "BisectStatus",
   ])("exposes the %s wire tag", (tag) => {
     expect(CbranchRpcs.requests.has(tag)).toBe(true);
   });

@@ -75,6 +75,11 @@ export const queryKeys = {
    */
   reflog: (repoId: RepoId, ref: string) =>
     [repoId, "refs", "reflog", ref] as const,
+  /**
+   * `bisect.status` — machine-derived session status (domain: `inProgress`). Stays enabled
+   * so a pre-existing session shows on repo open (cheap `existsSync` fast-path, REQ-P5-BS-006).
+   */
+  bisect: (repoId: RepoId) => [repoId, "inProgress", "bisect"] as const,
   /** `remote.list` (domain: `config`). */
   remotes: (repoId: RepoId) => [repoId, "config", "remotes"] as const,
   /** `worktree.list` (domain: `worktrees`). */

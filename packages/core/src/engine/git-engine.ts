@@ -27,6 +27,8 @@ import {
   type DiffFile,
   type ArchiveDescriptor,
   type ArchiveFormat,
+  type BisectMark,
+  type BisectStatus,
   type CleanPreview,
   type CleanResult,
   type FileContentResult,
@@ -516,6 +518,25 @@ export interface GitEngineApi {
     ref?: string,
     cursor?: string,
   ) => Effect.Effect<ReflogPage, GitError>;
+
+  // ── bisect (P5, S5) ─────────────────────────────────────────────────────────
+  /** bisect.start ✎ — `git bisect start [<bad> [<good>…]]`; idle-precheck. REQ-P5-BS-001. */
+  readonly bisectStart: (
+    repoId: RepoId,
+    bad?: string,
+    good?: ReadonlyArray<string>,
+  ) => Effect.Effect<BisectStatus, GitError>;
+  /** bisect.mark ✎ — `git bisect good|bad|skip`. REQ-P5-BS-003. */
+  readonly bisectMark: (
+    repoId: RepoId,
+    mark: BisectMark,
+  ) => Effect.Effect<BisectStatus, GitError>;
+  /** bisect.reset ✎ — `git bisect reset`. REQ-P5-BS-005. */
+  readonly bisectReset: (repoId: RepoId) => Effect.Effect<void, GitError>;
+  /** bisect.status — machine-derived session status. READ. REQ-P5-BS-006. */
+  readonly bisectStatus: (
+    repoId: RepoId,
+  ) => Effect.Effect<BisectStatus, GitError>;
 
   // ── object-read infrastructure (internal; for core-B) ──────────────────────
   /** Read a full object via the repo's `cat-file --batch` pool (`null` if missing). */

@@ -48,6 +48,8 @@ import {
 import {
   ArchiveDescriptor,
   ArchiveFormat,
+  BisectMark,
+  BisectStatus,
   CleanPreview,
   CleanResult,
   GcPrune,
@@ -678,6 +680,36 @@ export const CbranchRpcs = RpcGroup.make(
       cursor: Schema.optional(Schema.String),
     },
     success: ReflogPage,
+    error: GitError,
+  }),
+
+  // ── P5: bisect ─────────────────────────────────────────────────────────────
+  // bisect.start ✎ — `git bisect start [<bad> [<good>…]]`; idle-precheck → repoLocked.
+  Rpc.make("BisectStart", {
+    payload: {
+      repoId: RepoId,
+      bad: Schema.optional(Oid),
+      good: Schema.optional(Schema.Array(Oid)),
+    },
+    success: BisectStatus,
+    error: GitError,
+  }),
+  // bisect.mark ✎ — `git bisect good|bad|skip`; status from machine state, not prose.
+  Rpc.make("BisectMark", {
+    payload: { repoId: RepoId, mark: BisectMark },
+    success: BisectStatus,
+    error: GitError,
+  }),
+  // bisect.reset ✎ — `git bisect reset`; restores the original HEAD (REQ-P5-BS-005).
+  Rpc.make("BisectReset", {
+    payload: { repoId: RepoId },
+    success: Schema.Void,
+    error: GitError,
+  }),
+  // bisect.status — machine-derived session status (READ; repo-open detection, REQ-P5-BS-006).
+  Rpc.make("BisectStatus", {
+    payload: { repoId: RepoId },
+    success: BisectStatus,
     error: GitError,
   }),
 );

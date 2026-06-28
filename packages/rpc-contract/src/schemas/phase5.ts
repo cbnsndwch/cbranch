@@ -8,6 +8,7 @@
 
 import { Schema } from "effect";
 
+import { CommitSummary } from "./domain";
 import { Oid } from "./primitives";
 
 // ─── S1: repository maintenance (gc) ─────────────────────────────────────────────
@@ -93,4 +94,40 @@ export class ReflogEntry extends Schema.Class<ReflogEntry>("ReflogEntry")({
 export class ReflogPage extends Schema.Class<ReflogPage>("ReflogPage")({
   entries: Schema.Array(ReflogEntry),
   nextCursor: Schema.optional(Schema.String),
+}) {}
+
+// ─── S5: bisect ──────────────────────────────────────────────────────────────────
+
+/** A bisect mark verb (REQ-P5-BS-003). Custom terms are out of scope. */
+export const BisectMark = Schema.Literals(["good", "bad", "skip"]);
+export type BisectMark = typeof BisectMark.Type;
+
+/**
+ * The bisect session state — DATA, not error codes: `concluded` (first-bad found) and
+ * `unbisectable` (skips can't isolate) are non-error outcomes carried here (D18).
+ */
+export const BisectState = Schema.Literals([
+  "inactive",
+  "bisecting",
+  "concluded",
+  "unbisectable",
+]);
+export type BisectState = typeof BisectState.Type;
+
+/**
+ * Machine-derived bisect status (REQ-P5-BS-002/004). `current`/`firstBad` reuse
+ * {@link CommitSummary} (no new commit schema). `revisionsRemaining`/`stepsRemaining` are
+ * git's reported estimates; `candidates` is the ambiguous remaining set when
+ * `unbisectable`; `startPoint` is the original HEAD restored on reset.
+ */
+export class BisectStatus extends Schema.Class<BisectStatus>("BisectStatus")({
+  state: BisectState,
+  current: Schema.optional(CommitSummary),
+  badTerm: Schema.String,
+  goodTerm: Schema.String,
+  revisionsRemaining: Schema.optional(Schema.Number),
+  stepsRemaining: Schema.optional(Schema.Number),
+  firstBad: Schema.optional(CommitSummary),
+  candidates: Schema.optional(Schema.Array(Oid)),
+  startPoint: Schema.optional(Schema.String),
 }) {}
