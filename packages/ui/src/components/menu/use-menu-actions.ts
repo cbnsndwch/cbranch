@@ -49,7 +49,7 @@ export function useMenuActions(): MenuActions {
       "start.exit": () => navigate("/"),
       "repository.close": () => navigate("/"),
       "help.about": () =>
-        toast("cbranch", {
+        toast("cBranch", {
           description: "A desktop-style git client. MIT licensed.",
         }),
     };
