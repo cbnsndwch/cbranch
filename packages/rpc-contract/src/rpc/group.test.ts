@@ -61,6 +61,8 @@ import {
   GcResult,
   ReflogEntry,
   ReflogPage,
+  SubmoduleInfo,
+  SubmoduleStatus,
 } from "../schemas/phase5";
 import { Oid, RepoId } from "../schemas/primitives";
 import { LogQuery } from "../schemas/queries";
@@ -349,6 +351,29 @@ const bisectStatus = new BisectStatus({
   revisionsRemaining: 3,
   stepsRemaining: 2,
 });
+const submodules = [
+  // outOfSync: recorded ≠ checked-out, both present.
+  new SubmoduleInfo({
+    path: "vendor/lib",
+    name: "vendor/lib",
+    absPath: "/srv/repo/vendor/lib",
+    recordedOid: oid1,
+    checkedOutOid: oid2,
+    status: "outOfSync",
+    describe: "v1.2.3-4-gdeadbee",
+    url: "https://example.com/lib.git",
+    branch: "main",
+  }),
+  // uninitialized: no checked-out commit.
+  new SubmoduleInfo({
+    path: "vendor/uninit",
+    name: "vendor/uninit",
+    absPath: "/srv/repo/vendor/uninit",
+    recordedOid: oid1,
+    status: "uninitialized",
+    url: "https://example.com/uninit.git",
+  }),
+];
 
 // --- stub handlers: schema-valid data, plus payload-driven error injection ---
 const handlers = CbranchRpcs.toLayer({
@@ -501,6 +526,13 @@ const handlers = CbranchRpcs.toLayer({
   BisectMark: () => Effect.succeed(bisectStatus),
   BisectReset: () => Effect.void,
   BisectStatus: () => Effect.succeed(bisectStatus),
+
+  // ── P5: submodules ──────────────────────────────────────────────────────────────
+  SubmoduleList: () => Effect.succeed(submodules),
+  SubmoduleUpdate: () => Effect.void,
+  SubmoduleSync: () => Effect.void,
+  SubmoduleAdd: () => Effect.void,
+  SubmoduleRemove: () => Effect.void,
 });
 
 describe("CbranchRpcs P1 contract (in-memory RpcTest round-trip)", () => {
@@ -974,6 +1006,55 @@ describe("CbranchRpcs P5 power-features round-trip", () => {
     expect(r.reset).toBeUndefined();
     expect(r.status.goodTerm).toBe("good");
   });
+
+  test("submodule methods round-trip a listing + Void mutations", async () => {
+    const program = Effect.gen(function* () {
+      const client = yield* RpcTest.makeClient(CbranchRpcs);
+      const list = yield* client.SubmoduleList({ repoId });
+      const updated = yield* client.SubmoduleUpdate({
+        repoId,
+        paths: ["vendor/lib"],
+        init: true,
+        recursive: true,
+        force: true,
+      });
+      const synced = yield* client.SubmoduleSync({ repoId });
+      const added = yield* client.SubmoduleAdd({
+        repoId,
+        url: "https://example.com/lib.git",
+        path: "vendor/lib",
+      });
+      const removed = yield* client.SubmoduleRemove({
+        repoId,
+        path: "vendor/lib",
+      });
+      return { list, updated, synced, added, removed };
+    }).pipe(Effect.provide(handlers), Effect.scoped);
+
+    const r = await Effect.runPromise(program);
+
+    expect(r.list).toHaveLength(2);
+    // outOfSync: recorded and checked-out both present and differ.
+    expect(r.list[0]?.status).toBe("outOfSync");
+    expect(r.list[0]?.recordedOid).toBe(oid1);
+    expect(r.list[0]?.checkedOutOid).toBe(oid2);
+    // uninitialized: no checked-out commit on the wire.
+    expect(r.list[1]?.status).toBe("uninitialized");
+    expect(r.list[1]?.checkedOutOid).toBeUndefined();
+    expect(r.updated).toBeUndefined();
+    expect(r.synced).toBeUndefined();
+    expect(r.added).toBeUndefined();
+    expect(r.removed).toBeUndefined();
+  });
+
+  test("SubmoduleStatus is a closed literal set (RPC-032)", () => {
+    expect(
+      Exit.isSuccess(Schema.decodeUnknownExit(SubmoduleStatus)("conflicted")),
+    ).toBe(true);
+    expect(
+      Exit.isFailure(Schema.decodeUnknownExit(SubmoduleStatus)("deleted")),
+    ).toBe(true);
+  });
 });
 
 // Per-feature P5 slices APPEND their tags to this catalog block (D18); gc opens it.
@@ -993,6 +1074,12 @@ describe("CbranchRpcs P5 power-features method catalog (DECISIONS D1 wire tags)"
     "BisectMark",
     "BisectReset",
     "BisectStatus",
+    // submodules
+    "SubmoduleList",
+    "SubmoduleUpdate",
+    "SubmoduleSync",
+    "SubmoduleAdd",
+    "SubmoduleRemove",
   ])("exposes the %s wire tag", (tag) => {
     expect(CbranchRpcs.requests.has(tag)).toBe(true);
   });

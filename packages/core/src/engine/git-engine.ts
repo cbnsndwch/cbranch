@@ -49,6 +49,7 @@ import {
   type RepoId,
   type RepoState,
   type SequencerResult,
+  type SubmoduleInfo,
   type CommitSummary,
   type DiffSpec,
   type StashEntry,
@@ -537,6 +538,38 @@ export interface GitEngineApi {
   readonly bisectStatus: (
     repoId: RepoId,
   ) => Effect.Effect<BisectStatus, GitError>;
+
+  // ── submodules (P5, S6) ───────────────────────────────────────────────────
+  /** submodule.list — index-cross-read listing (gitlink + status + .gitmodules). READ. REQ-P5-SM-001. */
+  readonly submoduleList: (
+    repoId: RepoId,
+  ) => Effect.Effect<ReadonlyArray<SubmoduleInfo>, GitError>;
+  /** submodule.update ✎ — `git submodule update`; bulk = empty paths. REQ-P5-SM-002. */
+  readonly submoduleUpdate: (
+    repoId: RepoId,
+    paths?: ReadonlyArray<string>,
+    init?: boolean,
+    recursive?: boolean,
+    force?: boolean,
+  ) => Effect.Effect<void, GitError>;
+  /** submodule.sync ✎ — `git submodule sync`. REQ-P5-SM-003. */
+  readonly submoduleSync: (
+    repoId: RepoId,
+    paths?: ReadonlyArray<string>,
+    recursive?: boolean,
+  ) => Effect.Effect<void, GitError>;
+  /** submodule.add ✎ — `git submodule add [-b <branch>] -- <url> <path>`. REQ-P5-SM-004. */
+  readonly submoduleAdd: (
+    repoId: RepoId,
+    url: string,
+    path: string,
+    branch?: string,
+  ) => Effect.Effect<void, GitError>;
+  /** submodule.remove ✎ — guarded deinit → rm → modules cleanup. REQ-P5-SM-005. */
+  readonly submoduleRemove: (
+    repoId: RepoId,
+    path: string,
+  ) => Effect.Effect<void, GitError>;
 
   // ── object-read infrastructure (internal; for core-B) ──────────────────────
   /** Read a full object via the repo's `cat-file --batch` pool (`null` if missing). */

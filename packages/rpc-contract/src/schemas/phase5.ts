@@ -131,3 +131,41 @@ export class BisectStatus extends Schema.Class<BisectStatus>("BisectStatus")({
   candidates: Schema.optional(Schema.Array(Oid)),
   startPoint: Schema.optional(Schema.String),
 }) {}
+
+// ─── S6: submodules ────────────────────────────────────────────────────────────
+
+/**
+ * A submodule's working state (REQ-P5-SM-001), machine-derived from `git submodule
+ * status`'s leading prefix crossed with the index gitlink: `upToDate` (` `),
+ * `uninitialized` (`-`), `outOfSync` (`+`, checked-out ≠ recorded), `conflicted`
+ * (`U` / a merge-conflicted index entry with no stage-0 gitlink).
+ */
+export const SubmoduleStatus = Schema.Literals([
+  "uninitialized",
+  "upToDate",
+  "outOfSync",
+  "conflicted",
+]);
+export type SubmoduleStatus = typeof SubmoduleStatus.Type;
+
+/**
+ * One submodule (REQ-P5-SM-001). `recordedOid` is the superproject's stage-0 gitlink
+ * (mode `160000`) — ABSENT for a `conflicted` entry, which carries only stages 1/2/3
+ * (base/ours/theirs) and no stage-0 gitlink (D18). `checkedOutOid` is the actually
+ * checked-out commit from `submodule status`, absent when `uninitialized`. `name`/`url`/
+ * `branch` come from `.gitmodules`; `absPath` is the host-resolved working path the
+ * "Open" action reuses via `RepoOpen`.
+ */
+export class SubmoduleInfo extends Schema.Class<SubmoduleInfo>("SubmoduleInfo")(
+  {
+    path: Schema.String,
+    name: Schema.optional(Schema.String),
+    absPath: Schema.String,
+    recordedOid: Schema.optional(Oid),
+    checkedOutOid: Schema.optional(Oid),
+    status: SubmoduleStatus,
+    describe: Schema.optional(Schema.String),
+    url: Schema.optional(Schema.String),
+    branch: Schema.optional(Schema.String),
+  },
+) {}

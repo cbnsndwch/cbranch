@@ -55,6 +55,7 @@ import {
   GcPrune,
   GcResult,
   ReflogPage,
+  SubmoduleInfo,
 } from "../schemas/phase5";
 import { Oid, RepoId } from "../schemas/primitives";
 import { DiffSpec, LogQuery } from "../schemas/queries";
@@ -710,6 +711,54 @@ export const CbranchRpcs = RpcGroup.make(
   Rpc.make("BisectStatus", {
     payload: { repoId: RepoId },
     success: BisectStatus,
+    error: GitError,
+  }),
+
+  // ── P5: submodules ─────────────────────────────────────────────────────────
+  // submodule.list — index-cross-read listing (gitlink + status + .gitmodules). READ.
+  Rpc.make("SubmoduleList", {
+    payload: { repoId: RepoId },
+    success: Schema.Array(SubmoduleInfo),
+    error: GitError,
+  }),
+  // submodule.update ✎ — `git submodule update [--init] [--recursive] [--force] [-- <paths>]`;
+  // bulk = empty paths (REQ-P5-SM-002).
+  Rpc.make("SubmoduleUpdate", {
+    payload: {
+      repoId: RepoId,
+      paths: Schema.optional(Schema.Array(Schema.String)),
+      init: Schema.optional(Schema.Boolean),
+      recursive: Schema.optional(Schema.Boolean),
+      force: Schema.optional(Schema.Boolean),
+    },
+    success: Schema.Void,
+    error: GitError,
+  }),
+  // submodule.sync ✎ — `git submodule sync [--recursive] [-- <paths>]` (REQ-P5-SM-003).
+  Rpc.make("SubmoduleSync", {
+    payload: {
+      repoId: RepoId,
+      paths: Schema.optional(Schema.Array(Schema.String)),
+      recursive: Schema.optional(Schema.Boolean),
+    },
+    success: Schema.Void,
+    error: GitError,
+  }),
+  // submodule.add ✎ — `git submodule add [-b <branch>] -- <url> <path>` (REQ-P5-SM-004).
+  Rpc.make("SubmoduleAdd", {
+    payload: {
+      repoId: RepoId,
+      url: Schema.String,
+      path: Schema.String,
+      branch: Schema.optional(Schema.String),
+    },
+    success: Schema.Void,
+    error: GitError,
+  }),
+  // submodule.remove ✎ — guarded deinit → rm → modules cleanup (REQ-P5-SM-005).
+  Rpc.make("SubmoduleRemove", {
+    payload: { repoId: RepoId, path: Schema.String },
+    success: Schema.Void,
     error: GitError,
   }),
 );

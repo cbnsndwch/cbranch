@@ -109,6 +109,13 @@ import {
 } from "../git/stash";
 import { statusGet } from "../git/status";
 import {
+  submoduleAdd as submoduleAddGit,
+  submoduleList as submoduleListGit,
+  submoduleRemove as submoduleRemoveGit,
+  submoduleSync as submoduleSyncGit,
+  submoduleUpdate as submoduleUpdateGit,
+} from "../git/submodules";
+import {
   fetchStream as fetchStreamGit,
   pullStream as pullStreamGit,
   pushDeleteRemoteRef as pushDeleteRemoteRefGit,
@@ -807,6 +814,42 @@ export const makeGitEngine = (
       bisectStatus: (repoId) =>
         Effect.flatMap(resolveById(repoId), (repo) =>
           bisectStatusGit(repoCwd(repo), repo.gitDir, env),
+        ),
+
+      // ── submodules (P5) ───────────────────────────────────────────────────
+      // List is a lockless read; mutations hold the repo lock. Remove needs the
+      // common git dir to clear the cached `modules/<path>` after deinit + rm.
+      submoduleList: (repoId) =>
+        Effect.flatMap(resolveById(repoId), (repo) =>
+          submoduleListGit(repoCwd(repo), env),
+        ),
+      submoduleUpdate: (repoId, paths, init, recursive, force) =>
+        Effect.flatMap(resolveById(repoId), (repo) =>
+          locks.withRepoLock(repoId)(
+            submoduleUpdateGit(
+              repoCwd(repo),
+              { paths, init, recursive, force },
+              env,
+            ),
+          ),
+        ),
+      submoduleSync: (repoId, paths, recursive) =>
+        Effect.flatMap(resolveById(repoId), (repo) =>
+          locks.withRepoLock(repoId)(
+            submoduleSyncGit(repoCwd(repo), { paths, recursive }, env),
+          ),
+        ),
+      submoduleAdd: (repoId, url, path, branch) =>
+        Effect.flatMap(resolveById(repoId), (repo) =>
+          locks.withRepoLock(repoId)(
+            submoduleAddGit(repoCwd(repo), url, path, branch, env),
+          ),
+        ),
+      submoduleRemove: (repoId, path) =>
+        Effect.flatMap(resolveById(repoId), (repo) =>
+          locks.withRepoLock(repoId)(
+            submoduleRemoveGit(repoCwd(repo), repo.commonDir, path, env),
+          ),
         ),
     };
     return api;

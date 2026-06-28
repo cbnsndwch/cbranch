@@ -302,4 +302,22 @@ export const handlersLayer = CbranchRpcs.toLayer({
     Effect.flatMap(GitEngine, (engine) => engine.bisectReset(repoId)),
   BisectStatus: ({ repoId }) =>
     Effect.flatMap(GitEngine, (engine) => engine.bisectStatus(repoId)),
+
+  // ── submodules (P5) ───────────────────────────────────────────────────────
+  SubmoduleList: ({ repoId }) =>
+    Effect.flatMap(GitEngine, (engine) => engine.submoduleList(repoId)),
+  SubmoduleUpdate: ({ repoId, paths, init, recursive, force }) =>
+    Effect.flatMap(GitEngine, (engine) =>
+      engine.submoduleUpdate(repoId, paths, init, recursive, force),
+    ),
+  SubmoduleSync: ({ repoId, paths, recursive }) =>
+    Effect.flatMap(GitEngine, (engine) =>
+      engine.submoduleSync(repoId, paths, recursive),
+    ),
+  SubmoduleAdd: ({ repoId, url, path, branch }) =>
+    Effect.flatMap(GitEngine, (engine) =>
+      engine.submoduleAdd(repoId, url, path, branch),
+    ),
+  SubmoduleRemove: ({ repoId, path }) =>
+    Effect.flatMap(GitEngine, (engine) => engine.submoduleRemove(repoId, path)),
 });
