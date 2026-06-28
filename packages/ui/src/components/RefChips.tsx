@@ -11,13 +11,24 @@ import { parseRefs, type RefKind, type RefLabel } from "../lib/refs";
 
 const MAX_VISIBLE = 3;
 
-const kindClass: Record<RefKind, string> = {
-  localBranch:
-    "bg-[var(--color-status-staged)] text-black border-0 px-1.5 font-semibold",
-  remoteBranch: "border-border text-muted-foreground",
+// Tags / detached-HEAD keep theme tokens; local & remote branches are colored below.
+const kindClass: Record<"tag" | "head", string> = {
   tag: "border-status-ahead text-status-ahead",
   head: "border-primary text-primary",
 };
+
+// Local branches (except the active HEAD branch) read green, remote-tracking branches
+// red — fixed light-bg/dark-text palette colors so the pill looks the same in light and
+// dark mode. The active local branch keeps its distinct staged-color chip.
+function chipClass(label: RefLabel): string {
+  if (label.kind === "remoteBranch")
+    return "border-0 bg-red-100 px-1.5 text-red-800";
+  if (label.kind === "localBranch")
+    return label.isHead
+      ? "bg-[var(--color-status-staged)] text-white border-0 px-1.5 font-semibold"
+      : "border-0 bg-green-100 px-1.5 text-green-800";
+  return kindClass[label.kind];
+}
 
 const kindIcon: Record<RefKind, ReactNode> = {
   localBranch: <GitBranch className="size-3 shrink-0" aria-hidden="true" />,
@@ -32,11 +43,11 @@ function Chip({ label }: { readonly label: RefLabel }) {
       title={label.raw}
       className={cn(
         "inline-flex max-w-[12rem] items-center gap-1 border px-1 text-[10px] leading-4",
-        kindClass[label.kind],
+        chipClass(label),
       )}
     >
       {label.isHead && label.kind !== "head" ? (
-        <span className="bg-primary text-primary-foreground px-0.5 font-semibold">
+        <span className="bg-primary text-white px-0.5 font-semibold">
           HEAD
         </span>
       ) : null}

@@ -827,13 +827,13 @@ function BranchRow({
 }: BranchRowProps) {
   const remoteRef = splitRemoteRef(branch);
   // Local branches (except the active one) get a green chip; remote-tracking branches
-  // get a red one. Fixed light-bg/bold-dark-text palette colors so the pill reads the
-  // same in light and dark mode. The active branch keeps the plain ● + row highlight.
+  // get a red one. Fixed light-bg/dark-text palette colors so the pill reads the same in
+  // light and dark mode. The active branch keeps the plain ● + row highlight.
   const chipTone = branch.isRemote
-    ? "bg-red-100 font-bold text-red-800"
+    ? "bg-red-100 text-red-800"
     : branch.isCurrent
       ? null
-      : "bg-green-100 font-bold text-green-800";
+      : "bg-green-100 text-green-800";
   return (
     <div
       className={cn(
