@@ -83,6 +83,18 @@ export const resolveConfigPath = (
   return join(xdg, "cbranch", "config.json");
 };
 
+/**
+ * cbranch's own app settings (REQ-P5-CFG-006) — theme/locale/keybindings, persisted in
+ * THIS host `config.json`, NEVER in git config (REQ-P5-CFG-005). `keybindings` is the
+ * native `Record<commandId, chord>` of user overrides; the engine converts it to/from
+ * the wire `KeyBinding[]` at the boundary.
+ */
+export interface AppSettingsData {
+  readonly theme: Config["theme"];
+  readonly locale: string;
+  readonly keybindings: Record<string, string>;
+}
+
 export interface ConfigStore {
   readonly path: string;
   /** Load the config; ALWAYS succeeds with documented defaults on any problem. */
@@ -96,6 +108,12 @@ export interface ConfigStore {
     repoId: RepoId,
     name: string,
   ) => Effect.Effect<void, GitError>;
+  /** Read app settings (theme/locale/keybindings); infallible (defaults on any problem). */
+  readonly getAppSettings: () => Effect.Effect<AppSettingsData>;
+  /** Merge a partial patch into app settings and persist (REQ-P5-CFG-006). */
+  readonly setAppSettings: (
+    patch: Partial<AppSettingsData>,
+  ) => Effect.Effect<AppSettingsData, GitError>;
 }
 
 export const makeConfigStore = (opts?: {
@@ -160,6 +178,21 @@ export const makeConfigStore = (opts?: {
       mutate((recents) =>
         recents.map((r) => (r.repoId === repoId ? { ...r, name } : r)),
       ),
+    getAppSettings: () =>
+      Effect.map(load(), (config) => ({
+        theme: config.theme,
+        locale: config.locale,
+        keybindings: config.keybindings,
+      })),
+    setAppSettings: (patch) =>
+      Effect.flatMap(load(), (config) => {
+        const next: AppSettingsData = {
+          theme: patch.theme ?? config.theme,
+          locale: patch.locale ?? config.locale,
+          keybindings: patch.keybindings ?? config.keybindings,
+        };
+        return Effect.as(save({ ...config, ...next }), next);
+      }),
   };
 };
 

@@ -320,4 +320,24 @@ export const handlersLayer = CbranchRpcs.toLayer({
     ),
   SubmoduleRemove: ({ repoId, path }) =>
     Effect.flatMap(GitEngine, (engine) => engine.submoduleRemove(repoId, path)),
+
+  // ── settings & git config (P5) ────────────────────────────────────────────
+  ConfigList: ({ repoId }) =>
+    Effect.flatMap(GitEngine, (engine) => engine.configList(repoId)),
+  ConfigGet: ({ repoId, key, scope }) =>
+    Effect.flatMap(GitEngine, (engine) => engine.configGet(repoId, key, scope)),
+  ConfigSet: ({ repoId, key, value, scope }) =>
+    Effect.flatMap(GitEngine, (engine) =>
+      engine.configSet(repoId, key, value, scope),
+    ),
+  ConfigUnset: ({ repoId, key, scope }) =>
+    Effect.flatMap(GitEngine, (engine) =>
+      engine.configUnset(repoId, key, scope),
+    ),
+  ConfigAppGet: () =>
+    Effect.flatMap(GitEngine, (engine) => engine.appSettingsGet()),
+  ConfigAppSet: ({ theme, locale, keybindings }) =>
+    Effect.flatMap(GitEngine, (engine) =>
+      engine.appSettingsSet({ theme, locale, keybindings }),
+    ),
 });

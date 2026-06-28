@@ -51,6 +51,7 @@ import {
   SequencerResult,
 } from "../schemas/phase4";
 import {
+  AppSettings,
   ArchiveDescriptor,
   ArchiveFormat,
   BisectStatus,
@@ -59,10 +60,14 @@ import {
   CleanResult,
   GcPrune,
   GcResult,
+  GitConfigEntry,
+  GitConfigValue,
+  KeyBinding,
   ReflogEntry,
   ReflogPage,
   SubmoduleInfo,
   SubmoduleStatus,
+  WritableScope,
 } from "../schemas/phase5";
 import { Oid, RepoId } from "../schemas/primitives";
 import { LogQuery } from "../schemas/queries";
@@ -374,6 +379,38 @@ const submodules = [
     url: "https://example.com/uninit.git",
   }),
 ];
+const gitConfigEntries = [
+  new GitConfigEntry({
+    key: "user.name",
+    value: "Ada Lovelace",
+    scope: "global",
+    origin: "file:/home/ada/.gitconfig",
+  }),
+  new GitConfigEntry({
+    key: "core.editor",
+    value: "vim",
+    scope: "local",
+    origin: "file:.git/config",
+  }),
+];
+const gitConfigValuePresent = new GitConfigValue({
+  key: "user.email",
+  scope: "global",
+  present: true,
+  value: "ada@example.io",
+});
+const gitConfigValueAbsent = new GitConfigValue({
+  key: "user.signingkey",
+  scope: "global",
+  present: false,
+});
+const appSettings = new AppSettings({
+  theme: "dark",
+  locale: "en",
+  keybindings: [
+    new KeyBinding({ commandId: "commands.commit", chord: "Mod+Enter" }),
+  ],
+});
 
 // --- stub handlers: schema-valid data, plus payload-driven error injection ---
 const handlers = CbranchRpcs.toLayer({
@@ -533,6 +570,24 @@ const handlers = CbranchRpcs.toLayer({
   SubmoduleSync: () => Effect.void,
   SubmoduleAdd: () => Effect.void,
   SubmoduleRemove: () => Effect.void,
+
+  // ── P5: settings & git config ─────────────────────────────────────────────────
+  ConfigList: () => Effect.succeed(gitConfigEntries),
+  ConfigGet: ({ key }) =>
+    Effect.succeed(
+      key === gitConfigValueAbsent.key
+        ? gitConfigValueAbsent
+        : gitConfigValuePresent,
+    ),
+  ConfigSet: ({ key }) =>
+    key === "invalid.key"
+      ? Effect.fail(
+          new GitError({ code: "gitFailed", message: "bad config value" }),
+        )
+      : Effect.void,
+  ConfigUnset: () => Effect.void,
+  ConfigAppGet: () => Effect.succeed(appSettings),
+  ConfigAppSet: () => Effect.succeed(appSettings),
 });
 
 describe("CbranchRpcs P1 contract (in-memory RpcTest round-trip)", () => {
@@ -1055,6 +1110,107 @@ describe("CbranchRpcs P5 power-features round-trip", () => {
       Exit.isFailure(Schema.decodeUnknownExit(SubmoduleStatus)("deleted")),
     ).toBe(true);
   });
+
+  test("ConfigList round-trips on-disk entries with scope + origin", async () => {
+    const program = Effect.gen(function* () {
+      const client = yield* RpcTest.makeClient(CbranchRpcs);
+      return yield* client.ConfigList({ repoId });
+    }).pipe(Effect.provide(handlers), Effect.scoped);
+
+    const rows = await Effect.runPromise(program);
+
+    expect(rows).toHaveLength(2);
+    expect(rows[0]?.key).toBe("user.name");
+    expect(rows[0]?.scope).toBe("global");
+    expect(rows[1]?.scope).toBe("local");
+  });
+
+  test("ConfigGet round-trips present and absent (present:false) values", async () => {
+    const program = Effect.gen(function* () {
+      const client = yield* RpcTest.makeClient(CbranchRpcs);
+      const present = yield* client.ConfigGet({
+        repoId,
+        key: "user.email",
+        scope: "global",
+      });
+      const absent = yield* client.ConfigGet({
+        repoId,
+        key: "user.signingkey",
+        scope: "global",
+      });
+      return { present, absent };
+    }).pipe(Effect.provide(handlers), Effect.scoped);
+
+    const r = await Effect.runPromise(program);
+
+    expect(r.present.present).toBe(true);
+    expect(r.present.value).toBe("ada@example.io");
+    expect(r.absent.present).toBe(false);
+    expect(r.absent.value).toBeUndefined();
+  });
+
+  test("Config writes round-trip Void; an invalid set surfaces gitFailed", async () => {
+    const ok = Effect.gen(function* () {
+      const client = yield* RpcTest.makeClient(CbranchRpcs);
+      const set = yield* client.ConfigSet({
+        repoId,
+        key: "user.name",
+        value: "Ada",
+        scope: "global",
+      });
+      const unset = yield* client.ConfigUnset({
+        repoId,
+        key: "user.name",
+        scope: "local",
+      });
+      return { set, unset };
+    }).pipe(Effect.provide(handlers), Effect.scoped);
+
+    const r = await Effect.runPromise(ok);
+    expect(r.set).toBeUndefined();
+    expect(r.unset).toBeUndefined();
+
+    const fail = Effect.gen(function* () {
+      const client = yield* RpcTest.makeClient(CbranchRpcs);
+      return yield* Effect.flip(
+        client.ConfigSet({
+          repoId,
+          key: "invalid.key",
+          value: "x",
+          scope: "global",
+        }),
+      );
+    }).pipe(Effect.provide(handlers), Effect.scoped);
+
+    const error = await Effect.runPromise(fail);
+    expect(error).toBeInstanceOf(GitError);
+    expect(error.code).toBe("gitFailed");
+  });
+
+  test("WritableScope refuses system (write side excludes read-only scopes)", () => {
+    expect(
+      Exit.isSuccess(Schema.decodeUnknownExit(WritableScope)("global")),
+    ).toBe(true);
+    expect(
+      Exit.isFailure(Schema.decodeUnknownExit(WritableScope)("system")),
+    ).toBe(true);
+  });
+
+  test("app settings round-trip theme + locale + KeyBinding[]", async () => {
+    const program = Effect.gen(function* () {
+      const client = yield* RpcTest.makeClient(CbranchRpcs);
+      const got = yield* client.ConfigAppGet({});
+      const set = yield* client.ConfigAppSet({ theme: "light" });
+      return { got, set };
+    }).pipe(Effect.provide(handlers), Effect.scoped);
+
+    const r = await Effect.runPromise(program);
+
+    expect(r.got.theme).toBe("dark");
+    expect(r.got.keybindings).toHaveLength(1);
+    expect(r.got.keybindings[0]?.commandId).toBe("commands.commit");
+    expect(r.set.theme).toBe("dark");
+  });
 });
 
 // Per-feature P5 slices APPEND their tags to this catalog block (D18); gc opens it.
@@ -1080,6 +1236,13 @@ describe("CbranchRpcs P5 power-features method catalog (DECISIONS D1 wire tags)"
     "SubmoduleSync",
     "SubmoduleAdd",
     "SubmoduleRemove",
+    // settings & git config
+    "ConfigList",
+    "ConfigGet",
+    "ConfigSet",
+    "ConfigUnset",
+    "ConfigAppGet",
+    "ConfigAppSet",
   ])("exposes the %s wire tag", (tag) => {
     expect(CbranchRpcs.requests.has(tag)).toBe(true);
   });

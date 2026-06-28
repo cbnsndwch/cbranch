@@ -46,16 +46,23 @@ import {
   SequencerResult,
 } from "../schemas/phase4";
 import {
+  AppSettings,
   ArchiveDescriptor,
   ArchiveFormat,
   BisectMark,
   BisectStatus,
   CleanPreview,
   CleanResult,
+  ConfigScope,
   GcPrune,
   GcResult,
+  GitConfigEntry,
+  GitConfigValue,
+  KeyBinding,
   ReflogPage,
   SubmoduleInfo,
+  ThemePref,
+  WritableScope,
 } from "../schemas/phase5";
 import { Oid, RepoId } from "../schemas/primitives";
 import { DiffSpec, LogQuery } from "../schemas/queries";
@@ -759,6 +766,57 @@ export const CbranchRpcs = RpcGroup.make(
   Rpc.make("SubmoduleRemove", {
     payload: { repoId: RepoId, path: Schema.String },
     success: Schema.Void,
+    error: GitError,
+  }),
+
+  // ── P5: settings & git config ──────────────────────────────────────────────
+  // config.list — every on-disk entry with scope+origin (READ; REQ-P5-CFG-001).
+  Rpc.make("ConfigList", {
+    payload: { repoId: RepoId },
+    success: Schema.Array(GitConfigEntry),
+    error: GitError,
+  }),
+  // config.get — a single key, scoped or effective (READ; `present:false` = unset, REQ-P5-CFG-003).
+  Rpc.make("ConfigGet", {
+    payload: {
+      repoId: RepoId,
+      key: Schema.String,
+      scope: Schema.optional(ConfigScope),
+    },
+    success: GitConfigValue,
+    error: GitError,
+  }),
+  // config.set ✎ — `git config <--global|--local> <key> <value>` (REQ-P5-CFG-002/004).
+  Rpc.make("ConfigSet", {
+    payload: {
+      repoId: RepoId,
+      key: Schema.String,
+      value: Schema.String,
+      scope: WritableScope,
+    },
+    success: Schema.Void,
+    error: GitError,
+  }),
+  // config.unset ✎ — `git config <--global|--local> --unset <key>` (idempotent; REQ-P5-CFG-004).
+  Rpc.make("ConfigUnset", {
+    payload: { repoId: RepoId, key: Schema.String, scope: WritableScope },
+    success: Schema.Void,
+    error: GitError,
+  }),
+  // config.appGet — cbranch app settings from host `config.json`, NOT git (REQ-P5-CFG-005/006).
+  Rpc.make("ConfigAppGet", {
+    payload: {},
+    success: AppSettings,
+    error: GitError,
+  }),
+  // config.appSet ✎* — write app settings to host `config.json`; no repo lock, no git (REQ-P5-CFG-006).
+  Rpc.make("ConfigAppSet", {
+    payload: {
+      theme: Schema.optional(ThemePref),
+      locale: Schema.optional(Schema.String),
+      keybindings: Schema.optional(Schema.Array(KeyBinding)),
+    },
+    success: AppSettings,
     error: GitError,
   }),
 );

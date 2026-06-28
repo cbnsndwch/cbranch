@@ -110,6 +110,46 @@ describe("recent list CRUD (P1-RECENT-1/3/5)", () => {
   });
 });
 
+describe("app settings (REQ-P5-CFG-006; NEVER git config, REQ-P5-CFG-005)", () => {
+  test("getAppSettings returns documented defaults on a missing file", async () => {
+    const store = makeConfigStore({ configPath: newPath() });
+    const settings = await run(store.getAppSettings());
+    expect(settings.theme).toBe("system");
+    expect(settings.locale).toBe("en");
+    expect(settings.keybindings).toEqual({});
+  });
+
+  test("setAppSettings merges a partial patch + persists; defaults preserved", async () => {
+    const path = newPath();
+    const store = makeConfigStore({ configPath: path });
+    const returned = await run(store.setAppSettings({ theme: "dark" }));
+    expect(returned.theme).toBe("dark");
+    expect(returned.locale).toBe("en"); // untouched default preserved
+    const reread = await run(store.getAppSettings());
+    expect(reread.theme).toBe("dark");
+    // theme/keybindings live in THIS file, not git config.
+    expect(readFileSync(path, "utf8")).toContain('"theme": "dark"');
+  });
+
+  test("setAppSettings round-trips keybindings and restamps the version", async () => {
+    const path = newPath();
+    const store = makeConfigStore({ configPath: path });
+    await run(
+      store.setAppSettings({
+        keybindings: { "commands.commit": "Mod+Enter" },
+        locale: "fr",
+      }),
+    );
+    const reread = await run(store.getAppSettings());
+    expect(reread.keybindings).toEqual({ "commands.commit": "Mod+Enter" });
+    expect(reread.locale).toBe("fr");
+    const written = JSON.parse(readFileSync(path, "utf8")) as {
+      version: number;
+    };
+    expect(written.version).toBe(CONFIG_VERSION);
+  });
+});
+
 describe("resolveConfigPath (NF-CFG-7 / NF-PKG-9 precedence)", () => {
   test("CBRANCH_CONFIG wins", () => {
     expect(

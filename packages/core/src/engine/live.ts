@@ -16,10 +16,14 @@ import {
   type InvalidationEvent,
   type RepoId,
 } from "@cbranch/rpc-contract";
-import { RepoHandle } from "@cbranch/rpc-contract";
+import { AppSettings, KeyBinding, RepoHandle } from "@cbranch/rpc-contract";
 import { type Cause, Effect, Layer, Queue, Scope, Stream } from "effect";
 
-import { type ConfigStore, makeConfigStore } from "../config/config-store";
+import {
+  type AppSettingsData,
+  type ConfigStore,
+  makeConfigStore,
+} from "../config/config-store";
 import { blame as blameGit } from "../git/blame";
 import {
   bisectMark as bisectMarkGit,
@@ -56,6 +60,12 @@ import { fileContentAtRev } from "../git/content";
 import { commitDiff, diffWorkingFile } from "../git/diff";
 import { gitError } from "../git/errors";
 import { fileHistory as fileHistoryGit } from "../git/file-history";
+import {
+  configGet as configGetGit,
+  configList as configListGit,
+  configSet as configSetGit,
+  configUnset as configUnsetGit,
+} from "../git/git-config";
 import {
   archivePrepare as archivePrepareGit,
   archiveStreamGit,
@@ -148,6 +158,25 @@ export interface MakeGitEngineOptions {
   /** Working directory for the one-time `git --version` probe (default `process.cwd()`). */
   readonly versionProbeCwd?: string;
 }
+
+/** Wire app settings (host `config.json`, Record keybindings) → the {@link AppSettings} class. */
+const toAppSettings = (data: AppSettingsData): AppSettings =>
+  new AppSettings({
+    theme: data.theme,
+    locale: data.locale,
+    keybindings: Object.entries(data.keybindings).map(
+      ([commandId, chord]) => new KeyBinding({ commandId, chord }),
+    ),
+  });
+
+/** Wire wire-form {@link KeyBinding}[] back to the host's native `Record<commandId, chord>`. */
+const fromKeyBindings = (
+  bindings: ReadonlyArray<KeyBinding>,
+): Record<string, string> => {
+  const out: Record<string, string> = {};
+  for (const b of bindings) out[b.commandId] = b.chord;
+  return out;
+};
 
 /**
  * Build a live {@link GitEngineApi}. Requires a `Scope`: the version probe runs once,
@@ -850,6 +879,44 @@ export const makeGitEngine = (
           locks.withRepoLock(repoId)(
             submoduleRemoveGit(repoCwd(repo), repo.commonDir, path, env),
           ),
+        ),
+
+      // ── settings & git config (P5) ────────────────────────────────────────
+      // Git config: reads are lockless; writes hold the repo lock. App settings
+      // go to the host config.json — NOT git, NOT a repo — so NO lock, NO repoId.
+      configList: (repoId) =>
+        Effect.flatMap(resolveById(repoId), (repo) =>
+          configListGit(repoCwd(repo), env),
+        ),
+      configGet: (repoId, key, scope) =>
+        Effect.flatMap(resolveById(repoId), (repo) =>
+          configGetGit(repoCwd(repo), key, scope, env),
+        ),
+      configSet: (repoId, key, value, scope) =>
+        Effect.flatMap(resolveById(repoId), (repo) =>
+          locks.withRepoLock(repoId)(
+            configSetGit(repoCwd(repo), key, value, scope, env),
+          ),
+        ),
+      configUnset: (repoId, key, scope) =>
+        Effect.flatMap(resolveById(repoId), (repo) =>
+          locks.withRepoLock(repoId)(
+            configUnsetGit(repoCwd(repo), key, scope, env),
+          ),
+        ),
+      appSettingsGet: () =>
+        Effect.map(configStore.getAppSettings(), toAppSettings),
+      appSettingsSet: (patch) =>
+        Effect.map(
+          configStore.setAppSettings({
+            theme: patch.theme,
+            locale: patch.locale,
+            keybindings:
+              patch.keybindings === undefined
+                ? undefined
+                : fromKeyBindings(patch.keybindings),
+          }),
+          toAppSettings,
         ),
     };
     return api;

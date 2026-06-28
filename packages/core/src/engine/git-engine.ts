@@ -25,12 +25,18 @@ import {
   type ConflictSides,
   type ContentEncoding,
   type DiffFile,
+  type AppSettings,
   type ArchiveDescriptor,
   type ArchiveFormat,
   type BisectMark,
   type BisectStatus,
   type CleanPreview,
   type CleanResult,
+  type ConfigScope,
+  type GitConfigEntry,
+  type GitConfigValue,
+  type KeyBinding,
+  type WritableScope,
   type FileContentResult,
   type FileHistoryPage,
   type GcPrune,
@@ -570,6 +576,39 @@ export interface GitEngineApi {
     repoId: RepoId,
     path: string,
   ) => Effect.Effect<void, GitError>;
+
+  // ── settings & git config (P5, S7) ─────────────────────────────────────────
+  /** config.list — every on-disk entry with scope+origin. READ. REQ-P5-CFG-001. */
+  readonly configList: (
+    repoId: RepoId,
+  ) => Effect.Effect<ReadonlyArray<GitConfigEntry>, GitError>;
+  /** config.get — a single key (scoped or effective); `present:false` = unset. READ. REQ-P5-CFG-003. */
+  readonly configGet: (
+    repoId: RepoId,
+    key: string,
+    scope?: ConfigScope,
+  ) => Effect.Effect<GitConfigValue, GitError>;
+  /** config.set ✎ — write a key at a writable scope. REQ-P5-CFG-002/004. */
+  readonly configSet: (
+    repoId: RepoId,
+    key: string,
+    value: string,
+    scope: WritableScope,
+  ) => Effect.Effect<void, GitError>;
+  /** config.unset ✎ — unset a key (idempotent). REQ-P5-CFG-004. */
+  readonly configUnset: (
+    repoId: RepoId,
+    key: string,
+    scope: WritableScope,
+  ) => Effect.Effect<void, GitError>;
+  /** app.settings.get — cbranch app settings from host config.json; NOT git, no repo. REQ-P5-CFG-006. */
+  readonly appSettingsGet: () => Effect.Effect<AppSettings, GitError>;
+  /** app.settings.set ✎* — write host config.json; no repo lock, no git. REQ-P5-CFG-006. */
+  readonly appSettingsSet: (patch: {
+    theme?: AppSettings["theme"];
+    locale?: string;
+    keybindings?: ReadonlyArray<KeyBinding>;
+  }) => Effect.Effect<AppSettings, GitError>;
 
   // ── object-read infrastructure (internal; for core-B) ──────────────────────
   /** Read a full object via the repo's `cat-file --batch` pool (`null` if missing). */

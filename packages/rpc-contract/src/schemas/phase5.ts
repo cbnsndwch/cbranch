@@ -169,3 +169,84 @@ export class SubmoduleInfo extends Schema.Class<SubmoduleInfo>("SubmoduleInfo")(
     branch: Schema.optional(Schema.String),
   },
 ) {}
+
+// ─── S7: settings & git config ─────────────────────────────────────────────────
+
+/**
+ * A git config scope as reported by `--show-scope` (REQ-P5-CFG-001) — the READ side,
+ * so all five of git's scopes appear: `system`/`global`/`local`/`worktree`, plus
+ * `command` for `-c key=value` overrides (which cbranch's config reads deliberately
+ * suppress via `read:false`, but the parser still tolerates).
+ */
+export const ConfigScope = Schema.Literals([
+  "system",
+  "global",
+  "local",
+  "worktree",
+  "command",
+]);
+export type ConfigScope = typeof ConfigScope.Type;
+
+/**
+ * The WRITE side (REQ-P5-CFG-002): only `global` and `local` are writable in v1 —
+ * `system` is read-only in the picker AND refused by the engine; `worktree` is
+ * deferred. A narrower literal so an unwritable scope can never reach a write method.
+ */
+export const WritableScope = Schema.Literals(["global", "local"]);
+export type WritableScope = typeof WritableScope.Type;
+
+/**
+ * The app theme preference (REQ-P5-CFG-006) — an APP setting (host `config.json`),
+ * NEVER written into git config (REQ-P5-CFG-005). Mirrors the UI `theme.ts` `ThemePref`
+ * and the host `Config.theme` verbatim.
+ */
+export const ThemePref = Schema.Literals(["light", "dark", "system"]);
+export type ThemePref = typeof ThemePref.Type;
+
+/**
+ * One on-disk git config entry (REQ-P5-CFG-001) — one row per stored value, so a
+ * multi-valued key yields multiple entries; the effective value is resolved client-side
+ * by scope precedence. `origin` is git's `--show-origin` file path (DISPLAY).
+ */
+export class GitConfigEntry extends Schema.Class<GitConfigEntry>(
+  "GitConfigEntry",
+)({
+  key: Schema.String,
+  value: Schema.String,
+  scope: ConfigScope,
+  origin: Schema.String,
+}) {}
+
+/**
+ * A single-key config read (REQ-P5-CFG-003). `present:false` is DATA (git exit 1 — the
+ * key is unset), not an error. `scope` is set only on a SCOPED read (`--get` at a given
+ * scope); on an effective/merged read it is absent. `value` is absent when `!present`.
+ */
+export class GitConfigValue extends Schema.Class<GitConfigValue>(
+  "GitConfigValue",
+)({
+  key: Schema.String,
+  scope: Schema.optional(ConfigScope),
+  present: Schema.Boolean,
+  value: Schema.optional(Schema.String),
+}) {}
+
+/**
+ * One app-level keybinding (REQ-P5-CFG-006) — `commandId` is a menu-model id, `chord`
+ * the bound key chord. The wire form is an array; the host stores it as a native
+ * `Record<commandId, chord>` (user OVERRIDES only; defaults live client-side).
+ */
+export class KeyBinding extends Schema.Class<KeyBinding>("KeyBinding")({
+  commandId: Schema.String,
+  chord: Schema.String,
+}) {}
+
+/**
+ * cbranch's own app settings (REQ-P5-CFG-006), persisted to the host `config.json`,
+ * NEVER to git config (REQ-P5-CFG-005). `keybindings` carries user overrides only.
+ */
+export class AppSettings extends Schema.Class<AppSettings>("AppSettings")({
+  theme: ThemePref,
+  locale: Schema.String,
+  keybindings: Schema.Array(KeyBinding),
+}) {}
