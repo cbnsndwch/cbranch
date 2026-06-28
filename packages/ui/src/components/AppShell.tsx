@@ -26,6 +26,7 @@ import { TagsPanel } from "./TagsPanel";
 import { Toolbar } from "./Toolbar";
 import { Button } from "./ui/button";
 import { Placeholder } from "./ui/placeholder";
+import { ResizableSplit } from "./ui/resizable-split";
 import { WorktreesPanel } from "./WorktreesPanel";
 
 const VIEWS: ReadonlyArray<readonly [ActiveView, string]> = [
@@ -50,6 +51,8 @@ export function AppShell() {
   const setBlameTarget = useUiStore((s) => s.setBlameTarget);
   const historyTarget = useUiStore((s) => s.historyTarget);
   const setHistoryTarget = useUiStore((s) => s.setHistoryTarget);
+  const historySplit = useUiStore((s) => s.historySplit);
+  const setHistorySplit = useUiStore((s) => s.setHistorySplit);
   // Commit selection writes the URL (D13); the store mirrors it via <SyncRouteToStore>.
   const { selectOid } = useNavigation();
 
@@ -126,23 +129,34 @@ export function AppShell() {
         return <TagsPanel repoId={repoId} />;
       default:
         return (
-          <div className="grid min-h-0 grid-rows-[46px_minmax(200px,55%)_6px_28px_1fr]">
+          <div className="grid min-h-0 grid-rows-[46px_1fr]">
             {/* Status strip */}
             <HistoryStatusStrip repoId={repoId} />
-            {/* History list */}
-            <div className="min-h-0 overflow-hidden">
-              <HistoryPane
-                repoId={repoId}
-                selectedOid={selectedOid}
-                onSelectOid={selectOid}
-              />
-            </div>
-            {/* Splitter visual */}
-            <div className="border-t" />
-            {/* Detail tabs */}
-            <CommitDetailsTabs />
-            {/* Detail content */}
-            <div className="min-h-0 overflow-hidden">{detailContent}</div>
+            {/* History list over commit details, divided by a draggable splitter. */}
+            <ResizableSplit
+              orientation="vertical"
+              className="min-h-0"
+              fraction={historySplit}
+              onFractionChange={setHistorySplit}
+              min={0.2}
+              max={0.8}
+              label="Resize history and commit details"
+              left={
+                <HistoryPane
+                  repoId={repoId}
+                  selectedOid={selectedOid}
+                  onSelectOid={selectOid}
+                />
+              }
+              right={
+                <div className="grid h-full min-h-0 grid-rows-[28px_1fr]">
+                  {/* Detail tabs */}
+                  <CommitDetailsTabs />
+                  {/* Detail content */}
+                  <div className="min-h-0 overflow-hidden">{detailContent}</div>
+                </div>
+              }
+            />
           </div>
         );
     }

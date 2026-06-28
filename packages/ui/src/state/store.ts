@@ -21,6 +21,7 @@ import {
 import { type DiffView, readDiffView, writeDiffView } from "../lib/diff";
 import { emptyFilters, type LogFilters } from "../lib/filters";
 import { type DateMode, readDateMode, writeDateMode } from "../lib/format";
+import { readHistorySplit, writeHistorySplit } from "../lib/layout";
 import { applyTheme, readThemePref, type ThemePref } from "../theme/theme";
 
 export type DetailTab =
@@ -162,6 +163,9 @@ export interface UiState {
   /** The dialog body's changes|diff split fraction (0..1), persisted (§2/§3). */
   readonly commitSplit: number;
   readonly setCommitSplit: (fraction: number) => void;
+  /** History view's list|details split fraction (0..1), persisted (lib/layout.ts). */
+  readonly historySplit: number;
+  readonly setHistorySplit: (fraction: number) => void;
   // ── P2: file selection (staged / unstaged panels) ───────────────────────────
   readonly stagedSelection: ReadonlySet<string>;
   readonly unstagedSelection: ReadonlySet<string>;
@@ -216,6 +220,7 @@ export const useUiStore = create<UiState>((set) => ({
   commitDialogOpen: false,
   keepOpenAfterCommit: readKeepOpen(),
   commitSplit: readCommitSplit(),
+  historySplit: readHistorySplit(),
   stagedSelection: new Set(),
   unstagedSelection: new Set(),
   selectedDiffFile: null,
@@ -266,6 +271,10 @@ export const useUiStore = create<UiState>((set) => ({
   setCommitSplit: (commitSplit) => {
     writeCommitSplit(commitSplit);
     set({ commitSplit });
+  },
+  setHistorySplit: (historySplit) => {
+    writeHistorySplit(historySplit);
+    set({ historySplit });
   },
   toggleStagedSelection: (path) =>
     set((s) => {
