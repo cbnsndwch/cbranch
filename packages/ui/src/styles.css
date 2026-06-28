@@ -70,8 +70,8 @@
   --graph-14: #d946ef; /* fuchsia-500 */
   --graph-15: #ec4899; /* pink-500 */
   --graph-16: #f43f5e; /* rose-500 */
-  --selection-bg: oklch(0.51 0.17 253);
-  --selection-fg: oklch(1 0 0);
+  --selection-bg: oklch(0.62 0.12 165);
+  --selection-fg: oklch(0.985 0 0);
 }
 
 .dark {
@@ -113,8 +113,8 @@
 
   /* Graph lane colors are theme-independent Tailwind 500 shades (defined once in
      `:root`); only the selection accent shifts for dark. */
-  --selection-bg: oklch(0.58 0.2 253);
-  --selection-fg: oklch(1 0 0);
+  --selection-bg: oklch(0.62 0.12 165);
+  --selection-fg: oklch(0.985 0 0);
 }
 
 /* Map the CSS variables onto Tailwind's token namespace so utilities like
