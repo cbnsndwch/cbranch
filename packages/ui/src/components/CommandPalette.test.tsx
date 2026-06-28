@@ -59,13 +59,12 @@ beforeEach(() => {
 afterEach(() => cleanup());
 
 describe("CommandPalette P5 commands (spec §Entry points / NF-A11Y-6)", () => {
-  test("with an active repo, the eight primary commands are listed", async () => {
+  test("with an active repo, the wired primary commands are listed", async () => {
     act(() => {
       useUiStore.setState({ activeRepoId: repoId, paletteOpen: true });
     });
     renderPalette();
     for (const label of [
-      "Interactive rebase",
       "Reflog",
       "Bisect: start",
       "Export archive",
@@ -76,6 +75,9 @@ describe("CommandPalette P5 commands (spec §Entry points / NF-A11Y-6)", () => {
     ]) {
       expect(await screen.findByText(label)).toBeTruthy();
     }
+    // "Interactive rebase" (commands.rebase) is not wired until S8, so the palette
+    // hides it (filtered by menuActions.isEnabled) rather than offering a silent no-op.
+    expect(screen.queryByText("Interactive rebase")).toBeNull();
   });
 
   test("a command dispatches its menu id and closes the palette", async () => {

@@ -43,6 +43,11 @@ export function useMenuActions(): MenuActions {
   const api = useApi();
 
   return useMemo(() => {
+    // Settings is app-global (the App-settings tab works with no repo open); the
+    // git-config tab inside it prompts to open a repository (REQ-P5-CFG-005/006). The
+    // Tools and Repository entry points open the same dialog.
+    const openSettings = () =>
+      useUiStore.getState().setSettingsDialogOpen(true);
     // Only wired commands appear here; everything else greys out automatically.
     const handlers: Record<string, () => void> = {
       "start.open": () => useUiStore.getState().setPaletteOpen(true),
@@ -52,9 +57,7 @@ export function useMenuActions(): MenuActions {
         toast("cBranch", {
           description: "A desktop-style git client. MIT licensed.",
         }),
-      // Settings is app-global (the App-settings tab works with no repo open); the
-      // git-config tab inside it prompts to open a repository (REQ-P5-CFG-005/006).
-      "tools.settings": () => useUiStore.getState().setSettingsDialogOpen(true),
+      "tools.settings": openSettings,
     };
     // Repo-scoped commands need an open repository.
     if (repoId) {
@@ -105,10 +108,8 @@ export function useMenuActions(): MenuActions {
           .setBisectStartDialog({ bad: selectedOid ?? undefined });
       // Repository → Settings / Maintenance → Edit config open the same settings dialog
       // (git-config tab is the focus from the Repository menu). REQ-P5-CFG-001/002.
-      handlers["repository.settings"] = () =>
-        useUiStore.getState().setSettingsDialogOpen(true);
-      handlers["repository.maintenance.editConfig"] = () =>
-        useUiStore.getState().setSettingsDialogOpen(true);
+      handlers["repository.settings"] = openSettings;
+      handlers["repository.maintenance.editConfig"] = openSettings;
       // Submodules: Manage opens the routed panel; Update-all / Sync-all fire the bulk
       // ops (empty paths = all) with toast feedback (REQ-P5-SM-001..003).
       handlers["repository.submodulesManage"] = () =>

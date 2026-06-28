@@ -149,7 +149,7 @@ describe("git-config argv builders", () => {
     expect(configUnsetArgs("user.name", "local")).toEqual([
       "config",
       "--local",
-      "--unset",
+      "--unset-all",
       "user.name",
     ]);
   });
@@ -243,6 +243,42 @@ describe("git-config integration (real fixture repo)", () => {
     await run(configUnset(repo.dir, "does.not.exist", "local", isolated(repo)));
     // No throw == success.
     expect(true).toBe(true);
+  });
+
+  test("configUnset removes ALL values of a multi-valued key (--unset-all)", async () => {
+    const repo = await ws.createRepo("cfg-unset-multivar");
+    await repo.commit({ message: "init", files: { "a.txt": "a\n" } });
+    // Two values for one key — plain `--unset` would exit 5 and remove nothing.
+    await repo.git([
+      "config",
+      "--local",
+      "--add",
+      "credential.helper",
+      "cache",
+    ]);
+    await repo.git([
+      "config",
+      "--local",
+      "--add",
+      "credential.helper",
+      "store",
+    ]);
+    await run(
+      configUnset(repo.dir, "credential.helper", "local", isolated(repo)),
+    );
+    const rows = await run(configList(repo.dir, isolated(repo)));
+    expect(rows.some((r) => r.key === "credential.helper")).toBe(false);
+  });
+
+  test("configGet with a non-readable scope (command) does an effective read, scope omitted", async () => {
+    const repo = await ws.createRepo("cfg-get-command");
+    await repo.commit({ message: "init", files: { "a.txt": "a\n" } });
+    const v = await run(
+      configGet(repo.dir, "user.name", "command", isolated(repo)),
+    );
+    expect(v.present).toBe(true);
+    expect(v.value).toBe("Cb Tester");
+    expect(v.scope).toBeUndefined();
   });
 
   test("configSet refuses the system scope with permissionDenied", async () => {

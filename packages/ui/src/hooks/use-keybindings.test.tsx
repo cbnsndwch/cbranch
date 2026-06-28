@@ -1,7 +1,14 @@
 // @vitest-environment jsdom
 import { AppSettings, KeyBinding } from "@cbranch/rpc-contract";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, cleanup, render, waitFor } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 import { type CbranchApi } from "../rpc/api";
@@ -20,7 +27,7 @@ const makeApi = (keybindings: KeyBinding[]): CbranchApi =>
 
 function Harness({ actions }: { actions: Record<string, () => void> }) {
   useKeybindings(actions);
-  return null;
+  return <input aria-label="field" />;
 }
 
 const mount = async (api: CbranchApi, actions: Record<string, () => void>) => {
@@ -32,10 +39,11 @@ const mount = async (api: CbranchApi, actions: Record<string, () => void>) => {
       </ApiProvider>
     </QueryClientProvider>,
   );
-  // Let the app-settings query resolve so user overrides are merged before we fire keys.
+  // Let the app-settings query resolve AND commit (a macrotask flush so React re-renders
+  // and the dispatcher ref picks up the merged overrides) before we fire keys.
   await waitFor(() => expect(api.appSettingsGet).toHaveBeenCalled());
   await act(async () => {
-    await Promise.resolve();
+    await new Promise((resolve) => setTimeout(resolve, 0));
   });
 };
 
@@ -94,5 +102,21 @@ describe("useKeybindings dispatcher", () => {
 
     press({ key: "k", ctrlKey: true });
     expect(palette).not.toHaveBeenCalled();
+  });
+
+  test("a remapped bare-key chord does not hijack typing in a field", async () => {
+    const find = vi.fn();
+    await mount(
+      makeApi([new KeyBinding({ commandId: "history.find", chord: "F" })]),
+      { "history.find": find },
+    );
+
+    // Bare "f" anywhere else fires the bound action…
+    press({ key: "f" });
+    expect(find).toHaveBeenCalledTimes(1);
+
+    // …but the same press while focused in an input is left for text entry.
+    fireEvent.keyDown(screen.getByLabelText("field"), { key: "f" });
+    expect(find).toHaveBeenCalledTimes(1);
   });
 });

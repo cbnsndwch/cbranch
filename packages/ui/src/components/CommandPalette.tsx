@@ -59,7 +59,9 @@ export function CommandPalette() {
     activeRepoId === null
       ? []
       : PALETTE_COMMANDS.filter(
-          (c) => term === "" || c.label.toLowerCase().includes(term),
+          (c) =>
+            menuActions.isEnabled(c.id) &&
+            (term === "" || c.label.toLowerCase().includes(term)),
         );
 
   const runCommand = (id: string) => {

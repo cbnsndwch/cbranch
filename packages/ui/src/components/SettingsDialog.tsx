@@ -9,7 +9,7 @@ import {
   KeyBinding,
   type RepoId,
 } from "@cbranch/rpc-contract";
-import { type KeyboardEvent, useEffect, useMemo, useState } from "react";
+import { type KeyboardEvent, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import {
@@ -17,6 +17,7 @@ import {
   eventToChord,
   findConflicts,
   KEYBINDING_COMMANDS,
+  keybindingsToRecord,
   mergeBindings,
 } from "../lib/keybindings";
 import {
@@ -330,10 +331,14 @@ function DiffMergeSection({
 }) {
   const [diffTool, setDiffTool] = useState<string | null>(null);
   const [mergeTool, setMergeTool] = useState<string | null>(null);
-  const [diffCmd, setDiffCmd] = useState("");
-  const [mergeCmd, setMergeCmd] = useState("");
+  const [diffCmd, setDiffCmd] = useState<string | null>(null);
+  const [mergeCmd, setMergeCmd] = useState<string | null>(null);
   const diffToolVal = diffTool ?? eff("diff.tool");
   const mergeToolVal = mergeTool ?? eff("merge.tool");
+  // The custom-command fields round-trip the stored difftool/mergetool.<tool>.cmd value
+  // for the currently-named tool (REQ-P5-CFG-003), until the user edits them.
+  const diffCmdVal = diffCmd ?? eff(`difftool.${diffToolVal}.cmd`);
+  const mergeCmdVal = mergeCmd ?? eff(`mergetool.${mergeToolVal}.cmd`);
   return (
     <section className="flex flex-col gap-2">
       <h3 className="text-sm font-medium">Diff &amp; merge tools</h3>
@@ -357,7 +362,7 @@ function DiffMergeSection({
         <input
           className={FIELD}
           aria-label="difftool command"
-          value={diffCmd}
+          value={diffCmdVal}
           onChange={(e) => setDiffCmd(e.target.value)}
           placeholder="custom difftool cmd (optional)"
           disabled={busy}
@@ -365,7 +370,7 @@ function DiffMergeSection({
         <input
           className={FIELD}
           aria-label="mergetool command"
-          value={mergeCmd}
+          value={mergeCmdVal}
           onChange={(e) => setMergeCmd(e.target.value)}
           placeholder="custom mergetool cmd (optional)"
           disabled={busy}
@@ -383,10 +388,10 @@ function DiffMergeSection({
           onClick={() => {
             if (diffToolVal !== "") onSave("diff.tool", diffToolVal);
             if (mergeToolVal !== "") onSave("merge.tool", mergeToolVal);
-            if (diffToolVal !== "" && diffCmd !== "")
-              onSave(`difftool.${diffToolVal}.cmd`, diffCmd);
-            if (mergeToolVal !== "" && mergeCmd !== "")
-              onSave(`mergetool.${mergeToolVal}.cmd`, mergeCmd);
+            if (diffToolVal !== "" && diffCmdVal !== "")
+              onSave(`difftool.${diffToolVal}.cmd`, diffCmdVal);
+            if (mergeToolVal !== "" && mergeCmdVal !== "")
+              onSave(`mergetool.${mergeToolVal}.cmd`, mergeCmdVal);
           }}
         >
           Save tools
@@ -498,13 +503,17 @@ function AppSettingsTab() {
   const save = useSetAppSettings();
 
   // Working copy of user keybinding overrides (commandId → chord; "" clears a default).
-  const initialOverrides = useMemo(() => {
-    const o: Record<string, string> = {};
-    for (const b of settings.data?.keybindings ?? []) o[b.commandId] = b.chord;
-    return o;
-  }, [settings.data]);
+  // Seed ONCE from the first resolved settings load; do NOT re-seed on later refetches
+  // (e.g. the refetch a theme save triggers) or unsaved edits would be clobbered. The
+  // dialog unmounts on close, so reopening re-seeds from the latest persisted state.
   const [overrides, setOverrides] = useState<Record<string, string>>({});
-  useEffect(() => setOverrides(initialOverrides), [initialOverrides]);
+  const seeded = useRef(false);
+  useEffect(() => {
+    if (!seeded.current && settings.data !== undefined) {
+      setOverrides(keybindingsToRecord(settings.data.keybindings));
+      seeded.current = true;
+    }
+  }, [settings.data]);
   const [recording, setRecording] = useState<string | null>(null);
 
   const effective = mergeBindings(overrides);

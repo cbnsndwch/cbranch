@@ -27,6 +27,15 @@ export const DEFAULT_KEYBINDINGS: Readonly<Record<string, string>> = {
   "history.find": "Mod+F",
 };
 
+/** Reduce the wire `KeyBinding[]` form to the native `Record<commandId, chord>`. */
+export const keybindingsToRecord = (
+  bindings: ReadonlyArray<{ commandId: string; chord: string }>,
+): Record<string, string> => {
+  const out: Record<string, string> = {};
+  for (const b of bindings) out[b.commandId] = b.chord;
+  return out;
+};
+
 /** Canonicalize a key token: single letters upper-cased, named keys passed through. */
 const normalizeKey = (key: string): string =>
   key.length === 1 ? key.toUpperCase() : key;

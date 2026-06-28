@@ -71,11 +71,16 @@ export const configSetArgs = (
   scope: ConfigScope,
 ): string[] => ["config", `--${scope}`, key, value];
 
-/** Argv for an unset: `config --<scope> --unset <key>`. */
+/**
+ * Argv for an unset: `config --<scope> --unset-all <key>`. `--unset-all` (not `--unset`)
+ * removes ALL values of a multi-valued key (e.g. a multivar `credential.helper`); plain
+ * `--unset` exits 5 AND removes nothing on a multivar, which would be mis-read as
+ * idempotent success. With `--unset-all`, exit 5 unambiguously means "key absent".
+ */
 export const configUnsetArgs = (key: string, scope: ConfigScope): string[] => [
   "config",
   `--${scope}`,
-  "--unset",
+  "--unset-all",
   key,
 ];
 
@@ -132,7 +137,10 @@ export const configGet = (
     Effect.flatMap(
       runGit({ cwd, args: configGetArgs(key, scope), env, read: false }),
       (result) => {
-        const base = scope === undefined ? { key } : { key, scope };
+        // `scope` is set on the result ONLY when an actual scoped read was issued; a
+        // scope with no read flag (e.g. `command`, or undefined) falls through to an
+        // effective/merged read, so the result must NOT claim that scope.
+        const base = scopeReadFlag(scope) === null ? { key } : { key, scope };
         if (result.exitCode === 0)
           return Effect.succeed(
             new GitConfigValue({

@@ -280,6 +280,7 @@ export const useUiStore = create<UiState>((set) => ({
       pickDialog: null,
       blameTarget: null,
       historyTarget: null,
+      commitDialogOpen: false,
       gcDialogOpen: false,
       cleanDialogOpen: false,
       archiveDialog: null,
