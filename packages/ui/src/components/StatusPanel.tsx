@@ -24,6 +24,7 @@ export function StatusPanel({ repoId }: StatusPanelProps) {
   const discardFiles = useDiscardFiles(repoId);
   const deleteUntracked = useDeleteUntracked(repoId);
 
+  const setCleanDialogOpen = useUiStore((s) => s.setCleanDialogOpen);
   const stagedSelection = useUiStore((s) => s.stagedSelection);
   const unstagedSelection = useUiStore((s) => s.unstagedSelection);
   const toggleStagedSelection = useUiStore((s) => s.toggleStagedSelection);
@@ -125,6 +126,10 @@ export function StatusPanel({ repoId }: StatusPanelProps) {
             [...unstagedSelection].length > 0 ? "Stage Selected" : "Stage All"
           }
           disabled={unstaged.length === 0}
+          secondaryAction={{
+            label: "Clean…",
+            onClick: () => setCleanDialogOpen(true),
+          }}
         />
         <div className="min-h-0 overflow-y-auto">
           <StatusChangeList

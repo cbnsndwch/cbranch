@@ -9,6 +9,7 @@ import { BlamePanel } from "./BlamePanel";
 import { BranchesPanel } from "./BranchesPanel";
 import { CommandPalette } from "./CommandPalette";
 import { CommitDetailsTabs } from "./CommitDetailsTabs";
+import { CleanDialog } from "./CleanDialog";
 import { CommitDialog } from "./CommitDialog";
 import { GcDialog } from "./GcDialog";
 import { CommitTab } from "./CommitTab";
@@ -169,6 +170,7 @@ export function AppShell() {
       <CommitDialog />
       <PickDialogs />
       <GcDialog />
+      <CleanDialog />
       {repoId && editPath !== null && (
         <MergeEditor
           repoId={repoId}

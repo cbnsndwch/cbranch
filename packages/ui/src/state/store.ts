@@ -208,6 +208,10 @@ export interface UiState {
   /** Whether the run-maintenance (gc) modal is open (REQ-P5-GC-001). */
   readonly gcDialogOpen: boolean;
   readonly setGcDialogOpen: (open: boolean) => void;
+  // ── P5: clean working directory dialog ───────────────────────────────────────
+  /** Whether the clean-working-directory modal is open (REQ-P5-CL-001). */
+  readonly cleanDialogOpen: boolean;
+  readonly setCleanDialogOpen: (open: boolean) => void;
 }
 
 export const useUiStore = create<UiState>((set) => ({
@@ -234,6 +238,7 @@ export const useUiStore = create<UiState>((set) => ({
   blameTarget: null,
   historyTarget: null,
   gcDialogOpen: false,
+  cleanDialogOpen: false,
   // Switching repositories supersedes the old selection and filters (P1-OPEN-4 / P1-X-4).
   setActiveRepoId: (activeRepoId) =>
     set({
@@ -248,6 +253,7 @@ export const useUiStore = create<UiState>((set) => ({
       blameTarget: null,
       historyTarget: null,
       gcDialogOpen: false,
+      cleanDialogOpen: false,
     }),
   setSelectedOid: (selectedOid) => set({ selectedOid }),
   setPaletteOpen: (paletteOpen) => set({ paletteOpen }),
@@ -327,4 +333,5 @@ export const useUiStore = create<UiState>((set) => ({
   setBlameTarget: (blameTarget) => set({ blameTarget }),
   setHistoryTarget: (historyTarget) => set({ historyTarget }),
   setGcDialogOpen: (gcDialogOpen) => set({ gcDialogOpen }),
+  setCleanDialogOpen: (cleanDialogOpen) => set({ cleanDialogOpen }),
 }));

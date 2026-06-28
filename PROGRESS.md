@@ -94,10 +94,17 @@ Per-feature vertical slices, easiest-first (D18). Each = a `core` commit then a 
   `refs`+`commits`). ui: `GcDialog` (aggressive `Checkbox` + prune `Select`, non-dismissable while
   running, captured-output `<pre>` + toast, mid-op `role="alert"` warn-only) + `gcDialogOpen` store
   slice + wired `repository.maintenance.compress`. REQ-P5-GC-001..004.
-- ⬜ S2 clean · ⬜ S3 archive · ⬜ S4 reflog · ⬜ S5 bisect · ⬜ S6 submodules · ⬜ S7 settings/config ·
+- ✅ **S2 — clean.** core: `CleanEntry`/`CleanPreview`/`CleanResult`; `CleanPreview` (read) + `Clean` (✎)
+  RPCs; `git/clean.ts` (pure argv builders, C-unquote for git's quoted-path form, **empty-pathspec no-op
+  guard** at engine + UI); engine/live (preview lockless, clean repo-locked); api facade + options-keyed
+  `cleanPreview` key + `useCleanPreview`(enabled-gated)/`useClean`. ui: `CleanDialog` (two option checkboxes,
+  Preview, would-remove list, destructive `DestructiveConfirmDialog` gated on previewed-options==current ∧
+  entries>0 ∧ !fetching, empty-state) + `cleanDialogOpen` slice + wired `commands.clean` + StatusPanel
+  "Clean…". REQ-P5-CL-001..005.
+- ⬜ S3 archive · ⬜ S4 reflog · ⬜ S5 bisect · ⬜ S6 submodules · ⬜ S7 settings/config ·
   ⬜ S8 interactive rebase.
 
-## ▶ RESUME HERE — P5 IN PROGRESS (S1 gc ✅ complete; S2 clean next)
+## ▶ RESUME HERE — P5 IN PROGRESS (S1 gc ✅, S2 clean ✅; S3 archive next)
 
 **P0–P4 all landed on `main`.** P4 (cherry-pick / revert / conflicts / blame / single-file
 history) shipped core + UI: `conflict.list/sides`, take-side / save-merged / mark-resolved,
