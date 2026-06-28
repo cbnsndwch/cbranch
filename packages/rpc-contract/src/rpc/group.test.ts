@@ -50,6 +50,7 @@ import {
   FileHistoryPage,
   SequencerResult,
 } from "../schemas/phase4";
+import { GcPrune, GcResult } from "../schemas/phase5";
 import { Oid, RepoId } from "../schemas/primitives";
 import { LogQuery } from "../schemas/queries";
 import {
@@ -300,6 +301,12 @@ const fileHistoryPage = new FileHistoryPage({
   ],
 });
 
+// --- P5 sample data ---
+const gcResult = new GcResult({
+  stdout: "Counting objects: 12, done.\n",
+  stderr: "",
+});
+
 // --- stub handlers: schema-valid data, plus payload-driven error injection ---
 const handlers = CbranchRpcs.toLayer({
   RepoOpen: ({ path }) =>
@@ -432,6 +439,9 @@ const handlers = CbranchRpcs.toLayer({
           }),
         ),
   FileHistory: () => Effect.succeed(fileHistoryPage),
+
+  // ── P5: repository maintenance (gc) ───────────────────────────────────────────
+  RepoGc: () => Effect.succeed(gcResult),
 });
 
 describe("CbranchRpcs P1 contract (in-memory RpcTest round-trip)", () => {
@@ -801,6 +811,40 @@ describe("CbranchRpcs P4 conflicts/sequencer/blame/file-history method catalog (
     // blame & file history
     "Blame",
     "FileHistory",
+  ])("exposes the %s wire tag", (tag) => {
+    expect(CbranchRpcs.requests.has(tag)).toBe(true);
+  });
+});
+
+describe("CbranchRpcs P5 power-features round-trip", () => {
+  test("RepoGc round-trips a GcResult (display-only stdout/stderr)", async () => {
+    const program = Effect.gen(function* () {
+      const client = yield* RpcTest.makeClient(CbranchRpcs);
+      return yield* client.RepoGc({ repoId, aggressive: true, prune: "now" });
+    }).pipe(Effect.provide(handlers), Effect.scoped);
+
+    const result = await Effect.runPromise(program);
+
+    expect(result.stdout).toContain("Counting objects");
+    expect(result.stderr).toBe("");
+  });
+
+  test("GcPrune rejects an out-of-set literal (RPC-032)", () => {
+    expect(Exit.isFailure(Schema.decodeUnknownExit(GcPrune)("sometimes"))).toBe(
+      true,
+    );
+    expect(Exit.isSuccess(Schema.decodeUnknownExit(GcPrune)("now"))).toBe(true);
+    expect(Exit.isSuccess(Schema.decodeUnknownExit(GcPrune)("default"))).toBe(
+      true,
+    );
+  });
+});
+
+// Per-feature P5 slices APPEND their tags to this catalog block (D18); gc opens it.
+describe("CbranchRpcs P5 power-features method catalog (DECISIONS D1 wire tags)", () => {
+  test.each([
+    // maintenance (gc)
+    "RepoGc",
   ])("exposes the %s wire tag", (tag) => {
     expect(CbranchRpcs.requests.has(tag)).toBe(true);
   });

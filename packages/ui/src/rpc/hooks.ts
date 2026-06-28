@@ -23,6 +23,8 @@ import {
   type DiffSpec,
   type FileContentResult,
   type FileHistoryPage,
+  type GcPrune,
+  type GcResult,
   type LogQuery,
   type MergeMode,
   type MergeResult,
@@ -1238,5 +1240,29 @@ export const useRevert = (repoId: RepoId) => {
     mutationFn: ({ commits, mainline, noCommit, message }) =>
       api.revert(repoId, commits, { mainline, noCommit, message }),
     onSettled: () => invalidateOperation(qc, repoId),
+  });
+};
+
+// ── repository maintenance (P5) ───────────────────────────────────────────────
+
+/**
+ * Run `git gc` (REQ-P5-GC-001..004). A pure object repack emits ZERO fs-watcher
+ * events (`objects/**` is ignored), so `onSettled` MUST explicitly invalidate `refs`
+ * + `commits` — the only refresh after gc. Immutable content-addressed reads (commit
+ * detail/diff, blobs) are deliberately NOT invalidated (spec 15 §8).
+ */
+export const useGc = (repoId: RepoId) => {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation<
+    GcResult,
+    unknown,
+    { aggressive?: boolean; prune?: GcPrune }
+  >({
+    mutationFn: (opts) => api.gc(repoId, opts),
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: [repoId, "refs"] });
+      void qc.invalidateQueries({ queryKey: [repoId, "commits"] });
+    },
   });
 };

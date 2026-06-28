@@ -25,6 +25,8 @@ import {
   type DiffSpec,
   type FileContentResult,
   type FileHistoryPage,
+  type GcPrune,
+  type GcResult,
   type InvalidationEvent,
   type LogQuery,
   type MergeMode,
@@ -299,6 +301,11 @@ export interface CbranchApi {
     path: string,
     opts: { limit: number; cursor?: string; startRev?: string },
   ): Promise<FileHistoryPage>;
+  // ── repository maintenance (P5) ───────────────────────────────────────────
+  gc(
+    repoId: RepoId,
+    opts?: { aggressive?: boolean; prune?: GcPrune },
+  ): Promise<GcResult>;
 }
 
 /** Back a {@link CbranchApi} with the single app runtime. */
@@ -562,5 +569,8 @@ export const makeApi = (runtime: AppRuntime): CbranchApi => {
       runtime.runPromise(
         withClient((c) => c.FileHistory({ repoId, path, ...opts })),
       ),
+    // ── repository maintenance (P5) ─────────────────────────────────────────
+    gc: (repoId, opts) =>
+      runtime.runPromise(withClient((c) => c.RepoGc({ repoId, ...opts }))),
   };
 };

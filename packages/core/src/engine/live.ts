@@ -52,6 +52,7 @@ import { gitError } from "../git/errors";
 import { fileHistory as fileHistoryGit } from "../git/file-history";
 import { makeLogStream } from "../git/history";
 import { makeRepoLockRegistry } from "../git/locks";
+import { gc as gcGit } from "../git/maintenance";
 import {
   mergeAbort as mergeAbortGit,
   mergeCreate as mergeCreateGit,
@@ -722,6 +723,14 @@ export const makeGitEngine = (
       fileHistory: (repoId, path, limit, cursor, startRev) =>
         Effect.flatMap(resolveById(repoId), (repo) =>
           fileHistoryGit(repoCwd(repo), path, { limit, cursor, startRev }, env),
+        ),
+
+      // ── repository maintenance (P5) ─────────────────────────────────────────
+      // Hold the per-repo lock for the whole gc run (REQ-P5-GC-003); mid-op state
+      // (rebase/merge/bisect) is a UI warn-only concern, not a server block.
+      gc: (repoId, aggressive, prune) =>
+        Effect.flatMap(resolveById(repoId), (repo) =>
+          locks.withRepoLock(repoId)(gcGit(repoCwd(repo), aggressive, prune)),
         ),
     };
     return api;

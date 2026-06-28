@@ -27,6 +27,8 @@ import {
   type DiffFile,
   type FileContentResult,
   type FileHistoryPage,
+  type GcPrune,
+  type GcResult,
   type GitError,
   type InvalidationEvent,
   type LogQuery,
@@ -455,6 +457,14 @@ export interface GitEngineApi {
     cursor?: string,
     startRev?: string,
   ) => Effect.Effect<FileHistoryPage, GitError>;
+
+  // ── repository maintenance (P5, S1) ─────────────────────────────────────────
+  /** repo.gc ✎ — `git gc`; lock held for the whole run; output for display. REQ-P5-GC-001..003. */
+  readonly gc: (
+    repoId: RepoId,
+    aggressive?: boolean,
+    prune?: GcPrune,
+  ) => Effect.Effect<GcResult, GitError>;
 
   // ── object-read infrastructure (internal; for core-B) ──────────────────────
   /** Read a full object via the repo's `cat-file --batch` pool (`null` if missing). */

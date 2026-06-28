@@ -37,6 +37,10 @@ export * from "./schemas/branches";
 // P4 conflict / sequencer / blame / file-history Schemas.
 export * from "./schemas/phase4";
 
+// P5 power-feature Schemas: gc / clean / archive / reflog / bisect / submodules /
+// settings-config / interactive-rebase (each slice appends; D18).
+export * from "./schemas/phase5";
+
 // The P1 method catalog.
 export * from "./rpc/group";
 

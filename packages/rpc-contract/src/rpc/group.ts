@@ -45,6 +45,7 @@ import {
   FileHistoryPage,
   SequencerResult,
 } from "../schemas/phase4";
+import { GcPrune, GcResult } from "../schemas/phase5";
 import { Oid, RepoId } from "../schemas/primitives";
 import { DiffSpec, LogQuery } from "../schemas/queries";
 import {
@@ -604,6 +605,19 @@ export const CbranchRpcs = RpcGroup.make(
       startRev: Schema.optional(Schema.String),
     },
     success: FileHistoryPage,
+    error: GitError,
+  }),
+
+  // ── P5: repository maintenance (docs/spec/09) ──────────────────────────────
+  // repo.gc ✎ — `git gc [--aggressive] [--prune=now]`; captures stdout/stderr for
+  // display (REQ-P5-GC-001..003). Lock held for the whole run by the engine.
+  Rpc.make("RepoGc", {
+    payload: {
+      repoId: RepoId,
+      aggressive: Schema.optional(Schema.Boolean),
+      prune: Schema.optional(GcPrune),
+    },
+    success: GcResult,
     error: GitError,
   }),
 );

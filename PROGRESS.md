@@ -84,7 +84,18 @@ surfaces. It is not a separate milestone but a prerequisite for all future work.
 ## Blocked / decisions to surface
 - _(none yet)_
 
-## ▶ RESUME HERE — P4 COMPLETE; P5 is next
+## P5 — Power features (`docs/spec/09`; plan `docs/_impl-notes/P5-PLAN.md`; → D18)
+
+Per-feature vertical slices, easiest-first (D18). Each = a `core` commit then a `ui` commit.
+
+- 🔄 **S1 — gc.** ✅ core: bootstrapped P5 scaffolding (`schemas/phase5.ts` `GcPrune`/`GcResult`,
+  `index.ts` barrel, `group.test.ts` P5 catalog/round-trip), `RepoGc` method + handler, pure
+  `git/maintenance.ts` (`gcArgs`+`gc`, whole-run lock), `api.ts` facade + `useGc` (invalidates
+  `refs`+`commits`). ⬜ ui: `GcDialog` + `gcDialogOpen` slice + wire `repository.maintenance.compress`.
+- ⬜ S2 clean · ⬜ S3 archive · ⬜ S4 reflog · ⬜ S5 bisect · ⬜ S6 submodules · ⬜ S7 settings/config ·
+  ⬜ S8 interactive rebase.
+
+## ▶ RESUME HERE — P5 IN PROGRESS (S1 gc)
 
 **P0–P4 all landed on `main`.** P4 (cherry-pick / revert / conflicts / blame / single-file
 history) shipped core + UI: `conflict.list/sides`, take-side / save-merged / mark-resolved,
@@ -152,6 +163,13 @@ history. No P4 plan doc yet — author one first (cf. P2-PLAN.md / P3-PLAN.md sl
 **Key context files (gitignored working notes):** `docs/_impl-notes/DECISIONS.md` (D1–D12 locked decisions) + the 8 spec digests. **Verify command:** `pnpm gate`. **Clean-room:** never read `.local/SPEC-AGENT-BRIEF.md`; build only from `docs/spec/`+`LICENSES.md`+`BRANDING.md`+git/lib public docs. Undercover: no AI/model mentions in commits.
 
 ## Log
+- 2026-06-28 — **P5 started — S1 (gc) core landed + P5 scaffolding bootstrapped (D18).** Created
+  `schemas/phase5.ts` (`GcPrune`/`GcResult`), the `index.ts` barrel line, and the P5 `group.test.ts`
+  catalog/round-trip block — the one-time bootstrap that must precede S2–S8. Added the `RepoGc` RPC
+  method + web-server handler, `git/maintenance.ts` (pure `gcArgs` builder + `gc`, captured stdout/stderr,
+  whole-run repo lock per REQ-P5-GC-003, `read:false`), the engine `gc` method, `api.ts` facade, and the
+  `useGc` hook (explicit `refs`+`commits` invalidation — a pure repack emits no watcher events, REQ-P5-GC-004).
+  D18 opened (slice strategy + no-new-error/domain + gc sub-section). Next: S1 ui (`GcDialog`).
 - 2026-06-28 — **Reconciled progress to reality + two fixes.** P4 (cherry-pick/conflicts/blame/
   file-history) had fully landed but the doc still pointed at it as "next"; updated to mark
   P0–P4 done and P5 next. Fixed the lone red test: a `-w`/`-b` diff-assembly misalignment in
