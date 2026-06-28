@@ -58,6 +58,8 @@ import {
   CleanResult,
   GcPrune,
   GcResult,
+  ReflogEntry,
+  ReflogPage,
 } from "../schemas/phase5";
 import { Oid, RepoId } from "../schemas/primitives";
 import { LogQuery } from "../schemas/queries";
@@ -327,6 +329,17 @@ const archiveDescriptor = new ArchiveDescriptor({
   contentType: "application/zip",
   format: "zip",
 });
+const reflogPage = new ReflogPage({
+  entries: [
+    new ReflogEntry({
+      selector: "HEAD@{0}",
+      oid: oid1,
+      action: "commit",
+      message: "init",
+    }),
+  ],
+  nextCursor: "cursor-1",
+});
 
 // --- stub handlers: schema-valid data, plus payload-driven error injection ---
 const handlers = CbranchRpcs.toLayer({
@@ -470,6 +483,9 @@ const handlers = CbranchRpcs.toLayer({
 
   // ── P5: archive export ────────────────────────────────────────────────────────
   ArchivePrepare: () => Effect.succeed(archiveDescriptor),
+
+  // ── P5: reflog viewer ─────────────────────────────────────────────────────────
+  ReflogList: () => Effect.succeed(reflogPage),
 });
 
 describe("CbranchRpcs P1 contract (in-memory RpcTest round-trip)", () => {
@@ -910,6 +926,20 @@ describe("CbranchRpcs P5 power-features round-trip", () => {
       true,
     );
   });
+
+  test("ReflogList round-trips a page with selector/action/message + cursor", async () => {
+    const program = Effect.gen(function* () {
+      const client = yield* RpcTest.makeClient(CbranchRpcs);
+      return yield* client.ReflogList({ repoId, limit: 50 });
+    }).pipe(Effect.provide(handlers), Effect.scoped);
+
+    const page = await Effect.runPromise(program);
+
+    expect(page.entries[0]?.selector).toBe("HEAD@{0}");
+    expect(page.entries[0]?.action).toBe("commit");
+    expect(page.entries[0]?.oid).toBe(oid1);
+    expect(page.nextCursor).toBe("cursor-1");
+  });
 });
 
 // Per-feature P5 slices APPEND their tags to this catalog block (D18); gc opens it.
@@ -922,6 +952,8 @@ describe("CbranchRpcs P5 power-features method catalog (DECISIONS D1 wire tags)"
     "Clean",
     // archive
     "ArchivePrepare",
+    // reflog
+    "ReflogList",
   ])("exposes the %s wire tag", (tag) => {
     expect(CbranchRpcs.requests.has(tag)).toBe(true);
   });

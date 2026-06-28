@@ -38,6 +38,7 @@ import {
   type Oid,
   type PatchSelection,
   type RecentRepo,
+  type ReflogPage,
   type RemoteInfo,
   type RepoHandle,
   type RepoId,
@@ -332,6 +333,11 @@ export interface CbranchApi {
       subPath?: string;
     },
   ): Promise<ArchiveDescriptor>;
+  // ── reflog viewer (P5) ────────────────────────────────────────────────────
+  reflogList(
+    repoId: RepoId,
+    opts: { ref?: string; limit: number; cursor?: string },
+  ): Promise<ReflogPage>;
 }
 
 /** Back a {@link CbranchApi} with the single app runtime. */
@@ -612,5 +618,8 @@ export const makeApi = (runtime: AppRuntime): CbranchApi => {
       runtime.runPromise(
         withClient((c) => c.ArchivePrepare({ repoId, ...opts })),
       ),
+    // ── reflog viewer (P5) ──────────────────────────────────────────────────
+    reflogList: (repoId, opts) =>
+      runtime.runPromise(withClient((c) => c.ReflogList({ repoId, ...opts }))),
   };
 };

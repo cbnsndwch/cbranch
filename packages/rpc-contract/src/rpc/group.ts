@@ -52,6 +52,7 @@ import {
   CleanResult,
   GcPrune,
   GcResult,
+  ReflogPage,
 } from "../schemas/phase5";
 import { Oid, RepoId } from "../schemas/primitives";
 import { DiffSpec, LogQuery } from "../schemas/queries";
@@ -663,6 +664,20 @@ export const CbranchRpcs = RpcGroup.make(
       subPath: Schema.optional(Schema.String),
     },
     success: ArchiveDescriptor,
+    error: GitError,
+  }),
+
+  // ── P5: reflog viewer ──────────────────────────────────────────────────────
+  // reflog.list — paginated reflog for a ref (default HEAD), newest-first (READ).
+  // Recovery writes reuse BranchCreate/ResetTo with the entry's resolved oid. REQ-P5-RL-001.
+  Rpc.make("ReflogList", {
+    payload: {
+      repoId: RepoId,
+      ref: Schema.optional(Schema.String),
+      limit: Schema.Number,
+      cursor: Schema.optional(Schema.String),
+    },
+    success: ReflogPage,
     error: GitError,
   }),
 );

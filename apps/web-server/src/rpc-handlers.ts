@@ -284,4 +284,10 @@ export const handlersLayer = CbranchRpcs.toLayer({
     Effect.flatMap(GitEngine, (engine) =>
       engine.archivePrepare(repoId, treeish, format, prefix, subPath),
     ),
+
+  // ── reflog viewer (P5) ──────────────────────────────────────────────────────
+  ReflogList: ({ repoId, ref, limit, cursor }) =>
+    Effect.flatMap(GitEngine, (engine) =>
+      engine.reflogList(repoId, limit, ref, cursor),
+    ),
 });

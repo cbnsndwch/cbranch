@@ -34,6 +34,7 @@ import {
   type GcPrune,
   type GcResult,
   type GitError,
+  type ReflogPage,
   type InvalidationEvent,
   type LogQuery,
   type MergeMode,
@@ -506,6 +507,15 @@ export interface GitEngineApi {
     prefix?: string,
     subPath?: string,
   ) => Stream.Stream<Uint8Array, GitError>;
+
+  // ── reflog viewer (P5, S4) ──────────────────────────────────────────────────
+  /** reflog.list — paginated reflog for a ref (default HEAD), newest-first. READ. REQ-P5-RL-001. */
+  readonly reflogList: (
+    repoId: RepoId,
+    limit: number,
+    ref?: string,
+    cursor?: string,
+  ) => Effect.Effect<ReflogPage, GitError>;
 
   // ── object-read infrastructure (internal; for core-B) ──────────────────────
   /** Read a full object via the repo's `cat-file --batch` pool (`null` if missing). */

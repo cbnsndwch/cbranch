@@ -65,6 +65,7 @@ import {
   mergeAbort as mergeAbortGit,
   mergeCreate as mergeCreateGit,
 } from "../git/merge";
+import { reflogList as reflogListGit } from "../git/reflog";
 import {
   discardHunks as discardHunksGit,
   stageHunks as stageHunksGit,
@@ -770,6 +771,12 @@ export const makeGitEngine = (
           Effect.map(resolveById(repoId), (repo) =>
             archiveStreamGit(repoCwd(repo), treeish, format, prefix, subPath),
           ),
+        ),
+
+      // ── reflog viewer (P5) ──────────────────────────────────────────────────
+      reflogList: (repoId, limit, ref, cursor) =>
+        Effect.flatMap(resolveById(repoId), (repo) =>
+          reflogListGit(repoCwd(repo), limit, ref, cursor, env),
         ),
     };
     return api;

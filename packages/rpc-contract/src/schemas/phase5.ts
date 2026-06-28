@@ -8,6 +8,8 @@
 
 import { Schema } from "effect";
 
+import { Oid } from "./primitives";
+
 // ─── S1: repository maintenance (gc) ─────────────────────────────────────────────
 
 /**
@@ -70,4 +72,25 @@ export class ArchiveDescriptor extends Schema.Class<ArchiveDescriptor>(
   filename: Schema.String,
   contentType: Schema.String,
   format: ArchiveFormat,
+}) {}
+
+// ─── S4: reflog viewer ───────────────────────────────────────────────────────────
+
+/**
+ * One reflog entry (REQ-P5-RL-001). `action` is the `%gs` label before the first `:`
+ * (kept an OPEN `Schema.String` — reflog action tokens drift across git versions);
+ * `message` is the remainder. `oid` is the entry's RESOLVED commit (writes target it,
+ * not `HEAD@{n}`, to dodge the prune/expire reparse race).
+ */
+export class ReflogEntry extends Schema.Class<ReflogEntry>("ReflogEntry")({
+  selector: Schema.String,
+  oid: Oid,
+  action: Schema.String,
+  message: Schema.String,
+}) {}
+
+/** A reflog page; `nextCursor` reuses the history skip-cursor codec (present iff a full window). */
+export class ReflogPage extends Schema.Class<ReflogPage>("ReflogPage")({
+  entries: Schema.Array(ReflogEntry),
+  nextCursor: Schema.optional(Schema.String),
 }) {}

@@ -69,6 +69,12 @@ export const queryKeys = {
   lastMessage: (repoId: RepoId) => [repoId, "commit", "lastMessage"] as const,
   /** `branch.list` (domain: `refs`). */
   branches: (repoId: RepoId) => [repoId, "refs", "branches"] as const,
+  /**
+   * `reflog.list` — paginated reflog for a ref (domain: `refs`; every reflog append
+   * co-occurs with a watched ref-tip move). `useInfiniteQuery`, cursor-paged.
+   */
+  reflog: (repoId: RepoId, ref: string) =>
+    [repoId, "refs", "reflog", ref] as const,
   /** `remote.list` (domain: `config`). */
   remotes: (repoId: RepoId) => [repoId, "config", "remotes"] as const,
   /** `worktree.list` (domain: `worktrees`). */

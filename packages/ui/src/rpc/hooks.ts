@@ -35,6 +35,7 @@ import {
   type Oid,
   type PatchSelection,
   type RecentRepo,
+  type ReflogPage,
   type RemoteInfo,
   type RepoHandle,
   type RepoId,
@@ -1287,6 +1288,32 @@ export const useCleanPreview = (
     queryKey: queryKeys.cleanPreview(repoId, directories, ignored),
     queryFn: () => api.cleanPreview(repoId, directories, ignored),
     enabled,
+  });
+};
+
+/** A reflog page request size (REQ-P5-RL-001 — incremental load via `useInfiniteQuery`). */
+export const REFLOG_PAGE_SIZE = 100;
+
+/**
+ * The paginated reflog for `ref` (default HEAD), newest-first (REQ-P5-RL-001/002). Keyed
+ * under `refs` so a ref-tip move refetches it; `Load more` fetches the next cursor page.
+ */
+export const useReflog = (
+  repoId: RepoId | null,
+  ref: string,
+): UseInfiniteQueryResult<InfiniteData<ReflogPage, string | undefined>> => {
+  const api = useApi();
+  return useInfiniteQuery({
+    queryKey: repoId ? queryKeys.reflog(repoId, ref) : ["inactive"],
+    queryFn: ({ pageParam }) =>
+      api.reflogList(repoId as RepoId, {
+        ref,
+        limit: REFLOG_PAGE_SIZE,
+        cursor: pageParam,
+      }),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (last) => last.nextCursor,
+    enabled: repoId !== null,
   });
 };
 
