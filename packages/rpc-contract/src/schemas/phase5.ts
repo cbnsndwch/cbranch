@@ -9,6 +9,7 @@
 import { Schema } from "effect";
 
 import { CommitSummary } from "./domain";
+import { OperationProgress } from "./phase4";
 import { Oid } from "./primitives";
 
 // ─── S1: repository maintenance (gc) ─────────────────────────────────────────────
@@ -249,4 +250,91 @@ export class AppSettings extends Schema.Class<AppSettings>("AppSettings")({
   theme: ThemePref,
   locale: Schema.String,
   keybindings: Schema.Array(KeyBinding),
+}) {}
+
+// ─── S8: interactive rebase ──────────────────────────────────────────────────────
+
+/**
+ * A todo-row action (REQ-P5-IR-003). Exactly one per row; the default is `pick`.
+ * `drop` omits the commit from the replay; `reword`/`squash` carry a UI-authored
+ * message (never an interactive editor); `fixup` discards the commit's own message.
+ */
+export const RebaseAction = Schema.Literals([
+  "pick",
+  "reword",
+  "edit",
+  "squash",
+  "fixup",
+  "drop",
+]);
+export type RebaseAction = typeof RebaseAction.Type;
+
+/**
+ * Why an in-progress rebase has stopped (REQ-P5-IR-009) — DATA totalized from machine
+ * state, never localized stderr: `conflict` (unmerged index entries), `edit` (an `edit`
+ * action paused), `execFailed` (a failed `exec`-amend or an externally-introduced
+ * `break`/failed exec — steer to Abort, not a plain Continue that would skip the amend),
+ * `none` (no rebase in progress, or an apply-backend rebase with no stop marker).
+ */
+export const RebaseStopReason = Schema.Literals([
+  "none",
+  "conflict",
+  "edit",
+  "execFailed",
+]);
+export type RebaseStopReason = typeof RebaseStopReason.Type;
+
+/**
+ * One commit in the rebase range as shown in the todo editor (REQ-P5-IR-002), oldest
+ * first. Adds `body` over {@link CommitSummary} so the editor can seed a `squash`
+ * default message from the concatenated bodies; `subject`/author identify the row.
+ */
+export class RebaseTodoCommit extends Schema.Class<RebaseTodoCommit>(
+  "RebaseTodoCommit",
+)({
+  oid: Oid,
+  authorName: Schema.String,
+  authorEmail: Schema.String,
+  authorDate: Schema.String,
+  subject: Schema.String,
+  body: Schema.String,
+}) {}
+
+/**
+ * The computed rebase range (REQ-P5-IR-001/002): the commits in `<upstream>..HEAD`
+ * (optionally replayed `--onto` a different base), oldest-first. `commits:[]` means an
+ * empty range (nothing to rebase). DISPLAY input to the todo editor; not an operation.
+ */
+export class RebasePlan extends Schema.Class<RebasePlan>("RebasePlan")({
+  upstream: Schema.String,
+  onto: Schema.optional(Schema.String),
+  commits: Schema.Array(RebaseTodoCommit),
+}) {}
+
+/**
+ * One authored todo step (REQ-P5-IR-003/004) — the rows in the user's chosen replay
+ * order. `message` carries the non-empty `reword` text or the combined `squash` message
+ * (validated non-empty in-engine before the todo is written; never `--allow-empty-message`).
+ */
+export class RebaseStep extends Schema.Class<RebaseStep>("RebaseStep")({
+  oid: Oid,
+  action: RebaseAction,
+  message: Schema.optional(Schema.String),
+}) {}
+
+/**
+ * Machine-derived in-progress rebase status (REQ-P5-IR-009/011), backend-aware over
+ * `rebase-merge/` (cbranch's `-i` merge backend) and `rebase-apply/` (an external
+ * apply-backend rebase). `progress` reuses {@link OperationProgress} (step X of Y, see
+ * D18) and is absent when no rebase is in progress; `stopReason` totalizes the stop;
+ * `detail` carries the failing command on `execFailed`; `onto`/`headName` are the
+ * replay target and the branch being rebased.
+ */
+export class RebaseStatus extends Schema.Class<RebaseStatus>("RebaseStatus")({
+  inProgress: Schema.Boolean,
+  stopReason: RebaseStopReason,
+  progress: Schema.optional(OperationProgress),
+  detail: Schema.optional(Schema.String),
+  onto: Schema.optional(Schema.String),
+  headName: Schema.optional(Schema.String),
 }) {}

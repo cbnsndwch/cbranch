@@ -48,6 +48,7 @@ import {
   ConflictStage,
   FileHistoryEntry,
   FileHistoryPage,
+  OperationProgress,
   SequencerResult,
 } from "../schemas/phase4";
 import {
@@ -63,6 +64,12 @@ import {
   GitConfigEntry,
   GitConfigValue,
   KeyBinding,
+  RebaseAction,
+  RebasePlan,
+  RebaseStatus,
+  RebaseStep,
+  RebaseStopReason,
+  RebaseTodoCommit,
   ReflogEntry,
   ReflogPage,
   SubmoduleInfo,
@@ -411,6 +418,27 @@ const appSettings = new AppSettings({
     new KeyBinding({ commandId: "commands.commit", chord: "Mod+Enter" }),
   ],
 });
+const rebasePlan = new RebasePlan({
+  upstream: "main",
+  onto: "release",
+  commits: [
+    new RebaseTodoCommit({
+      oid: oid1,
+      authorName: "Ada Lovelace",
+      authorEmail: "ada@example.io",
+      authorDate: "2023-11-14T22:13:20-05:00",
+      subject: "feat: thing",
+      body: "A longer body.\n",
+    }),
+  ],
+});
+const rebaseStatus = new RebaseStatus({
+  inProgress: true,
+  stopReason: "conflict",
+  progress: new OperationProgress({ current: 2, total: 5 }),
+  onto: "1".repeat(40),
+  headName: "refs/heads/feature",
+});
 
 // --- stub handlers: schema-valid data, plus payload-driven error injection ---
 const handlers = CbranchRpcs.toLayer({
@@ -588,6 +616,11 @@ const handlers = CbranchRpcs.toLayer({
   ConfigUnset: () => Effect.void,
   ConfigAppGet: () => Effect.succeed(appSettings),
   ConfigAppSet: () => Effect.succeed(appSettings),
+
+  // ── P5: interactive rebase ────────────────────────────────────────────────────
+  RebasePlan: () => Effect.succeed(rebasePlan),
+  RebaseStart: () => Effect.succeed(rebaseStatus),
+  RebaseStatus: () => Effect.succeed(rebaseStatus),
 });
 
 describe("CbranchRpcs P1 contract (in-memory RpcTest round-trip)", () => {
@@ -1211,6 +1244,82 @@ describe("CbranchRpcs P5 power-features round-trip", () => {
     expect(r.got.keybindings[0]?.commandId).toBe("commands.commit");
     expect(r.set.theme).toBe("dark");
   });
+
+  test("RebasePlan round-trips populated commits (oldest-first todo rows)", async () => {
+    const program = Effect.gen(function* () {
+      const client = yield* RpcTest.makeClient(CbranchRpcs);
+      return yield* client.RebasePlan({ repoId, upstream: "main" });
+    }).pipe(Effect.provide(handlers), Effect.scoped);
+
+    const plan = await Effect.runPromise(program);
+
+    expect(plan.upstream).toBe("main");
+    expect(plan.commits).toHaveLength(1);
+    expect(plan.commits[0]?.subject).toBe("feat: thing");
+    expect(plan.commits[0]?.body).toBe("A longer body.\n");
+  });
+
+  test("RebasePlan accepts an empty range (commits:[])", () => {
+    const empty = Schema.decodeUnknownExit(RebasePlan)({
+      upstream: "main",
+      commits: [],
+    });
+    expect(Exit.isSuccess(empty)).toBe(true);
+  });
+
+  test("RebaseStart returns the in-progress RebaseStatus with step progress", async () => {
+    const program = Effect.gen(function* () {
+      const client = yield* RpcTest.makeClient(CbranchRpcs);
+      return yield* client.RebaseStart({
+        repoId,
+        upstream: "main",
+        steps: [new RebaseStep({ oid: oid1, action: "pick" })],
+      });
+    }).pipe(Effect.provide(handlers), Effect.scoped);
+
+    const status = await Effect.runPromise(program);
+
+    expect(status.inProgress).toBe(true);
+    expect(status.stopReason).toBe("conflict");
+    expect(status.progress?.current).toBe(2);
+    expect(status.progress?.total).toBe(5);
+  });
+
+  test("RebaseStatus decodes every stop reason (incl. execFailed)", () => {
+    for (const reason of ["none", "conflict", "edit", "execFailed"] as const) {
+      const decoded = Schema.decodeUnknownExit(RebaseStatus)({
+        inProgress: reason !== "none",
+        stopReason: reason,
+      });
+      expect(Exit.isSuccess(decoded)).toBe(true);
+    }
+    expect(
+      Exit.isFailure(Schema.decodeUnknownExit(RebaseStopReason)("paused")),
+    ).toBe(true);
+  });
+
+  test("RebaseStep accepts each action and rejects a malformed one", () => {
+    for (const action of [
+      "pick",
+      "reword",
+      "edit",
+      "squash",
+      "fixup",
+      "drop",
+    ] as const) {
+      expect(
+        Exit.isSuccess(Schema.decodeUnknownExit(RebaseAction)(action)),
+      ).toBe(true);
+    }
+    expect(
+      Exit.isFailure(
+        Schema.decodeUnknownExit(RebaseStep)({
+          oid: oid1,
+          action: "frobnicate",
+        }),
+      ),
+    ).toBe(true);
+  });
 });
 
 // Per-feature P5 slices APPEND their tags to this catalog block (D18); gc opens it.
@@ -1243,6 +1352,10 @@ describe("CbranchRpcs P5 power-features method catalog (DECISIONS D1 wire tags)"
     "ConfigUnset",
     "ConfigAppGet",
     "ConfigAppSet",
+    // interactive rebase
+    "RebasePlan",
+    "RebaseStart",
+    "RebaseStatus",
   ])("exposes the %s wire tag", (tag) => {
     expect(CbranchRpcs.requests.has(tag)).toBe(true);
   });

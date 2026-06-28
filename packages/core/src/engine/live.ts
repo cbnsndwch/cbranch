@@ -102,6 +102,11 @@ import {
   revert as revertGit,
 } from "../git/sequencer";
 import {
+  rebasePlan as rebasePlanGit,
+  rebaseStart as rebaseStartGit,
+  rebaseStatus as rebaseStatusGit,
+} from "../git/rebase";
+import {
   deleteUntracked as deleteUntrackedGit,
   discardFiles as discardFilesGit,
   resetTo as resetToGit,
@@ -917,6 +922,31 @@ export const makeGitEngine = (
                 : fromKeyBindings(patch.keybindings),
           }),
           toAppSettings,
+        ),
+
+      // ── interactive rebase (P5) ───────────────────────────────────────────
+      // Plan + status are lockless reads; start scripts `git rebase -i` under the
+      // repo lock (it reads its own machine state to classify the outcome).
+      rebasePlan: (repoId, upstream, onto) =>
+        Effect.flatMap(resolveById(repoId), (repo) =>
+          rebasePlanGit(repoCwd(repo), upstream, onto, env),
+        ),
+      rebaseStart: (repoId, upstream, steps, onto) =>
+        Effect.flatMap(resolveById(repoId), (repo) =>
+          locks.withRepoLock(repoId)(
+            rebaseStartGit(
+              repoCwd(repo),
+              repo.gitDir,
+              upstream,
+              steps,
+              onto,
+              env,
+            ),
+          ),
+        ),
+      rebaseStatus: (repoId) =>
+        Effect.flatMap(resolveById(repoId), (repo) =>
+          rebaseStatusGit(repoCwd(repo), repo.gitDir, env),
         ),
     };
     return api;

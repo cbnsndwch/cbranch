@@ -49,6 +49,9 @@ import {
   type MergeResult,
   type Oid,
   type PatchSelection,
+  type RebasePlan,
+  type RebaseStatus,
+  type RebaseStep,
   type RecentRepo,
   type RemoteInfo,
   type RepoHandle,
@@ -609,6 +612,25 @@ export interface GitEngineApi {
     locale?: string;
     keybindings?: ReadonlyArray<KeyBinding>;
   }) => Effect.Effect<AppSettings, GitError>;
+
+  // ── interactive rebase (P5, S8) ─────────────────────────────────────────────
+  /** rebase.plan — the `<upstream>..HEAD` range (optionally `--onto`), oldest-first. READ. REQ-P5-IR-001/002. */
+  readonly rebasePlan: (
+    repoId: RepoId,
+    upstream: string,
+    onto?: string,
+  ) => Effect.Effect<RebasePlan, GitError>;
+  /** rebase.start ✎ — scripted `git rebase -i` with an exec-amend todo. REQ-P5-IR-008. */
+  readonly rebaseStart: (
+    repoId: RepoId,
+    upstream: string,
+    steps: ReadonlyArray<RebaseStep>,
+    onto?: string,
+  ) => Effect.Effect<RebaseStatus, GitError>;
+  /** rebase.status — machine-derived in-progress status (backend-aware). READ. REQ-P5-IR-009/011. */
+  readonly rebaseStatus: (
+    repoId: RepoId,
+  ) => Effect.Effect<RebaseStatus, GitError>;
 
   // ── object-read infrastructure (internal; for core-B) ──────────────────────
   /** Read a full object via the repo's `cat-file --batch` pool (`null` if missing). */

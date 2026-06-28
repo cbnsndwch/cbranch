@@ -59,6 +59,9 @@ import {
   GitConfigEntry,
   GitConfigValue,
   KeyBinding,
+  RebasePlan,
+  RebaseStatus,
+  RebaseStep,
   ReflogPage,
   SubmoduleInfo,
   ThemePref,
@@ -817,6 +820,35 @@ export const CbranchRpcs = RpcGroup.make(
       keybindings: Schema.optional(Schema.Array(KeyBinding)),
     },
     success: AppSettings,
+    error: GitError,
+  }),
+
+  // ── P5: interactive rebase ───────────────────────────────────────────────────
+  // rebase.plan — the `<upstream>..HEAD` range (optionally `--onto`), oldest-first. READ.
+  Rpc.make("RebasePlan", {
+    payload: {
+      repoId: RepoId,
+      upstream: Schema.String,
+      onto: Schema.optional(Schema.String),
+    },
+    success: RebasePlan,
+    error: GitError,
+  }),
+  // rebase.start ✎ — scripted `git rebase -i` with an exec-amend todo (REQ-P5-IR-008).
+  Rpc.make("RebaseStart", {
+    payload: {
+      repoId: RepoId,
+      upstream: Schema.String,
+      steps: Schema.Array(RebaseStep),
+      onto: Schema.optional(Schema.String),
+    },
+    success: RebaseStatus,
+    error: GitError,
+  }),
+  // rebase.status — machine-derived in-progress status (READ; repo-open detection, REQ-P5-IR-011).
+  Rpc.make("RebaseStatus", {
+    payload: { repoId: RepoId },
+    success: RebaseStatus,
     error: GitError,
   }),
 );

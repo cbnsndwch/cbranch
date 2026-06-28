@@ -340,4 +340,16 @@ export const handlersLayer = CbranchRpcs.toLayer({
     Effect.flatMap(GitEngine, (engine) =>
       engine.appSettingsSet({ theme, locale, keybindings }),
     ),
+
+  // ── P5: interactive rebase ─────────────────────────────────────────────────
+  RebasePlan: ({ repoId, upstream, onto }) =>
+    Effect.flatMap(GitEngine, (engine) =>
+      engine.rebasePlan(repoId, upstream, onto),
+    ),
+  RebaseStart: ({ repoId, upstream, steps, onto }) =>
+    Effect.flatMap(GitEngine, (engine) =>
+      engine.rebaseStart(repoId, upstream, steps, onto),
+    ),
+  RebaseStatus: ({ repoId }) =>
+    Effect.flatMap(GitEngine, (engine) => engine.rebaseStatus(repoId)),
 });

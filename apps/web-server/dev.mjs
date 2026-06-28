@@ -5,8 +5,28 @@
 // Usage: node dev.mjs   (or via `pnpm dev` in this package)
 // The UI dev server (Vite) runs separately on :5173 and proxies /rpc + /sidechannel to :7420.
 import { spawn } from "node:child_process";
+import { copyFileSync, mkdirSync } from "node:fs";
+import { dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import * as esbuild from "esbuild";
+
+// Copy the interactive-rebase sequence-editor shim next to the bundle on every build
+// (esbuild won't bundle a `.mjs` asset resolved via `import.meta.url`). Kept in lockstep
+// with `build.mjs` and `defaultShimPath()` in packages/core (S8; REQ-P5-IR-008).
+const copyRebaseShim = () => {
+  const src = fileURLToPath(
+    new URL(
+      "../../packages/core/src/git/shims/rebase-seq-editor.mjs",
+      import.meta.url,
+    ),
+  );
+  const dest = fileURLToPath(
+    new URL("./dist/shims/rebase-seq-editor.mjs", import.meta.url),
+  );
+  mkdirSync(dirname(dest), { recursive: true });
+  copyFileSync(src, dest);
+};
 
 let server = null;
 
@@ -47,6 +67,7 @@ const ctx = await esbuild.context({
       setup(build) {
         build.onEnd((result) => {
           if (result.errors.length === 0) {
+            copyRebaseShim();
             console.log("[web-server] rebuilt — restarting…");
             restart();
           }
