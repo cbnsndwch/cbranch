@@ -826,6 +826,14 @@ function BranchRow({
   onDetach,
 }: BranchRowProps) {
   const remoteRef = splitRemoteRef(branch);
+  // Local branches (except the active one) get a green chip; remote-tracking branches
+  // get a red one. Fixed light-bg/bold-dark-text palette colors so the pill reads the
+  // same in light and dark mode. The active branch keeps the plain ● + row highlight.
+  const chipTone = branch.isRemote
+    ? "bg-red-100 font-bold text-red-800"
+    : branch.isCurrent
+      ? null
+      : "bg-green-100 font-bold text-green-800";
   return (
     <div
       className={cn(
@@ -836,7 +844,17 @@ function BranchRow({
       <span className="text-primary mr-2 w-2 text-xs">
         {branch.isCurrent ? "●" : ""}
       </span>
-      <span className="flex-1 truncate font-mono text-xs">{branch.name}</span>
+      <div className="min-w-0 flex-1">
+        <span
+          className={cn(
+            "inline-block max-w-full truncate align-middle font-mono text-xs",
+            chipTone && "rounded px-1.5 py-0.5",
+            chipTone,
+          )}
+        >
+          {branch.name}
+        </span>
+      </div>
       {branch.upstream && (
         <span
           className="mr-2 flex items-center gap-1 text-[10px]"
