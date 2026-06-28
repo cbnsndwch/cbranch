@@ -84,17 +84,35 @@ surfaces. It is not a separate milestone but a prerequisite for all future work.
 ## Blocked / decisions to surface
 - _(none yet)_
 
-## ▶ RESUME HERE — P3 COMPLETE (incl. self-review fixes), STOP for review
+## ▶ RESUME HERE — P4 COMPLETE; P5 is next
 
-**P3 fully complete, including the post-ship self-review.** Original S1–S9 core + UI-A/UI-B
-shipped; then the `P3-REVIEW.md` self-review fixes for groups **A (bugs) / B (missing
-behaviors) / D (UI gaps) / E (tests)** all landed on `main` (commit dialog surface, sync
-non-ff retry, stash preview, richer branches panel, optimistic history, etc.), and the Group E
-test sweep merged via `a8f2813`. Gate green: **590 UI + 354 core/rpc tests, 80.49% branches**.
-Deferred: group **C (robustness, C1–C5)** descoped, and the `14-rpc-contract §7` spec
-reconciliation — both candidates for a future session. **Next major phase: P4.**
+**P0–P4 all landed on `main`.** P4 (cherry-pick / revert / conflicts / blame / single-file
+history) shipped core + UI: `conflict.list/sides`, take-side / save-merged / mark-resolved,
+cherry-pick / revert / continuation, per-line blame + file history with rename-following
+(commits `61d0f9c`→`1e795b1`), plus the 06-24 correctness pass (am/bisect continue-abort
+refusal, machine-classified branch-switch dirty refusal, re-verify-unmerged) and a 06-28 UI
+polish round (colored ref chips, favicon, resizable history/details divider). Gate green:
+**783 tests, 80.53% branches.**
 
-**P3 fully complete. Gate green: 505 tests, 80.69% branches.**
+**Next major phase: P5 (power features)** — `docs/spec/09-phase5-power.md`: interactive
+rebase, reflog recovery, bisect, archive export, safe clean preview, gc, submodules, and a
+config/identity editor. Each is independently shippable; **author a P5 plan doc first**
+(cf. `docs/_impl-notes/P2-PLAN.md` slice pattern).
+
+### 2026-06-28 session — gate-red fix + commit-row context menu
+- **Fixed a diff-assembly alignment bug** (`packages/core/src/git/diff.ts`). Under `-w`/`-b`,
+  `git diff --name-status` keeps whitespace-only files but `--numstat`/`-p` both drop them, so
+  the by-index zip in `buildDiffFiles` emitted a phantom row and — when the suppressed file
+  sorted first — grafted a real file's hunks onto the wrong path. Now driven off `numstat`
+  (co-aligned with the patch) with the status letter joined from `name-status` by path. This
+  was the one red test (`git-engine-core-b.test.ts:417`) on git 2.43.0; added a regression test.
+- **Wired right-click on commit rows** (`HistoryList.tsx`). Vendored the base-lyra
+  `context-menu` primitive (Base UI `ContextMenu`) and wrapped each row's trigger; right-click
+  now opens Cherry-pick / Revert instead of the browser's default menu. The hover `…` dropdown
+  and the context menu share one pair of action handlers.
+
+**Earlier — P3 fully complete** (self-review groups A/B/D/E landed; group C robustness and the
+`14-rpc-contract §7` reconciliation deferred).
 
 ### P3 core (S1-S9)
 S1 contract+stubs (5d31d47) · S2 branch listing (79c81a4) · S3 branch lifecycle (5b38e4a) · S4 merge (7fdd625) · S5 sync streaming (693c513) · S6 remotes (c0d36e9) · S7 worktrees (9273602) · S8 stash (63902b7) · S9 tags (0aabe44) · fix unused import (0e7d5fd).
@@ -122,6 +140,14 @@ history. No P4 plan doc yet — author one first (cf. P2-PLAN.md / P3-PLAN.md sl
 **Key context files (gitignored working notes):** `docs/_impl-notes/DECISIONS.md` (D1–D12 locked decisions) + the 8 spec digests. **Verify command:** `pnpm gate`. **Clean-room:** never read `.local/SPEC-AGENT-BRIEF.md`; build only from `docs/spec/`+`LICENSES.md`+`BRANDING.md`+git/lib public docs. Undercover: no AI/model mentions in commits.
 
 ## Log
+- 2026-06-28 — **Reconciled progress to reality + two fixes.** P4 (cherry-pick/conflicts/blame/
+  file-history) had fully landed but the doc still pointed at it as "next"; updated to mark
+  P0–P4 done and P5 next. Fixed the lone red test: a `-w`/`-b` diff-assembly misalignment in
+  `buildDiffFiles` (`--name-status` keeps whitespace-only files that `--numstat`/`-p` drop, so
+  the by-index zip emitted phantom rows / grafted hunks) — now numstat-driven with a path join,
+  plus a regression test. Wired right-click commit-row context menu (vendored base-lyra
+  `context-menu`, Base UI `ContextMenu`) so Cherry-pick/Revert replace the browser default.
+  Gate green: 783 tests, 80.53% branches.
 - 2026-06-20 — **P3 self-review fixes COMPLETE + Group E test sweep merged.** All `P3-REVIEW.md`
   groups A/B/D/E landed on `main`: merge/sync/branch correctness (`3cd61e7`/`a1c44d5`/`9fba60b`),
   worktree switch + branches panel + dense toolbar (`dbe9b0d`/`598cfb6`/`479f629`), commit-dialog
