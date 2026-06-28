@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import { cn } from "../lib/cn";
 import { useRepoState } from "../rpc/hooks";
@@ -27,6 +27,7 @@ import { MergeEditor } from "./MergeEditor";
 import { MenuBar } from "./MenuBar";
 import { RepositorySidebar } from "./RepositorySidebar";
 import { PickDialogs } from "./SequencerDialogs";
+import { SettingsDialog } from "./SettingsDialog";
 import { StashPanel } from "./StashPanel";
 import { SubmodulesPanel } from "./SubmodulesPanel";
 import { TagsPanel } from "./TagsPanel";
@@ -55,7 +56,6 @@ export function AppShell() {
   const activeView = useUiStore((s) => s.activeView);
   const setActiveView = useUiStore((s) => s.setActiveView);
   const openPalette = useUiStore((s) => s.setPaletteOpen);
-  const setCommitDialogOpen = useUiStore((s) => s.setCommitDialogOpen);
   const blameTarget = useUiStore((s) => s.blameTarget);
   const setBlameTarget = useUiStore((s) => s.setBlameTarget);
   const historyTarget = useUiStore((s) => s.historyTarget);
@@ -76,19 +76,8 @@ export function AppShell() {
   const inProgress = useRepoState(repoId).data?.inProgress ?? "none";
   const showConflicts = inProgress !== "none";
 
-  // Global shortcut to open the commit dialog (docs/design/commit-surface.md §6:
-  // Ctrl/Cmd+Shift+Enter). Ctrl/Cmd+Enter is reserved for committing inside the dialog.
-  useEffect(() => {
-    if (!repoId) return;
-    const onKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === "Enter") {
-        e.preventDefault();
-        setCommitDialogOpen(true);
-      }
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [repoId, setCommitDialogOpen]);
+  // The commit-dialog shortcut (Ctrl/Cmd+Shift+Enter) now rides the central keybinding
+  // dispatcher (App → useKeybindings), so AppShell no longer installs its own listener.
 
   const detailContent = (() => {
     if (!repoId)
@@ -183,6 +172,7 @@ export function AppShell() {
       <GcDialog />
       <CleanDialog />
       <ArchiveDialog />
+      <SettingsDialog />
       {repoId && <BisectStartDialog repoId={repoId} onSelectOid={selectOid} />}
       {repoId && editPath !== null && (
         <MergeEditor

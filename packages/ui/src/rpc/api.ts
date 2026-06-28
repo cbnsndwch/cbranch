@@ -8,6 +8,7 @@
 // React Query error state); a stream's per-item error reaches `onError`.
 
 import {
+  type AppSettings,
   type ArchiveDescriptor,
   type ArchiveFormat,
   type BisectMark,
@@ -23,6 +24,7 @@ import {
   type CommitInput,
   type CommitMessage,
   type CommitSummary,
+  type ConfigScope,
   type ConflictListing,
   type ConflictResolution,
   type ConflictSides,
@@ -33,7 +35,12 @@ import {
   type FileHistoryPage,
   type GcPrune,
   type GcResult,
+  type GitConfigEntry,
+  type GitConfigValue,
   type InvalidationEvent,
+  type KeyBinding,
+  type ThemePref,
+  type WritableScope,
   type LogQuery,
   type MergeMode,
   type MergeResult,
@@ -371,6 +378,26 @@ export interface CbranchApi {
     branch?: string,
   ): Promise<void>;
   submoduleRemove(repoId: RepoId, path: string): Promise<void>;
+  // ── settings & git config (P5) ──────────────────────────────────────────────
+  configList(repoId: RepoId): Promise<ReadonlyArray<GitConfigEntry>>;
+  configGet(
+    repoId: RepoId,
+    key: string,
+    scope?: ConfigScope,
+  ): Promise<GitConfigValue>;
+  configSet(
+    repoId: RepoId,
+    key: string,
+    value: string,
+    scope: WritableScope,
+  ): Promise<void>;
+  configUnset(repoId: RepoId, key: string, scope: WritableScope): Promise<void>;
+  appSettingsGet(): Promise<AppSettings>;
+  appSettingsSet(patch: {
+    theme?: ThemePref;
+    locale?: string;
+    keybindings?: ReadonlyArray<KeyBinding>;
+  }): Promise<AppSettings>;
 }
 
 /** Back a {@link CbranchApi} with the single app runtime. */
@@ -682,5 +709,24 @@ export const makeApi = (runtime: AppRuntime): CbranchApi => {
       runtime.runPromise(
         withClient((c) => c.SubmoduleRemove({ repoId, path })),
       ),
+    // ── settings & git config (P5) ──────────────────────────────────────────────
+    configList: (repoId) =>
+      runtime.runPromise(withClient((c) => c.ConfigList({ repoId }))),
+    configGet: (repoId, key, scope) =>
+      runtime.runPromise(
+        withClient((c) => c.ConfigGet({ repoId, key, scope })),
+      ),
+    configSet: (repoId, key, value, scope) =>
+      runtime.runPromise(
+        withClient((c) => c.ConfigSet({ repoId, key, value, scope })),
+      ),
+    configUnset: (repoId, key, scope) =>
+      runtime.runPromise(
+        withClient((c) => c.ConfigUnset({ repoId, key, scope })),
+      ),
+    appSettingsGet: () =>
+      runtime.runPromise(withClient((c) => c.ConfigAppGet({}))),
+    appSettingsSet: (patch) =>
+      runtime.runPromise(withClient((c) => c.ConfigAppSet(patch))),
   };
 };

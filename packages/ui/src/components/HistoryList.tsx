@@ -99,7 +99,10 @@ export function HistoryList({
     overscan: 12,
   });
 
-  const [findOpen, setFindOpen] = useState(false);
+  // Find-bar open state lives in the store so the central keybinding dispatcher
+  // (App → useKeybindings, Ctrl/Cmd+F) can open it without its own window listener.
+  const findOpen = useUiStore((s) => s.findOpen);
+  const setFindOpen = useUiStore((s) => s.setFindOpen);
   const [findQuery, setFindQuery] = useState("");
   const [findPos, setFindPos] = useState(-1);
   const matches = useMemo(
@@ -131,17 +134,8 @@ export function HistoryList({
     parentRef.current?.scrollTo({ top: 0 });
   }, [queryKey]);
 
-  // Open quick-find on the conventional shortcut, even when the list is not focused (P1-UI-FILT-2).
-  useEffect(() => {
-    const onKey = (event: globalThis.KeyboardEvent) => {
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "f") {
-        event.preventDefault();
-        setFindOpen(true);
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  // The quick-find shortcut (Ctrl/Cmd+F, P1-UI-FILT-2) now rides the central keybinding
+  // dispatcher (App → useKeybindings → setFindOpen), which is remappable (REQ-P5-CFG-006).
 
   // As the find query changes, jump to the first match (responsive find, P1-FILT-7).
   const firstMatch = matches[0];

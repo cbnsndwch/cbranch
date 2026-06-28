@@ -7,6 +7,7 @@
 // goes through the injected {@link useApi} facade so components stay mockable (NF-TEST-7).
 
 import {
+  type AppSettings,
   type ArchiveDescriptor,
   type ArchiveFormat,
   type BisectMark,
@@ -31,6 +32,8 @@ import {
   type FileHistoryPage,
   type GcPrune,
   type GcResult,
+  type GitConfigEntry,
+  type KeyBinding,
   type LogQuery,
   type MergeMode,
   type MergeResult,
@@ -1493,6 +1496,88 @@ export const useSubmoduleRemove = (repoId: RepoId) => {
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: [repoId, "status"] });
       void qc.invalidateQueries({ queryKey: [repoId, "config"] });
+    },
+  });
+};
+
+// ── settings & git config (P5, S7) ──────────────────────────────────────────
+
+/** All on-disk git config entries (domain: `config`; REQ-P5-CFG-001). */
+export const useGitConfig = (
+  repoId: RepoId | null,
+): UseQueryResult<ReadonlyArray<GitConfigEntry>> => {
+  const api = useApi();
+  return useQuery({
+    queryKey: repoId ? queryKeys.gitConfig(repoId) : ["inactive"],
+    queryFn: () => api.configList(repoId as RepoId),
+    enabled: repoId !== null,
+  });
+};
+
+/**
+ * Set a git config key at a writable scope (REQ-P5-CFG-002/004). `onSettled` invalidates
+ * the `config` domain — the SOLE refresh for global/system writes the watcher can't see
+ * (REQ-P5-CFG-008).
+ */
+export const useConfigSet = (repoId: RepoId) => {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation<
+    void,
+    unknown,
+    { key: string; value: string; scope: "global" | "local" }
+  >({
+    mutationFn: ({ key, value, scope }) =>
+      api.configSet(repoId, key, value, scope),
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: [repoId, "config"] });
+    },
+  });
+};
+
+/** Unset a git config key (REQ-P5-CFG-004); idempotent. Invalidates the `config` domain. */
+export const useConfigUnset = (repoId: RepoId) => {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation<void, unknown, { key: string; scope: "global" | "local" }>(
+    {
+      mutationFn: ({ key, scope }) => api.configUnset(repoId, key, scope),
+      onSettled: () => {
+        void qc.invalidateQueries({ queryKey: [repoId, "config"] });
+      },
+    },
+  );
+};
+
+/**
+ * cbranch app settings from the host `config.json` (REQ-P5-CFG-006). NOT repo-scoped;
+ * never domain-invalidated (like the recent list). Stays enabled so the keybinding
+ * dispatcher and theme reconciliation can read user overrides app-wide.
+ */
+export const useAppSettings = (): UseQueryResult<AppSettings> => {
+  const api = useApi();
+  return useQuery({
+    queryKey: queryKeys.appSettings(),
+    queryFn: () => api.appSettingsGet(),
+  });
+};
+
+/** Persist an app-settings patch (theme/locale/keybindings); refreshes the `appSettings` cache. */
+export const useSetAppSettings = () => {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation<
+    AppSettings,
+    unknown,
+    {
+      theme?: AppSettings["theme"];
+      locale?: string;
+      keybindings?: ReadonlyArray<KeyBinding>;
+    }
+  >({
+    mutationFn: (patch) => api.appSettingsSet(patch),
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.appSettings() });
     },
   });
 };

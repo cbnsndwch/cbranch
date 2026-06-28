@@ -22,6 +22,7 @@ const REQUIRED = {
   Tooltip: { role: "tooltips" },
   ScrollArea: { role: "custom scroll regions" },
   Tabs: { role: "tabbed surfaces" },
+  RadioGroup: { role: "radio groups (theme picker)" },
   Select: { role: "select menus" },
   Menu: { role: "dropdown menus", alias: "DropdownMenu" },
   ContextMenu: { role: "right-click context menus" },

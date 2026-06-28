@@ -15,6 +15,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { buildLogQuery, emptyFilters } from "../lib/filters";
 import { type CbranchApi, type StreamHandlers } from "../rpc/api";
 import { ApiProvider } from "../rpc/ApiProvider";
+import { useUiStore } from "../state/store";
 import { GraphCell } from "./GraphCell";
 import { HistoryList } from "./HistoryList";
 import { RefChips } from "./RefChips";
@@ -205,7 +206,9 @@ describe("HistoryList (P1-HIST-1/2/3; spec 10)", () => {
     expect(screen.getByText("Revert…")).toBeTruthy();
   });
 
-  test("quick-find opens on Ctrl+F and selects the first match (P1-FILT-7)", async () => {
+  // The Ctrl+F shortcut now rides the central keybinding dispatcher (covered in
+  // hooks/use-keybindings.test.tsx); the find bar opens off the store findOpen flag.
+  test("quick-find (opened via the store flag) selects the first match (P1-FILT-7)", async () => {
     const onSelect = vi.fn();
     const api = fakeApi([
       summary("a", ["b"]),
@@ -223,7 +226,7 @@ describe("HistoryList (P1-HIST-1/2/3; spec 10)", () => {
       api,
     );
     expect(await screen.findByText("commit a")).toBeTruthy();
-    act(() => fireEvent.keyDown(window, { key: "f", ctrlKey: true }));
+    act(() => useUiStore.setState({ findOpen: true }));
     const input = screen.getByLabelText("Find in loaded history");
     act(() => fireEvent.change(input, { target: { value: "commit c" } }));
     expect(onSelect).toHaveBeenCalledWith(oid("c"));

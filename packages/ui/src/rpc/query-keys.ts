@@ -82,6 +82,14 @@ export const queryKeys = {
   bisect: (repoId: RepoId) => [repoId, "inProgress", "bisect"] as const,
   /** `remote.list` (domain: `config`). */
   remotes: (repoId: RepoId) => [repoId, "config", "remotes"] as const,
+  /**
+   * `config.list` — every on-disk git config entry (domain: `config`). The SOLE refresh
+   * for global/system writes invisible to the fs watcher → `onSettled` invalidates it
+   * (REQ-P5-CFG-008).
+   */
+  gitConfig: (repoId: RepoId) => [repoId, "config", "gitConfig"] as const,
+  /** `config.appGet` — cbranch app settings (NOT repo-scoped; never domain-invalidated, like `recentList`). */
+  appSettings: () => ["appSettings"] as const,
   /** `worktree.list` (domain: `worktrees`). */
   worktrees: (repoId: RepoId) => [repoId, "worktrees", "list"] as const,
   /**

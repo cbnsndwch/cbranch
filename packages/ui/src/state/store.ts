@@ -229,6 +229,13 @@ export interface UiState {
    */
   readonly bisectStartDialog: { readonly bad?: Oid } | null;
   readonly setBisectStartDialog: (state: { bad?: Oid } | null) => void;
+  // ── P5: settings & git config dialog ─────────────────────────────────────────
+  /** Whether the settings modal (git config + app settings) is open (REQ-P5-CFG-001). App-global. */
+  readonly settingsDialogOpen: boolean;
+  readonly setSettingsDialogOpen: (open: boolean) => void;
+  // ── P5: history find bar (lifted from HistoryList so the keybinding dispatcher opens it) ──
+  readonly findOpen: boolean;
+  readonly setFindOpen: (open: boolean) => void;
 }
 
 export const useUiStore = create<UiState>((set) => ({
@@ -258,6 +265,8 @@ export const useUiStore = create<UiState>((set) => ({
   cleanDialogOpen: false,
   archiveDialog: null,
   bisectStartDialog: null,
+  settingsDialogOpen: false,
+  findOpen: false,
   // Switching repositories supersedes the old selection and filters (P1-OPEN-4 / P1-X-4).
   setActiveRepoId: (activeRepoId) =>
     set({
@@ -275,6 +284,7 @@ export const useUiStore = create<UiState>((set) => ({
       cleanDialogOpen: false,
       archiveDialog: null,
       bisectStartDialog: null,
+      findOpen: false,
     }),
   setSelectedOid: (selectedOid) => set({ selectedOid }),
   setPaletteOpen: (paletteOpen) => set({ paletteOpen }),
@@ -297,6 +307,8 @@ export const useUiStore = create<UiState>((set) => ({
     set((s) => ({ commitDraft: { ...s.commitDraft, ...patch } })),
   resetCommitDraft: () => set({ commitDraft: DEFAULT_DRAFT }),
   setCommitDialogOpen: (commitDialogOpen) => set({ commitDialogOpen }),
+  setSettingsDialogOpen: (settingsDialogOpen) => set({ settingsDialogOpen }),
+  setFindOpen: (findOpen) => set({ findOpen }),
   setKeepOpenAfterCommit: (keepOpenAfterCommit) => {
     writeKeepOpen(keepOpenAfterCommit);
     set({ keepOpenAfterCommit });

@@ -141,7 +141,7 @@ Per-feature vertical slices, easiest-first (D18). Each = a `core` commit then a 
   REQ-P5-SM-001..006.
 - ⬜ S7 settings/config · ⬜ S8 interactive rebase.
 
-## ▶ RESUME HERE — P5 IN PROGRESS (S1–S6 ✅: gc, clean, archive, reflog, bisect, submodules; S7 settings/config next)
+## ▶ RESUME HERE — P5 IN PROGRESS (S1–S7 ✅: gc, clean, archive, reflog, bisect, submodules, settings/config; S8 interactive rebase next)
 
 **P0–P4 all landed on `main`.** P4 (cherry-pick / revert / conflicts / blame / single-file
 history) shipped core + UI: `conflict.list/sides`, take-side / save-merged / mark-resolved,
@@ -209,6 +209,24 @@ history. No P4 plan doc yet — author one first (cf. P2-PLAN.md / P3-PLAN.md sl
 **Key context files (gitignored working notes):** `docs/_impl-notes/DECISIONS.md` (D1–D12 locked decisions) + the 8 spec digests. **Verify command:** `pnpm gate`. **Clean-room:** never read `.local/SPEC-AGENT-BRIEF.md`; build only from `docs/spec/`+`LICENSES.md`+`BRANDING.md`+git/lib public docs. Undercover: no AI/model mentions in commits.
 
 ## Log
+- 2026-06-28 — **S7 (settings & git config) landed — core + ui, gate green.** core
+  (`feat(p5): settings & git config`): `ConfigScope`/`WritableScope`/`ThemePref` +
+  `GitConfigEntry`/`GitConfigValue`/`KeyBinding`/`AppSettings` schemas + 6 RPCs
+  (`ConfigList`/`ConfigGet` read; `ConfigSet`/`ConfigUnset` ✎ repo-lock;
+  `ConfigAppGet`/`ConfigAppSet` non-repo, host config.json). New `git/git-config.ts`
+  (`--list --show-origin --show-scope -z` grouped-by-3 parse; scoped/effective `--get`,
+  exit 1 = `present:false`; `--global`/`--local` writes, system refused; idempotent
+  `--unset` exit 5; reads pass `read:false` so injected `-c` overrides never surface as
+  `command`-scope rows). `config-store.ts` `getAppSettings`/`setAppSettings`
+  (theme/locale/keybindings, NEVER git). 17 git-config + 3 config-store tests + contract
+  round-trips. ui (`feat(ui): settings dialog`): vendored `tabs`+`radio-group`, `SettingsDialog`
+  (Tabs: guided Identity/Editor/Credentials/Diff-Merge sections incl. `difftool/mergetool.<tool>.cmd`,
+  scope `Select` with system disabled, advanced add/unset table; App tab theme `RadioGroup` +
+  remappable keybindings with conflict detection + reset), `lib/keybindings.ts` +
+  `useKeybindings` dispatcher replacing the three ad-hoc keydown listeners (palette/commit/find,
+  the latter lifted to a `findOpen` store slice), cmdk palette wiring for the eight named
+  commands, menu `tools.settings`/`repository.settings`/`maintenance.editConfig`. Theme
+  reconciled from host config.json on load. **S8 (interactive rebase) next.**
 - 2026-06-28 — **S6 (submodules) landed — core + ui, gate green.** core (`feat(p5): submodules`):
   `SubmoduleStatus`/`SubmoduleInfo` schemas + 5 RPCs (`SubmoduleList` read; `Update`/`Sync`/`Add`/
   `Remove` ✎ Void) + `git/submodules.ts` index-cross-read (gitlink `ls-files --stage -z` joined with
