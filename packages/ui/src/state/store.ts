@@ -221,6 +221,13 @@ export interface UiState {
    */
   readonly archiveDialog: { readonly treeish: string } | null;
   readonly setArchiveDialog: (state: { treeish: string } | null) => void;
+  // ── P5: bisect start dialog ──────────────────────────────────────────────────
+  /**
+   * The start-bisect dialog, or `null` when closed. `bad` pre-seeds the known-bad
+   * commit (the selected commit when launched from "Bisect from here"). REQ-P5-BS-001.
+   */
+  readonly bisectStartDialog: { readonly bad?: Oid } | null;
+  readonly setBisectStartDialog: (state: { bad?: Oid } | null) => void;
 }
 
 export const useUiStore = create<UiState>((set) => ({
@@ -249,6 +256,7 @@ export const useUiStore = create<UiState>((set) => ({
   gcDialogOpen: false,
   cleanDialogOpen: false,
   archiveDialog: null,
+  bisectStartDialog: null,
   // Switching repositories supersedes the old selection and filters (P1-OPEN-4 / P1-X-4).
   setActiveRepoId: (activeRepoId) =>
     set({
@@ -265,6 +273,7 @@ export const useUiStore = create<UiState>((set) => ({
       gcDialogOpen: false,
       cleanDialogOpen: false,
       archiveDialog: null,
+      bisectStartDialog: null,
     }),
   setSelectedOid: (selectedOid) => set({ selectedOid }),
   setPaletteOpen: (paletteOpen) => set({ paletteOpen }),
@@ -346,4 +355,5 @@ export const useUiStore = create<UiState>((set) => ({
   setGcDialogOpen: (gcDialogOpen) => set({ gcDialogOpen }),
   setCleanDialogOpen: (cleanDialogOpen) => set({ cleanDialogOpen }),
   setArchiveDialog: (archiveDialog) => set({ archiveDialog }),
+  setBisectStartDialog: (bisectStartDialog) => set({ bisectStartDialog }),
 }));

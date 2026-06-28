@@ -95,6 +95,11 @@ export function useMenuActions(): MenuActions {
         useUiStore.getState().setActiveView("reflog");
       handlers["view.showReflog"] = () =>
         useUiStore.getState().setActiveView("reflog");
+      // Bisect: open the start dialog, pre-seeding the selected commit as bad (BS-001).
+      handlers["commands.bisect"] = () =>
+        useUiStore
+          .getState()
+          .setBisectStartDialog({ bad: selectedOid ?? undefined });
     }
     // Cherry-pick / revert act on the selected commit (REQ-UX-001); the dialog fetches
     // the commit's subject + parents (for the merge-commit mainline gate).

@@ -10,6 +10,8 @@ import { BranchesPanel } from "./BranchesPanel";
 import { CommandPalette } from "./CommandPalette";
 import { CommitDetailsTabs } from "./CommitDetailsTabs";
 import { ArchiveDialog } from "./ArchiveDialog";
+import { BisectBanner } from "./BisectBanner";
+import { BisectStartDialog } from "./BisectStartDialog";
 import { CleanDialog } from "./CleanDialog";
 import { ReflogPanel } from "./ReflogPanel";
 import { CommitDialog } from "./CommitDialog";
@@ -177,6 +179,7 @@ export function AppShell() {
       <GcDialog />
       <CleanDialog />
       <ArchiveDialog />
+      {repoId && <BisectStartDialog repoId={repoId} onSelectOid={selectOid} />}
       {repoId && editPath !== null && (
         <MergeEditor
           repoId={repoId}
@@ -217,45 +220,49 @@ export function AppShell() {
         {/* Row 3: Main split — sidebar beside (view nav tabs over content). The
             tabs scope the right-hand graph only, so they live above it rather
             than spanning the full width over the sidebar too. */}
-        <div className="grid min-h-0 grid-cols-[265px_1fr]">
-          {/* Left: Repository sidebar (spans the full content height) */}
-          <RepositorySidebar repoId={repoId} />
-          {/* Right: view nav tabs over view content */}
-          <div className="grid min-h-0 grid-rows-[28px_1fr]">
-            {/* View nav tabs */}
-            <div className="bg-muted flex items-end border-b">
-              {VIEWS.map(([view, label]) => (
-                <button
-                  key={view}
-                  type="button"
-                  onClick={() => setActiveView(view)}
-                  className={cn(
-                    "px-3 py-0.5 text-[11px]",
-                    view === activeView
-                      ? "relative -mb-px border border-b-background bg-background font-medium"
-                      : "text-muted-foreground hover:bg-accent/50",
-                  )}
-                >
-                  {label}
-                </button>
-              ))}
-              {showConflicts && (
-                <button
-                  type="button"
-                  onClick={() => setActiveView("solveConflicts")}
-                  className={cn(
-                    "px-3 py-0.5 text-[11px]",
-                    activeView === "solveConflicts"
-                      ? "relative -mb-px border border-b-background bg-background font-medium"
-                      : "text-status-behind hover:bg-accent/50",
-                  )}
-                >
-                  Conflicts
-                </button>
-              )}
+        <div className="flex min-h-0 flex-col">
+          {/* Persistent bisect banner (REQ-P5-BS-002), above the sidebar + content. */}
+          {repoId && <BisectBanner repoId={repoId} onSelectOid={selectOid} />}
+          <div className="grid min-h-0 flex-1 grid-cols-[265px_1fr]">
+            {/* Left: Repository sidebar (spans the full content height) */}
+            <RepositorySidebar repoId={repoId} />
+            {/* Right: view nav tabs over view content */}
+            <div className="grid min-h-0 grid-rows-[28px_1fr]">
+              {/* View nav tabs */}
+              <div className="bg-muted flex items-end border-b">
+                {VIEWS.map(([view, label]) => (
+                  <button
+                    key={view}
+                    type="button"
+                    onClick={() => setActiveView(view)}
+                    className={cn(
+                      "px-3 py-0.5 text-[11px]",
+                      view === activeView
+                        ? "relative -mb-px border border-b-background bg-background font-medium"
+                        : "text-muted-foreground hover:bg-accent/50",
+                    )}
+                  >
+                    {label}
+                  </button>
+                ))}
+                {showConflicts && (
+                  <button
+                    type="button"
+                    onClick={() => setActiveView("solveConflicts")}
+                    className={cn(
+                      "px-3 py-0.5 text-[11px]",
+                      activeView === "solveConflicts"
+                        ? "relative -mb-px border border-b-background bg-background font-medium"
+                        : "text-status-behind hover:bg-accent/50",
+                    )}
+                  >
+                    Conflicts
+                  </button>
+                )}
+              </div>
+              {/* View content */}
+              {mainContent}
             </div>
-            {/* View content */}
-            {mainContent}
           </div>
         </div>
       </div>

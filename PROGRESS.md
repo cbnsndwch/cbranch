@@ -116,9 +116,19 @@ Per-feature vertical slices, easiest-first (D18). Each = a `core` commit then a 
   message, per-row menu: Create-branch→`BranchCreate(startPoint=oid)`, Reset soft·mixed direct / hard behind
   consequence-confirm `ResetTo(target=oid)`, View-commit→`selectOid`, Load more) as a routed `"reflog"`
   view (`ActiveView`+`VIEWS`+switch); wired `commands.reflog`+`view.showReflog`. REQ-P5-RL-001..006.
-- ⬜ S5 bisect · ⬜ S6 submodules · ⬜ S7 settings/config · ⬜ S8 interactive rebase.
+- ✅ **S5 — bisect.** core: `BisectMark`/`BisectState`/`BisectStatus`; `BisectStart`/`Mark`/`Reset` (✎) +
+  `BisectStatus` (read) RPCs; `git/bisect.ts` `computeBisectStatus` (machine-derived from `refs/bisect/*`
+  + `rev-list --bisect-vars`, concluded ⟺ bisect_rev===bad; "could be any of" → unbisectable); lock-held
+  mutations + lockless status; inProgress-domain `bisect` key + `useBisectStatus`/`Start`/`Mark`/`Reset`.
+  ui: top-of-shell `BisectBanner` (detached-HEAD warning, current+counts, good/bad/skip, conclude firstBad
+  + View commit, unbisectable candidates, Reset behind confirm; `selectOid(current)` after start/mark) +
+  `BisectStartDialog` + `bisectStartDialog` store slice; wired `commands.bisect` + commit-context "Bisect
+  from here". REQ-P5-BS-001..007. _Deferred hardening:_ per-surface branch-mutating disable (BranchesPanel/
+  reflog/commit-context) — the always-visible banner states the detached-HEAD/unavailable indication (the
+  REQ-BS-007 MUST); explicit per-action disabling is a follow-up.
+- ⬜ S6 submodules · ⬜ S7 settings/config · ⬜ S8 interactive rebase.
 
-## ▶ RESUME HERE — P5 IN PROGRESS (S1–S4 ✅: gc, clean, archive, reflog; S5 bisect next)
+## ▶ RESUME HERE — P5 IN PROGRESS (S1–S5 ✅: gc, clean, archive, reflog, bisect; S6 submodules next)
 
 **P0–P4 all landed on `main`.** P4 (cherry-pick / revert / conflicts / blame / single-file
 history) shipped core + UI: `conflict.list/sides`, take-side / save-merged / mark-resolved,

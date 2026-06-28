@@ -75,6 +75,7 @@ export function HistoryList({
   const setKnownRefStrings = useUiStore((s) => s.setKnownRefStrings);
   const setPickDialog = useUiStore((s) => s.setPickDialog);
   const setArchiveDialog = useUiStore((s) => s.setArchiveDialog);
+  const setBisectStartDialog = useUiStore((s) => s.setBisectStartDialog);
   useEffect(() => {
     const allRefs = [...new Set(rows.flatMap((r) => r.refs))];
     setKnownRefStrings(allRefs);
@@ -211,6 +212,7 @@ export function HistoryList({
   const revertCommit = (target: Oid, subject: string) =>
     setPickDialog({ kind: "revert", commits: [{ oid: target, subject }] });
   const archiveCommit = (target: Oid) => setArchiveDialog({ treeish: target });
+  const bisectFrom = (target: Oid) => setBisectStartDialog({ bad: target });
 
   if (status === "error")
     return <Placeholder tone="danger">Could not load history.</Placeholder>;
@@ -338,6 +340,9 @@ export function HistoryList({
                       <DropdownMenuItem onClick={() => archiveCommit(row.oid)}>
                         Archive revision…
                       </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => bisectFrom(row.oid)}>
+                        Bisect from here…
+                      </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </ContextMenuTrigger>
@@ -354,6 +359,9 @@ export function HistoryList({
                   </ContextMenuItem>
                   <ContextMenuItem onClick={() => archiveCommit(row.oid)}>
                     Archive revision…
+                  </ContextMenuItem>
+                  <ContextMenuItem onClick={() => bisectFrom(row.oid)}>
+                    Bisect from here…
                   </ContextMenuItem>
                 </ContextMenuContent>
               </ContextMenu>
