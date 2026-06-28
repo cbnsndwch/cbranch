@@ -354,6 +354,43 @@ describe("submodule git operations", () => {
     expect(existsSync(cached)).toBe(false);
   });
 
+  test("remove clears the cached git dir by NAME when name != path", async () => {
+    // git stores the cached git dir at modules/<name>, not modules/<path>; a
+    // `--name`-added submodule (name "customname" at path "path/to/sub") would orphan
+    // its object store if cleanup keyed off the path.
+    const child = await ws.createRepo("nm-child");
+    await child.commit({ message: "c1", files: { "lib.txt": "v1\n" } });
+    const sup = await ws.createRepo("nm-super");
+    await sup.commit({ message: "init", files: { "README.md": "x\n" } });
+    await sup.git([
+      "-c",
+      "protocol.file.allow=always",
+      "submodule",
+      "add",
+      "--name",
+      "customname",
+      "--",
+      child.dir,
+      "path/to/sub",
+    ]);
+    await sup.commit({ message: "add named submodule" });
+
+    const gitDir = join(sup.dir, ".git");
+    const byName = join(gitDir, "modules", "customname");
+    const byPath = join(gitDir, "modules", "path/to/sub");
+    expect(existsSync(byName)).toBe(true);
+    expect(existsSync(byPath)).toBe(false);
+    // The listing maps the worktree path to its distinct name.
+    const before = await run(submoduleList(sup.dir));
+    expect(before[0]?.path).toBe("path/to/sub");
+    expect(before[0]?.name).toBe("customname");
+
+    await run(submoduleRemove(sup.dir, gitDir, "path/to/sub"));
+
+    expect(await run(submoduleList(sup.dir))).toEqual([]);
+    expect(existsSync(byName)).toBe(false);
+  });
+
   test("remove of an unknown path fails as gitFailed (no partial removal)", async () => {
     const { sup, gitDir } = await seedSuper("sm-remove-bad");
     const err = await run(

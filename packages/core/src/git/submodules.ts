@@ -335,10 +335,17 @@ export const submoduleAdd = (
 /**
  * Remove a submodule as ONE guarded op (REQ-P5-SM-005): `deinit -f` (unregister +
  * empty the working tree) → `rm -f` (drop the gitlink + the `.gitmodules` stanza) →
- * best-effort removal of the cached git dir at `<commonDir>/modules/<path>`. Partial
- * removal is impossible — git refuses on a dirty superproject before any tree is
- * touched (→ `gitFailed`). A cleanup failure after the tracking is gone surfaces as
- * `fsError`/`permissionDenied` (the submodule IS removed; only its cached objects linger).
+ * best-effort removal of the cached git dir. Partial removal is impossible — git
+ * refuses on a dirty superproject before any tree is touched (→ `gitFailed`). A
+ * cleanup failure after the tracking is gone surfaces as `fsError`/`permissionDenied`
+ * (the submodule IS removed; only its cached objects linger).
+ *
+ * git stores the cached git dir at `<commonDir>/modules/<NAME>`, where NAME is the
+ * `.gitmodules` `submodule.<name>` subsection — which equals the worktree path ONLY for
+ * the default `git submodule add <url> <path>`. For a `--name`-added or `git mv`-relocated
+ * submodule the two differ, so the NAME is resolved from `.gitmodules` BEFORE `git rm`
+ * strips its stanza; otherwise a path-keyed cleanup would silently miss and orphan the
+ * whole object store. Falls back to `path` when `.gitmodules` carries no name.
  */
 export const submoduleRemove = (
   cwd: string,
@@ -347,6 +354,15 @@ export const submoduleRemove = (
   env?: NodeJS.ProcessEnv,
 ): Effect.Effect<void, GitError> =>
   Effect.gen(function* () {
+    const gmResult = yield* runGit({
+      cwd,
+      args: ["config", "-f", ".gitmodules", "-z", "--list"],
+      env,
+    });
+    const name =
+      gmResult.exitCode === 0
+        ? parseGitmodules(decodeUtf8(gmResult.stdout)).get(path)?.name
+        : undefined;
     yield* runGitOk({
       cwd,
       args: ["submodule", "deinit", "-f", "--", path],
@@ -356,7 +372,7 @@ export const submoduleRemove = (
     yield* runGitOk({ cwd, args: ["rm", "-f", "--", path], env, read: false });
     yield* Effect.tryPromise({
       try: () =>
-        rm(join(commonDir, "modules", path), {
+        rm(join(commonDir, "modules", name ?? path), {
           recursive: true,
           force: true,
         }),
