@@ -80,6 +80,9 @@ export function useMenuActions(): MenuActions {
       // Commands → Commit… opens the dedicated commit dialog (commit-surface.md §9.4).
       handlers["commands.commit"] = () =>
         useUiStore.getState().setCommitDialogOpen(true);
+      // Repository → Maintenance → Compress opens the gc dialog (REQ-P5-GC-001).
+      handlers["repository.maintenance.compress"] = () =>
+        useUiStore.getState().setGcDialogOpen(true);
     }
     // Cherry-pick / revert act on the selected commit (REQ-UX-001); the dialog fetches
     // the commit's subject + parents (for the merge-commit mainline gate).

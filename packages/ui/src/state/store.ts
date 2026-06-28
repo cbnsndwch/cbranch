@@ -204,6 +204,10 @@ export interface UiState {
   // ── P4: file-history overlay ─────────────────────────────────────────────────
   readonly historyTarget: HistoryTarget | null;
   readonly setHistoryTarget: (target: HistoryTarget | null) => void;
+  // ── P5: repository maintenance (gc) dialog ───────────────────────────────────
+  /** Whether the run-maintenance (gc) modal is open (REQ-P5-GC-001). */
+  readonly gcDialogOpen: boolean;
+  readonly setGcDialogOpen: (open: boolean) => void;
 }
 
 export const useUiStore = create<UiState>((set) => ({
@@ -229,6 +233,7 @@ export const useUiStore = create<UiState>((set) => ({
   pickDialog: null,
   blameTarget: null,
   historyTarget: null,
+  gcDialogOpen: false,
   // Switching repositories supersedes the old selection and filters (P1-OPEN-4 / P1-X-4).
   setActiveRepoId: (activeRepoId) =>
     set({
@@ -242,6 +247,7 @@ export const useUiStore = create<UiState>((set) => ({
       pickDialog: null,
       blameTarget: null,
       historyTarget: null,
+      gcDialogOpen: false,
     }),
   setSelectedOid: (selectedOid) => set({ selectedOid }),
   setPaletteOpen: (paletteOpen) => set({ paletteOpen }),
@@ -320,4 +326,5 @@ export const useUiStore = create<UiState>((set) => ({
   setPickDialog: (pickDialog) => set({ pickDialog }),
   setBlameTarget: (blameTarget) => set({ blameTarget }),
   setHistoryTarget: (historyTarget) => set({ historyTarget }),
+  setGcDialogOpen: (gcDialogOpen) => set({ gcDialogOpen }),
 }));

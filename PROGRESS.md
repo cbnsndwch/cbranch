@@ -88,14 +88,16 @@ surfaces. It is not a separate milestone but a prerequisite for all future work.
 
 Per-feature vertical slices, easiest-first (D18). Each = a `core` commit then a `ui` commit.
 
-- 🔄 **S1 — gc.** ✅ core: bootstrapped P5 scaffolding (`schemas/phase5.ts` `GcPrune`/`GcResult`,
+- ✅ **S1 — gc.** core: bootstrapped P5 scaffolding (`schemas/phase5.ts` `GcPrune`/`GcResult`,
   `index.ts` barrel, `group.test.ts` P5 catalog/round-trip), `RepoGc` method + handler, pure
   `git/maintenance.ts` (`gcArgs`+`gc`, whole-run lock), `api.ts` facade + `useGc` (invalidates
-  `refs`+`commits`). ⬜ ui: `GcDialog` + `gcDialogOpen` slice + wire `repository.maintenance.compress`.
+  `refs`+`commits`). ui: `GcDialog` (aggressive `Checkbox` + prune `Select`, non-dismissable while
+  running, captured-output `<pre>` + toast, mid-op `role="alert"` warn-only) + `gcDialogOpen` store
+  slice + wired `repository.maintenance.compress`. REQ-P5-GC-001..004.
 - ⬜ S2 clean · ⬜ S3 archive · ⬜ S4 reflog · ⬜ S5 bisect · ⬜ S6 submodules · ⬜ S7 settings/config ·
   ⬜ S8 interactive rebase.
 
-## ▶ RESUME HERE — P5 IN PROGRESS (S1 gc)
+## ▶ RESUME HERE — P5 IN PROGRESS (S1 gc ✅ complete; S2 clean next)
 
 **P0–P4 all landed on `main`.** P4 (cherry-pick / revert / conflicts / blame / single-file
 history) shipped core + UI: `conflict.list/sides`, take-side / save-merged / mark-resolved,

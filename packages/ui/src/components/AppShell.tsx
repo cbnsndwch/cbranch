@@ -10,6 +10,7 @@ import { BranchesPanel } from "./BranchesPanel";
 import { CommandPalette } from "./CommandPalette";
 import { CommitDetailsTabs } from "./CommitDetailsTabs";
 import { CommitDialog } from "./CommitDialog";
+import { GcDialog } from "./GcDialog";
 import { CommitTab } from "./CommitTab";
 import { ConflictsPanel } from "./ConflictsPanel";
 import { DiffPanel } from "./DiffPanel";
@@ -167,6 +168,7 @@ export function AppShell() {
       <CommandPalette />
       <CommitDialog />
       <PickDialogs />
+      <GcDialog />
       {repoId && editPath !== null && (
         <MergeEditor
           repoId={repoId}
