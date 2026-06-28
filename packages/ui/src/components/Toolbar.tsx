@@ -1,25 +1,25 @@
 import { useQueryClient } from "@tanstack/react-query";
 import {
-    Archive,
-    ArrowDownToLine,
-    ArrowUpFromLine,
-    ChevronDown,
-    CloudDownload,
-    FolderGit2,
-    FolderTree,
-    GitBranch,
-    GitCommitHorizontal,
-    type LucideIcon,
-    RefreshCw,
-    Search,
-    X,
+  Archive,
+  ArrowDownToLine,
+  ArrowUpFromLine,
+  ChevronDown,
+  CloudDownload,
+  FolderGit2,
+  FolderTree,
+  GitBranch,
+  GitCommitHorizontal,
+  type LucideIcon,
+  RefreshCw,
+  Search,
+  X,
 } from "lucide-react";
 import {
-    type ReactNode,
-    type SubmitEvent,
-    useEffect,
-    useRef,
-    useState,
+  type ReactNode,
+  type SubmitEvent,
+  useEffect,
+  useRef,
+  useState,
 } from "react";
 import { toast } from "sonner";
 
@@ -27,34 +27,34 @@ import { cn } from "../lib/cn";
 import { type RefScope } from "../lib/filters";
 import { useApi } from "../rpc/ApiProvider";
 import {
-    useBranchList,
-    useRemoteList,
-    useRepoState,
-    useStatus,
+  useBranchList,
+  useRemoteList,
+  useRepoState,
+  useStatus,
 } from "../rpc/hooks";
 import { useUiStore } from "../state/store";
 import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogClose,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogClose,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
 } from "./ui/alert-dialog";
 import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
 import {
-    Tooltip,
-    TooltipContent,
-    TooltipProvider,
-    TooltipTrigger,
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
 } from "./ui/tooltip";
 
 type PullMode = "ff-only" | "rebase" | "merge";
@@ -462,9 +462,9 @@ export function Toolbar() {
               <TooltipContent>Cancel the running sync</TooltipContent>
             </Tooltip>
           )}
-          
+
           <Separator />
-          
+
           {/* Commit */}
           <Tooltip>
             <TooltipTrigger
@@ -526,8 +526,6 @@ export function Toolbar() {
               Apply
             </button>
           </form>
-
-         
         </div>
 
         {/* Non-fast-forward push retry dialog (UI-007). */}
