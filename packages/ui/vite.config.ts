@@ -21,7 +21,11 @@ export default defineConfig({
   // runner (`vitest.config.ts`) carries no plugins, so root runs are unaffected either way.
   plugins: process.env.VITEST
     ? []
-    : [reactRouterDevTools(), reactRouter(), tailwindcss()],
+    : [reactRouterDevTools({
+        tanstackConfig:{
+            triggerHidden: true
+        }
+    }), reactRouter(), tailwindcss()],
   // `@/*` → src is the shadcn `base-lyra` import alias (components.json); keep it in sync
   // with tsconfig `paths` and the root vitest config so vendored/generated UI resolves.
   resolve: {
