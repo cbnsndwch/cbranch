@@ -47,6 +47,7 @@ import {
   type RepoState,
   type SequencerResult,
   type StashEntry,
+  type SubmoduleInfo,
   type SyncEvent,
   type TagInfo,
   type TagType,
@@ -348,6 +349,28 @@ export interface CbranchApi {
   bisectMark(repoId: RepoId, mark: BisectMark): Promise<BisectStatus>;
   bisectReset(repoId: RepoId): Promise<void>;
   bisectStatus(repoId: RepoId): Promise<BisectStatus>;
+  // ── submodules (P5) ───────────────────────────────────────────────────────
+  submoduleList(repoId: RepoId): Promise<ReadonlyArray<SubmoduleInfo>>;
+  submoduleUpdate(
+    repoId: RepoId,
+    opts?: {
+      paths?: ReadonlyArray<string>;
+      init?: boolean;
+      recursive?: boolean;
+      force?: boolean;
+    },
+  ): Promise<void>;
+  submoduleSync(
+    repoId: RepoId,
+    opts?: { paths?: ReadonlyArray<string>; recursive?: boolean },
+  ): Promise<void>;
+  submoduleAdd(
+    repoId: RepoId,
+    url: string,
+    path: string,
+    branch?: string,
+  ): Promise<void>;
+  submoduleRemove(repoId: RepoId, path: string): Promise<void>;
 }
 
 /** Back a {@link CbranchApi} with the single app runtime. */
@@ -640,5 +663,24 @@ export const makeApi = (runtime: AppRuntime): CbranchApi => {
       runtime.runPromise(withClient((c) => c.BisectReset({ repoId }))),
     bisectStatus: (repoId) =>
       runtime.runPromise(withClient((c) => c.BisectStatus({ repoId }))),
+    // ── submodules (P5) ───────────────────────────────────────────────────────
+    submoduleList: (repoId) =>
+      runtime.runPromise(withClient((c) => c.SubmoduleList({ repoId }))),
+    submoduleUpdate: (repoId, opts) =>
+      runtime.runPromise(
+        withClient((c) => c.SubmoduleUpdate({ repoId, ...opts })),
+      ),
+    submoduleSync: (repoId, opts) =>
+      runtime.runPromise(
+        withClient((c) => c.SubmoduleSync({ repoId, ...opts })),
+      ),
+    submoduleAdd: (repoId, url, path, branch) =>
+      runtime.runPromise(
+        withClient((c) => c.SubmoduleAdd({ repoId, url, path, branch })),
+      ),
+    submoduleRemove: (repoId, path) =>
+      runtime.runPromise(
+        withClient((c) => c.SubmoduleRemove({ repoId, path })),
+      ),
   };
 };

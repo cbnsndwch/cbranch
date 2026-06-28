@@ -84,6 +84,11 @@ export const queryKeys = {
   remotes: (repoId: RepoId) => [repoId, "config", "remotes"] as const,
   /** `worktree.list` (domain: `worktrees`). */
   worktrees: (repoId: RepoId) => [repoId, "worktrees", "list"] as const,
+  /**
+   * `submodule.list` — index-cross-read listing (domain: `status`; a submodule's
+   * checkout/init/conflict state moves with the superproject index/worktree). REQ-P5-SM-001.
+   */
+  submodules: (repoId: RepoId) => [repoId, "status", "submodules"] as const,
   /** `stash.list` (domain: `stash`). */
   stash: (repoId: RepoId) => [repoId, "stash", "list"] as const,
   /** `stash.show` — immutable once the stash entry is dropped. */

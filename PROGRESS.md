@@ -126,9 +126,22 @@ Per-feature vertical slices, easiest-first (D18). Each = a `core` commit then a 
   from here". REQ-P5-BS-001..007. _Deferred hardening:_ per-surface branch-mutating disable (BranchesPanel/
   reflog/commit-context) — the always-visible banner states the detached-HEAD/unavailable indication (the
   REQ-BS-007 MUST); explicit per-action disabling is a follow-up.
-- ⬜ S6 submodules · ⬜ S7 settings/config · ⬜ S8 interactive rebase.
+- ✅ **S6 — submodules.** core: `SubmoduleStatus` literal + `SubmoduleInfo`; `SubmoduleList` (read)
+  + `Update`/`Sync`/`Add`/`Remove` (✎ Void) RPCs; `git/submodules.ts` index-cross-read (gitlink from
+  `ls-files --stage -z` = authoritative paths + `recordedOid`; line-based `submodule status` =
+  status/`checkedOutOid`/`describe`; `.gitmodules` = name/url/branch; joined by path, status lines
+  unmatched to a gitlink dropped; conflicted = stages 1/2/3 with no stage-0 gitlink → `recordedOid`
+  absent) + pure argv builders + guarded remove (deinit→rm→`modules/<path>` cleanup) + leading-dash
+  guards on add. engine/live (list lockless, mutations `withRepoLock`, remove uses `commonDir`);
+  `status`-domain `submodules` key + `useSubmodules` + 4 mutation hooks (Update→status; Sync/Add/Remove
+  →status+config). ui: `SubmodulesPanel` (`Table`, `SubmoduleStatusBadge`, row menu Update/Force-update/
+  Sync/Open/Remove with Sync+Open disabled when uninitialized, bulk Update-all/Sync-all, `AddDialog`,
+  force-update `AlertDialog`, reused `DestructiveConfirmDialog`, Open→`RepoOpen(absPath)`→navigate) as a
+  routed `"submodules"` view; wired `repository.submodulesManage`(→view)/`UpdateAll`/`SyncAll`(bulk ops).
+  REQ-P5-SM-001..006.
+- ⬜ S7 settings/config · ⬜ S8 interactive rebase.
 
-## ▶ RESUME HERE — P5 IN PROGRESS (S1–S5 ✅: gc, clean, archive, reflog, bisect; S6 submodules next)
+## ▶ RESUME HERE — P5 IN PROGRESS (S1–S6 ✅: gc, clean, archive, reflog, bisect, submodules; S7 settings/config next)
 
 **P0–P4 all landed on `main`.** P4 (cherry-pick / revert / conflicts / blame / single-file
 history) shipped core + UI: `conflict.list/sides`, take-side / save-merged / mark-resolved,
@@ -196,6 +209,15 @@ history. No P4 plan doc yet — author one first (cf. P2-PLAN.md / P3-PLAN.md sl
 **Key context files (gitignored working notes):** `docs/_impl-notes/DECISIONS.md` (D1–D12 locked decisions) + the 8 spec digests. **Verify command:** `pnpm gate`. **Clean-room:** never read `.local/SPEC-AGENT-BRIEF.md`; build only from `docs/spec/`+`LICENSES.md`+`BRANDING.md`+git/lib public docs. Undercover: no AI/model mentions in commits.
 
 ## Log
+- 2026-06-28 — **S6 (submodules) landed — core + ui, gate green.** core (`feat(p5): submodules`):
+  `SubmoduleStatus`/`SubmoduleInfo` schemas + 5 RPCs (`SubmoduleList` read; `Update`/`Sync`/`Add`/
+  `Remove` ✎ Void) + `git/submodules.ts` index-cross-read (gitlink `ls-files --stage -z` joined with
+  line-based `submodule status` + `.gitmodules`; conflicted = no stage-0 → `recordedOid` absent) +
+  guarded remove + leading-dash add guards; engine/live + 5 handlers; 17 module tests + contract
+  round-trip. ui: `useSubmodules` + 4 mutation hooks (status / +config), `SubmodulesPanel` routed
+  `"submodules"` view (Table + status badge + per-row Update/Force/Sync/Open/Remove + bulk + Add +
+  Open→RepoOpen), menu `submodulesManage`/`UpdateAll`/`SyncAll` wired; 8 component tests. Also a tiny
+  `style(ui)` commit reformatting a pre-existing oxfmt drift in `Toolbar.tsx`. **S7 (settings/config) next.**
 - 2026-06-28 — **P5 started — S1 (gc) core landed + P5 scaffolding bootstrapped (D18).** Created
   `schemas/phase5.ts` (`GcPrune`/`GcResult`), the `index.ts` barrel line, and the P5 `group.test.ts`
   catalog/round-trip block — the one-time bootstrap that must precede S2–S8. Added the `RepoGc` RPC

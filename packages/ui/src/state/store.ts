@@ -40,6 +40,7 @@ export type ActiveView =
   | "stash"
   | "tags"
   | "reflog"
+  | "submodules"
   | "solveConflicts";
 
 /** A commit targeted by a cherry-pick / revert dialog (P4 UI-C, REQ-UX-001). */

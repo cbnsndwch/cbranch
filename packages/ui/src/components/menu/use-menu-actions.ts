@@ -100,6 +100,33 @@ export function useMenuActions(): MenuActions {
         useUiStore
           .getState()
           .setBisectStartDialog({ bad: selectedOid ?? undefined });
+      // Submodules: Manage opens the routed panel; Update-all / Sync-all fire the bulk
+      // ops (empty paths = all) with toast feedback (REQ-P5-SM-001..003).
+      handlers["repository.submodulesManage"] = () =>
+        useUiStore.getState().setActiveView("submodules");
+      handlers["repository.submodulesUpdateAll"] = () =>
+        void api
+          .submoduleUpdate(repoId, { init: true })
+          .then(() => {
+            void queryClient.invalidateQueries({
+              queryKey: [repoId, "status"],
+            });
+            toast.success("All submodules updated");
+          })
+          .catch((e) => toast.error(String(e)));
+      handlers["repository.submodulesSyncAll"] = () =>
+        void api
+          .submoduleSync(repoId, {})
+          .then(() => {
+            void queryClient.invalidateQueries({
+              queryKey: [repoId, "status"],
+            });
+            void queryClient.invalidateQueries({
+              queryKey: [repoId, "config"],
+            });
+            toast.success("All submodules synchronized");
+          })
+          .catch((e) => toast.error(String(e)));
     }
     // Cherry-pick / revert act on the selected commit (REQ-UX-001); the dialog fetches
     // the commit's subject + parents (for the merge-commit mainline gate).

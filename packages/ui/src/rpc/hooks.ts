@@ -44,6 +44,7 @@ import {
   type RepoState,
   type SequencerResult,
   type StashEntry,
+  type SubmoduleInfo,
   type TagInfo,
   type TagType,
   type WorkingTreeStatus,
@@ -1406,5 +1407,92 @@ export const useBisectReset = (repoId: RepoId) => {
   return useMutation<void, unknown, void>({
     mutationFn: () => api.bisectReset(repoId),
     onSettled: () => invalidateOperation(qc, repoId),
+  });
+};
+
+// ── submodules (P5) ─────────────────────────────────────────────────────────
+
+/**
+ * The superproject's submodule listing (REQ-P5-SM-001). Keyed under `status` (a
+ * submodule's init/checkout/conflict state moves with the index/worktree), so a
+ * status-domain invalidation (incl. submodule mutations below) refetches it.
+ */
+export const useSubmodules = (
+  repoId: RepoId | null,
+): UseQueryResult<ReadonlyArray<SubmoduleInfo>> => {
+  const api = useApi();
+  return useQuery({
+    queryKey: repoId ? queryKeys.submodules(repoId) : ["inactive"],
+    queryFn: () => api.submoduleList(repoId as RepoId),
+    enabled: repoId !== null,
+  });
+};
+
+/** Update submodules (REQ-P5-SM-002); bulk via empty/omitted paths. Refresh `status`. */
+export const useSubmoduleUpdate = (repoId: RepoId) => {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation<
+    void,
+    unknown,
+    {
+      paths?: ReadonlyArray<string>;
+      init?: boolean;
+      recursive?: boolean;
+      force?: boolean;
+    }
+  >({
+    mutationFn: (opts) => api.submoduleUpdate(repoId, opts),
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: [repoId, "status"] });
+    },
+  });
+};
+
+/** Sync submodule remote URLs from `.gitmodules` (REQ-P5-SM-003); touches `config` too. */
+export const useSubmoduleSync = (repoId: RepoId) => {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation<
+    void,
+    unknown,
+    { paths?: ReadonlyArray<string>; recursive?: boolean }
+  >({
+    mutationFn: (opts) => api.submoduleSync(repoId, opts),
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: [repoId, "status"] });
+      void qc.invalidateQueries({ queryKey: [repoId, "config"] });
+    },
+  });
+};
+
+/** Add a new submodule (REQ-P5-SM-004); records a gitlink + `.gitmodules` entry. */
+export const useSubmoduleAdd = (repoId: RepoId) => {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation<
+    void,
+    unknown,
+    { url: string; path: string; branch?: string }
+  >({
+    mutationFn: ({ url, path, branch }) =>
+      api.submoduleAdd(repoId, url, path, branch),
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: [repoId, "status"] });
+      void qc.invalidateQueries({ queryKey: [repoId, "config"] });
+    },
+  });
+};
+
+/** Remove a submodule (REQ-P5-SM-005); guarded deinit → rm → cached-modules cleanup. */
+export const useSubmoduleRemove = (repoId: RepoId) => {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation<void, unknown, { path: string }>({
+    mutationFn: ({ path }) => api.submoduleRemove(repoId, path),
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: [repoId, "status"] });
+      void qc.invalidateQueries({ queryKey: [repoId, "config"] });
+    },
   });
 };

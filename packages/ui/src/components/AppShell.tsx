@@ -28,6 +28,7 @@ import { MenuBar } from "./MenuBar";
 import { RepositorySidebar } from "./RepositorySidebar";
 import { PickDialogs } from "./SequencerDialogs";
 import { StashPanel } from "./StashPanel";
+import { SubmodulesPanel } from "./SubmodulesPanel";
 import { TagsPanel } from "./TagsPanel";
 import { Toolbar } from "./Toolbar";
 import { Button } from "./ui/button";
@@ -42,6 +43,7 @@ const VIEWS: ReadonlyArray<readonly [ActiveView, string]> = [
   ["stash", "Stash"],
   ["tags", "Tags"],
   ["reflog", "Reflog"],
+  ["submodules", "Submodules"],
 ];
 
 // Web layout: menu bar → toolbar → view nav → main split (sidebar + content). There is no
@@ -136,6 +138,8 @@ export function AppShell() {
         return <TagsPanel repoId={repoId} />;
       case "reflog":
         return <ReflogPanel repoId={repoId} onSelectOid={selectOid} />;
+      case "submodules":
+        return <SubmodulesPanel repoId={repoId} />;
       default:
         return (
           <div className="grid min-h-0 grid-rows-[46px_1fr]">
