@@ -27,6 +27,18 @@ import diffStyles from "react-diff-view/style/index.css?url";
 export const links: Route.LinksFunction = () => [
   { rel: "stylesheet", href: diffStyles },
   { rel: "stylesheet", href: appStyles },
+
+  // Favicon / PWA icon pack (realfavicongenerator) — lives in `public/`, served at the root.
+  {
+    rel: "icon",
+    type: "image/png",
+    href: "/favicon-96x96.png",
+    sizes: "96x96",
+  },
+  { rel: "icon", type: "image/svg+xml", href: "/favicon.svg" },
+  { rel: "shortcut icon", href: "/favicon.ico" },
+  { rel: "apple-touch-icon", href: "/apple-touch-icon.png", sizes: "180x180" },
+  { rel: "manifest", href: "/site.webmanifest" },
 ];
 
 // The RPC URL is derived from the page origin; fall back to a placeholder during the
@@ -66,6 +78,8 @@ export function Layout({ children }: { readonly children: React.ReactNode }) {
       <head>
         <meta charSet="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <meta name="apple-mobile-web-app-title" content="cBranch" />
+        <meta name="theme-color" content="#2bc6ad" />
         {/* Must run before <Links> so the right theme is active when the CSS applies. */}
         <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
         <title>cbranch</title>
