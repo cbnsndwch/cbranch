@@ -50,6 +50,10 @@ import { fileContentAtRev } from "../git/content";
 import { commitDiff, diffWorkingFile } from "../git/diff";
 import { gitError } from "../git/errors";
 import { fileHistory as fileHistoryGit } from "../git/file-history";
+import {
+  clean as cleanGit,
+  cleanPreview as cleanPreviewGit,
+} from "../git/clean";
 import { makeLogStream } from "../git/history";
 import { makeRepoLockRegistry } from "../git/locks";
 import { gc as gcGit } from "../git/maintenance";
@@ -731,6 +735,18 @@ export const makeGitEngine = (
       gc: (repoId, aggressive, prune) =>
         Effect.flatMap(resolveById(repoId), (repo) =>
           locks.withRepoLock(repoId)(gcGit(repoCwd(repo), aggressive, prune)),
+        ),
+
+      // ── clean working directory (P5) ────────────────────────────────────────
+      cleanPreview: (repoId, directories, ignored) =>
+        Effect.flatMap(resolveById(repoId), (repo) =>
+          cleanPreviewGit(repoCwd(repo), directories, ignored),
+        ),
+      clean: (repoId, paths, directories, ignored) =>
+        Effect.flatMap(resolveById(repoId), (repo) =>
+          locks.withRepoLock(repoId)(
+            cleanGit(repoCwd(repo), paths, directories, ignored),
+          ),
         ),
     };
     return api;

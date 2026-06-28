@@ -45,7 +45,12 @@ import {
   FileHistoryPage,
   SequencerResult,
 } from "../schemas/phase4";
-import { GcPrune, GcResult } from "../schemas/phase5";
+import {
+  CleanPreview,
+  CleanResult,
+  GcPrune,
+  GcResult,
+} from "../schemas/phase5";
 import { Oid, RepoId } from "../schemas/primitives";
 import { DiffSpec, LogQuery } from "../schemas/queries";
 import {
@@ -618,6 +623,29 @@ export const CbranchRpcs = RpcGroup.make(
       prune: Schema.optional(GcPrune),
     },
     success: GcResult,
+    error: GitError,
+  }),
+
+  // ── P5: clean working directory ────────────────────────────────────────────
+  // clean.preview — dry-run list of would-remove untracked entries (READ, REQ-P5-CL-001).
+  Rpc.make("CleanPreview", {
+    payload: {
+      repoId: RepoId,
+      directories: Schema.Boolean,
+      ignored: Schema.Boolean,
+    },
+    success: CleanPreview,
+    error: GitError,
+  }),
+  // clean ✎ — remove exactly the previewed paths (REQ-P5-CL-003/005). Empty paths = no-op.
+  Rpc.make("Clean", {
+    payload: {
+      repoId: RepoId,
+      paths: Schema.Array(Schema.String),
+      directories: Schema.Boolean,
+      ignored: Schema.Boolean,
+    },
+    success: CleanResult,
     error: GitError,
   }),
 );

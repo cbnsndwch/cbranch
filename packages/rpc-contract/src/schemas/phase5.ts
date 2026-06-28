@@ -27,3 +27,25 @@ export class GcResult extends Schema.Class<GcResult>("GcResult")({
   stdout: Schema.String,
   stderr: Schema.String,
 }) {}
+
+// ─── S2: clean working directory ─────────────────────────────────────────────────
+
+/**
+ * One entry git would remove (REQ-P5-CL-001). `isDirectory` is derived from git's
+ * trailing `/`, which the `path` retains so the destructive run can pass it back as a
+ * pathspec unchanged.
+ */
+export class CleanEntry extends Schema.Class<CleanEntry>("CleanEntry")({
+  path: Schema.String,
+  isDirectory: Schema.Boolean,
+}) {}
+
+/** The dry-run preview: exactly what a clean with the same options would remove. */
+export class CleanPreview extends Schema.Class<CleanPreview>("CleanPreview")({
+  entries: Schema.Array(CleanEntry),
+}) {}
+
+/** The destructive clean outcome: the count of previewed entries removed (REQ-P5-CL-005). */
+export class CleanResult extends Schema.Class<CleanResult>("CleanResult")({
+  removed: Schema.Number,
+}) {}

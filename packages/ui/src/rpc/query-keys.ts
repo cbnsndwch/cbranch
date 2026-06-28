@@ -81,6 +81,13 @@ export const queryKeys = {
   /** `tag.list` (domain: `tags`). */
   tags: (repoId: RepoId) => [repoId, "tags", "list"] as const,
   /**
+   * `clean.preview` — dry-run would-remove list, keyed by the option toggles so changing
+   * an option invalidates the stale preview (domain: `status`; REQ-P5-CL-002). The query
+   * is `enabled` only once the user requests a Preview.
+   */
+  cleanPreview: (repoId: RepoId, directories: boolean, ignored: boolean) =>
+    [repoId, "status", "clean", directories, ignored] as const,
+  /**
    * `conflict.list` — in-progress op + conflicted paths (domain: `status`; every
    * conflict mutation touches the index). Drives the banner + panel.
    */

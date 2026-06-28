@@ -25,6 +25,8 @@ import {
   type ConflictSides,
   type ContentEncoding,
   type DiffFile,
+  type CleanPreview,
+  type CleanResult,
   type FileContentResult,
   type FileHistoryPage,
   type GcPrune,
@@ -465,6 +467,21 @@ export interface GitEngineApi {
     aggressive?: boolean,
     prune?: GcPrune,
   ) => Effect.Effect<GcResult, GitError>;
+
+  // ── clean working directory (P5, S2) ────────────────────────────────────────
+  /** clean.preview — dry-run list of would-remove untracked entries. READ. REQ-P5-CL-001. */
+  readonly cleanPreview: (
+    repoId: RepoId,
+    directories: boolean,
+    ignored: boolean,
+  ) => Effect.Effect<CleanPreview, GitError>;
+  /** clean ✎ — remove exactly the previewed paths; empty paths = no-op. REQ-P5-CL-003/005. */
+  readonly clean: (
+    repoId: RepoId,
+    paths: ReadonlyArray<string>,
+    directories: boolean,
+    ignored: boolean,
+  ) => Effect.Effect<CleanResult, GitError>;
 
   // ── object-read infrastructure (internal; for core-B) ──────────────────────
   /** Read a full object via the repo's `cat-file --batch` pool (`null` if missing). */

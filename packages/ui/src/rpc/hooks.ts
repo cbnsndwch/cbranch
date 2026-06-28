@@ -11,6 +11,8 @@ import {
   type BranchInfo,
   type BranchListing,
   type BranchSwitchStrategy,
+  type CleanPreview,
+  type CleanResult,
   type CommitCreated,
   type CommitDetail,
   type CommitInput,
@@ -1263,6 +1265,42 @@ export const useGc = (repoId: RepoId) => {
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: [repoId, "refs"] });
       void qc.invalidateQueries({ queryKey: [repoId, "commits"] });
+    },
+  });
+};
+
+/**
+ * The dry-run clean preview (REQ-P5-CL-001/002), keyed by the option toggles so a
+ * changed option fetches a fresh preview rather than reusing a stale one. `enabled` is
+ * driven by the dialog's "has the user pressed Preview for these options?" flag.
+ */
+export const useCleanPreview = (
+  repoId: RepoId,
+  directories: boolean,
+  ignored: boolean,
+  enabled: boolean,
+): UseQueryResult<CleanPreview> => {
+  const api = useApi();
+  return useQuery({
+    queryKey: queryKeys.cleanPreview(repoId, directories, ignored),
+    queryFn: () => api.cleanPreview(repoId, directories, ignored),
+    enabled,
+  });
+};
+
+/** Destructively clean the previewed paths (REQ-P5-CL-003/005); refresh status on settle. */
+export const useClean = (repoId: RepoId) => {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation<
+    CleanResult,
+    unknown,
+    { paths: ReadonlyArray<string>; directories: boolean; ignored: boolean }
+  >({
+    mutationFn: ({ paths, directories, ignored }) =>
+      api.clean(repoId, paths, directories, ignored),
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: [repoId, "status"] });
     },
   });
 };

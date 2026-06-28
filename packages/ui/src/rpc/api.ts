@@ -14,6 +14,8 @@ import {
   type BranchSwitchStrategy,
   type CommitCreated,
   type CommitDetail,
+  type CleanPreview,
+  type CleanResult,
   type CommitInput,
   type CommitMessage,
   type CommitSummary,
@@ -306,6 +308,18 @@ export interface CbranchApi {
     repoId: RepoId,
     opts?: { aggressive?: boolean; prune?: GcPrune },
   ): Promise<GcResult>;
+  // ── clean working directory (P5) ──────────────────────────────────────────
+  cleanPreview(
+    repoId: RepoId,
+    directories: boolean,
+    ignored: boolean,
+  ): Promise<CleanPreview>;
+  clean(
+    repoId: RepoId,
+    paths: ReadonlyArray<string>,
+    directories: boolean,
+    ignored: boolean,
+  ): Promise<CleanResult>;
 }
 
 /** Back a {@link CbranchApi} with the single app runtime. */
@@ -572,5 +586,14 @@ export const makeApi = (runtime: AppRuntime): CbranchApi => {
     // ── repository maintenance (P5) ─────────────────────────────────────────
     gc: (repoId, opts) =>
       runtime.runPromise(withClient((c) => c.RepoGc({ repoId, ...opts }))),
+    // ── clean working directory (P5) ────────────────────────────────────────
+    cleanPreview: (repoId, directories, ignored) =>
+      runtime.runPromise(
+        withClient((c) => c.CleanPreview({ repoId, directories, ignored })),
+      ),
+    clean: (repoId, paths, directories, ignored) =>
+      runtime.runPromise(
+        withClient((c) => c.Clean({ repoId, paths, directories, ignored })),
+      ),
   };
 };

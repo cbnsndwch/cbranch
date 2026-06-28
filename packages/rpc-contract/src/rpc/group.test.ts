@@ -50,7 +50,13 @@ import {
   FileHistoryPage,
   SequencerResult,
 } from "../schemas/phase4";
-import { GcPrune, GcResult } from "../schemas/phase5";
+import {
+  CleanEntry,
+  CleanPreview,
+  CleanResult,
+  GcPrune,
+  GcResult,
+} from "../schemas/phase5";
 import { Oid, RepoId } from "../schemas/primitives";
 import { LogQuery } from "../schemas/queries";
 import {
@@ -306,6 +312,13 @@ const gcResult = new GcResult({
   stdout: "Counting objects: 12, done.\n",
   stderr: "",
 });
+const cleanPreview = new CleanPreview({
+  entries: [
+    new CleanEntry({ path: "build.log", isDirectory: false }),
+    new CleanEntry({ path: "dist/", isDirectory: true }),
+  ],
+});
+const cleanResult = new CleanResult({ removed: 2 });
 
 // --- stub handlers: schema-valid data, plus payload-driven error injection ---
 const handlers = CbranchRpcs.toLayer({
@@ -442,6 +455,10 @@ const handlers = CbranchRpcs.toLayer({
 
   // ── P5: repository maintenance (gc) ───────────────────────────────────────────
   RepoGc: () => Effect.succeed(gcResult),
+
+  // ── P5: clean working directory ───────────────────────────────────────────────
+  CleanPreview: () => Effect.succeed(cleanPreview),
+  Clean: () => Effect.succeed(cleanResult),
 });
 
 describe("CbranchRpcs P1 contract (in-memory RpcTest round-trip)", () => {
@@ -838,6 +855,30 @@ describe("CbranchRpcs P5 power-features round-trip", () => {
       true,
     );
   });
+
+  test("CleanPreview + Clean round-trip (file + directory entries)", async () => {
+    const program = Effect.gen(function* () {
+      const client = yield* RpcTest.makeClient(CbranchRpcs);
+      const preview = yield* client.CleanPreview({
+        repoId,
+        directories: true,
+        ignored: false,
+      });
+      const result = yield* client.Clean({
+        repoId,
+        paths: ["build.log", "dist/"],
+        directories: true,
+        ignored: false,
+      });
+      return { preview, result };
+    }).pipe(Effect.provide(handlers), Effect.scoped);
+
+    const { preview, result } = await Effect.runPromise(program);
+
+    expect(preview.entries.map((e) => e.path)).toEqual(["build.log", "dist/"]);
+    expect(preview.entries[1]?.isDirectory).toBe(true);
+    expect(result.removed).toBe(2);
+  });
 });
 
 // Per-feature P5 slices APPEND their tags to this catalog block (D18); gc opens it.
@@ -845,6 +886,9 @@ describe("CbranchRpcs P5 power-features method catalog (DECISIONS D1 wire tags)"
   test.each([
     // maintenance (gc)
     "RepoGc",
+    // clean
+    "CleanPreview",
+    "Clean",
   ])("exposes the %s wire tag", (tag) => {
     expect(CbranchRpcs.requests.has(tag)).toBe(true);
   });

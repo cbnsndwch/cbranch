@@ -268,4 +268,14 @@ export const handlersLayer = CbranchRpcs.toLayer({
   // ── repository maintenance (P5) ─────────────────────────────────────────────
   RepoGc: ({ repoId, aggressive, prune }) =>
     Effect.flatMap(GitEngine, (engine) => engine.gc(repoId, aggressive, prune)),
+
+  // ── clean working directory (P5) ────────────────────────────────────────────
+  CleanPreview: ({ repoId, directories, ignored }) =>
+    Effect.flatMap(GitEngine, (engine) =>
+      engine.cleanPreview(repoId, directories, ignored),
+    ),
+  Clean: ({ repoId, paths, directories, ignored }) =>
+    Effect.flatMap(GitEngine, (engine) =>
+      engine.clean(repoId, paths, directories, ignored),
+    ),
 });
