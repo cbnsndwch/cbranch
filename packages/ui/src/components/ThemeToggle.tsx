@@ -18,7 +18,7 @@ export function ThemeToggle() {
       onClick={next}
       aria-label={`Theme: ${theme}`}
       title={`Theme: ${theme}`}
-      className="border p-1.5"
+      className="border-0 p-1.5"
     >
       <Icon className="h-4 w-4" aria-hidden="true" />
     </button>

@@ -15,6 +15,7 @@ import {
   MenubarSubTrigger,
   MenubarTrigger,
 } from "./ui/menubar";
+import { ThemeToggle } from "./ThemeToggle";
 
 // The desktop shell's menu bar. The full nine-menu chrome renders from day one
 // (menu-hierarchy.md); items without a wired handler render greyed/disabled, driven by the
@@ -97,7 +98,7 @@ function renderEntry(
 export function MenuBar() {
   const actions = useMenuActions();
   return (
-    <Menubar className="bg-background h-full gap-0 rounded-none border-0 border-b p-0 px-1">
+    <Menubar className="bg-background h-full gap-0 rounded-none border-0 p-0 px-1">
       {MENUS.map((menu) => (
         <MenubarMenu key={menu.id}>
           <MenubarTrigger className="h-full rounded-none px-2 py-0 text-[11px] font-normal">
@@ -110,6 +111,9 @@ export function MenuBar() {
           </MenubarContent>
         </MenubarMenu>
       ))}
+
+      <div className="flex-1" />
+      <ThemeToggle />
     </Menubar>
   );
 }
