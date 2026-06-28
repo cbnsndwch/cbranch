@@ -197,51 +197,56 @@ export function AppShell() {
       {/* Headless: reflects the active branch in the browser window title (no in-app title bar). */}
       <DocumentTitle />
 
-      <div className="grid h-dvh grid-rows-[24px_auto_28px_1fr] overflow-hidden">
+      <div className="grid h-dvh grid-rows-[24px_auto_1fr] overflow-hidden">
         {/* Row 1: Menu bar */}
         <MenuBar />
 
         {/* Row 2: Toolbar */}
         <Toolbar />
 
-        {/* Row 3: View nav tabs */}
-        <div className="bg-muted flex items-end border-b">
-          {VIEWS.map(([view, label]) => (
-            <button
-              key={view}
-              type="button"
-              onClick={() => setActiveView(view)}
-              className={cn(
-                "px-3 py-0.5 text-[11px]",
-                view === activeView
-                  ? "relative -mb-px border border-b-background bg-background font-medium"
-                  : "text-muted-foreground hover:bg-accent/50",
-              )}
-            >
-              {label}
-            </button>
-          ))}
-          {showConflicts && (
-            <button
-              type="button"
-              onClick={() => setActiveView("solveConflicts")}
-              className={cn(
-                "px-3 py-0.5 text-[11px]",
-                activeView === "solveConflicts"
-                  ? "relative -mb-px border border-b-background bg-background font-medium"
-                  : "text-status-behind hover:bg-accent/50",
-              )}
-            >
-              Conflicts
-            </button>
-          )}
-        </div>
-        {/* Row 4: Main split */}
+        {/* Row 3: Main split — sidebar beside (view nav tabs over content). The
+            tabs scope the right-hand graph only, so they live above it rather
+            than spanning the full width over the sidebar too. */}
         <div className="grid min-h-0 grid-cols-[265px_1fr]">
-          {/* Left: Repository sidebar */}
+          {/* Left: Repository sidebar (spans the full content height) */}
           <RepositorySidebar repoId={repoId} />
-          {/* Right: View content */}
-          {mainContent}
+          {/* Right: view nav tabs over view content */}
+          <div className="grid min-h-0 grid-rows-[28px_1fr]">
+            {/* View nav tabs */}
+            <div className="bg-muted flex items-end border-b">
+              {VIEWS.map(([view, label]) => (
+                <button
+                  key={view}
+                  type="button"
+                  onClick={() => setActiveView(view)}
+                  className={cn(
+                    "px-3 py-0.5 text-[11px]",
+                    view === activeView
+                      ? "relative -mb-px border border-b-background bg-background font-medium"
+                      : "text-muted-foreground hover:bg-accent/50",
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
+              {showConflicts && (
+                <button
+                  type="button"
+                  onClick={() => setActiveView("solveConflicts")}
+                  className={cn(
+                    "px-3 py-0.5 text-[11px]",
+                    activeView === "solveConflicts"
+                      ? "relative -mb-px border border-b-background bg-background font-medium"
+                      : "text-status-behind hover:bg-accent/50",
+                  )}
+                >
+                  Conflicts
+                </button>
+              )}
+            </div>
+            {/* View content */}
+            {mainContent}
+          </div>
         </div>
       </div>
     </>
