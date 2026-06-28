@@ -26,6 +26,7 @@ import { HistoryStatusStrip } from "./HistoryStatusStrip";
 import { MergeEditor } from "./MergeEditor";
 import { MenuBar } from "./MenuBar";
 import { RepositorySidebar } from "./RepositorySidebar";
+import { RebaseDialog } from "./RebaseDialog";
 import { PickDialogs } from "./SequencerDialogs";
 import { SettingsDialog } from "./SettingsDialog";
 import { StashPanel } from "./StashPanel";
@@ -174,6 +175,7 @@ export function AppShell() {
       <ArchiveDialog />
       <SettingsDialog />
       {repoId && <BisectStartDialog repoId={repoId} onSelectOid={selectOid} />}
+      {repoId && <RebaseDialog repoId={repoId} />}
       {repoId && editPath !== null && (
         <MergeEditor
           repoId={repoId}

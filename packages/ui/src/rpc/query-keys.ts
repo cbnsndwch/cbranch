@@ -80,6 +80,18 @@ export const queryKeys = {
    * so a pre-existing session shows on repo open (cheap `existsSync` fast-path, REQ-P5-BS-006).
    */
   bisect: (repoId: RepoId) => [repoId, "inProgress", "bisect"] as const,
+  /**
+   * `rebase.plan` — the computed `<upstream>..HEAD` range for the todo editor (domain:
+   * `commits`; re-derived per chosen base/onto). REQ-P5-IR-002.
+   */
+  rebasePlan: (repoId: RepoId, upstream: string, onto?: string) =>
+    [repoId, "commits", "rebasePlan", upstream, onto ?? ""] as const,
+  /**
+   * `rebase.status` — machine-derived in-progress status (domain: `inProgress`). Stays
+   * enabled so a pre-existing rebase shows on repo open (REQ-P5-IR-011).
+   */
+  rebaseStatus: (repoId: RepoId) =>
+    [repoId, "inProgress", "rebaseStatus"] as const,
   /** `remote.list` (domain: `config`). */
   remotes: (repoId: RepoId) => [repoId, "config", "remotes"] as const,
   /**

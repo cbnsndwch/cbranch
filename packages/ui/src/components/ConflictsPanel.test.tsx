@@ -74,6 +74,10 @@ const makeFakeApi = (overrides: Partial<CbranchApi> = {}): CbranchApi =>
       operation: "rebase",
       committed: 0,
     })),
+    rebaseStatus: vi.fn(async () => ({
+      inProgress: true,
+      stopReason: "conflict",
+    })),
     ...overrides,
   }) as unknown as CbranchApi;
 
@@ -229,12 +233,61 @@ describe("ConflictsPanel", () => {
       }),
     );
     expect(await screen.findByText("Skip")).toBeTruthy();
-    expect(screen.getByText(/commit 2 of 5/)).toBeTruthy();
+    expect(screen.getByText(/step 2 of 5/)).toBeTruthy();
     cleanup();
 
     renderPanel(makeFakeApi());
     await screen.findByText("Continue");
     expect(screen.queryByText("Skip")).toBeNull();
+  });
+
+  test("a rebase edit stop shows the stop-reason copy and no message box", async () => {
+    renderPanel(
+      makeFakeApi({
+        conflictList: vi.fn(async () =>
+          listing([], {
+            operation: "rebase",
+            canContinue: true,
+            canSkip: true,
+            progress: { current: 3, total: 4 },
+          }),
+        ),
+        rebaseStatus: vi.fn(async () => ({
+          inProgress: true,
+          stopReason: "edit",
+        })),
+      }),
+    );
+    expect(await screen.findByText(/Stopped to edit this commit/)).toBeTruthy();
+    // Rebase bakes reword/squash messages into the todo — no commit-message box.
+    expect(screen.queryByLabelText("Commit message")).toBeNull();
+    const cont = screen.getByText("Continue") as HTMLButtonElement;
+    expect(cont.disabled).toBe(false);
+  });
+
+  test("an execFailed rebase stop disables Continue and alerts to abort", async () => {
+    renderPanel(
+      makeFakeApi({
+        conflictList: vi.fn(async () =>
+          listing([], {
+            operation: "rebase",
+            canContinue: true,
+            canSkip: true,
+            progress: { current: 2, total: 3 },
+          }),
+        ),
+        rebaseStatus: vi.fn(async () => ({
+          inProgress: true,
+          stopReason: "execFailed",
+        })),
+      }),
+    );
+    expect(
+      await screen.findByText(/A scripted rebase step failed/),
+    ).toBeTruthy();
+    const cont = screen.getByText("Continue") as HTMLButtonElement;
+    expect(cont.disabled).toBe(true);
+    expect(screen.getByText("Abort")).toBeTruthy();
   });
 
   test("a failed resolution surfaces an error toast (REQ-UX-011)", async () => {

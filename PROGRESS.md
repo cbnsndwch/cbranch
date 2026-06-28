@@ -141,7 +141,19 @@ Per-feature vertical slices, easiest-first (D18). Each = a `core` commit then a 
   REQ-P5-SM-001..006.
 - ⬜ S7 settings/config · ⬜ S8 interactive rebase.
 
-## ▶ RESUME HERE — P5 IN PROGRESS (S1–S7 ✅: gc, clean, archive, reflog, bisect, submodules, settings/config; S8 interactive rebase next)
+## ▶ RESUME HERE — P5 COMPLETE ✅ (S1–S8 all landed: gc, clean, archive, reflog, bisect, submodules, settings/config, interactive rebase)
+
+**P5 (power features) is done.** All eight vertical slices landed on `main` core+UI, gate
+green. The last slice, **S8 interactive rebase**, shipped: a scripted `git rebase -i`
+driven by a `GIT_SEQUENCE_EDITOR` shim (copied into the web-server bundle) with an
+exec-amend todo rewrite for reword/squash, a backend-aware machine-state status reader,
+the `InteractiveRebaseDialog` (base picker → live plan → reorderable todo rows + per-row
+action + message editor), an extended in-progress banner (step X/Y, stop-reason copy,
+execFailed→Abort), and the commit-context "Rebase commits since here…" entry. Continue/
+Skip/Abort and the conflicts view are the reused P4 sequencer surface. **Next: P5 review
+pass or P6 — await user direction.**
+
+
 
 **P0–P4 all landed on `main`.** P4 (cherry-pick / revert / conflicts / blame / single-file
 history) shipped core + UI: `conflict.list/sides`, take-side / save-merged / mark-resolved,
@@ -209,6 +221,23 @@ history. No P4 plan doc yet — author one first (cf. P2-PLAN.md / P3-PLAN.md sl
 **Key context files (gitignored working notes):** `docs/_impl-notes/DECISIONS.md` (D1–D12 locked decisions) + the 8 spec digests. **Verify command:** `pnpm gate`. **Clean-room:** never read `.local/SPEC-AGENT-BRIEF.md`; build only from `docs/spec/`+`LICENSES.md`+`BRANDING.md`+git/lib public docs. Undercover: no AI/model mentions in commits.
 
 ## Log
+- 2026-06-28 — **S8 (interactive rebase) landed — core + ui, gate green. P5 COMPLETE.**
+  core (`feat(p5): interactive rebase engine`): `RebaseAction`/`RebaseStopReason` literals
+  + `RebaseTodoCommit`/`RebasePlan`/`RebaseStep`/`RebaseStatus` (reusing `OperationProgress`)
+  + 3 RPCs (`RebasePlan`/`RebaseStatus` read, `RebaseStart` ✎). New `git/rebase.ts`: plan
+  lists `<upstream>..HEAD` oldest-first; start writes a full `git-rebase-todo` and drives
+  `git rebase -i` through a `GIT_SEQUENCE_EDITOR` shim (`git/shims/rebase-seq-editor.mjs`,
+  resolved via `defaultShimPath()` + `import.meta.url`, copied into the web-server bundle by
+  `build.mjs`/`dev.mjs`), baking reword/squash messages as `exec git commit --amend -F`
+  lines (`GIT_EDITOR=true`); empty reword/squash messages rejected in-engine, dirty tree
+  refused; status backend-aware over `rebase-merge/`+`rebase-apply/`, stop reason totalized
+  from machine state (conflict/edit/execFailed/none). Continue/Skip/Abort reuse the P4
+  sequencer. 29 engine tests + a packaged-shim check + contract round-trips. ui
+  (`feat(ui): interactive rebase dialog`): `RebaseDialog` (base picker → live `rebasePlan`
+  → reorderable native-select todo rows + `RebaseMessageDialog`), extended `InProgressBanner`
+  for rebase (step X/Y, stop-reason copy, `execFailed`→Abort, no message box), `rebaseDialog`
+  store slice, `commands.rebase` handler + palette unhide, commit-context "Rebase commits
+  since here…" (seeds upstream to the commit's parent). `pnpm gate` green.
 - 2026-06-28 — **S7 (settings & git config) landed — core + ui, gate green.** core
   (`feat(p5): settings & git config`): `ConfigScope`/`WritableScope`/`ThemePref` +
   `GitConfigEntry`/`GitConfigValue`/`KeyBinding`/`AppSettings` schemas + 6 RPCs

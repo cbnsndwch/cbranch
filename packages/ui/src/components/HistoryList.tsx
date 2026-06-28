@@ -76,6 +76,7 @@ export function HistoryList({
   const setPickDialog = useUiStore((s) => s.setPickDialog);
   const setArchiveDialog = useUiStore((s) => s.setArchiveDialog);
   const setBisectStartDialog = useUiStore((s) => s.setBisectStartDialog);
+  const setRebaseDialog = useUiStore((s) => s.setRebaseDialog);
   useEffect(() => {
     const allRefs = [...new Set(rows.flatMap((r) => r.refs))];
     setKnownRefStrings(allRefs);
@@ -207,6 +208,10 @@ export function HistoryList({
     setPickDialog({ kind: "revert", commits: [{ oid: target, subject }] });
   const archiveCommit = (target: Oid) => setArchiveDialog({ treeish: target });
   const bisectFrom = (target: Oid) => setBisectStartDialog({ bad: target });
+  // "Rebase commits since here" seeds the upstream to the commit's first parent, so the
+  // replayed range (parent..HEAD) includes the selected commit (REQ-P5-IR-001).
+  const rebaseSince = (parents: ReadonlyArray<Oid>) =>
+    setRebaseDialog({ upstream: parents[0] ?? null });
 
   if (status === "error")
     return <Placeholder tone="danger">Could not load history.</Placeholder>;
@@ -337,6 +342,11 @@ export function HistoryList({
                       <DropdownMenuItem onClick={() => bisectFrom(row.oid)}>
                         Bisect from here…
                       </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => rebaseSince(row.parents)}
+                      >
+                        Rebase commits since here…
+                      </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </ContextMenuTrigger>
@@ -356,6 +366,9 @@ export function HistoryList({
                   </ContextMenuItem>
                   <ContextMenuItem onClick={() => bisectFrom(row.oid)}>
                     Bisect from here…
+                  </ContextMenuItem>
+                  <ContextMenuItem onClick={() => rebaseSince(row.parents)}>
+                    Rebase commits since here…
                   </ContextMenuItem>
                 </ContextMenuContent>
               </ContextMenu>

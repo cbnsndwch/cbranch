@@ -39,6 +39,9 @@ import {
   type MergeResult,
   type Oid,
   type PatchSelection,
+  type RebasePlan,
+  type RebaseStatus,
+  type RebaseStep,
   type RecentRepo,
   type ReflogPage,
   type RemoteInfo,
@@ -1409,6 +1412,59 @@ export const useBisectReset = (repoId: RepoId) => {
   const qc = useQueryClient();
   return useMutation<void, unknown, void>({
     mutationFn: () => api.bisectReset(repoId),
+    onSettled: () => invalidateOperation(qc, repoId),
+  });
+};
+
+// ── interactive rebase (P5) ───────────────────────────────────────────────────
+
+/**
+ * The computed rebase range for the todo editor (REQ-P5-IR-002). Disabled until a base
+ * is chosen (empty upstream); content-addressed under `commits` per base/onto.
+ */
+export const useRebasePlan = (
+  repoId: RepoId | null,
+  upstream: string,
+  onto?: string,
+): UseQueryResult<RebasePlan> => {
+  const api = useApi();
+  return useQuery({
+    queryKey:
+      repoId && upstream !== ""
+        ? queryKeys.rebasePlan(repoId, upstream, onto)
+        : ["inactive"],
+    queryFn: () =>
+      api.rebasePlan(repoId as RepoId, upstream, onto ? { onto } : undefined),
+    enabled: repoId !== null && upstream !== "",
+  });
+};
+
+/**
+ * Machine-derived in-progress rebase status (REQ-P5-IR-009/011). Kept enabled so a
+ * pre-existing rebase surfaces on repo open; keyed under `inProgress`.
+ */
+export const useRebaseStatus = (
+  repoId: RepoId | null,
+): UseQueryResult<RebaseStatus> => {
+  const api = useApi();
+  return useQuery({
+    queryKey: repoId ? queryKeys.rebaseStatus(repoId) : ["inactive"],
+    queryFn: () => api.rebaseStatus(repoId as RepoId),
+    enabled: repoId !== null,
+  });
+};
+
+/** Start a scripted interactive rebase (REQ-P5-IR-008/012). */
+export const useRebaseStart = (repoId: RepoId) => {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation<
+    RebaseStatus,
+    unknown,
+    { upstream: string; steps: ReadonlyArray<RebaseStep>; onto?: string }
+  >({
+    mutationFn: ({ upstream, steps, onto }) =>
+      api.rebaseStart(repoId, upstream, steps, onto ? { onto } : undefined),
     onSettled: () => invalidateOperation(qc, repoId),
   });
 };

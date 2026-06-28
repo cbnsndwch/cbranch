@@ -229,6 +229,18 @@ export interface UiState {
    */
   readonly bisectStartDialog: { readonly bad?: Oid } | null;
   readonly setBisectStartDialog: (state: { bad?: Oid } | null) => void;
+  /**
+   * The interactive-rebase dialog, or `null` when closed. `upstream` pre-seeds the base
+   * (the selected commit's parent from "Rebase commits since here…"); `null` opens the
+   * base picker empty so the user chooses an upstream/onto ref. REQ-P5-IR-001.
+   */
+  readonly rebaseDialog: {
+    readonly upstream: string | null;
+    readonly onto?: string;
+  } | null;
+  readonly setRebaseDialog: (
+    state: { upstream: string | null; onto?: string } | null,
+  ) => void;
   // ── P5: settings & git config dialog ─────────────────────────────────────────
   /** Whether the settings modal (git config + app settings) is open (REQ-P5-CFG-001). App-global. */
   readonly settingsDialogOpen: boolean;
@@ -265,6 +277,7 @@ export const useUiStore = create<UiState>((set) => ({
   cleanDialogOpen: false,
   archiveDialog: null,
   bisectStartDialog: null,
+  rebaseDialog: null,
   settingsDialogOpen: false,
   findOpen: false,
   // Switching repositories supersedes the old selection and filters (P1-OPEN-4 / P1-X-4).
@@ -285,6 +298,7 @@ export const useUiStore = create<UiState>((set) => ({
       cleanDialogOpen: false,
       archiveDialog: null,
       bisectStartDialog: null,
+      rebaseDialog: null,
       findOpen: false,
     }),
   setSelectedOid: (selectedOid) => set({ selectedOid }),
@@ -370,4 +384,5 @@ export const useUiStore = create<UiState>((set) => ({
   setCleanDialogOpen: (cleanDialogOpen) => set({ cleanDialogOpen }),
   setArchiveDialog: (archiveDialog) => set({ archiveDialog }),
   setBisectStartDialog: (bisectStartDialog) => set({ bisectStartDialog }),
+  setRebaseDialog: (rebaseDialog) => set({ rebaseDialog }),
 }));

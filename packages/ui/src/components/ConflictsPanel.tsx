@@ -4,6 +4,7 @@ import {
   type ConflictResolution,
   type OperationKind,
   type OperationProgress,
+  type RebaseStopReason,
   type RepoId,
 } from "@cbranch/rpc-contract";
 import { useRef, useState } from "react";
@@ -15,6 +16,7 @@ import {
   useOpAbort,
   useOpContinue,
   useOpSkip,
+  useRebaseStatus,
 } from "../rpc/hooks";
 import { DestructiveConfirmDialog } from "./DestructiveConfirmDialog";
 import { Badge, type BadgeTone } from "./ui/badge";
@@ -66,6 +68,15 @@ const CLASS_TONE: Record<ConflictClassification, BadgeTone> = {
 const isDeleteModify = (c: ConflictClassification): boolean =>
   c === "deletedByUs" || c === "deletedByThem";
 
+/** Rebase stop-reason copy for the banner (REQ-P5-IR-009). `none` has no banner line. */
+const REBASE_STOP_COPY: Record<RebaseStopReason, string> = {
+  none: "",
+  conflict: "Resolve the conflicts below, then Continue.",
+  edit: "Stopped to edit this commit — make changes and stage them, then Continue.",
+  execFailed:
+    "A scripted rebase step failed. Abort and start over — Continue would skip it and drop its change.",
+};
+
 interface ConflictsPanelProps {
   repoId: RepoId;
   /** Seam for UI-B: open the 3-way merge editor for a path. */
@@ -85,6 +96,12 @@ export function ConflictsPanel({ repoId, onEdit }: ConflictsPanelProps) {
 
   const conflicted = data?.conflicted ?? [];
   const operation = data?.operation ?? "none";
+
+  // Rebase carries an extra stop-reason (edit vs conflict vs execFailed) that the
+  // generic conflict listing can't express; fetch it only while a rebase is active.
+  const rebaseStatus = useRebaseStatus(operation === "rebase" ? repoId : null);
+  const rebaseStop =
+    operation === "rebase" ? rebaseStatus.data?.stopReason : undefined;
 
   // "Resolved" is relative to the operation's initial set, which only the client
   // knows (the server can't tell a taken-ours resolution from HEAD). Accumulate every
@@ -148,6 +165,7 @@ export function ConflictsPanel({ repoId, onEdit }: ConflictsPanelProps) {
           canSkip={data?.canSkip ?? false}
           conflictedCount={conflicted.length}
           resolvedCount={resolvedCount}
+          rebaseStop={rebaseStop}
           message={message}
           onMessageChange={setMessage}
           onContinue={handleContinue}
@@ -218,6 +236,8 @@ interface BannerProps {
   canSkip: boolean;
   conflictedCount: number;
   resolvedCount: number;
+  /** Rebase-only stop reason; drives the banner copy + steers `execFailed` to Abort. */
+  rebaseStop: RebaseStopReason | undefined;
   message: string;
   onMessageChange: (value: string) => void;
   onContinue: () => void;
@@ -233,6 +253,7 @@ function InProgressBanner({
   canSkip,
   conflictedCount,
   resolvedCount,
+  rebaseStop,
   message,
   onMessageChange,
   onContinue,
@@ -240,6 +261,11 @@ function InProgressBanner({
   onSkip,
   busy,
 }: BannerProps) {
+  const isRebase = operation === "rebase";
+  // Rebase Continue passes no message (reword/squash are baked into the todo); a failed
+  // scripted step must not be Continued (it would skip the step and drop its change).
+  const execFailed = rebaseStop === "execFailed";
+  const stopCopy = isRebase && rebaseStop ? REBASE_STOP_COPY[rebaseStop] : "";
   return (
     <div className="bg-muted border-b px-3 py-2" role="status">
       <div className="flex items-center justify-between gap-2">
@@ -247,7 +273,8 @@ function InProgressBanner({
           <span>{OP_LABELS[operation]} in progress</span>
           {progress && (
             <span className="ml-1">
-              — commit {progress.current} of {progress.total}
+              — {isRebase ? "step" : "commit"} {progress.current} of{" "}
+              {progress.total}
             </span>
           )}
           <span className="text-muted-foreground ml-2 font-normal">
@@ -258,7 +285,7 @@ function InProgressBanner({
           <button
             type="button"
             onClick={onContinue}
-            disabled={!canContinue || busy}
+            disabled={!canContinue || busy || execFailed}
             className="bg-primary text-primary-foreground flex h-[22px] items-center px-2 text-[11px] disabled:opacity-40"
           >
             Continue
@@ -283,7 +310,16 @@ function InProgressBanner({
           </button>
         </div>
       </div>
-      {canContinue && (
+      {stopCopy !== "" && (
+        <p
+          className={`mt-1 text-[11px] ${execFailed ? "text-destructive" : "text-muted-foreground"}`}
+          role={execFailed ? "alert" : undefined}
+        >
+          {stopCopy}
+        </p>
+      )}
+      {/* Rebase bakes reword/squash messages into the todo — no message box. */}
+      {canContinue && !isRebase && (
         <textarea
           value={message}
           onChange={(e) => onMessageChange(e.target.value)}

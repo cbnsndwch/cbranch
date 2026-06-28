@@ -46,6 +46,9 @@ import {
   type MergeResult,
   type Oid,
   type PatchSelection,
+  type RebasePlan,
+  type RebaseStatus,
+  type RebaseStep,
   type RecentRepo,
   type ReflogPage,
   type RemoteInfo,
@@ -398,6 +401,19 @@ export interface CbranchApi {
     locale?: string;
     keybindings?: ReadonlyArray<KeyBinding>;
   }): Promise<AppSettings>;
+  // ── interactive rebase (P5) ─────────────────────────────────────────────────
+  rebasePlan(
+    repoId: RepoId,
+    upstream: string,
+    opts?: { onto?: string },
+  ): Promise<RebasePlan>;
+  rebaseStart(
+    repoId: RepoId,
+    upstream: string,
+    steps: ReadonlyArray<RebaseStep>,
+    opts?: { onto?: string },
+  ): Promise<RebaseStatus>;
+  rebaseStatus(repoId: RepoId): Promise<RebaseStatus>;
 }
 
 /** Back a {@link CbranchApi} with the single app runtime. */
@@ -728,5 +744,16 @@ export const makeApi = (runtime: AppRuntime): CbranchApi => {
       runtime.runPromise(withClient((c) => c.ConfigAppGet({}))),
     appSettingsSet: (patch) =>
       runtime.runPromise(withClient((c) => c.ConfigAppSet(patch))),
+    // ── interactive rebase (P5) ─────────────────────────────────────────────────
+    rebasePlan: (repoId, upstream, opts) =>
+      runtime.runPromise(
+        withClient((c) => c.RebasePlan({ repoId, upstream, ...opts })),
+      ),
+    rebaseStart: (repoId, upstream, steps, opts) =>
+      runtime.runPromise(
+        withClient((c) => c.RebaseStart({ repoId, upstream, steps, ...opts })),
+      ),
+    rebaseStatus: (repoId) =>
+      runtime.runPromise(withClient((c) => c.RebaseStatus({ repoId }))),
   };
 };

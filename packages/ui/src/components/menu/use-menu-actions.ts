@@ -106,6 +106,10 @@ export function useMenuActions(): MenuActions {
         useUiStore
           .getState()
           .setBisectStartDialog({ bad: selectedOid ?? undefined });
+      // Interactive rebase: open the editor with the base picker empty so the user
+      // chooses an upstream/onto ref. The commit context menu seeds it instead (IR-001).
+      handlers["commands.rebase"] = () =>
+        useUiStore.getState().setRebaseDialog({ upstream: null });
       // Repository → Settings / Maintenance → Edit config open the same settings dialog
       // (git-config tab is the focus from the Repository menu). REQ-P5-CFG-001/002.
       handlers["repository.settings"] = openSettings;
