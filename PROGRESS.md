@@ -109,9 +109,16 @@ Per-feature vertical slices, easiest-first (D18). Each = a `core` commit then a 
   `useArchivePrepare`. ui: `ArchiveDialog` (treeish/format/prefix/subpath, fetch→blob→`<a download>`,
   inline "Exported …(N bytes)", invalid→inline error no download) + `archiveDialog` store slice + wired
   `commands.archive` (retag P5) + commit-context "Archive revision…". REQ-P5-AR-001..005.
-- ⬜ S4 reflog · ⬜ S5 bisect · ⬜ S6 submodules · ⬜ S7 settings/config · ⬜ S8 interactive rebase.
+- ✅ **S4 — reflog.** core: `ReflogEntry`/`ReflogPage`; `ReflogList` (read) RPC; `git/reflog.ts`
+  (`git log -g -z` machine parser, action = %gs before first colon, malformed records skipped; skip-cursor
+  reuses history codec; no-reflog/unborn → empty page); engine/live lockless; api facade + refs-domain
+  reflog key + `useReflog` infinite query. ui: `ReflogPanel` (ref `Select`, rows with selector/oid/action/
+  message, per-row menu: Create-branch→`BranchCreate(startPoint=oid)`, Reset soft·mixed direct / hard behind
+  consequence-confirm `ResetTo(target=oid)`, View-commit→`selectOid`, Load more) as a routed `"reflog"`
+  view (`ActiveView`+`VIEWS`+switch); wired `commands.reflog`+`view.showReflog`. REQ-P5-RL-001..006.
+- ⬜ S5 bisect · ⬜ S6 submodules · ⬜ S7 settings/config · ⬜ S8 interactive rebase.
 
-## ▶ RESUME HERE — P5 IN PROGRESS (S1 gc ✅, S2 clean ✅, S3 archive ✅; S4 reflog next)
+## ▶ RESUME HERE — P5 IN PROGRESS (S1–S4 ✅: gc, clean, archive, reflog; S5 bisect next)
 
 **P0–P4 all landed on `main`.** P4 (cherry-pick / revert / conflicts / blame / single-file
 history) shipped core + UI: `conflict.list/sides`, take-side / save-merged / mark-resolved,

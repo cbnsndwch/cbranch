@@ -11,6 +11,7 @@ import { CommandPalette } from "./CommandPalette";
 import { CommitDetailsTabs } from "./CommitDetailsTabs";
 import { ArchiveDialog } from "./ArchiveDialog";
 import { CleanDialog } from "./CleanDialog";
+import { ReflogPanel } from "./ReflogPanel";
 import { CommitDialog } from "./CommitDialog";
 import { GcDialog } from "./GcDialog";
 import { CommitTab } from "./CommitTab";
@@ -38,6 +39,7 @@ const VIEWS: ReadonlyArray<readonly [ActiveView, string]> = [
   ["worktrees", "Worktrees"],
   ["stash", "Stash"],
   ["tags", "Tags"],
+  ["reflog", "Reflog"],
 ];
 
 // Web layout: menu bar → toolbar → view nav → main split (sidebar + content). There is no
@@ -130,6 +132,8 @@ export function AppShell() {
         return <StashPanel repoId={repoId} />;
       case "tags":
         return <TagsPanel repoId={repoId} />;
+      case "reflog":
+        return <ReflogPanel repoId={repoId} onSelectOid={selectOid} />;
       default:
         return (
           <div className="grid min-h-0 grid-rows-[46px_1fr]">

@@ -90,6 +90,11 @@ export function useMenuActions(): MenuActions {
       // commit when there is one, else empty (the user types a ref). REQ-P5-AR-001.
       handlers["commands.archive"] = () =>
         useUiStore.getState().setArchiveDialog({ treeish: selectedOid ?? "" });
+      // Reflog viewer is a routed view (REQ-P5-RL-001); both entry points switch to it.
+      handlers["commands.reflog"] = () =>
+        useUiStore.getState().setActiveView("reflog");
+      handlers["view.showReflog"] = () =>
+        useUiStore.getState().setActiveView("reflog");
     }
     // Cherry-pick / revert act on the selected commit (REQ-UX-001); the dialog fetches
     // the commit's subject + parents (for the merge-commit mainline gate).
