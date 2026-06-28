@@ -96,8 +96,20 @@ polish round (colored ref chips, favicon, resizable history/details divider). Ga
 
 **Next major phase: P5 (power features)** — `docs/spec/09-phase5-power.md`: interactive
 rebase, reflog recovery, bisect, archive export, safe clean preview, gc, submodules, and a
-config/identity editor. Each is independently shippable; **author a P5 plan doc first**
-(cf. `docs/_impl-notes/P2-PLAN.md` slice pattern).
+config/identity editor. **The plan is already authored and validated:**
+`docs/_impl-notes/P5-PLAN.md` (823 lines — grounding facts, 8 vertical slices, 23-method
+contract table, engine shapes, → D18). Its line anchors were re-checked against the tree on
+2026-06-28 and still hold (`phase5.ts` absent, barrel insert point, `detectInProgress` literals,
+`live.ts:147` lock registry, `rpc-handlers.ts:16` exhaustive `toLayer`, D17 latest).
+
+**Strategy (D18):** unlike P4's batched S1, P5's eight groups are independent, so the plan ships
+**per-feature vertical slices, easiest-first** — each a `core` commit (schemas + `Rpc.make` +
+engine impl + handler + tests) then a `ui` commit. Order: **S1 gc → S2 clean → S3 archive →
+S4 reflog → S5 bisect → S6 submodules → S7 settings/config → S8 interactive rebase.** Hard
+serialize-first edge: S1 bootstraps the shared scaffolding (creates `schemas/phase5.ts`, inserts
+the `index.ts` barrel line, opens the `group.test.ts` P5 catalog block) — must land before any
+other slice. Two genuinely-new core mechanisms: `streamGitBytes` (raw-byte runner for archive,
+S3) and the `rebase-seq-editor.mjs` shim copied into the web-server bundle (S8). **Start at S1.**
 
 ### 2026-06-28 session — gate-red fix + commit-row context menu
 - **Fixed a diff-assembly alignment bug** (`packages/core/src/git/diff.ts`). Under `-w`/`-b`,
