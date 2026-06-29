@@ -14,6 +14,12 @@ import { repoScopeKey } from "../../rpc/query-keys";
 import { useNavigation } from "../../state/navigation";
 import { useUiStore } from "../../state/store";
 
+/** Pull a human message off an unknown error (mirrors the P5 dialogs). */
+const errorMessage = (error: unknown): string =>
+  typeof error === "object" && error !== null && "message" in error
+    ? String((error as { message: unknown }).message)
+    : String(error);
+
 export interface DynamicItem {
   readonly id: string;
   readonly label: string;
@@ -79,7 +85,7 @@ export function useMenuActions(): MenuActions {
               queryKey: [repoId, "status"],
             }),
           )
-          .catch((e) => toast.error("Stage all failed: " + String(e)));
+          .catch((e) => toast.error("Stage all failed: " + errorMessage(e)));
       handlers["commands.unstageAll"] = () =>
         void api
           .unstageFiles(repoId, [], true)
@@ -88,7 +94,7 @@ export function useMenuActions(): MenuActions {
               queryKey: [repoId, "status"],
             }),
           )
-          .catch((e) => toast.error("Unstage all failed: " + String(e)));
+          .catch((e) => toast.error("Unstage all failed: " + errorMessage(e)));
       // Commands → Commit… opens the dedicated commit dialog (commit-surface.md §9.4).
       handlers["commands.commit"] = () =>
         useUiStore.getState().setCommitDialogOpen(true);
@@ -185,7 +191,7 @@ export function useMenuActions(): MenuActions {
             });
             toast.success("All submodules updated");
           })
-          .catch((e) => toast.error(String(e)));
+          .catch((e) => toast.error(errorMessage(e)));
       handlers["repository.submodulesSyncAll"] = () =>
         void api
           .submoduleSync(repoId, {})
@@ -198,7 +204,7 @@ export function useMenuActions(): MenuActions {
             });
             toast.success("All submodules synchronized");
           })
-          .catch((e) => toast.error(String(e)));
+          .catch((e) => toast.error(errorMessage(e)));
     }
     // Cherry-pick / revert act on the selected commit (REQ-UX-001); the dialog fetches
     // the commit's subject + parents (for the merge-commit mainline gate).
