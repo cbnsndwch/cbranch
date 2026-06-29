@@ -163,6 +163,12 @@ describe("web-server end-to-end (NF-TEST-8)", () => {
       const archiveBadPrefix = yield* fetchBytes(
         `${base}/sidechannel/archive?repoId=${repoId}&treeish=HEAD&format=zip&prefix=../evil`,
       );
+      const archiveNoTree = yield* fetchBytes(
+        `${base}/sidechannel/archive?repoId=${repoId}&format=zip`,
+      );
+      const archiveBadFormat = yield* fetchBytes(
+        `${base}/sidechannel/archive?repoId=${repoId}&treeish=HEAD&format=rar`,
+      );
       const forbiddenArchive = yield* fetchBytes(
         `${base}/sidechannel/archive?repoId=${repoId}&treeish=HEAD&format=zip`,
         { headers: { origin: "http://evil.example.com" } },
@@ -180,6 +186,8 @@ describe("web-server end-to-end (NF-TEST-8)", () => {
         archiveOk,
         archiveBadTree,
         archiveBadPrefix,
+        archiveNoTree,
+        archiveBadFormat,
         forbiddenArchive,
       };
     }).pipe(Effect.provide(serverLive), Effect.scoped);
@@ -245,6 +253,10 @@ describe("web-server end-to-end (NF-TEST-8)", () => {
       0x50, 0x4b, 0x03, 0x04,
     ]);
     expect(r.archiveBadPrefix.status).toBe(400);
+    // REQ-P5-AR-004: a missing tree-ish and an unsupported format are each rejected
+    // with 400 before any engine call (no partial download).
+    expect(r.archiveNoTree.status).toBe(400);
+    expect(r.archiveBadFormat.status).toBe(400);
     expect(r.forbiddenArchive.status).toBe(403);
   }, 30_000);
 });

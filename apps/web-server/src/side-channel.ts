@@ -80,6 +80,15 @@ export const guessContentType = (path: string): string =>
   MIME_BY_EXT[extname(path).toLowerCase()] ?? "application/octet-stream";
 
 /**
+ * A `Content-Disposition` filename for the quoted-string form: the blob's basename
+ * with any double-quote stripped so the `filename="…"` token cannot be broken
+ * (CR/LF/NUL are already excluded by `containBlobPath`). Mirrors the archive route's
+ * plain quoted `filename` rather than introducing RFC 5987 escaping.
+ */
+const dispositionFilename = (path: string): string =>
+  basename(path).split('"').join("");
+
+/**
  * The `GET /sidechannel/blob` route layer. Streams the bytes of `<rev>:<path>` from
  * the repo's object database via the engine's `cat-file` pool. Maps a missing object
  * or any `GitError` to `404` (no detail leakage), bad inputs to `400`.
@@ -120,7 +129,7 @@ export const sideChannelRoute = Http.HttpRouter.add(
         status: 200,
         contentType: guessContentType(path),
         headers: {
-          "content-disposition": `attachment; filename="${basename(path)}"`,
+          "content-disposition": `attachment; filename="${dispositionFilename(path)}"`,
           "cache-control": "no-store",
         },
       });
