@@ -248,6 +248,22 @@ export interface UiState {
   // ── P5: history find bar (lifted from HistoryList so the keybinding dispatcher opens it) ──
   readonly findOpen: boolean;
   readonly setFindOpen: (open: boolean) => void;
+  // ── P3 menu wiring: panel dialogs lifted to the store so the menu/palette/context
+  //    menus can open them (the panels bind to these instead of local useState) ──
+  /** Branch-create dialog: the start point to pre-seed, or null when closed. */
+  readonly branchCreate: { readonly startPoint: string } | null;
+  readonly setBranchCreate: (
+    state: { readonly startPoint: string } | null,
+  ) => void;
+  /** Tag-create dialog open state. */
+  readonly tagCreateOpen: boolean;
+  readonly setTagCreateOpen: (open: boolean) => void;
+  /** Remotes-manager dialog open state. */
+  readonly remotesDialogOpen: boolean;
+  readonly setRemotesDialogOpen: (open: boolean) => void;
+  /** One-shot sync request consumed by the always-mounted Toolbar (fetch/pull/push). */
+  readonly syncRequest: "fetch" | "pull" | "push" | null;
+  readonly setSyncRequest: (req: "fetch" | "pull" | "push" | null) => void;
 }
 
 export const useUiStore = create<UiState>((set) => ({
@@ -280,6 +296,10 @@ export const useUiStore = create<UiState>((set) => ({
   rebaseDialog: null,
   settingsDialogOpen: false,
   findOpen: false,
+  branchCreate: null,
+  tagCreateOpen: false,
+  remotesDialogOpen: false,
+  syncRequest: null,
   // Switching repositories supersedes the old selection and filters (P1-OPEN-4 / P1-X-4).
   setActiveRepoId: (activeRepoId) =>
     set({
@@ -300,6 +320,10 @@ export const useUiStore = create<UiState>((set) => ({
       bisectStartDialog: null,
       rebaseDialog: null,
       findOpen: false,
+      branchCreate: null,
+      tagCreateOpen: false,
+      remotesDialogOpen: false,
+      syncRequest: null,
     }),
   setSelectedOid: (selectedOid) => set({ selectedOid }),
   setPaletteOpen: (paletteOpen) => set({ paletteOpen }),
@@ -385,4 +409,8 @@ export const useUiStore = create<UiState>((set) => ({
   setArchiveDialog: (archiveDialog) => set({ archiveDialog }),
   setBisectStartDialog: (bisectStartDialog) => set({ bisectStartDialog }),
   setRebaseDialog: (rebaseDialog) => set({ rebaseDialog }),
+  setBranchCreate: (branchCreate) => set({ branchCreate }),
+  setTagCreateOpen: (tagCreateOpen) => set({ tagCreateOpen }),
+  setRemotesDialogOpen: (remotesDialogOpen) => set({ remotesDialogOpen }),
+  setSyncRequest: (syncRequest) => set({ syncRequest }),
 }));

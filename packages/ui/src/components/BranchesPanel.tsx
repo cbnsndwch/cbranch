@@ -18,6 +18,7 @@ import {
   usePushDeleteRemoteRef,
   useRemoteList,
 } from "../rpc/hooks";
+import { useUiStore } from "../state/store";
 import { DestructiveConfirmDialog } from "./DestructiveConfirmDialog";
 import { RemotesManagerDialog } from "./RemotesManagerDialog";
 import {
@@ -42,7 +43,6 @@ const ROW_HEIGHT = 30;
 const HEADER_HEIGHT = 22;
 
 type Dialog =
-  | { kind: "create" }
   | { kind: "rename"; name: string }
   | { kind: "delete"; name: string }
   | { kind: "dirtyTree"; target: string }
@@ -89,6 +89,12 @@ export function BranchesPanel({ repoId }: BranchesPanelProps) {
   const { data: remotes } = useRemoteList(repoId);
   const api = useApi();
   const [dialog, setDialog] = useState<Dialog>(null);
+  // Create + remotes dialogs are lifted to the store so the menu/palette can open them
+  // (REQ menu wiring); the panel's own buttons/rows set the same slices.
+  const branchCreate = useUiStore((s) => s.branchCreate);
+  const setBranchCreate = useUiStore((s) => s.setBranchCreate);
+  const remotesOpen = useUiStore((s) => s.remotesDialogOpen);
+  const setRemotesOpen = useUiStore((s) => s.setRemotesDialogOpen);
 
   const createMut = useBranchCreate(repoId);
   const renameMut = useBranchRename(repoId);
@@ -101,7 +107,6 @@ export function BranchesPanel({ repoId }: BranchesPanelProps) {
 
   const defaultRemote = remotes?.[0]?.name ?? "origin";
 
-  const [remotesOpen, setRemotesOpen] = useState(false);
   const [localCollapsed, setLocalCollapsed] = useState(false);
   const [remoteCollapsed, setRemoteCollapsed] = useState(false);
 
@@ -119,13 +124,18 @@ export function BranchesPanel({ repoId }: BranchesPanelProps) {
   const [syncRunning, setSyncRunning] = useState(false);
   useEffect(() => () => syncUnsubRef.current?.(), []);
 
-  const openCreate = (startPoint = "HEAD") => {
-    setCreateName("");
-    setCreateStart(startPoint);
-    setCreateSwitch(true);
-    setCreateUpstream(false);
-    setDialog({ kind: "create" });
-  };
+  const openCreate = (startPoint = "HEAD") => setBranchCreate({ startPoint });
+
+  // Seed the create form whenever the dialog opens. The panel rows open it via
+  // `openCreate`; the menu/palette set `branchCreate` directly — both land here.
+  useEffect(() => {
+    if (branchCreate) {
+      setCreateName("");
+      setCreateStart(branchCreate.startPoint);
+      setCreateSwitch(true);
+      setCreateUpstream(false);
+    }
+  }, [branchCreate]);
 
   const handleCreate = () => {
     createMut.mutate(
@@ -138,7 +148,7 @@ export function BranchesPanel({ repoId }: BranchesPanelProps) {
       {
         onSuccess: () => {
           toast.success("Branch created");
-          setDialog(null);
+          setBranchCreate(null);
         },
         onError: (err) => toast.error(String(err)),
       },
@@ -503,9 +513,9 @@ export function BranchesPanel({ repoId }: BranchesPanelProps) {
 
       {/* Create dialog */}
       <AlertDialog
-        open={dialog?.kind === "create"}
+        open={branchCreate !== null}
         onOpenChange={(open) => {
-          if (!open) setDialog(null);
+          if (!open) setBranchCreate(null);
         }}
       >
         <AlertDialogContent>
@@ -552,7 +562,7 @@ export function BranchesPanel({ repoId }: BranchesPanelProps) {
             </label>
           </div>
           <AlertDialogFooter>
-            <AlertDialogClose onClick={() => setDialog(null)}>
+            <AlertDialogClose onClick={() => setBranchCreate(null)}>
               Cancel
             </AlertDialogClose>
             <AlertDialogAction

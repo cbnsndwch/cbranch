@@ -10,6 +10,7 @@ import {
   useTagList,
   useTagPush,
 } from "../rpc/hooks";
+import { useUiStore } from "../state/store";
 import { DestructiveConfirmDialog } from "./DestructiveConfirmDialog";
 import {
   AlertDialog,
@@ -41,7 +42,9 @@ export function TagsPanel({ repoId }: TagsPanelProps) {
   const pushMut = useTagPush(repoId);
   const deleteRemoteMut = useTagDeleteRemote(repoId);
 
-  const [createOpen, setCreateOpen] = useState(false);
+  // Create dialog open-state is lifted to the store so the menu/palette can open it.
+  const createOpen = useUiStore((s) => s.tagCreateOpen);
+  const setCreateOpen = useUiStore((s) => s.setTagCreateOpen);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   // Tag push / delete-remote let the user pick the remote (UI-011) rather than assuming
   // `origin`. Opening the picker seeds the choice with the first configured remote.

@@ -108,6 +108,8 @@ export function Toolbar() {
   const openPalette = useUiStore((s) => s.setPaletteOpen);
   const setActiveView = useUiStore((s) => s.setActiveView);
   const openCommitDialog = useUiStore((s) => s.setCommitDialogOpen);
+  const syncRequest = useUiStore((s) => s.syncRequest);
+  const setSyncRequest = useUiStore((s) => s.setSyncRequest);
   const { data: state } = useRepoState(repoId);
   const { data: remotes } = useRemoteList(repoId);
   const { data: branchListing } = useBranchList(repoId);
@@ -256,6 +258,34 @@ export function Toolbar() {
       onCompleted: () => handlePush(pushOpts),
     });
   };
+
+  // The menu/palette request a sync without owning the streaming machinery: they set
+  // `syncRequest`, and this always-mounted toolbar consumes it (fetch/pull/push) with the
+  // current pull mode + default push opts. A ref holds the latest closures so the effect
+  // fires only on a new request, not on every render (matching use-keybindings' pattern).
+  const syncTriggerRef = useRef({
+    handleFetch,
+    handlePull,
+    handlePush,
+    pullMode,
+    repoId,
+  });
+  syncTriggerRef.current = {
+    handleFetch,
+    handlePull,
+    handlePush,
+    pullMode,
+    repoId,
+  };
+  useEffect(() => {
+    if (!syncRequest) return;
+    setSyncRequest(null);
+    const t = syncTriggerRef.current;
+    if (!t.repoId) return;
+    if (syncRequest === "fetch") t.handleFetch({});
+    else if (syncRequest === "pull") t.handlePull(t.pullMode);
+    else if (syncRequest === "push") t.handlePush({});
+  }, [syncRequest, setSyncRequest]);
 
   const handleCancel = () => {
     if (!syncRunning) return;
