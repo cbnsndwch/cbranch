@@ -318,8 +318,9 @@ export const submoduleAdd = (
   env?: NodeJS.ProcessEnv,
 ): Effect.Effect<void, GitError> =>
   Effect.gen(function* () {
-    // url/path/branch precede the `--` (url/path) or are option-adjacent (branch),
-    // so a leading dash would be read as a git option (NF-SEC-6).
+    // `-b branch` is option-adjacent (precedes the `--`), so a leading-dash branch would
+    // be read as a git option; url/path follow the `--`, where these guards are defensive
+    // belt-and-suspenders (NF-SEC-6).
     yield* assertNoLeadingDash(url, "submodule url");
     yield* assertNoLeadingDash(path, "submodule path");
     if (branch !== undefined && branch !== "")

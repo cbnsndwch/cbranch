@@ -863,7 +863,8 @@ export const makeGitEngine = (
 
       // ── submodules (P5) ───────────────────────────────────────────────────
       // List is a lockless read; mutations hold the repo lock. Remove needs the
-      // common git dir to clear the cached `modules/<path>` after deinit + rm.
+      // common git dir to clear the cached `modules/<NAME>` (the .gitmodules
+      // subsection name, which only equals the path for a default add) after deinit + rm.
       submoduleList: (repoId) =>
         Effect.flatMap(resolveById(repoId), (repo) =>
           submoduleListGit(repoCwd(repo), env),

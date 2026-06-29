@@ -800,7 +800,7 @@ export const CbranchRpcs = RpcGroup.make(
     success: Schema.Void,
     error: GitError,
   }),
-  // config.unset ✎ — `git config <--global|--local> --unset <key>` (idempotent; REQ-P5-CFG-004).
+  // config.unset ✎ — `git config <--global|--local> --unset-all <key>` (idempotent; REQ-P5-CFG-004).
   Rpc.make("ConfigUnset", {
     payload: { repoId: RepoId, key: Schema.String, scope: WritableScope },
     success: Schema.Void,
