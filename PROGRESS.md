@@ -237,7 +237,13 @@ history. No P4 plan doc yet — author one first (cf. P2-PLAN.md / P3-PLAN.md sl
   → reorderable native-select todo rows + `RebaseMessageDialog`), extended `InProgressBanner`
   for rebase (step X/Y, stop-reason copy, `execFailed`→Abort, no message box), `rebaseDialog`
   store slice, `commands.rebase` handler + palette unhide, commit-context "Rebase commits
-  since here…" (seeds upstream to the commit's parent). `pnpm gate` green.
+  since here…" (seeds upstream to the commit's parent). `pnpm gate` green. **Adversarial
+  review follow-ups landed (`fix(p5)`):** consumed-message validation (reword folded into a
+  squash / non-last squashes no longer validate-then-discard), `break`/apply-backend stops
+  classified `none` not `execFailed`, `--onto` change + dirty-guard no longer clobber edits,
+  Continue disabled until the rebase stop reason loads, sidecar reaped after a reused
+  Continue/Skip/Abort, shim marker guards a foreign-rebase race, packaged-shim test keyed on
+  a build-only marker.
 - 2026-06-28 — **S7 (settings & git config) landed — core + ui, gate green.** core
   (`feat(p5): settings & git config`): `ConfigScope`/`WritableScope`/`ThemePref` +
   `GitConfigEntry`/`GitConfigValue`/`KeyBinding`/`AppSettings` schemas + 6 RPCs
