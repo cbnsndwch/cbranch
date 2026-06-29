@@ -531,6 +531,29 @@ describe("rebase git operations", () => {
     );
     expect(emptyMsg.code).toBe("gitFailed");
   });
+
+  test("a step oid that is not a plain hex id is refused (todo exec-injection guard)", async () => {
+    const { repo, gitDir, oids } = await seedRange("evil-oid");
+    // A branded Oid carries no charset validation, so a crafted value could smuggle a
+    // newline + `exec` line into the git-rebase-todo (host RCE). rebaseStart must reject
+    // it before authoring the todo, and nothing must run or start.
+    const evil = Oid.make(`${oids[1]}\nexec touch ${join(repo.dir, "pwned")}`);
+    const err = await run(
+      Effect.flip(
+        rebaseStart(
+          repo.dir,
+          gitDir,
+          oids[0],
+          [rs("pick", oids[1]), new RebaseStep({ oid: evil, action: "pick" })],
+          undefined,
+          iso(repo),
+        ),
+      ),
+    );
+    expect(err.code).toBe("invalidRefName");
+    expect(existsSync(join(repo.dir, "pwned"))).toBe(false);
+    expect(existsSync(join(gitDir, "rebase-merge"))).toBe(false);
+  });
 });
 
 // ── rebaseStatus: backend-aware machine-state reading ────────────────────────────

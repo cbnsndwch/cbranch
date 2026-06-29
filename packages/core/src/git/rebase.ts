@@ -33,7 +33,13 @@ import { Effect } from "effect";
 
 import { detectInProgress } from "../repo/state";
 import { gitError } from "./errors";
-import { assertNoLeadingDash, decodeUtf8, runGit, runGitOk } from "./run-git";
+import {
+  assertNoLeadingDash,
+  decodeUtf8,
+  isHexOid,
+  runGit,
+  runGitOk,
+} from "./run-git";
 
 /** Unit separator between commit fields (never present in any field). */
 const FS = "\x1f";
@@ -377,6 +383,18 @@ export const rebaseStart = (
     const invalid = validateRebasePlan(steps);
     if (invalid !== null)
       return yield* Effect.fail(gitError("gitFailed", invalid));
+    // Security: each step oid is written verbatim into the git-rebase-todo (`pick <oid>`),
+    // and `oid` is a branded primitive with no charset validation. Reject anything that is
+    // not a plain hex object id, so a value like "<hex>\nexec <cmd>" cannot inject an extra
+    // `exec` line that `git rebase -i` would run on the host (NF-SEC-6).
+    const badOid = steps.find((s) => s.action !== "drop" && !isHexOid(s.oid));
+    if (badOid !== undefined)
+      return yield* Effect.fail(
+        gitError(
+          "invalidRefName",
+          "a rebase step references an invalid commit id",
+        ),
+      );
 
     // Refuse a dirty tree rather than auto-stashing (REQ-P5-IR-013 sibling rule).
     const dirty = yield* runGitOk({
