@@ -30,6 +30,9 @@ if (
 try {
   // Byte-for-byte copy: never decode/re-encode the authored todo.
   writeFileSync(gitTodoPath, readFileSync(authoredPath));
+  // Drop a marker so the engine can tell OUR rebase actually started (git ran this
+  // editor) from a foreign rebase that occupied the repo before git reached the editor.
+  writeFileSync(`${authoredPath}.applied`, "");
 } catch (err) {
   process.stderr.write(`cbranch rebase shim: ${String(err)}\n`);
   process.exit(1);

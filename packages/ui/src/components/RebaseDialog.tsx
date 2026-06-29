@@ -11,6 +11,7 @@ import {
   type BranchInfo,
   type Oid,
   type RebaseAction,
+  type RebasePlan,
   type RebaseStep as RebaseStepClass,
   type RepoId,
   RebaseStep,
@@ -90,17 +91,44 @@ const defaultSquashMessage = (
     .join("\n\n");
 };
 
+/**
+ * The original-row indices whose message the rebase actually applies — one per group:
+ * the last squash, or a reword base with no squash follower. Mirrors the engine's
+ * `consumedMessageIndices`, so the UI only collects/requires the messages git will use
+ * (an absorbed reword and non-last squashes contribute none).
+ */
+const consumedMessageRows = (rows: ReadonlyArray<TodoRow>): Set<number> => {
+  const kept = rows
+    .map((r, i) => ({ r, i }))
+    .filter((x) => x.r.action !== "drop");
+  const out = new Set<number>();
+  let k = 0;
+  while (k < kept.length) {
+    let j = k + 1;
+    let lastSquash = -1;
+    while (
+      j < kept.length &&
+      (kept[j].r.action === "fixup" || kept[j].r.action === "squash")
+    ) {
+      if (kept[j].r.action === "squash") lastSquash = j;
+      j += 1;
+    }
+    if (lastSquash >= 0) out.add(kept[lastSquash].i);
+    else if (kept[k].r.action === "reword") out.add(kept[k].i);
+    k = j;
+  }
+  return out;
+};
+
 /** Mirror the engine's validation so Start is blocked client-side (REQ-P5-IR-005). */
 const validateRows = (rows: ReadonlyArray<TodoRow>): string | null => {
   const kept = rows.filter((r) => r.action !== "drop");
   if (kept.length === 0) return "This plan drops every commit.";
   if (kept[0].action === "squash" || kept[0].action === "fixup")
     return "The first commit can't be a squash or fixup.";
-  for (const r of rows) {
-    if (
-      (r.action === "reword" || r.action === "squash") &&
-      (r.message ?? "").trim() === ""
-    )
+  for (const idx of consumedMessageRows(rows)) {
+    const r = rows[idx];
+    if ((r.message ?? "").trim() === "")
       return `Provide a message for the ${r.action} of ${shortOid(r.oid)}.`;
   }
   return null;
@@ -136,39 +164,51 @@ function RebaseBody({
   const [onto, setOnto] = useState(initialOnto);
   const effectiveOnto = showOnto && onto !== "" ? onto : undefined;
 
-  const plan = useRebasePlan(repoId, upstream, effectiveOnto);
+  // The range is `<upstream>..HEAD` and is independent of `--onto`, so the plan query is
+  // keyed on `upstream` only — changing the replay target never refetches/re-seeds.
+  const plan = useRebasePlan(repoId, upstream);
   const [rows, setRows] = useState<ReadonlyArray<TodoRow>>([]);
   const [editing, setEditing] = useState<number | null>(null);
+  // Once the user touches the plan it is "dirty"; we then never auto-re-seed for the same
+  // base (an external history change would otherwise silently discard their edits).
+  const dirty = useRef(false);
 
-  // Seed the todo rows whenever the plan's commit set changes (a new base/onto), but
-  // not on a background refetch of the same range (which would clobber edits).
-  const planSig =
+  const seedRows = (commits: RebasePlan["commits"]) => {
+    dirty.current = false;
+    setRows(
+      commits.map((c) => ({
+        oid: c.oid,
+        subject: c.subject,
+        authorName: c.authorName,
+        body: c.body,
+        action: "pick" as RebaseAction,
+      })),
+    );
+  };
+
+  // Re-seed when the base (upstream) changes — an intentional new plan. For the SAME base,
+  // re-seed only while the plan is still pristine; once edited, a background refetch (e.g.
+  // an external HEAD move) must not clobber the user's todo (REQ-P5-IR-004).
+  const seededUpstream = useRef<string | null>(null);
+  const seededOids =
     plan.data === undefined
       ? null
-      : `${upstream}|${effectiveOnto ?? ""}|${plan.data.commits
-          .map((c) => c.oid)
-          .join(",")}`;
-  const seeded = useRef<string | null>(null);
+      : plan.data.commits.map((c) => c.oid).join(",");
+  const lastOids = useRef<string | null>(null);
   useEffect(() => {
-    if (
-      plan.data !== undefined &&
-      planSig !== null &&
-      seeded.current !== planSig
-    ) {
-      seeded.current = planSig;
-      setRows(
-        plan.data.commits.map((c) => ({
-          oid: c.oid,
-          subject: c.subject,
-          authorName: c.authorName,
-          body: c.body,
-          action: "pick" as RebaseAction,
-        })),
-      );
+    if (plan.data === undefined) return;
+    const baseChanged = seededUpstream.current !== upstream;
+    const oidsChanged = lastOids.current !== seededOids;
+    if (baseChanged || (oidsChanged && !dirty.current)) {
+      seededUpstream.current = upstream;
+      lastOids.current = seededOids;
+      seedRows(plan.data.commits);
     }
-  }, [planSig, plan.data]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [upstream, seededOids, plan.data]);
 
   const setAction = (index: number, action: RebaseAction) => {
+    dirty.current = true;
     setRows((prev) =>
       prev.map((r, i) => {
         if (i !== index) return r;
@@ -184,6 +224,7 @@ function RebaseBody({
   };
 
   const move = (index: number, delta: -1 | 1) => {
+    dirty.current = true;
     setRows((prev) => {
       const next = index + delta;
       if (next < 0 || next >= prev.length) return prev;
@@ -193,12 +234,17 @@ function RebaseBody({
     });
   };
 
-  const setMessage = (index: number, message: string) =>
+  const setMessage = (index: number, message: string) => {
+    dirty.current = true;
     setRows((prev) =>
       prev.map((r, i) => (i === index ? { ...r, message } : r)),
     );
+  };
 
   const validation = rows.length === 0 ? null : validateRows(rows);
+  // Only the rows whose message the rebase applies get a message editor (an absorbed
+  // reword / non-last squash folds without its own message).
+  const messageRows = consumedMessageRows(rows);
   const hasBase = upstream !== "";
   const canStart =
     hasBase &&
@@ -382,7 +428,7 @@ function RebaseBody({
                   <span className="text-muted-foreground hidden shrink-0 text-[10px] sm:inline">
                     {r.authorName}
                   </span>
-                  {(r.action === "reword" || r.action === "squash") && (
+                  {messageRows.has(i) && (
                     <Button
                       variant="outline"
                       size="sm"

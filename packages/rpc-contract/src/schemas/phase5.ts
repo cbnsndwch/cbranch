@@ -272,9 +272,10 @@ export type RebaseAction = typeof RebaseAction.Type;
 /**
  * Why an in-progress rebase has stopped (REQ-P5-IR-009) — DATA totalized from machine
  * state, never localized stderr: `conflict` (unmerged index entries), `edit` (an `edit`
- * action paused), `execFailed` (a failed `exec`-amend or an externally-introduced
- * `break`/failed exec — steer to Abort, not a plain Continue that would skip the amend),
- * `none` (no rebase in progress, or an apply-backend rebase with no stop marker).
+ * action paused), `execFailed` (the stopped `done` step is a failed `exec`-amend — steer
+ * to Abort, not a plain Continue that would skip the amend), `none` (no rebase in
+ * progress, OR a conflict-free resumable pause such as a `break` row or an apply-backend
+ * stop, which the UI resumes with a plain Continue/Skip).
  */
 export const RebaseStopReason = Schema.Literals([
   "none",

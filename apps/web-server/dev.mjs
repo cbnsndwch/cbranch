@@ -5,7 +5,7 @@
 // Usage: node dev.mjs   (or via `pnpm dev` in this package)
 // The UI dev server (Vite) runs separately on :5173 and proxies /rpc + /sidechannel to :7420.
 import { spawn } from "node:child_process";
-import { copyFileSync, mkdirSync } from "node:fs";
+import { copyFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -26,6 +26,7 @@ const copyRebaseShim = () => {
   );
   mkdirSync(dirname(dest), { recursive: true });
   copyFileSync(src, dest);
+  writeFileSync(fileURLToPath(new URL("./dist/.bundled", import.meta.url)), "");
 };
 
 let server = null;

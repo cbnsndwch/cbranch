@@ -147,9 +147,7 @@ describe("RebaseDialog", () => {
     });
 
     expect(await screen.findByText("first")).toBeTruthy();
-    await waitFor(() =>
-      expect(rebasePlan).toHaveBeenCalledWith(repoId, base, undefined),
-    );
+    await waitFor(() => expect(rebasePlan).toHaveBeenCalledWith(repoId, base));
     // Oldest-first order: first, second, third.
     const subjects = screen
       .getAllByTitle(/first|second|third/)
@@ -269,5 +267,52 @@ describe("RebaseDialog", () => {
       name: "Start rebase",
     }) as HTMLButtonElement;
     expect(startBtn.disabled).toBe(true);
+  });
+
+  test("changing the replay target keeps the user's edited todo", async () => {
+    const rebaseStart = vi.fn(async () => completed);
+    renderDialog(makeApi({ rebaseStart }));
+    act(() => {
+      useUiStore.setState({ rebaseDialog: { upstream: base } });
+    });
+    await screen.findByText("first");
+
+    // Edit the plan, then change --onto: the edited order must survive (no re-seed).
+    fireEvent.click(screen.getByRole("button", { name: "Move 11111111 down" }));
+    fireEvent.click(screen.getByLabelText("Rebase onto a different base"));
+    fireEvent.change(await screen.findByLabelText("New base"), {
+      target: { value: "main" },
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Start rebase" }));
+    });
+
+    await waitFor(() => expect(rebaseStart).toHaveBeenCalled());
+    const [, , steps, opts] = rebaseStart.mock.calls[0];
+    expect(steps.map((s: { oid: string }) => s.oid)).toEqual([c2, c1, c3]);
+    expect(opts).toEqual({ onto: "main" });
+  });
+
+  test("a reword folded into a squash needs no reword message and shows one editor", async () => {
+    renderDialog(makeApi());
+    act(() => {
+      useUiStore.setState({ rebaseDialog: { upstream: base } });
+    });
+    await screen.findByText("first");
+
+    chooseAction("11111111", "reword"); // base of the group, absorbed by the squash
+    chooseAction("22222222", "squash"); // the consumed (combined) message
+    // Only the squash carries a message editor; the absorbed reword does not.
+    expect(screen.getAllByRole("button", { name: "Message…" })).toHaveLength(1);
+    // Start is NOT blocked despite the reword having no separate message.
+    await waitFor(() =>
+      expect(
+        (
+          screen.getByRole("button", {
+            name: "Start rebase",
+          }) as HTMLButtonElement
+        ).disabled,
+      ).toBe(false),
+    );
   });
 });

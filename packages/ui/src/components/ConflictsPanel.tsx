@@ -97,9 +97,11 @@ export function ConflictsPanel({ repoId, onEdit }: ConflictsPanelProps) {
   const conflicted = data?.conflicted ?? [];
   const operation = data?.operation ?? "none";
 
-  // Rebase carries an extra stop-reason (edit vs conflict vs execFailed) that the
-  // generic conflict listing can't express; fetch it only while a rebase is active.
-  const rebaseStatus = useRebaseStatus(operation === "rebase" ? repoId : null);
+  // Rebase carries an extra stop-reason (edit vs conflict vs execFailed) that the generic
+  // conflict listing can't express. Kept enabled (not gated on `operation`) so its cache
+  // is warm by the time a rebase stop renders — otherwise Continue would briefly enable
+  // before the reason loads, allowing a click that skips a failed step (REQ-P5-IR-010/013).
+  const rebaseStatus = useRebaseStatus(repoId);
   const rebaseStop =
     operation === "rebase" ? rebaseStatus.data?.stopReason : undefined;
 
@@ -265,6 +267,10 @@ function InProgressBanner({
   // Rebase Continue passes no message (reword/squash are baked into the todo); a failed
   // scripted step must not be Continued (it would skip the step and drop its change).
   const execFailed = rebaseStop === "execFailed";
+  // For a rebase, only allow Continue once the stop reason is KNOWN and safe — `undefined`
+  // means the status query hasn't resolved yet, so don't enable a premature Continue.
+  const continueBlocked =
+    isRebase && (rebaseStop === undefined || rebaseStop === "execFailed");
   const stopCopy = isRebase && rebaseStop ? REBASE_STOP_COPY[rebaseStop] : "";
   return (
     <div className="bg-muted border-b px-3 py-2" role="status">
@@ -285,7 +291,7 @@ function InProgressBanner({
           <button
             type="button"
             onClick={onContinue}
-            disabled={!canContinue || busy || execFailed}
+            disabled={!canContinue || busy || continueBlocked}
             className="bg-primary text-primary-foreground flex h-[22px] items-center px-2 text-[11px] disabled:opacity-40"
           >
             Continue

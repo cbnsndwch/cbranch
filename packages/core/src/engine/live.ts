@@ -102,6 +102,7 @@ import {
   revert as revertGit,
 } from "../git/sequencer";
 import {
+  cleanupRebaseSidecar,
   rebasePlan as rebasePlanGit,
   rebaseStart as rebaseStartGit,
   rebaseStatus as rebaseStatusGit,
@@ -154,6 +155,16 @@ import {
 import { type ResolvedRepo, repoCwd, resolveRepo } from "../repo/resolve";
 import { detectInProgress, readRepoState } from "../repo/state";
 import { GitEngine, type GitEngineApi } from "./git-engine";
+
+/**
+ * Best-effort reap of the scripted-rebase sidecar once a Continue/Skip/Abort ends the
+ * rebase — the reused P4 sequencer doesn't know about `<gitDir>/cbranch-rebase/`, so the
+ * engine clears it here when the rebase is no longer in progress (a no-op otherwise).
+ */
+const reapRebaseSidecar = (gitDir: string): Effect.Effect<void> =>
+  Effect.sync(() => {
+    if (detectInProgress(gitDir) !== "rebase") cleanupRebaseSidecar(gitDir);
+  });
 
 export interface MakeGitEngineOptions {
   /** Override the settings file path (tests / `CBRANCH_CONFIG` semantics). */
@@ -740,7 +751,7 @@ export const makeGitEngine = (
                 { message, allowEmpty },
                 env,
               ),
-            ),
+            ).pipe(Effect.tap(() => reapRebaseSidecar(repo.gitDir))),
           ),
         ),
       opAbort: (repoId) =>
@@ -748,7 +759,7 @@ export const makeGitEngine = (
           locks.withRepoLock(repoId)(
             Effect.suspend(() =>
               opAbortGit(repoCwd(repo), detectInProgress(repo.gitDir), env),
-            ),
+            ).pipe(Effect.tap(() => reapRebaseSidecar(repo.gitDir))),
           ),
         ),
       opSkip: (repoId) =>
@@ -761,7 +772,7 @@ export const makeGitEngine = (
                 detectInProgress(repo.gitDir),
                 env,
               ),
-            ),
+            ).pipe(Effect.tap(() => reapRebaseSidecar(repo.gitDir))),
           ),
         ),
       blame: (repoId, path, rev, startLine, endLine, force) =>

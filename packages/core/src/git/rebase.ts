@@ -59,6 +59,16 @@ export const defaultShimPath = (): string =>
 export const shellSingleQuote = (value: string): string =>
   `'${value.replace(/'/g, "'\\''")}'`;
 
+/**
+ * Best-effort removal of the scripted-rebase sidecar (`<gitDir>/cbranch-rebase/`, the
+ * authored todo + exec-amend message files). A successful `rebaseStart` clears it inline,
+ * but a rebase that stops and is later resolved via the reused Continue/Skip/Abort surface
+ * leaves it behind — the engine calls this once that sequencer op ends the rebase.
+ */
+export const cleanupRebaseSidecar = (gitDir: string): void => {
+  rmSync(join(gitDir, "cbranch-rebase"), { recursive: true, force: true });
+};
+
 // ── plan (read) ──────────────────────────────────────────────────────────────────
 
 /** Parse `git log -z` records into oldest-first rebase todo commits. */
@@ -126,10 +136,41 @@ const isBlank = (s: string | undefined): boolean =>
   s === undefined || s.trim() === "";
 
 /**
+ * For the kept (non-drop) steps, the index into `kept` of the ONE step whose message the
+ * combined exec-amend consumes per group: the last squash of the group, or the group's
+ * reword base when it has no squash. Exactly these steps must carry a non-empty message
+ * (and exactly these are the messages `buildRebaseTodo` writes) — a reword that is folded
+ * into a following squash, and the non-last squashes of a group, contribute no message.
+ */
+const consumedMessageIndices = (
+  kept: ReadonlyArray<RebaseStep>,
+): ReadonlyArray<number> => {
+  const out: number[] = [];
+  let i = 0;
+  while (i < kept.length) {
+    let j = i + 1;
+    let lastSquash = -1;
+    while (
+      j < kept.length &&
+      (kept[j].action === "fixup" || kept[j].action === "squash")
+    ) {
+      if (kept[j].action === "squash") lastSquash = j;
+      j += 1;
+    }
+    if (lastSquash >= 0) out.push(lastSquash);
+    else if (kept[i].action === "reword") out.push(i);
+    i = j;
+  }
+  return out;
+};
+
+/**
  * Validate an authored step list (REQ-P5-IR-005); returns an error message, or null
  * when valid. A single `kept[0]` check covers both "first row not squash/fixup" and
- * "every squash/fixup has a preceding non-drop" (anything after kept[0] does). Empty
- * reword/squash messages are rejected here, NOT papered over with `--allow-empty-message`.
+ * "every squash/fixup has a preceding non-drop" (anything after kept[0] does). Only the
+ * messages the rebase actually applies (one per group — see {@link consumedMessageIndices})
+ * must be non-empty, so we never demand a message that the todo rewrite then discards;
+ * empty ones are rejected here, NOT papered over with `--allow-empty-message`.
  */
 export const validateRebasePlan = (
   steps: ReadonlyArray<RebaseStep>,
@@ -138,11 +179,11 @@ export const validateRebasePlan = (
   if (kept.length === 0) return "the rebase plan drops every commit";
   if (kept[0].action === "squash" || kept[0].action === "fixup")
     return "the first commit cannot be a squash or fixup";
-  for (const step of steps) {
-    if (step.action === "reword" && isBlank(step.message))
-      return "a reworded commit needs a non-empty message";
-    if (step.action === "squash" && isBlank(step.message))
-      return "a squashed commit needs a non-empty message";
+  for (const idx of consumedMessageIndices(kept)) {
+    if (isBlank(kept[idx].message))
+      return kept[idx].action === "reword"
+        ? "a reworded commit needs a non-empty message"
+        : "a squashed commit needs a non-empty message";
   }
   return null;
 };
@@ -161,12 +202,16 @@ export interface RebaseTodoBuild {
  *   pick         → `pick <oid>`
  *   reword       → `pick <oid>` + amend-exec with the new message
  *   fixup        → `fixup <oid>` (discards this commit's own message)
- *   squash group → base + `fixup`(s) + ONE amend-exec with the combined message
+ *   squash group → base + `fixup`(s) + ONE combined amend-exec
  *   edit         → `edit <oid>` (pauses; trailing fixups apply on continue)
  *   drop         → omitted
- * Replay order is the step order, top-to-bottom. Message bytes live in sidecar files
- * (paths from `msgPath`), single-quote-escaped into the `exec` line — no commit
- * message, oid, or author string ever reaches a shell.
+ * One amend-exec per group carries the group's single message (REQ-P5-IR-007): the LAST
+ * squash's message when the group has a squash, else the reword base's message. A reword
+ * base that is folded into a following squash is thus a plain `pick` and the squash
+ * message wins (the squash's combined message is the final word; validation does not
+ * demand the absorbed reword message). Replay order is the step order, top-to-bottom.
+ * Message bytes live in sidecar files (paths from `msgPath`), single-quote-escaped into
+ * the `exec` line — no commit message, oid, or author string ever reaches a shell.
  */
 export const buildRebaseTodo = (
   steps: ReadonlyArray<RebaseStep>,
@@ -186,23 +231,20 @@ export const buildRebaseTodo = (
   while (i < kept.length) {
     const base = kept[i];
     let j = i + 1;
+    let lastSquash = -1;
     const followers: RebaseStep[] = [];
     while (
       j < kept.length &&
       (kept[j].action === "fixup" || kept[j].action === "squash")
     ) {
+      if (kept[j].action === "squash") lastSquash = j;
       followers.push(kept[j]);
       j += 1;
     }
     lines.push(`${base.action === "edit" ? "edit" : "pick"} ${base.oid}`);
     for (const f of followers) lines.push(`fixup ${f.oid}`);
-    const squashes = followers.filter((f) => f.action === "squash");
-    if (squashes.length > 0) {
-      // The combined message is authored on the last squash (its UI seed covers all).
-      amendExec(squashes[squashes.length - 1].message ?? "");
-    } else if (base.action === "reword") {
-      amendExec(base.message ?? "");
-    }
+    if (lastSquash >= 0) amendExec(kept[lastSquash].message ?? "");
+    else if (base.action === "reword") amendExec(base.message ?? "");
     i = j;
   }
 
@@ -293,12 +335,16 @@ export const rebaseStatus = (
       stopReason = "conflict";
     } else if (doneVerb === "edit" || doneVerb === "e") {
       stopReason = "edit";
-    } else {
-      // In progress, no conflict, not an `edit` pause: a failed exec-amend or an
-      // externally-introduced break/failed exec. Steer the UI to Abort, not a plain
-      // Continue (which would skip the failed exec and silently drop the amend).
+    } else if (doneVerb === "exec" || doneVerb === "x") {
+      // A failed `exec`-amend (the `done` step that stopped is the exec itself). Steer the
+      // UI to Abort, NOT a plain Continue — which would skip the failed exec and silently
+      // drop the amend it carried.
       stopReason = "execFailed";
-      detail = inMerge ? lastDoneLine(mergeDir) : undefined;
+      detail = lastDoneLine(mergeDir);
+    } else {
+      // Any other in-progress, conflict-free stop resumes with a plain Continue/Skip: a
+      // `break` pause, or an apply-backend stop (no exec/edit there). Not an error.
+      stopReason = "none";
     }
 
     return new RebaseStatus({
@@ -373,15 +419,29 @@ export const rebaseStart = (
     const result = yield* runGit({ cwd, args, read: false, env: rebaseEnv });
 
     const status = yield* rebaseStatus(cwd, gitDir, env);
-    if (!status.inProgress) {
-      // Completed (or never started): the sidecar is no longer referenced.
-      yield* Effect.sync(() =>
-        rmSync(sidecar, { recursive: true, force: true }),
-      );
-      if (result.exitCode !== 0)
+    // The shim drops a marker when (and only when) git accepted our sequence editor —
+    // i.e. OUR rebase actually started.
+    const ourRebaseRan = existsSync(`${todoPath}.applied`);
+    if (status.inProgress) {
+      if (!ourRebaseRan) {
+        // A foreign `git rebase` occupied the repo in the precheck→spawn window: git
+        // exited non-zero and never ran our editor. Don't claim that rebase as our stop.
+        yield* Effect.sync(() =>
+          rmSync(sidecar, { recursive: true, force: true }),
+        );
         return yield* Effect.fail(
           gitError("gitFailed", "git rebase failed", decodeUtf8(result.stderr)),
         );
+      }
+      // Our rebase stopped (conflict / edit / failed exec): keep the sidecar so the todo's
+      // exec-amend message files survive the reused Continue.
+      return status;
     }
+    // Completed (or never started): the sidecar is no longer referenced.
+    yield* Effect.sync(() => rmSync(sidecar, { recursive: true, force: true }));
+    if (result.exitCode !== 0)
+      return yield* Effect.fail(
+        gitError("gitFailed", "git rebase failed", decodeUtf8(result.stderr)),
+      );
     return status;
   });

@@ -265,6 +265,25 @@ describe("ConflictsPanel", () => {
     expect(cont.disabled).toBe(false);
   });
 
+  test("Continue stays disabled for a rebase until the stop reason loads", async () => {
+    renderPanel(
+      makeFakeApi({
+        // A conflict-free rebase stop (canContinue true) where the reason hasn't loaded.
+        conflictList: vi.fn(async () =>
+          listing([], {
+            operation: "rebase",
+            canContinue: true,
+            canSkip: true,
+            progress: { current: 1, total: 2 },
+          }),
+        ),
+        rebaseStatus: vi.fn(() => new Promise<never>(() => {})), // never resolves
+      }),
+    );
+    const cont = (await screen.findByText("Continue")) as HTMLButtonElement;
+    expect(cont.disabled).toBe(true); // no premature Continue before the reason is known
+  });
+
   test("an execFailed rebase stop disables Continue and alerts to abort", async () => {
     renderPanel(
       makeFakeApi({

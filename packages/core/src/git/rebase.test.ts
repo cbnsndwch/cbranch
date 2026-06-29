@@ -23,6 +23,7 @@ import {
 import {
   buildRebasePlanArgs,
   buildRebaseTodo,
+  cleanupRebaseSidecar,
   defaultShimPath,
   parseRebaseTodoCommits,
   rebasePlan,
@@ -167,6 +168,31 @@ describe("buildRebaseTodo", () => {
     );
     expect(todo).toContain("exec git commit --amend -F '/we'\\''rd/msg-0'\n");
   });
+
+  test("a reword base folded into a squash yields one combined message (the squash's)", () => {
+    const { todo, msgFiles } = buildRebaseTodo(
+      [step("reword", "a", "REWORD"), step("squash", "b", "COMBINED")],
+      msgPath,
+    );
+    expect(todo).toBe(
+      `pick ${oid("a")}\nfixup ${oid("b")}\n` +
+        `exec git commit --amend -F '/sidecar/msg-0'\n`,
+    );
+    expect(msgFiles).toEqual([{ path: "/sidecar/msg-0", content: "COMBINED" }]);
+    expect(todo).not.toContain("REWORD");
+  });
+
+  test("a multi-squash group bakes only the last squash's message", () => {
+    const { msgFiles } = buildRebaseTodo(
+      [
+        step("pick", "a"),
+        step("squash", "b", "MID"),
+        step("squash", "c", "LAST"),
+      ],
+      msgPath,
+    );
+    expect(msgFiles).toEqual([{ path: "/sidecar/msg-0", content: "LAST" }]);
+  });
 });
 
 // ── pure: validation ─────────────────────────────────────────────────────────────
@@ -200,6 +226,25 @@ describe("validateRebasePlan", () => {
       validateRebasePlan([step("pick", "a"), step("squash", "b", "")]),
     ).toMatch(/squashed/);
   });
+
+  test("only the consumed message is required, never a discarded one", () => {
+    // A reword absorbed by a following squash: its (unused) message is NOT demanded.
+    expect(
+      validateRebasePlan([step("reword", "a"), step("squash", "b", "C")]),
+    ).toBeNull();
+    // ...but the squash's combined message (the one that's applied) still is.
+    expect(
+      validateRebasePlan([step("reword", "a", "R"), step("squash", "b", "")]),
+    ).toMatch(/squashed/);
+    // A multi-squash group only requires the LAST (consumed) squash message.
+    expect(
+      validateRebasePlan([
+        step("pick", "a"),
+        step("squash", "b", ""),
+        step("squash", "c", "LAST"),
+      ]),
+    ).toBeNull();
+  });
 });
 
 // ── shim ─────────────────────────────────────────────────────────────────────────
@@ -218,6 +263,21 @@ describe("rebase-seq-editor shim", () => {
     });
 
     expect(readFileSync(gitTodo, "utf8")).toBe(bytes);
+    // The shim drops a marker so the engine can tell our rebase actually started.
+    expect(existsSync(`${authored}.applied`)).toBe(true);
+    rmSync(dir, { recursive: true, force: true });
+  });
+});
+
+describe("cleanupRebaseSidecar", () => {
+  test("removes the scripted-rebase sidecar (and no-ops when absent)", () => {
+    const dir = mkdtempSync(join(tmpdir(), "cbranch-sidecar-"));
+    const sidecar = join(dir, "cbranch-rebase");
+    mkdirSync(sidecar, { recursive: true });
+    writeFileSync(join(sidecar, "msg-0"), "secret message");
+    cleanupRebaseSidecar(dir);
+    expect(existsSync(sidecar)).toBe(false);
+    cleanupRebaseSidecar(dir); // idempotent
     rmSync(dir, { recursive: true, force: true });
   });
 });
@@ -542,6 +602,21 @@ describe("rebaseStatus machine-state reader", () => {
     rmSync(mergeDir, { recursive: true, force: true });
   });
 
+  test("merge backend: a conflict-free `break` pause is none, not execFailed", async () => {
+    const { repo, gitDir } = await seedClean("status-break");
+    const mergeDir = join(gitDir, "rebase-merge");
+    writeState(mergeDir, {
+      msgnum: "2\n",
+      end: "4\n",
+      done: `pick ${"f".repeat(40)}\nbreak\n`,
+    });
+    const status = await run(rebaseStatus(repo.dir, gitDir, iso(repo)));
+    expect(status.inProgress).toBe(true);
+    expect(status.stopReason).toBe("none"); // resumable via plain Continue
+    expect(status.detail).toBeUndefined();
+    rmSync(mergeDir, { recursive: true, force: true });
+  });
+
   test("apply backend: reads next/last/onto/head-name (without an `applying` marker)", async () => {
     const { repo, gitDir } = await seedClean("status-apply");
     const applyDir = join(gitDir, "rebase-apply");
@@ -553,6 +628,8 @@ describe("rebaseStatus machine-state reader", () => {
     });
     const status = await run(rebaseStatus(repo.dir, gitDir, iso(repo)));
     expect(status.inProgress).toBe(true);
+    // The apply backend has no exec/edit step, so a conflict-free stop is none (not execFailed).
+    expect(status.stopReason).toBe("none");
     expect(status.progress?.current).toBe(1);
     expect(status.progress?.total).toBe(3);
     expect(status.onto).toBe("e".repeat(40));

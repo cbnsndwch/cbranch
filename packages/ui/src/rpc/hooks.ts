@@ -1420,22 +1420,25 @@ export const useBisectReset = (repoId: RepoId) => {
 
 /**
  * The computed rebase range for the todo editor (REQ-P5-IR-002). Disabled until a base
- * is chosen (empty upstream); content-addressed under `commits` per base/onto.
+ * is chosen (empty upstream); content-addressed under `commits` per base. The range does
+ * not depend on `--onto`, so the dialog passes only `upstream` (changing the replay
+ * target must not refetch or re-seed the todo). `staleTime: Infinity` further prevents a
+ * background `commits` invalidation from clobbering the user's in-progress edits while
+ * the dialog is open; a deliberate base change is a new key and still refetches.
  */
 export const useRebasePlan = (
   repoId: RepoId | null,
   upstream: string,
-  onto?: string,
 ): UseQueryResult<RebasePlan> => {
   const api = useApi();
   return useQuery({
     queryKey:
       repoId && upstream !== ""
-        ? queryKeys.rebasePlan(repoId, upstream, onto)
+        ? queryKeys.rebasePlan(repoId, upstream)
         : ["inactive"],
-    queryFn: () =>
-      api.rebasePlan(repoId as RepoId, upstream, onto ? { onto } : undefined),
+    queryFn: () => api.rebasePlan(repoId as RepoId, upstream),
     enabled: repoId !== null && upstream !== "",
+    staleTime: Infinity,
   });
 };
 

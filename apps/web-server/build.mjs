@@ -6,7 +6,7 @@
 // web-server is therefore bundled with esbuild: the workspace packages (@cbranch/core,
 // @cbranch/rpc-contract) are inlined, while `effect` and `@effect/platform-node` stay
 // external and resolve from node_modules at runtime (they ship Node-ready ESM).
-import { copyFileSync, mkdirSync } from "node:fs";
+import { copyFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -48,4 +48,7 @@ function copyRebaseShim() {
   );
   mkdirSync(dirname(dest), { recursive: true });
   copyFileSync(src, dest);
+  // A build-only marker: ONLY this esbuild step writes it (tsc never does), so the
+  // packaged-shim test can distinguish a real bundle from a typecheck-only `dist/`.
+  writeFileSync(fileURLToPath(new URL("./dist/.bundled", import.meta.url)), "");
 }
