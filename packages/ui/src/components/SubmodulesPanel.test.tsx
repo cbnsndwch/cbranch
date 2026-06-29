@@ -121,6 +121,7 @@ describe("SubmodulesPanel", () => {
         paths: ["vendor/b"],
         init: true,
         force: false,
+        recursive: false,
       }),
     );
   });
@@ -169,6 +170,7 @@ describe("SubmodulesPanel", () => {
         paths: ["vendor/c"],
         init: false,
         force: true,
+        recursive: false,
       }),
     );
   });
@@ -237,10 +239,29 @@ describe("SubmodulesPanel", () => {
     await screen.findByText("vendor/a");
     act(() => fireEvent.click(screen.getByText("Update all")));
     await waitFor(() =>
-      expect(submoduleUpdate).toHaveBeenCalledWith(repoId, { init: true }),
+      expect(submoduleUpdate).toHaveBeenCalledWith(repoId, {
+        init: true,
+        recursive: false,
+      }),
     );
 
     act(() => fireEvent.click(screen.getByText("Sync all")));
     await waitFor(() => expect(submoduleSync).toHaveBeenCalledWith(repoId, {}));
+  });
+
+  test("the Recursive toggle passes recursive:true through Update all (SM-002)", async () => {
+    const submoduleUpdate = vi.fn(async () => undefined);
+    renderPanel(makeFakeApi({ submoduleUpdate }));
+
+    await screen.findByText("vendor/a");
+    act(() => fireEvent.click(screen.getByLabelText("Recursive")));
+    act(() => fireEvent.click(screen.getByText("Update all")));
+
+    await waitFor(() =>
+      expect(submoduleUpdate).toHaveBeenCalledWith(repoId, {
+        init: true,
+        recursive: true,
+      }),
+    );
   });
 });

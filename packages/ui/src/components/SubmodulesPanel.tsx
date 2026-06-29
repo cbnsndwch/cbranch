@@ -43,6 +43,11 @@ import {
 const short = (oid: string | undefined): string =>
   oid ? oid.slice(0, 7) : "—";
 
+const errorMessage = (error: unknown): string =>
+  error != null && typeof error === "object" && "message" in error
+    ? String((error as { message: unknown }).message)
+    : "Submodule operation failed.";
+
 const STATUS_STYLE: Record<SubmoduleStatus, { label: string; cls: string }> = {
   upToDate: { label: "up to date", cls: "border-border text-muted-foreground" },
   uninitialized: {
@@ -79,8 +84,16 @@ export function SubmodulesPanel({ repoId }: SubmodulesPanelProps) {
   const [addBranch, setAddBranch] = useState("");
   const [forceTarget, setForceTarget] = useState<SubmoduleInfo | null>(null);
   const [removeTarget, setRemoveTarget] = useState<string | null>(null);
+  const [recursive, setRecursive] = useState(false);
 
   const list = submodules ?? [];
+
+  // Any in-flight submodule mutation; gates conflicting actions while one runs.
+  const busy =
+    updateMut.isPending ||
+    syncMut.isPending ||
+    addMut.isPending ||
+    removeMut.isPending;
 
   const runUpdate = (sub: SubmoduleInfo, force: boolean) => {
     updateMut.mutate(
@@ -88,13 +101,14 @@ export function SubmodulesPanel({ repoId }: SubmodulesPanelProps) {
         paths: [sub.path],
         init: sub.status === "uninitialized",
         force,
+        recursive,
       },
       {
         onSuccess: () =>
           toast.success(
             force ? "Submodule force-updated" : "Submodule updated",
           ),
-        onError: (err) => toast.error(String(err)),
+        onError: (err) => toast.error(errorMessage(err)),
       },
     );
   };
@@ -104,7 +118,7 @@ export function SubmodulesPanel({ repoId }: SubmodulesPanelProps) {
       { paths: [sub.path] },
       {
         onSuccess: () => toast.success("Submodule synchronized"),
-        onError: (err) => toast.error(String(err)),
+        onError: (err) => toast.error(errorMessage(err)),
       },
     );
   };
@@ -112,16 +126,16 @@ export function SubmodulesPanel({ repoId }: SubmodulesPanelProps) {
   const handleOpen = (sub: SubmoduleInfo) => {
     openMut.mutate(sub.absPath, {
       onSuccess: (handle) => openRepo(handle.repoId),
-      onError: (err) => toast.error(String(err)),
+      onError: (err) => toast.error(errorMessage(err)),
     });
   };
 
   const handleUpdateAll = () => {
     updateMut.mutate(
-      { init: true },
+      { init: true, recursive },
       {
         onSuccess: () => toast.success("All submodules updated"),
-        onError: (err) => toast.error(String(err)),
+        onError: (err) => toast.error(errorMessage(err)),
       },
     );
   };
@@ -131,7 +145,7 @@ export function SubmodulesPanel({ repoId }: SubmodulesPanelProps) {
       {},
       {
         onSuccess: () => toast.success("All submodules synchronized"),
-        onError: (err) => toast.error(String(err)),
+        onError: (err) => toast.error(errorMessage(err)),
       },
     );
   };
@@ -151,7 +165,7 @@ export function SubmodulesPanel({ repoId }: SubmodulesPanelProps) {
           setAddPath("");
           setAddBranch("");
         },
-        onError: (err) => toast.error(String(err)),
+        onError: (err) => toast.error(errorMessage(err)),
       },
     );
   };
@@ -165,7 +179,7 @@ export function SubmodulesPanel({ repoId }: SubmodulesPanelProps) {
           toast.success("Submodule removed");
           setRemoveTarget(null);
         },
-        onError: (err) => toast.error(String(err)),
+        onError: (err) => toast.error(errorMessage(err)),
       },
     );
   };
@@ -176,10 +190,19 @@ export function SubmodulesPanel({ repoId }: SubmodulesPanelProps) {
       <div className="flex items-center justify-between border-b px-3 py-1.5">
         <h2 className="text-sm font-medium">Submodules</h2>
         <div className="flex gap-1">
+          <label className="flex h-[22px] items-center gap-1 px-1 text-[11px]">
+            <input
+              type="checkbox"
+              checked={recursive}
+              onChange={(e) => setRecursive(e.target.checked)}
+              className="h-3 w-3"
+            />
+            Recursive
+          </label>
           <button
             type="button"
             onClick={handleUpdateAll}
-            disabled={updateMut.isPending}
+            disabled={busy}
             className="hover:bg-accent flex h-[22px] items-center border px-2 text-[11px] disabled:opacity-40"
           >
             Update all
@@ -187,7 +210,7 @@ export function SubmodulesPanel({ repoId }: SubmodulesPanelProps) {
           <button
             type="button"
             onClick={handleSyncAll}
-            disabled={syncMut.isPending}
+            disabled={busy}
             className="hover:bg-accent flex h-[22px] items-center border px-2 text-[11px] disabled:opacity-40"
           >
             Sync all
@@ -195,7 +218,8 @@ export function SubmodulesPanel({ repoId }: SubmodulesPanelProps) {
           <button
             type="button"
             onClick={() => setAddOpen(true)}
-            className="hover:bg-accent flex h-[22px] items-center border px-2 text-[11px]"
+            disabled={busy}
+            className="hover:bg-accent flex h-[22px] items-center border px-2 text-[11px] disabled:opacity-40"
           >
             + Add
           </button>
@@ -230,6 +254,7 @@ export function SubmodulesPanel({ repoId }: SubmodulesPanelProps) {
                 <SubmoduleRow
                   key={sub.path}
                   sub={sub}
+                  busy={busy}
                   onUpdate={(s) => runUpdate(s, false)}
                   onForceUpdate={(s) => setForceTarget(s)}
                   onSync={handleSync}
@@ -350,6 +375,7 @@ export function SubmodulesPanel({ repoId }: SubmodulesPanelProps) {
 
 interface SubmoduleRowProps {
   sub: SubmoduleInfo;
+  busy: boolean;
   onUpdate: (sub: SubmoduleInfo) => void;
   onForceUpdate: (sub: SubmoduleInfo) => void;
   onSync: (sub: SubmoduleInfo) => void;
@@ -359,6 +385,7 @@ interface SubmoduleRowProps {
 
 function SubmoduleRow({
   sub,
+  busy,
   onUpdate,
   onForceUpdate,
   onSync,
@@ -400,14 +427,17 @@ function SubmoduleRow({
             …
           </DropdownMenuTrigger>
           <DropdownMenuContent side="bottom" align="end">
-            <DropdownMenuItem onClick={() => onUpdate(sub)}>
+            <DropdownMenuItem disabled={busy} onClick={() => onUpdate(sub)}>
               Update
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => onForceUpdate(sub)}>
+            <DropdownMenuItem
+              disabled={busy}
+              onClick={() => onForceUpdate(sub)}
+            >
               Force update…
             </DropdownMenuItem>
             <DropdownMenuItem
-              disabled={!initialized}
+              disabled={!initialized || busy}
               onClick={() => onSync(sub)}
             >
               Sync
@@ -420,6 +450,7 @@ function SubmoduleRow({
             </DropdownMenuItem>
             <DropdownMenuItem
               variant="destructive"
+              disabled={busy}
               onClick={() => onRemove(sub)}
             >
               Remove
