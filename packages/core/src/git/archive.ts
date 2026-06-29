@@ -15,7 +15,7 @@ import {
   type GitError,
   type RepoId,
 } from "@cbranch/rpc-contract";
-import { Effect, type Stream } from "effect";
+import { Effect, Stream } from "effect";
 
 import { gitError } from "./errors";
 import { assertNoLeadingDash, runGit, streamGitBytes } from "./run-git";
@@ -176,9 +176,16 @@ export const archiveStreamGit = (
     prefix !== undefined && prefix !== "" ? cleanPrefix(prefix) : null;
   const cleanedSubPath =
     subPath !== undefined && subPath !== "" ? cleanSubPath(subPath) : null;
-  return streamGitBytes({
-    cwd,
-    args: archiveArgs(treeish, format, cleanedPrefix, cleanedSubPath),
-    read: false,
-  });
+  // Defense-in-depth: reject a leading-dash tree-ish here too (it sits before `--`),
+  // mirroring archivePrepare — the route validates at prepare, but the stream may be
+  // reached directly.
+  return Stream.unwrap(
+    Effect.map(assertNoLeadingDash(treeish, "archive tree-ish"), () =>
+      streamGitBytes({
+        cwd,
+        args: archiveArgs(treeish, format, cleanedPrefix, cleanedSubPath),
+        read: false,
+      }),
+    ),
+  );
 };

@@ -131,4 +131,70 @@ describe("bisect git operations", () => {
     const err = await run(Effect.flip(bisectMark(repo.dir, gitDir, "good")));
     expect(err.code).toBe("gitFailed");
   });
+
+  test("a no-seed start opens an empty seeding session", async () => {
+    const { repo, gitDir } = await seedRegression("bisect-no-seed");
+    const status = await run(bisectStart(repo.dir, gitDir));
+    expect(status.state).toBe("bisecting");
+    expect(status.current).toBeDefined();
+    expect(existsSync(join(gitDir, "BISECT_LOG"))).toBe(true);
+    await run(bisectReset(repo.dir));
+  });
+
+  test("a bad-only start seeds without checking out a midpoint", async () => {
+    const { repo, gitDir, oids } = await seedRegression("bisect-bad-only");
+    const status = await run(bisectStart(repo.dir, gitDir, oids[5]));
+    expect(status.state).toBe("bisecting");
+    await run(bisectReset(repo.dir));
+  });
+
+  test("goods supplied without a bad fail clearly instead of being dropped", async () => {
+    const { repo, gitDir, oids } = await seedRegression("bisect-goods-no-bad");
+    const err = await run(
+      Effect.flip(bisectStart(repo.dir, gitDir, undefined, [oids[0]])),
+    );
+    expect(err.code).toBe("gitFailed");
+    // No session must have been started by the rejected call.
+    expect(existsSync(join(gitDir, "BISECT_LOG"))).toBe(false);
+  });
+
+  test("a seed beginning with '-' is rejected (option-injection guard)", async () => {
+    const { repo, gitDir, oids } = await seedRegression("bisect-dash-seed");
+
+    const badErr = await run(
+      Effect.flip(bisectStart(repo.dir, gitDir, "--bad")),
+    );
+    expect(badErr.code).toBe("invalidRefName");
+
+    const goodErr = await run(
+      Effect.flip(bisectStart(repo.dir, gitDir, oids[5], ["-x"])),
+    );
+    expect(goodErr.code).toBe("invalidRefName");
+
+    // Neither rejected call may have started a session.
+    expect(existsSync(join(gitDir, "BISECT_LOG"))).toBe(false);
+  });
+
+  test("a start git rejects surfaces a gitFailed with the stderr excerpt", async () => {
+    const repo = await ws.createRepo("bisect-start-fail");
+    const gitDir = join(repo.dir, ".git");
+    // An unborn HEAD (no commits) gives bisect no HEAD to anchor to → git fails.
+    const err = await run(Effect.flip(bisectStart(repo.dir, gitDir)));
+    expect(err.code).toBe("gitFailed");
+    expect(err.detail).toBeDefined();
+  });
+
+  test("an all-skipped narrow range resolves to unbisectable (not an error)", async () => {
+    const { repo, gitDir, oids } = await seedRegression("bisect-unbisectable");
+    // good=c0, bad=c2 leaves a single midpoint (c1) to test.
+    await run(bisectStart(repo.dir, gitDir, oids[2], [oids[0]]));
+
+    // Skipping the only testable commit leaves git unable to isolate the first
+    // bad; git signals this with a non-zero exit, but it is DATA, not a failure.
+    const status = await run(bisectMark(repo.dir, gitDir, "skip"));
+    expect(status.state).toBe("unbisectable");
+    expect(status.candidates?.length).toBeGreaterThan(0);
+
+    await run(bisectReset(repo.dir));
+  });
 });

@@ -48,10 +48,11 @@ describe("rebase pure helpers", () => {
     expect(shellSingleQuote("/a'b/c")).toBe("'/a'\\''b/c'");
   });
 
-  test("buildRebasePlanArgs builds an oldest-first no-merges range", () => {
+  test("buildRebasePlanArgs builds an oldest-first topo-ordered no-merges range", () => {
     expect(buildRebasePlanArgs("abc123")).toEqual([
       "log",
       "-z",
+      "--topo-order",
       "--reverse",
       "--no-merges",
       `--format=${["%H", "%an", "%ae", "%aI", "%s", "%b"].join(FS)}`,
@@ -552,6 +553,28 @@ describe("rebase git operations", () => {
     );
     expect(err.code).toBe("invalidRefName");
     expect(existsSync(join(repo.dir, "pwned"))).toBe(false);
+    expect(existsSync(join(gitDir, "rebase-merge"))).toBe(false);
+  });
+
+  test("a post-spawn non-zero exit (invalid upstream) fails as gitFailed and reaps the sidecar", async () => {
+    const { repo, gitDir, oids } = await seedRange("nonzero-exit");
+    // A valid-hex but non-existent upstream clears every pre-spawn guard, so git itself
+    // exits non-zero without ever leaving a rebase in progress — the completed-with-
+    // non-zero-exit arm. It must surface as gitFailed and reap the authored sidecar.
+    const err = await run(
+      Effect.flip(
+        rebaseStart(
+          repo.dir,
+          gitDir,
+          "f".repeat(40),
+          [rs("pick", oids[1])],
+          undefined,
+          iso(repo),
+        ),
+      ),
+    );
+    expect(err.code).toBe("gitFailed");
+    expect(existsSync(join(gitDir, "cbranch-rebase"))).toBe(false);
     expect(existsSync(join(gitDir, "rebase-merge"))).toBe(false);
   });
 });

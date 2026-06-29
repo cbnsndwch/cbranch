@@ -70,9 +70,18 @@ export const shellSingleQuote = (value: string): string =>
  * authored todo + exec-amend message files). A successful `rebaseStart` clears it inline,
  * but a rebase that stops and is later resolved via the reused Continue/Skip/Abort surface
  * leaves it behind — the engine calls this once that sequencer op ends the rebase.
+ *
+ * The reap is best-effort and never throws: the engine runs it in an `Effect.tap` AFTER
+ * the Continue/Skip/Abort has already succeeded, so a transient EPERM/EBUSY (e.g. an AV
+ * scanner or indexer holding a sidecar handle) must not turn that succeeded RPC into a
+ * defect. `force: true` already swallows a missing dir; the catch covers the rest.
  */
 export const cleanupRebaseSidecar = (gitDir: string): void => {
-  rmSync(join(gitDir, "cbranch-rebase"), { recursive: true, force: true });
+  try {
+    rmSync(join(gitDir, "cbranch-rebase"), { recursive: true, force: true });
+  } catch {
+    // ignore — see above; leaving the sidecar behind is harmless.
+  }
 };
 
 // ── plan (read) ──────────────────────────────────────────────────────────────────
@@ -103,12 +112,17 @@ export const parseRebaseTodoCommits = (
   return rows;
 };
 
-/** Build the `git log` argv for the rebase range (exported for argv coverage). */
+/**
+ * Build the `git log` argv for the rebase range (exported for argv coverage).
+ * `--topo-order` matches `git rebase -i`'s replay order for non-linear ranges, so the
+ * planned/replayed step order can never diverge from git's (date order would).
+ */
 export const buildRebasePlanArgs = (
   upstream: string,
 ): ReadonlyArray<string> => [
   "log",
   "-z",
+  "--topo-order",
   "--reverse",
   "--no-merges",
   `--format=${REBASE_LOG_FORMAT}`,

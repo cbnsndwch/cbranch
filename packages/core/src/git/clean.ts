@@ -103,6 +103,23 @@ export const parseCleanPreview = (
   return entries;
 };
 
+const REMOVED_PREFIX = "Removing ";
+
+/**
+ * Count git's `Removing …` lines — the paths it ACTUALLY removed. Mirrors
+ * {@link parseCleanPreview}; the prefix is fixed under `LC_ALL=C`. Reporting this
+ * instead of the requested `paths.length` keeps `removed` honest when git deletes
+ * fewer than requested (a previewed path vanished before the run, or a non-UTF-8
+ * pathspec matched nothing).
+ */
+export const countRemoved = (stdout: string): number => {
+  let removed = 0;
+  for (const line of stdout.split("\n")) {
+    if (line.startsWith(REMOVED_PREFIX)) removed += 1;
+  }
+  return removed;
+};
+
 export const cleanPreview = (
   cwd: string,
   directories: boolean,
@@ -130,6 +147,6 @@ export const clean = (
       args: cleanArgs(paths, directories, ignored),
       read: false,
     }),
-    () => new CleanResult({ removed: paths.length }),
+    (r) => new CleanResult({ removed: countRemoved(decodeUtf8(r.stdout)) }),
   );
 };

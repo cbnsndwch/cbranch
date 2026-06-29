@@ -14,6 +14,7 @@ import {
   cleanArgs,
   cleanPreview,
   cleanPreviewArgs,
+  countRemoved,
   parseCleanPreview,
 } from "./clean";
 
@@ -76,6 +77,36 @@ describe("parseCleanPreview", () => {
     ]);
     expect(entries[3]?.isDirectory).toBe(true);
   });
+
+  test("octal escapes are unquoted (control bytes under core.quotePath=false)", () => {
+    // Even with core.quotePath=false, git C-quotes control bytes octally (e.g. \001),
+    // so the parser must decode 1–3 digit octal escapes back to their byte.
+    const entries = parseCleanPreview(
+      ['Would remove "\\001ctrl.txt"', 'Would remove "tab\\011sep.txt"'].join(
+        "\n",
+      ),
+    );
+    expect(entries.map((e) => e.path)).toEqual([
+      String.fromCharCode(1) + "ctrl.txt",
+      "tab\tsep.txt",
+    ]);
+  });
+});
+
+describe("countRemoved", () => {
+  test("counts only the 'Removing ' lines git actually printed", () => {
+    expect(
+      countRemoved(
+        [
+          "Removing a.txt",
+          "Removing sub/",
+          "Skipping repository nested/",
+          "",
+        ].join("\n"),
+      ),
+    ).toBe(2);
+    expect(countRemoved("")).toBe(0);
+  });
 });
 
 describe("clean git operations", () => {
@@ -118,6 +149,21 @@ describe("clean git operations", () => {
     expect(existsSync(join(repo.dir, "sub"))).toBe(false);
     // Tracked content is untouched.
     expect(existsSync(join(repo.dir, "tracked.txt"))).toBe(true);
+  });
+
+  test("removed count is git's actual output, not the requested count", async () => {
+    const repo = await ws.createRepo("clean-toctou");
+    await repo.commit({ message: "init", files: { "tracked.txt": "t\n" } });
+    await repo.writeFile("real.txt", "r\n");
+
+    // Request two paths but only one exists (a previewed path can vanish before the
+    // run — TOCTOU). git removes just `real.txt`, so `removed` must be 1, not 2.
+    const result = await run(
+      clean(repo.dir, ["real.txt", "gone.txt"], false, false),
+    );
+
+    expect(result.removed).toBe(1);
+    expect(existsSync(join(repo.dir, "real.txt"))).toBe(false);
   });
 
   test("empty paths is a no-op: removed:0, no git invoked (worktree untouched)", async () => {
