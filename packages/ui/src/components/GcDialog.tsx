@@ -42,7 +42,9 @@ const errorMessage = (error: unknown): string =>
 export function GcDialog() {
   const repoId = useUiStore((s) => s.activeRepoId);
   if (repoId === null) return null;
-  return <GcDialogBody repoId={repoId} />;
+  // Key by repoId so switching repos remounts the body, discarding the previous
+  // repo's captured gc stdout/stderr (held in the useGc mutation's local state).
+  return <GcDialogBody key={repoId} repoId={repoId} />;
 }
 
 function GcDialogBody({ repoId }: { repoId: RepoId }) {

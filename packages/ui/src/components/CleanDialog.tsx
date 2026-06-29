@@ -26,6 +26,11 @@ import {
 
 const plural = (n: number) => (n === 1 ? "entry" : "entries");
 
+const errorMessage = (error: unknown): string =>
+  error != null && typeof error === "object" && "message" in error
+    ? String((error as { message: unknown }).message)
+    : "Clean failed.";
+
 export function CleanDialog() {
   const repoId = useUiStore((s) => s.activeRepoId);
   if (repoId === null) return null;
@@ -77,6 +82,7 @@ function CleanDialogBody({ repoId }: { repoId: RepoId }) {
           reset();
           setOpen(false);
         },
+        onError: (e) => toast.error(errorMessage(e)),
       },
     );
 

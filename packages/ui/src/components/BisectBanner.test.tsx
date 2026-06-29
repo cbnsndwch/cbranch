@@ -120,6 +120,24 @@ describe("BisectBanner", () => {
     expect(screen.getByRole("button", { name: "Skip" })).toBeTruthy();
   });
 
+  test("while seeding (no revision estimate) HEAD is not detached and a seeding hint shows", async () => {
+    const seeding = new BisectStatus({
+      state: "bisecting",
+      current: summary(mid, "midpoint"),
+      badTerm: "bad",
+      goodTerm: "good",
+    });
+    renderBanner(makeApi({ bisectStatus: vi.fn(async () => seeding) }));
+    expect(await screen.findByText("Bisecting")).toBeTruthy();
+    // A bare start hasn't detached HEAD yet — no detached-HEAD warning.
+    expect(screen.queryByText(/detached HEAD/i)).toBeNull();
+    // The seeding hint replaces the (misleading) revision-under-test line.
+    expect(screen.getByText(/seeding/i)).toBeTruthy();
+    expect(screen.queryByText(/midpoint/)).toBeNull();
+    // The good/bad/skip controls remain so the user can seed the session.
+    expect(screen.getByRole("button", { name: "Good" })).toBeTruthy();
+  });
+
   test("marking advances and navigates the graph to the next revision", async () => {
     const next = new BisectStatus({
       state: "bisecting",

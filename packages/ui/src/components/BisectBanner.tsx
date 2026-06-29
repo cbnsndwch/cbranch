@@ -39,6 +39,15 @@ export function BisectBanner({
 
   const busy = mark.isPending || reset.isPending;
 
+  // A bisect session can exist without HEAD being detached: a bare `git bisect start` (or
+  // only one of good/bad marked so far) leaves HEAD on the original branch — git only
+  // checks out a revision to test, detaching HEAD, once it has both a bad and ≥1 good. The
+  // engine computes the revision estimate only at that point, so its absence is the machine
+  // signal for the still-"seeding" phase; `current` is always populated (it's just HEAD)
+  // and so can't distinguish the two.
+  const seeding =
+    data.state === "bisecting" && data.revisionsRemaining === undefined;
+
   const doMark = (m: "good" | "bad" | "skip") =>
     mark.mutate(m, {
       onSuccess: (s) => {
@@ -55,17 +64,23 @@ export function BisectBanner({
       className="border-status-behind/40 bg-status-behind/10 flex flex-wrap items-center gap-x-3 gap-y-1 border-b px-3 py-1.5 text-xs"
     >
       <span className="font-semibold">Bisecting</span>
-      <span className="text-muted-foreground">
-        detached HEAD — branch operations are unavailable until you reset.
-      </span>
+      {seeding ? (
+        <span className="text-muted-foreground">
+          seeding — mark good/bad to begin.
+        </span>
+      ) : (
+        <span className="text-muted-foreground">
+          detached HEAD — branch operations are unavailable until you reset.
+        </span>
+      )}
 
       {data.state === "bisecting" && (
         <>
-          <span className="font-mono">
-            {data.current
-              ? `${shortOid(data.current.oid)} ${data.current.subject}`
-              : "seeding — mark good/bad to begin"}
-          </span>
+          {!seeding && data.current && (
+            <span className="font-mono">
+              {shortOid(data.current.oid)} {data.current.subject}
+            </span>
+          )}
           {data.revisionsRemaining !== undefined && (
             <span className="text-muted-foreground">
               ~{data.revisionsRemaining} revisions

@@ -19,7 +19,12 @@ import {
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
-import { useBranchList, useRebasePlan, useRebaseStart } from "../rpc/hooks";
+import {
+  useBranchList,
+  useRebasePlan,
+  useRebaseStart,
+  useStashPush,
+} from "../rpc/hooks";
 import { useUiStore } from "../state/store";
 import { Button } from "./ui/button";
 import { Checkbox } from "./ui/checkbox";
@@ -158,6 +163,10 @@ function RebaseBody({
   const close = () => useUiStore.getState().setRebaseDialog(null);
   const branches = useBranchList(repoId);
   const start = useRebaseStart(repoId);
+  const stash = useStashPush(repoId);
+  // A dirty-tree refusal (the engine returns a typed `dirtyWorkingTree`) opens an
+  // offer-to-stash affordance rather than dropping a bare toast (REQ-P5-IR refusal UX).
+  const [dirtyTree, setDirtyTree] = useState(false);
 
   const [upstream, setUpstream] = useState(initialUpstream);
   const [showOnto, setShowOnto] = useState(initialOnto !== "");
@@ -271,6 +280,29 @@ function RebaseBody({
           else if (status.stopReason === "edit")
             toast.message("Rebase stopped to edit a commit");
           else toast.message("Rebase stopped");
+        },
+        onError: (e) => {
+          // The engine machine-detects a dirty-tree refusal and returns a typed
+          // `dirtyWorkingTree` (NF-GIT-3) — branch on the error CODE, not git's stderr — and
+          // offer to stash the conflicting changes rather than dropping a bare toast.
+          if ((e as { code?: unknown }).code === "dirtyWorkingTree")
+            setDirtyTree(true);
+          else toast.error(errorMessage(e));
+        },
+      },
+    );
+  };
+
+  // Stash the local changes that blocked the rebase, then retry. The stash is left for the
+  // user to pop afterwards (the rebase may stop on a conflict/edit, so auto-popping isn't safe).
+  const stashAndRebase = () => {
+    stash.mutate(
+      {},
+      {
+        onSuccess: () => {
+          setDirtyTree(false);
+          toast.success("Stashed local changes");
+          doStart();
         },
         onError: (e) => toast.error(errorMessage(e)),
       },
@@ -477,6 +509,42 @@ function RebaseBody({
             setEditing(null);
           }}
         />
+      )}
+
+      {dirtyTree && (
+        <Dialog
+          open={true}
+          onOpenChange={(next: boolean) => {
+            if (!next && !stash.isPending) setDirtyTree(false);
+          }}
+        >
+          <DialogContent style={{ width: "min(520px, 92vw)" }}>
+            <div className="flex flex-col gap-3 p-4">
+              <DialogTitle>Uncommitted changes</DialogTitle>
+              <DialogDescription>
+                Local changes would be overwritten by this rebase. Stash them
+                and rebase, or cancel and deal with them yourself.
+              </DialogDescription>
+              <div className="flex justify-end gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setDirtyTree(false)}
+                  disabled={stash.isPending}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={stashAndRebase}
+                  disabled={stash.isPending}
+                >
+                  {stash.isPending ? "Stashing…" : "Stash and rebase"}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       )}
     </Dialog>
   );

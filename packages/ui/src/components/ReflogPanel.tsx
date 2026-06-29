@@ -18,6 +18,7 @@ import {
   useReflog,
   useResetTo,
 } from "../rpc/hooks";
+import { useUiStore } from "../state/store";
 import { DestructiveConfirmDialog } from "./DestructiveConfirmDialog";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
@@ -58,6 +59,14 @@ export function ReflogPanel({
   const reflog = useReflog(repoId, ref);
   const branchCreate = useBranchCreate(repoId);
   const resetTo = useResetTo(repoId);
+  const setActiveView = useUiStore((s) => s.setActiveView);
+
+  // The reflog view fully replaces the detail pane, so selecting a commit must also
+  // switch back to the history view for it to be surfaced (REQ-P5-RL-005).
+  const viewCommit = (oid: Oid) => {
+    onSelectOid(oid);
+    setActiveView("history");
+  };
 
   const [branchFrom, setBranchFrom] = useState<Oid | null>(null);
   const [branchName, setBranchName] = useState("");
@@ -136,7 +145,7 @@ export function ReflogPanel({
                 </span>
                 <button
                   type="button"
-                  onClick={() => onSelectOid(e.oid)}
+                  onClick={() => viewCommit(e.oid)}
                   className="w-16 shrink-0 text-left font-mono hover:underline"
                 >
                   {shortOid(e.oid)}
@@ -163,7 +172,7 @@ export function ReflogPanel({
                     <DropdownMenuItem onClick={() => setHardReset(e.oid)}>
                       Reset (hard) to here…
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => onSelectOid(e.oid)}>
+                    <DropdownMenuItem onClick={() => viewCommit(e.oid)}>
                       View commit
                     </DropdownMenuItem>
                   </DropdownMenuContent>

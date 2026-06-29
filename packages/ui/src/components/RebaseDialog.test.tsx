@@ -293,6 +293,39 @@ describe("RebaseDialog", () => {
     expect(opts).toEqual({ onto: "main" });
   });
 
+  test("a dirty-tree refusal offers to stash and rebase, then retries on stash", async () => {
+    const dirtyErr = Object.assign(new Error("dirty"), {
+      code: "dirtyWorkingTree",
+    });
+    const rebaseStart = vi
+      .fn()
+      .mockRejectedValueOnce(dirtyErr)
+      .mockResolvedValueOnce(completed);
+    const stashPush = vi.fn(async () => ({}) as never);
+    renderDialog(makeApi({ rebaseStart, stashPush }));
+    act(() => {
+      useUiStore.setState({ rebaseDialog: { upstream: base } });
+    });
+    await screen.findByText("first");
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Start rebase" }));
+    });
+
+    // The refusal surfaces the stash affordance, not a bare toast/close.
+    const stashBtn = await screen.findByRole("button", {
+      name: "Stash and rebase",
+    });
+    await act(async () => {
+      fireEvent.click(stashBtn);
+    });
+
+    // Stashed, then the rebase is retried and (now clean) completes + closes.
+    await waitFor(() => expect(stashPush).toHaveBeenCalled());
+    await waitFor(() => expect(rebaseStart).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(useUiStore.getState().rebaseDialog).toBeNull());
+  });
+
   test("a reword folded into a squash needs no reword message and shows one editor", async () => {
     renderDialog(makeApi());
     act(() => {
