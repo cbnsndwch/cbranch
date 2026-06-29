@@ -13,7 +13,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 import { type CbranchApi } from "../rpc/api";
 import { ApiProvider } from "../rpc/ApiProvider";
-import { useKeybindings } from "./use-keybindings";
+import { setKeybindingCaptureActive, useKeybindings } from "./use-keybindings";
 
 const makeApi = (keybindings: KeyBinding[]): CbranchApi =>
   ({
@@ -52,7 +52,10 @@ const press = (init: KeyboardEventInit) =>
     window.dispatchEvent(new KeyboardEvent("keydown", init));
   });
 
-afterEach(() => cleanup());
+afterEach(() => {
+  cleanup();
+  setKeybindingCaptureActive(false);
+});
 beforeEach(() => vi.clearAllMocks());
 
 describe("useKeybindings dispatcher", () => {
@@ -102,6 +105,22 @@ describe("useKeybindings dispatcher", () => {
 
     press({ key: "k", ctrlKey: true });
     expect(palette).not.toHaveBeenCalled();
+  });
+
+  test("an active chord capture suppresses the dispatcher entirely (modifiers included)", async () => {
+    const palette = vi.fn();
+    await mount(makeApi([]), { "view.commandPalette": palette });
+
+    // While a chord-capture input is recording, even a modifier chord must not fire its
+    // bound action (the SettingsDialog regression: Mod+K popping the palette over Settings).
+    setKeybindingCaptureActive(true);
+    press({ key: "k", ctrlKey: true });
+    expect(palette).not.toHaveBeenCalled();
+
+    // Recording over → the dispatcher resumes.
+    setKeybindingCaptureActive(false);
+    press({ key: "k", ctrlKey: true });
+    expect(palette).toHaveBeenCalledTimes(1);
   });
 
   test("a remapped bare-key chord does not hijack typing in a field", async () => {

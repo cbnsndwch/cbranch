@@ -12,6 +12,7 @@ import {
 import { type KeyboardEvent, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
+import { setKeybindingCaptureActive } from "../hooks/use-keybindings";
 import {
   DEFAULT_KEYBINDINGS,
   eventToChord,
@@ -59,13 +60,15 @@ const FIELD = "h-8 w-full border px-2 text-sm";
 
 type WritableScope = "global" | "local";
 
-// Effective value of a key = the highest-precedence on-disk entry (local > worktree >
-// global > system); used to prefill the guided editors (REQ-P5-CFG-001).
+// Effective value of a key = the highest-precedence on-disk entry (command > worktree >
+// local > global > system); used to prefill the guided editors (REQ-P5-CFG-001). A
+// per-worktree config (extensions.worktreeConfig) overrides the repo-local one in git, so
+// worktree must outrank local.
 const SCOPE_RANK: Readonly<Record<string, number>> = {
   system: 0,
   global: 1,
-  worktree: 2,
-  local: 3,
+  local: 2,
+  worktree: 3,
   command: 4,
 };
 const effectiveValue = (
@@ -84,6 +87,13 @@ const effectiveValue = (
   }
   return value;
 };
+
+// Keys git stores as multi-valued (multivar). A plain `git config <key> <value>` aborts
+// with exit 5 — instead of overwriting — once more than one value already exists, and the
+// guided editors only ever write a single value. cbranch can't pass `--replace-all` over
+// the current ConfigSet contract, so a failed write of one of these keys surfaces an
+// actionable message pointing at the All-config table (REQ-P5-CFG-002/004).
+const MULTIVAR_KEYS: ReadonlySet<string> = new Set(["credential.helper"]);
 
 export function SettingsDialog() {
   const open = useUiStore((s) => s.settingsDialogOpen);
@@ -158,7 +168,12 @@ function GitConfigTab({ repoId }: { repoId: RepoId }) {
       { key, value, scope },
       {
         onSuccess: () => toast.success(`Set ${key} (${scope})`),
-        onError: () => toast.error(`Could not set ${key}`),
+        onError: () =>
+          toast.error(
+            MULTIVAR_KEYS.has(key)
+              ? `${key} already has multiple values — clear the extras in "All config entries" below, then set it again.`
+              : `Could not set ${key}`,
+          ),
       },
     );
   };
@@ -515,6 +530,15 @@ function AppSettingsTab() {
     }
   }, [settings.data]);
   const [recording, setRecording] = useState<string | null>(null);
+
+  // Stand the global keybinding dispatcher down while a chord is being captured, so
+  // recording e.g. Mod+K doesn't ALSO fire its bound action over the dialog. Cleared on
+  // unmount too, so closing the dialog mid-capture can't leave the dispatcher disabled
+  // (REQ-P5-CFG-006/007).
+  useEffect(() => {
+    setKeybindingCaptureActive(recording !== null);
+    return () => setKeybindingCaptureActive(false);
+  }, [recording]);
 
   const effective = mergeBindings(overrides);
   const conflicts = findConflicts(effective);

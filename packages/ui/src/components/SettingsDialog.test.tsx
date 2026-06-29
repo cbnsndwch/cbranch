@@ -9,8 +9,10 @@ import {
   screen,
   waitFor,
 } from "@testing-library/react";
+import { toast } from "sonner";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
+import { useKeybindings } from "../hooks/use-keybindings";
 import { type CbranchApi } from "../rpc/api";
 import { ApiProvider } from "../rpc/ApiProvider";
 import { useUiStore } from "../state/store";
@@ -322,5 +324,92 @@ describe("SettingsDialog", () => {
         (b) => b.commandId === "history.find" && b.chord === "",
       ),
     ).toBe(true);
+  });
+
+  test("recording a chord does not also fire the global action it is bound to", async () => {
+    const palette = vi.fn();
+    const qc = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    const Wrap = () => {
+      useKeybindings({ "view.commandPalette": palette });
+      return <SettingsDialog />;
+    };
+    render(
+      <QueryClientProvider client={qc}>
+        <ApiProvider api={makeApi()}>
+          <Wrap />
+        </ApiProvider>
+      </QueryClientProvider>,
+    );
+    open();
+    fireEvent.click(screen.getByRole("tab", { name: "App settings" }));
+    fireEvent.click(
+      await screen.findByLabelText("Change Open command palette"),
+    );
+    const capture = screen.getByLabelText(
+      "Recording chord for Open command palette",
+    );
+    // The window dispatcher also sees this bubbled keydown; while capturing it must stand
+    // down so Mod+K records the chord instead of opening the palette over Settings.
+    fireEvent.keyDown(capture, { key: "k", ctrlKey: true });
+    expect(palette).not.toHaveBeenCalled();
+
+    // Capture over → the dispatcher resumes and the same chord fires its action.
+    await act(async () => {
+      await Promise.resolve();
+    });
+    act(() => {
+      window.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "k", ctrlKey: true }),
+      );
+    });
+    expect(palette).toHaveBeenCalledTimes(1);
+  });
+
+  test("guided editor prefills the worktree value over the repo-local one (git precedence)", async () => {
+    const api = makeApi({
+      configList: vi.fn(async () => [
+        {
+          key: "core.editor",
+          value: "vim",
+          scope: "local",
+          origin: "file:.git/config",
+        },
+        {
+          key: "core.editor",
+          value: "nano",
+          scope: "worktree",
+          origin: "file:.git/config.worktree",
+        },
+      ]),
+    });
+    renderDialog(api);
+    open();
+    const editor = (await screen.findByLabelText(
+      "core.editor",
+    )) as HTMLInputElement;
+    await waitFor(() => expect(editor.value).toBe("nano"));
+  });
+
+  test("guided Credentials surfaces an actionable message when a multivar set fails", async () => {
+    const api = makeApi({
+      configSet: vi.fn(async () => {
+        throw new Error("boom");
+      }),
+    });
+    renderDialog(api);
+    open();
+    const helper = (await screen.findByLabelText(
+      "credential.helper",
+    )) as HTMLInputElement;
+    fireEvent.change(helper, { target: { value: "store" } });
+    fireEvent.click(helper.parentElement!.querySelector("button")!);
+    await waitFor(() => expect(toast.error).toHaveBeenCalled());
+    const msg = (toast.error as ReturnType<typeof vi.fn>).mock.calls.at(
+      -1,
+    )?.[0] as string;
+    expect(msg).toMatch(/multiple values/i);
+    expect(msg).toContain("credential.helper");
   });
 });

@@ -27,6 +27,22 @@ const isEditableTarget = (target: EventTarget | null): boolean => {
   );
 };
 
+// While the SettingsDialog is RECORDING a new chord, the global dispatcher must stand down
+// entirely: a captured MODIFIER chord (e.g. Mod+K) otherwise ALSO fires its bound global
+// action and pops the palette/find over the dialog (the editable-field guard below only
+// suppresses BARE keys). The chord-capture input raises this module-level flag for the
+// lifetime of its recording; the dispatcher honors it first (REQ-P5-CFG-006/007).
+const captureState = { active: false };
+
+/**
+ * Suspend (`true`) or resume (`false`) the global keybinding dispatcher. SettingsDialog's
+ * chord-capture input calls this while recording a new binding so the keystroke is consumed
+ * by the capture, never by the action that chord is (or is about to be) bound to.
+ */
+export const setKeybindingCaptureActive = (active: boolean): void => {
+  captureState.active = active;
+};
+
 export const useKeybindings = (
   actions: Readonly<Record<string, () => void>>,
 ): void => {
@@ -42,6 +58,9 @@ export const useKeybindings = (
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
+      // A chord-capture field is recording a binding — let it consume the keystroke so
+      // capturing a chord never also fires the action that chord is bound to.
+      if (captureState.active) return;
       const current = ref.current;
       const editable = isEditableTarget(event.target);
       for (const [commandId, chord] of Object.entries(current.bindings)) {
