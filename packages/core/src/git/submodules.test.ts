@@ -192,6 +192,17 @@ describe("submodule parsers (pure)", () => {
   test("combineSubmodules on a repo with no submodules is empty", () => {
     expect(combineSubmodules("", "", "", "/srv/repo")).toEqual([]);
   });
+
+  test("a stage-0 gitlink with no `submodule status` line falls back to uninitialized", () => {
+    // The deriveStatus default arm: an indexed gitlink that `submodule status` never
+    // reports (e.g. not in .gitmodules) has no prefix → the safe machine default.
+    const stage = [`160000 ${hex("a")} 0\tlib`].map((r) => `${r}\0`).join("");
+    const subs = combineSubmodules(stage, "", "", "/srv/repo");
+    expect(subs).toHaveLength(1);
+    expect(subs[0]?.status).toBe("uninitialized");
+    expect(subs[0]?.recordedOid).toBe(hex("a"));
+    expect(subs[0]?.checkedOutOid).toBeUndefined();
+  });
 });
 
 describe("submodule argv builders (pure)", () => {

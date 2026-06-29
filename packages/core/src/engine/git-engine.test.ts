@@ -1,6 +1,6 @@
 import { join } from "node:path";
 
-import { type RepoId } from "@cbranch/rpc-contract";
+import { type GitError, type RepoId } from "@cbranch/rpc-contract";
 import { RepoId as RepoIdBrand } from "@cbranch/rpc-contract";
 import { Effect, Exit } from "effect";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
@@ -20,6 +20,11 @@ const withEngine = <A, E>(
   configPath: string,
   f: (engine: GitEngineApi) => Effect.Effect<A, E>,
 ): Promise<A> => runScoped(Effect.flatMap(makeGitEngine({ configPath }), f));
+
+// Collapse an op to a comparable label — "ok" on success, else the GitError.code —
+// so two concurrently-raced ops can be compared without digging into Exit causes.
+const outcome = <A>(eff: Effect.Effect<A, GitError>): Effect.Effect<string> =>
+  Effect.match(eff, { onSuccess: () => "ok", onFailure: (err) => err.code });
 
 beforeAll(async () => {
   ws = await createFixtureWorkspace();
@@ -198,5 +203,58 @@ describe("GitEngine worktree.switch (P3, WT-006)", () => {
     );
 
     expect(err.code).toBe("repoUnavailable");
+  });
+});
+
+describe("GitEngine repo-lock wiring (P5 mutations serialize; reads stay lockless)", () => {
+  // Lock acquisition is a synchronous test-and-set and only yields at the git child
+  // spawn, so racing two ops on one repoId is deterministic: the first acquires the
+  // permit and the second finds it busy. `config.set`/`reflog.list` stand in for the
+  // P5 ✎/READ handlers — a handler that dropped `withRepoLock` would let both writes
+  // through (the whole suite would otherwise still pass).
+  test("two concurrent P5 mutations on one repoId fail-fast: the loser is rejected (repoLocked)", async () => {
+    const repo = await ws.createRepo("lock-mutations");
+    await repo.commit({ message: "init", files: { "a.txt": "a\n" } });
+    const cfg = newCfg();
+
+    const labels = await withEngine(cfg, (e) =>
+      Effect.gen(function* () {
+        const { repoId } = yield* e.open(repo.dir);
+        return yield* Effect.all(
+          [
+            outcome(e.configSet(repoId, "cbranch.locktest", "a", "local")),
+            outcome(e.configSet(repoId, "cbranch.locktest", "b", "local")),
+          ],
+          { concurrency: "unbounded" },
+        );
+      }),
+    );
+
+    // Exactly one ran; the other was rejected by the LOCK (not a git-level error).
+    expect(labels.filter((l) => l === "ok")).toHaveLength(1);
+    expect(labels.filter((l) => l === "repoLocked")).toHaveLength(1);
+  });
+
+  test("a read proceeds concurrently with a held mutation (reads never take the lock)", async () => {
+    const repo = await ws.createRepo("lock-read");
+    await repo.commit({ message: "init", files: { "a.txt": "a\n" } });
+    const cfg = newCfg();
+
+    const labels = await withEngine(cfg, (e) =>
+      Effect.gen(function* () {
+        const { repoId } = yield* e.open(repo.dir);
+        // The mutation (listed first) acquires the permit; the read fires while it is
+        // held and must still succeed rather than be rejected with `repoLocked`.
+        return yield* Effect.all(
+          [
+            outcome(e.configSet(repoId, "cbranch.locktest", "x", "local")),
+            outcome(e.reflogList(repoId, 50)),
+          ],
+          { concurrency: "unbounded" },
+        );
+      }),
+    );
+
+    expect(labels).toEqual(["ok", "ok"]);
   });
 });

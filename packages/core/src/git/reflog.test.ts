@@ -54,6 +54,19 @@ describe("reflog parse + argv (pure)", () => {
     expect(entries[3]?.action).toBe("rebase (finish)");
   });
 
+  test("a %gs with no colon → action is the whole label, message empty", () => {
+    // Some reflog subjects carry no `action: message` colon (e.g. a bare token); the
+    // whole `%gs` becomes the action and the message is empty.
+    const oid = "f".repeat(40);
+    const entries = parseReflog(rec(oid, "HEAD@{0}", "initial pull"));
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({
+      selector: "HEAD@{0}",
+      action: "initial pull",
+      message: "",
+    });
+  });
+
   test("drops malformed records (non-hex oid / too few fields)", () => {
     const stdout = [
       rec("not-an-oid", "HEAD@{0}", "commit: x"),

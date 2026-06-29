@@ -53,6 +53,14 @@ describe("parseConfigList", () => {
     expect(rows[0]?.value).toBe("");
   });
 
+  test("a valueless boolean with NO trailing newline yields an empty value (nl<0)", () => {
+    // Real `-z` framing carries NO trailing newline on a bare boolean: `...core.bare\0`
+    // (unlike the "core.bare\n" case above). This exercises the `nl < 0` parse branch.
+    const rows = parseConfigList(rec("local", "file:.git/config", "core.bare"));
+    expect(rows[0]?.key).toBe("core.bare");
+    expect(rows[0]?.value).toBe("");
+  });
+
   test("a value containing newlines round-trips (NUL framing, split on FIRST \\n)", () => {
     const rows = parseConfigList(
       rec("global", "file:x", "alias.lol\nlog --oneline\nmore"),
@@ -210,6 +218,20 @@ describe("git-config integration (real fixture repo)", () => {
     expect(v.present).toBe(true);
     expect(v.value).toBe("tester@cbranch.test");
     expect(v.scope).toBeUndefined();
+  });
+
+  test("configGet surfaces a GitError (not present:false) on a corrupt config (exit 128)", async () => {
+    const repo = await ws.createRepo("cfg-get-corrupt");
+    await repo.commit({ message: "init", files: { "a.txt": "a\n" } });
+    // A merely-absent key exits 1 (→ present:false); a genuinely CORRUPT config file
+    // makes git fatal with exit 128, which must reach the classifyExit arm. Write an
+    // unterminated section header at the isolated global path so the `--global` read
+    // is forced to parse it.
+    await repo.writeFile(".gitconfig-global", "[core\n");
+    const err = await run(
+      Effect.flip(configGet(repo.dir, "user.name", "global", isolated(repo))),
+    );
+    expect(err.code).toBe("gitFailed");
   });
 
   test("configSet writes local and global, integration set→get→unset", async () => {
