@@ -12,7 +12,7 @@
 // the list is a lockless read.
 
 import { rm } from "node:fs/promises";
-import { join } from "node:path";
+import { join, resolve, sep } from "node:path";
 
 import {
   type GitError,
@@ -22,7 +22,7 @@ import {
 } from "@cbranch/rpc-contract";
 import { Effect } from "effect";
 
-import { classifyNodeError } from "./errors";
+import { classifyNodeError, gitError } from "./errors";
 import {
   assertNoLeadingDash,
   decodeUtf8,
@@ -363,6 +363,21 @@ export const submoduleRemove = (
       gmResult.exitCode === 0
         ? parseGitmodules(decodeUtf8(gmResult.stdout)).get(path)?.name
         : undefined;
+    // Security: the cached git dir is deleted with a recursive `rm`, and its segment
+    // (`name` from .gitmodules, else the submodule path) is attacker-controllable — a
+    // crafted value like "../../../tmp/x" or an absolute path would escape
+    // <commonDir>/modules and recursively delete an arbitrary host directory. Resolve it
+    // and refuse anything that does not land strictly under modules/ BEFORE touching the
+    // working tree (NF-SEC-6).
+    const modulesDir = resolve(commonDir, "modules");
+    const cachedGitDir = resolve(modulesDir, name ?? path);
+    if (!cachedGitDir.startsWith(modulesDir + sep))
+      return yield* Effect.fail(
+        gitError(
+          "invalidRefName",
+          "refusing to remove a submodule git dir outside the modules directory",
+        ),
+      );
     yield* runGitOk({
       cwd,
       args: ["submodule", "deinit", "-f", "--", path],
@@ -371,11 +386,7 @@ export const submoduleRemove = (
     });
     yield* runGitOk({ cwd, args: ["rm", "-f", "--", path], env, read: false });
     yield* Effect.tryPromise({
-      try: () =>
-        rm(join(commonDir, "modules", name ?? path), {
-          recursive: true,
-          force: true,
-        }),
+      try: () => rm(cachedGitDir, { recursive: true, force: true }),
       catch: classifyNodeError,
     });
   });

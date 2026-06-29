@@ -400,4 +400,30 @@ describe("submodule git operations", () => {
     // the real submodule is untouched.
     expect(await run(submoduleList(sup.dir))).toHaveLength(1);
   });
+
+  test("remove refuses a .gitmodules name that escapes the modules dir (path traversal)", async () => {
+    // A crafted submodule NAME ("../../EVIL") resolves outside <gitDir>/modules; the
+    // cached-git-dir cleanup does a recursive rm on that segment, so without the
+    // containment guard it would delete an arbitrary host directory. A committed sentinel
+    // at the escape target (resolve(<gitDir>/modules, "../../EVIL") === <repo>/EVIL)
+    // proves the rm never reaches it.
+    const repo = await ws.createRepo("sm-traversal");
+    await repo.commit({
+      message: "init",
+      files: {
+        ".gitmodules": '[submodule "../../EVIL"]\n\tpath = evil\n\turl = ./x\n',
+        EVIL: "sentinel\n",
+      },
+    });
+    const gitDir = join(repo.dir, ".git");
+    const sentinel = join(repo.dir, "EVIL");
+    expect(existsSync(sentinel)).toBe(true);
+
+    const err = await run(
+      Effect.flip(submoduleRemove(repo.dir, gitDir, "evil")),
+    );
+    expect(err.code).toBe("invalidRefName");
+    // The escape target survived — the guard fired before any deletion.
+    expect(existsSync(sentinel)).toBe(true);
+  });
 });
