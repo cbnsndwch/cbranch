@@ -1,9 +1,11 @@
 // The full top-menu structure for the desktop shell, transcribed from
 // docs/design/menu-hierarchy.md (the authoritative forward-design spec). Per its
 // implementation notes the full chrome renders from day one — all nine menus and every
-// item — with unwired items disabled (greyed), driven by a capability + phase flag rather
-// than ad-hoc conditionals. This model is the single source of truth; the revision-grid
-// context menu (later) reuses the same command ids.
+// item — with unwired items disabled (greyed). Greying is driven purely by the capability
+// layer in `use-menu-actions` (an item is enabled iff a handler is registered), NOT by the
+// `phase` tag below: `phase` is a delivery/wiring checklist marker (which milestone is
+// expected to wire the command), not a runtime gate. This model is the single source of
+// truth; the revision-grid context menu reuses the same command ids.
 
 import {
   ArrowLeft,
@@ -145,19 +147,19 @@ export const MENUS: ReadonlyArray<TopMenu> = [
         kind: "command",
         id: "repository.submodulesManage",
         label: "Manage submodules…",
-        phase: "later",
+        phase: "P5",
       },
       {
         kind: "command",
         id: "repository.submodulesUpdateAll",
         label: "Update all submodules",
-        phase: "later",
+        phase: "P5",
       },
       {
         kind: "command",
         id: "repository.submodulesSyncAll",
         label: "Synchronize all submodules",
-        phase: "later",
+        phase: "P5",
       },
       sep,
       {

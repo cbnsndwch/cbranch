@@ -9,7 +9,7 @@ import { useNavigate } from "react-router";
 import { toast } from "sonner";
 
 import { useApi } from "../../rpc/ApiProvider";
-import { useRecentList } from "../../rpc/hooks";
+import { useRecentList, useRepoState } from "../../rpc/hooks";
 import { repoScopeKey } from "../../rpc/query-keys";
 import { useNavigation } from "../../state/navigation";
 import { useUiStore } from "../../state/store";
@@ -40,6 +40,9 @@ export function useMenuActions(): MenuActions {
   const selectedOid = useUiStore((s) => s.selectedOid);
   const dateMode = useUiStore((s) => s.dateMode);
   const recentQuery = useRecentList();
+  // The Conflicts view/tab only exists while a conflict-capable op is in progress
+  // (mirrors AppShell), so "Solve merge conflicts…" is gated on the same signal.
+  const inProgress = useRepoState(repoId).data?.inProgress ?? "none";
   const api = useApi();
 
   return useMemo(() => {
@@ -53,6 +56,9 @@ export function useMenuActions(): MenuActions {
       "start.open": () => useUiStore.getState().setPaletteOpen(true),
       "start.exit": () => navigate("/"),
       "repository.close": () => navigate("/"),
+      // Browser-style history navigation is meaningful app-wide (no repo required).
+      "navigate.back": () => navigate(-1),
+      "navigate.forward": () => navigate(1),
       "help.about": () =>
         toast("cBranch", {
           description: "A desktop-style git client. MIT licensed.",
@@ -73,7 +79,7 @@ export function useMenuActions(): MenuActions {
               queryKey: [repoId, "status"],
             }),
           )
-          .catch(() => {});
+          .catch((e) => toast.error("Stage all failed: " + String(e)));
       handlers["commands.unstageAll"] = () =>
         void api
           .unstageFiles(repoId, [], true)
@@ -82,7 +88,7 @@ export function useMenuActions(): MenuActions {
               queryKey: [repoId, "status"],
             }),
           )
-          .catch(() => {});
+          .catch((e) => toast.error("Unstage all failed: " + String(e)));
       // Commands → Commit… opens the dedicated commit dialog (commit-surface.md §9.4).
       handlers["commands.commit"] = () =>
         useUiStore.getState().setCommitDialogOpen(true);
@@ -114,6 +120,58 @@ export function useMenuActions(): MenuActions {
       // (git-config tab is the focus from the Repository menu). REQ-P5-CFG-001/002.
       handlers["repository.settings"] = openSettings;
       handlers["repository.maintenance.editConfig"] = openSettings;
+      // Routed views reachable from the menu (P3): switch the main view; the panel mounts
+      // on switch and owns its in-view actions.
+      handlers["repository.worktrees"] = () =>
+        useUiStore.getState().setActiveView("worktrees");
+      handlers["commands.stashes"] = () =>
+        useUiStore.getState().setActiveView("stash");
+      // "Recover lost objects…" → the reflog view is the recovery surface (REQ-P5-RL-*).
+      handlers["repository.maintenance.recover"] = () =>
+        useUiStore.getState().setActiveView("reflog");
+      // Quick search (Ctrl+F): show history, then open the find bar over the loaded log.
+      handlers["navigate.quickSearch"] = () => {
+        const s = useUiStore.getState();
+        s.setActiveView("history");
+        s.setFindOpen(true);
+      };
+      // Branch lifecycle (P3). "Create branch…" has a standalone dialog (lifted to the
+      // store); the row-based delete/checkout/merge actions live in the Branches view, so
+      // those entries route there.
+      handlers["commands.createBranch"] = () => {
+        const s = useUiStore.getState();
+        s.setActiveView("branches");
+        s.setBranchCreate({ startPoint: "HEAD" });
+      };
+      handlers["commands.deleteBranch"] = () =>
+        useUiStore.getState().setActiveView("branches");
+      handlers["commands.checkoutBranch"] = () =>
+        useUiStore.getState().setActiveView("branches");
+      handlers["commands.checkoutRevision"] = () =>
+        useUiStore.getState().setActiveView("branches");
+      handlers["commands.merge"] = () =>
+        useUiStore.getState().setActiveView("branches");
+      // Remotes manager (P3): a dialog rendered by the Branches panel — show it, then open.
+      handlers["repository.remotes"] = () => {
+        const s = useUiStore.getState();
+        s.setActiveView("branches");
+        s.setRemotesDialogOpen(true);
+      };
+      // Tag lifecycle (P3). "Create tag…" has a standalone dialog; "Delete tag…" is
+      // row-based, so it routes to the Tags view.
+      handlers["commands.createTag"] = () => {
+        const s = useUiStore.getState();
+        s.setActiveView("tags");
+        s.setTagCreateOpen(true);
+      };
+      handlers["commands.deleteTag"] = () =>
+        useUiStore.getState().setActiveView("tags");
+      // Streaming fetch/pull/push run through the always-mounted Toolbar, which consumes
+      // this one-shot request (it owns the progress toast + non-ff retry dialog).
+      handlers["commands.pull"] = () =>
+        useUiStore.getState().setSyncRequest("pull");
+      handlers["commands.push"] = () =>
+        useUiStore.getState().setSyncRequest("push");
       // Submodules: Manage opens the routed panel; Update-all / Sync-all fire the bulk
       // ops (empty paths = all) with toast feedback (REQ-P5-SM-001..003).
       handlers["repository.submodulesManage"] = () =>
@@ -156,6 +214,12 @@ export function useMenuActions(): MenuActions {
           commits: [{ oid: selectedOid, subject: "" }],
         });
     }
+    // "Solve merge conflicts…" is reachable only while a conflict-capable op is in
+    // progress — the Conflicts view exists only then (mirrors AppShell's tab gating).
+    if (repoId && inProgress !== "none") {
+      handlers["commands.solveConflicts"] = () =>
+        useUiStore.getState().setActiveView("solveConflicts");
+    }
     // State-bound checkbox: the date column's relative/absolute mode (P1-HIST-8).
     const checkboxes: Record<string, boolean> = {
       "view.showRelativeDate": dateMode === "relative",
@@ -185,6 +249,7 @@ export function useMenuActions(): MenuActions {
     repoId,
     selectedOid,
     dateMode,
+    inProgress,
     recentQuery.data,
     api,
   ]);
