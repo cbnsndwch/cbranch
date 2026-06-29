@@ -150,6 +150,31 @@ describe("app settings (REQ-P5-CFG-006; NEVER git config, REQ-P5-CFG-005)", () =
   });
 });
 
+describe("concurrent writes are serialized (no lost update)", () => {
+  test("a theme save racing an upsertRecent: both persist", async () => {
+    const store = makeConfigStore({ configPath: newPath() });
+    const e = entry("/a");
+    // Without serialization both writers load the same base, then each saves its
+    // OWN full config, so the later write clobbers the earlier (lost update). The
+    // module-level write permit makes the read→modify→write atomic.
+    await Promise.all([
+      run(store.setAppSettings({ theme: "dark" })),
+      run(store.upsertRecent(e)),
+    ]);
+    const config = await run(store.load());
+    expect(config.theme).toBe("dark");
+    expect(config.recentRepos.map((r) => r.path)).toEqual(["/a"]);
+  });
+
+  test("many concurrent upserts all persist", async () => {
+    const store = makeConfigStore({ configPath: newPath() });
+    const paths = Array.from({ length: 10 }, (_, i) => `/r${i}`);
+    await Promise.all(paths.map((p) => run(store.upsertRecent(entry(p)))));
+    const recents = await run(store.listRecent());
+    expect(recents.map((r) => r.path).sort()).toEqual([...paths].sort());
+  });
+});
+
 describe("resolveConfigPath (NF-CFG-7 / NF-PKG-9 precedence)", () => {
   test("CBRANCH_CONFIG wins", () => {
     expect(

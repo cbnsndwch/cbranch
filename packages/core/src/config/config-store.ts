@@ -8,13 +8,14 @@
 // crashing (NF-CFG-5), and unknown fields are ignored (forward/backward compatible).
 // cbranch NEVER writes repository git config (NF-CFG-4) or secrets (NF-CFG-6).
 
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
+import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 
 import { type GitError, type RepoId } from "@cbranch/rpc-contract";
 import { RecentRepo, RepoId as RepoIdBrand } from "@cbranch/rpc-contract";
-import { Effect } from "effect";
+import { Effect, Semaphore } from "effect";
 
 import { classifyNodeError } from "../git/errors";
 
@@ -116,6 +117,13 @@ export interface ConfigStore {
   ) => Effect.Effect<AppSettingsData, GitError>;
 }
 
+/**
+ * ONE process-wide write permit. Every writer (theme save, upsertRecent, …) runs
+ * its whole load→modify→write under this so a concurrent theme save racing an
+ * upsertRecent can't lose an update. Reads stay lockless (load is infallible).
+ */
+const writeLock = Semaphore.makeUnsafe(1);
+
 export const makeConfigStore = (opts?: {
   readonly configPath?: string;
   readonly env?: NodeJS.ProcessEnv;
@@ -135,21 +143,32 @@ export const makeConfigStore = (opts?: {
     Effect.tryPromise({
       try: async () => {
         await mkdir(dirname(path), { recursive: true });
-        await writeFile(
-          path,
-          `${JSON.stringify({ ...config, version: CONFIG_VERSION }, null, 2)}\n`,
-          "utf8",
-        );
+        const json = `${JSON.stringify({ ...config, version: CONFIG_VERSION }, null, 2)}\n`;
+        // Atomic write: write a sibling temp file then rename over the target so a
+        // crash mid-write can't leave a half-written config.json (NF-CFG-5).
+        const tmp = `${path}.${randomUUID()}.tmp`;
+        await writeFile(tmp, json, "utf8");
+        await rename(tmp, path);
       },
       catch: classifyNodeError,
     });
 
+  // Serialize the whole read→modify→write under the single write permit so
+  // concurrent writers don't clobber each other's updates (lost-update race).
+  const update = (
+    f: (config: Config) => Config,
+  ): Effect.Effect<void, GitError> =>
+    writeLock.withPermits(1)(
+      Effect.flatMap(load(), (config) => save(f(config))),
+    );
+
   const mutate = (
     f: (recents: RecentRepoEntry[]) => RecentRepoEntry[],
   ): Effect.Effect<void, GitError> =>
-    Effect.flatMap(load(), (config) =>
-      save({ ...config, recentRepos: f([...config.recentRepos]) }),
-    );
+    update((config) => ({
+      ...config,
+      recentRepos: f([...config.recentRepos]),
+    }));
 
   return {
     path,
@@ -185,14 +204,16 @@ export const makeConfigStore = (opts?: {
         keybindings: config.keybindings,
       })),
     setAppSettings: (patch) =>
-      Effect.flatMap(load(), (config) => {
-        const next: AppSettingsData = {
-          theme: patch.theme ?? config.theme,
-          locale: patch.locale ?? config.locale,
-          keybindings: patch.keybindings ?? config.keybindings,
-        };
-        return Effect.as(save({ ...config, ...next }), next);
-      }),
+      writeLock.withPermits(1)(
+        Effect.flatMap(load(), (config) => {
+          const next: AppSettingsData = {
+            theme: patch.theme ?? config.theme,
+            locale: patch.locale ?? config.locale,
+            keybindings: patch.keybindings ?? config.keybindings,
+          };
+          return Effect.as(save({ ...config, ...next }), next);
+        }),
+      ),
   };
 };
 
