@@ -21,7 +21,7 @@
     "gate": "pnpm license-audit && pnpm lint && pnpm format:check && pnpm typecheck && pnpm build && pnpm test && pnpm coverage && pnpm depcheck"
   },
   "devDependencies": {
-    "@types/node": "^24.0.0",
+    "@types/node": "^26.0.1",
     "@vitest/coverage-v8": "^4.1.9",
     "concurrently": "^10.0.3",
     "oxfmt": "0.55.0",
