@@ -93,7 +93,7 @@ invalidates the matching React Query keys. There is no cross-process object cach
 
 ## Conventions you must follow
 
-- **Effect v4 is pinned exactly** (`effect@4.0.0-beta.84`) and must not be downgraded to v3.
+- **Effect v4 is pinned exactly** (`effect@4.0.0-beta.92`) and must not be downgraded to v3.
   Every `effect/unstable/*` import (rpc, socket, http) is **quarantined in one adapter
   module** — `packages/rpc-contract/src/effect-rpc-adapter.ts` (consumed via the
   `@cbranch/rpc-contract/effect-rpc-adapter` subpath). Do not import `effect/unstable/*`

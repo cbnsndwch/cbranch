@@ -23,7 +23,7 @@ document and is **not** part of the hand-off — do not build from it.)
 
 ## Dependency discipline (read before `pnpm install`)
 
-- **Pin pre-stable pillars exactly** (no `^`): `effect@4.0.0-beta.84`, `oxfmt`
+- **Pin pre-stable pillars exactly** (no `^`): `effect@4.0.0-beta.92`, `oxfmt`
   (beta), the `oxlint` type-aware backend (alpha) — `03` REQ-STACK-035.
 - **Quarantine every `effect/unstable/*` import** (rpc, socket, http) behind
   `packages/rpc-contract/src/effect-rpc-adapter.ts` (`14 §1`). Treat each

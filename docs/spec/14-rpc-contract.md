@@ -22,7 +22,7 @@ pre-stable pillars get explicit pins):
 
 | Package | Pin | Track |
 |---|---|---|
-| `effect` | `4.0.0-beta.84` | beta — RPC lives in `effect/unstable/rpc` (breaking changes allowed in minors) |
+| `effect` | `4.0.0-beta.92` | beta — RPC lives in `effect/unstable/rpc` (breaking changes allowed in minors) |
 | `@tanstack/react-query` | `^5` | stable — floats (track latest) |
 
 `effect/Schema` is on the **stable** semver track; `effect/unstable/*` (rpc, socket, http) is **not**.
@@ -33,7 +33,7 @@ pre-stable pillars get explicit pins):
 > `@effect/*` packages and pre-rewrite APIs do not fit this architecture; the early-stage risk is
 > accepted and absorbed through this adapter (re-validate `⚠` symbols on bump), not by retreating to v3.
 
-> All `effect/unstable/rpc` API in this doc is validated against `4.0.0-beta.84`. On any bump, re-verify
+> All `effect/unstable/rpc` API in this doc is validated against `4.0.0-beta.92`. On any bump, re-verify
 > the symbols marked ⚠ below against the pinned source before relying on them.
 
 ---
@@ -243,7 +243,7 @@ export const SequencerOutcome = Schema.Union([
 ```
 
 ⚠ `Schema.Literals` / `Schema.TaggedStruct` / `Schema.Struct` symbol names are validated against
-`4.0.0-beta.84`; re-confirm on bump.
+`4.0.0-beta.92`; re-confirm on bump.
 
 ---
 

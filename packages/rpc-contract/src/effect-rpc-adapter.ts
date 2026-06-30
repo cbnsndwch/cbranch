@@ -9,7 +9,7 @@
 // `effect/Schema` is on Effect's STABLE track and is therefore NOT quarantined:
 // Schemas are imported directly via `import { Schema } from "effect"` elsewhere.
 //
-// P0 status: these re-exports are VERIFIED to resolve against effect@4.0.0-beta.84.
+// P0 status: these re-exports are VERIFIED to resolve against effect@4.0.0-beta.92.
 // The ⚠ member symbols the spec flags were checked present at this pin:
 //   RpcServer.layerProtocolWebsocket, RpcClient.layerProtocolSocket,
 //   RpcSerialization.layerNdjson, Socket.layerWebSocket,
@@ -28,7 +28,7 @@ export {
 } from "effect/unstable/rpc";
 
 // --- RPC test transport: in-memory client<->server, no sockets/serialization ---
-// P0.5: verified present at effect@4.0.0-beta.84 as `RpcTest.makeClient(group)`.
+// P0.5: verified present at effect@4.0.0-beta.92 as `RpcTest.makeClient(group)`.
 // This is the transport contract tests use (NF-TEST-6) instead of a real WebSocket;
 // it routes through the same client/server machinery via the no-serialization path.
 export { RpcTest } from "effect/unstable/rpc";

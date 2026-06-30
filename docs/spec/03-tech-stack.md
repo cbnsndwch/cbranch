@@ -172,7 +172,7 @@ pillars are pinned exactly** (see REQ-STACK-035).
 
 ### RPC & transport
 
-- **REQ-STACK-023** The RPC layer MUST use **Effect** (`effect@4.0.0-beta.84`,
+- **REQ-STACK-023** The RPC layer MUST use **Effect** (`effect@4.0.0-beta.92`,
   pinned) with **`@effect/rpc`** (the RPC module now lives under
   `effect/unstable/rpc`) to expose the service methods as a typed `RpcGroup`
   catalog. **Effect Schema** (`effect/Schema`, stable track) is the RPC validation
@@ -254,7 +254,7 @@ pillars are pinned exactly** (see REQ-STACK-035).
 - **REQ-STACK-035** Stable dependencies track latest within their supported range.
   **Pre-stable pillars MUST be pinned exactly (no `^`)** and re-validated on every
   deliberate bump:
-  - `effect@4.0.0-beta.84` — beta; the RPC API in `effect/unstable/rpc` may take
+  - `effect@4.0.0-beta.92` — beta; the RPC API in `effect/unstable/rpc` may take
     breaking changes in minors (mitigated by the adapter-module quarantine,
     REQ-STACK-023). `effect/Schema` is on the stable track. **cbranch commits to
     Effect v4 and MUST NOT downgrade to Effect v3 as a churn mitigation:** v3's
@@ -370,7 +370,7 @@ Expressed functionally in terms of the chosen libraries:
   the service MUST either select a documented fallback invocation or return a typed
   `hostGitTooOld` error — never silently pass an unknown flag. (Minimum version and
   fallbacks: `12-nonfunctional.md`.)
-- **Effect beta / unstable RPC churn:** because `effect@4.0.0-beta.84` and
+- **Effect beta / unstable RPC churn:** because `effect@4.0.0-beta.92` and
   `effect/unstable/rpc` may take breaking changes, every unstable symbol MUST be
   accessed through the single adapter module (REQ-STACK-023) and re-validated on
   bump; `⚠`-marked symbols in `14` MUST be confirmed against the pinned version at

@@ -19,7 +19,7 @@ import {
   Socket,
 } from "./effect-rpc-adapter";
 
-describe("effect-rpc-adapter quarantine surface @ effect@4.0.0-beta.84", () => {
+describe("effect-rpc-adapter quarantine surface @ effect@4.0.0-beta.92", () => {
   test("RPC catalog + test-transport symbols are present", () => {
     expect(typeof Rpc.make).toBe("function");
     expect(typeof RpcGroup.make).toBe("function");

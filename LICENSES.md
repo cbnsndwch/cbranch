@@ -42,7 +42,7 @@ TypeScript is in any case a build-time-only dependency that is not shipped.
 | @tailwindcss/vite (4.3.x) | MIT | Yes | Yes | Yes — retain copyright + MIT text | https://github.com/tailwindlabs/tailwindcss |
 | lucide-react (latest) | ISC | Yes | Yes | Yes — retain copyright + ISC text | https://github.com/lucide-icons/lucide |
 | cmdk (1.1.x) | MIT | Yes | Yes | Yes — retain copyright + MIT text | https://github.com/pacocoursey/cmdk |
-| effect (4.0.0-beta.84, pinned; provides `@effect/rpc`, http, socket under `effect/unstable/*`) | MIT | Yes | Yes | Yes — retain copyright + MIT text | https://github.com/Effect-TS/effect |
+| effect (4.0.0-beta.92, pinned; provides `@effect/rpc`, http, socket under `effect/unstable/*`) | MIT | Yes | Yes | Yes — retain copyright + MIT text | https://github.com/Effect-TS/effect |
 | @shikijs/codemirror (latest) | MIT | Yes | Yes | Yes — retain copyright + MIT text | https://github.com/shikijs/shiki |
 | chokidar (4.x) | MIT | Yes | Yes | Yes — retain copyright + MIT text | https://github.com/paulmillr/chokidar |
 | ws (8.21.x; the Node WebSocket impl used by Effect's socket layer) | MIT | Yes | Yes | Yes — retain copyright + MIT text | https://github.com/websockets/ws |

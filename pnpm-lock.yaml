@@ -47,11 +47,11 @@ importers:
         specifier: workspace:*
         version: link:../../packages/rpc-contract
       '@effect/platform-node':
-        specifier: 4.0.0-beta.84
-        version: 4.0.0-beta.84(effect@4.0.0-beta.84)(ioredis@5.11.1)
+        specifier: 4.0.0-beta.92
+        version: 4.0.0-beta.92(effect@4.0.0-beta.92)(ioredis@5.11.1)
       effect:
-        specifier: 4.0.0-beta.84
-        version: 4.0.0-beta.84
+        specifier: 4.0.0-beta.92
+        version: 4.0.0-beta.92
     devDependencies:
       '@types/node':
         specifier: ^26.0.1
@@ -69,8 +69,8 @@ importers:
         specifier: ^5.0.0
         version: 5.0.0
       effect:
-        specifier: 4.0.0-beta.84
-        version: 4.0.0-beta.84
+        specifier: 4.0.0-beta.92
+        version: 4.0.0-beta.92
     devDependencies:
       '@types/node':
         specifier: ^26.0.1
@@ -79,8 +79,8 @@ importers:
   packages/rpc-contract:
     dependencies:
       effect:
-        specifier: 4.0.0-beta.84
-        version: 4.0.0-beta.84
+        specifier: 4.0.0-beta.92
+        version: 4.0.0-beta.92
 
   packages/ui:
     dependencies:
@@ -115,8 +115,8 @@ importers:
         specifier: ^1.1.1
         version: 1.1.1(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       effect:
-        specifier: 4.0.0-beta.84
-        version: 4.0.0-beta.84
+        specifier: 4.0.0-beta.92
+        version: 4.0.0-beta.92
       lucide-react:
         specifier: ^1.22.0
         version: 1.22.0(react@19.2.7)
@@ -427,17 +427,17 @@ packages:
     resolution: {integrity: sha512-QxULHAm7cNu72w97JUNCBFODFaXpbDg+dP8b/oWFAZ2MTRppA3U00Y2L1HqaS4J6yBqxwa/Y3nMBaxVKbB/NsA==}
     engines: {node: '>=20.19.0'}
 
-  '@effect/platform-node-shared@4.0.0-beta.84':
-    resolution: {integrity: sha512-WQ6+gGMYgnuwL+rUHKlxFon1T/CfK1ezxRYSjbylqovWeA2lrO7OHDSBqdwPyXJFDt2KqkZEEtbl9HarlTF/eg==}
+  '@effect/platform-node-shared@4.0.0-beta.92':
+    resolution: {integrity: sha512-156ADSfmWcqz0mC8VxlHN9IHyT97AbYsBc3wJxyz2ceiWyGJOWkIRd6H/n5Be4hd6dQ4IegSt6J3HinBIJ9S/A==}
     engines: {node: '>=18.0.0'}
     peerDependencies:
-      effect: ^4.0.0-beta.84
+      effect: ^4.0.0-beta.92
 
-  '@effect/platform-node@4.0.0-beta.84':
-    resolution: {integrity: sha512-WHPXaaIR1NpiANg+TOfTRupx9Uf2h/WVFZxRQdg5soUpa8bU61NwKxi3A5F/zLpp2AkRPgHTw1rQjwUD+/uA9A==}
+  '@effect/platform-node@4.0.0-beta.92':
+    resolution: {integrity: sha512-ZNcwKqBb99yw+cj+KQBMgw0xoQl3GDbUtQjnN3cLsIRpfYS/AVcSp4wfURMczvX5PzoR131yOWkqds5Vmm5tLg==}
     engines: {node: '>=18.0.0'}
     peerDependencies:
-      effect: ^4.0.0-beta.84
+      effect: ^4.0.0-beta.92
       ioredis: ^5.7.0
 
   '@emnapi/core@1.11.1':
@@ -1872,8 +1872,8 @@ packages:
   dom-helpers@3.4.0:
     resolution: {integrity: sha512-LnuPJ+dwqKDIyotW1VzmOZ5TONUN7CwkCR5hrgawTUbkBGYdeoNLZo6nNfGkCrjtE1nXXaj7iMMpDa8/d9WoIA==}
 
-  effect@4.0.0-beta.84:
-    resolution: {integrity: sha512-zWwFI9WZ4TsddBmtcuuAO2IXGR0Dp56xIUt8cX29ZeyOEtErXqP6muDaVpro08lGiMSOGMqSpuH/C1TUxHsRAA==}
+  effect@4.0.0-beta.92:
+    resolution: {integrity: sha512-et6Fy8X9cxhzV/w4U372lB7YCP/B9a8FYVxlx9UMzSgnmwWKxpldnaHz7mHpZHh+OU+ENhU9DO/rTAakmT0sEA==}
 
   electron-to-chromium@1.5.376:
     resolution: {integrity: sha512-cUVA7/RvbFTEuw/i3obUwDTRIXojaxkResf+ibByPFxjc6XK3VNtcQXV0NSbAlJ0FMjcJGgftVVB4Qo184EXvA==}
@@ -3168,19 +3168,19 @@ snapshots:
 
   '@csstools/css-tokenizer@4.0.0': {}
 
-  '@effect/platform-node-shared@4.0.0-beta.84(effect@4.0.0-beta.84)':
+  '@effect/platform-node-shared@4.0.0-beta.92(effect@4.0.0-beta.92)':
     dependencies:
       '@types/ws': 8.18.1
-      effect: 4.0.0-beta.84
+      effect: 4.0.0-beta.92
       ws: 8.21.0
     transitivePeerDependencies:
       - bufferutil
       - utf-8-validate
 
-  '@effect/platform-node@4.0.0-beta.84(effect@4.0.0-beta.84)(ioredis@5.11.1)':
+  '@effect/platform-node@4.0.0-beta.92(effect@4.0.0-beta.92)(ioredis@5.11.1)':
     dependencies:
-      '@effect/platform-node-shared': 4.0.0-beta.84(effect@4.0.0-beta.84)
-      effect: 4.0.0-beta.84
+      '@effect/platform-node-shared': 4.0.0-beta.92(effect@4.0.0-beta.92)
+      effect: 4.0.0-beta.92
       ioredis: 5.11.1
       mime: 4.1.0
       undici: 8.5.0
@@ -4339,7 +4339,7 @@ snapshots:
     dependencies:
       '@babel/runtime': 7.29.7
 
-  effect@4.0.0-beta.84:
+  effect@4.0.0-beta.92:
     dependencies:
       '@standard-schema/spec': 1.1.0
       fast-check: 4.8.0
