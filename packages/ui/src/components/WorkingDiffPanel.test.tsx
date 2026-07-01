@@ -185,6 +185,66 @@ describe('WorkingDiffPanel', () => {
         expect(called.hunks[0].selectedLines).toHaveLength(0);
     });
 
+    test('selecting individual lines and Stage lines sends those line indices', async () => {
+        const stageHunksFn = vi.fn(async () => undefined);
+        const api = makeFakeApi({
+            workingFileDiff: vi.fn(async () => makeDiffFile()),
+            stageHunks: stageHunksFn,
+        });
+        act(() => {
+            useUiStore.setState({
+                selectedDiffFile: { path: 'a.txt', staged: false },
+            });
+        });
+        renderWithApi(<WorkingDiffPanel repoId={repoId} />, api);
+
+        // Lines 1 (delete) and 2 (add) are the selectable +/- rows of the hunk.
+        await userEvent.click(
+            await screen.findByRole('button', { name: /old line/ }),
+        );
+        await userEvent.click(screen.getByRole('button', { name: /new line/ }));
+        expect(screen.getByText('2 lines selected')).toBeTruthy();
+
+        await userEvent.click(
+            screen.getByRole('button', { name: 'Stage lines' }),
+        );
+        await waitFor(() => expect(stageHunksFn).toHaveBeenCalledTimes(1));
+        const called = stageHunksFn.mock.calls[0][0] as PatchSelection;
+        expect(called.hunks).toHaveLength(1);
+        expect([...called.hunks[0].selectedLines]).toEqual([1, 2]);
+    });
+
+    test('Discard lines is gated behind a confirmation', async () => {
+        const discardHunksFn = vi.fn(async () => undefined);
+        const api = makeFakeApi({
+            workingFileDiff: vi.fn(async () => makeDiffFile()),
+            discardHunks: discardHunksFn,
+        });
+        act(() => {
+            useUiStore.setState({
+                selectedDiffFile: { path: 'a.txt', staged: false },
+            });
+        });
+        renderWithApi(<WorkingDiffPanel repoId={repoId} />, api);
+
+        await userEvent.click(
+            await screen.findByRole('button', { name: /new line/ }),
+        );
+        await userEvent.click(
+            screen.getByRole('button', { name: 'Discard lines' }),
+        );
+        // Nothing runs until the destructive guard is confirmed.
+        expect(discardHunksFn).not.toHaveBeenCalled();
+        expect(await screen.findByText('Discard selected lines?')).toBeTruthy();
+        const confirmBtns = screen.getAllByRole('button', {
+            name: 'Discard lines',
+        });
+        await userEvent.click(confirmBtns[confirmBtns.length - 1]);
+        await waitFor(() => expect(discardHunksFn).toHaveBeenCalledTimes(1));
+        const sel = discardHunksFn.mock.calls[0][0] as PatchSelection;
+        expect([...sel.hunks[0].selectedLines]).toEqual([2]);
+    });
+
     test('toggling to staged side calls setSelectedDiffFile with staged=true', async () => {
         const api = makeFakeApi({
             workingFileDiff: vi.fn(async () => makeDiffFile()),
