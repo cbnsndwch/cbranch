@@ -14,3 +14,16 @@ onlyBuiltDependencies:
 allowBuilds:
   esbuild: true
   msgpackr-extract: true
+
+# Supply-chain policy (pnpm 11): the default ~24h minimumReleaseAge gate is kept
+# for the ecosystem at large, but these packages are exempt because we track them
+# fresh on purpose.
+minimumReleaseAgeExclude:
+  # Effect ecosystem — we follow effect v4 beta releases closely.
+  - effect
+  - "@effect/*"
+  # TEMPORARY (added 2026-07-01): unblock this dep sweep's just-published bumps;
+  # safe to remove once they are >24h old.
+  - vite
+  - "@tanstack/react-virtual"
+  - "@tanstack/virtual-core"
