@@ -1673,6 +1673,7 @@ export const useSetAppSettings = () => {
             theme?: AppSettings['theme'];
             locale?: string;
             keybindings?: ReadonlyArray<KeyBinding>;
+            columns?: AppSettings['columns'];
         }
     >({
         mutationFn: patch => api.appSettingsSet(patch),

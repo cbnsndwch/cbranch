@@ -63,6 +63,7 @@ import {
     GcResult,
     GitConfigEntry,
     GitConfigValue,
+    HistoryColumnVisibility,
     KeyBinding,
     RebaseAction,
     RebasePlan,
@@ -419,6 +420,12 @@ const appSettings = new AppSettings({
     keybindings: [
         new KeyBinding({ commandId: 'commands.commit', chord: 'Mod+Enter' }),
     ],
+    columns: new HistoryColumnVisibility({
+        authorName: true,
+        avatar: false,
+        date: true,
+        sha: true,
+    }),
 });
 const rebasePlan = new RebasePlan({
     upstream: 'main',

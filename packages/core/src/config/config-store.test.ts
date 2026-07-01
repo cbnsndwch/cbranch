@@ -124,6 +124,37 @@ describe('app settings (REQ-P5-CFG-006; NEVER git config, REQ-P5-CFG-005)', () =
         expect(settings.theme).toBe('system');
         expect(settings.locale).toBe('en');
         expect(settings.keybindings).toEqual({});
+        // Every optional history column defaults to shown (REQ-P6-COL-002).
+        expect(settings.columns).toEqual({
+            authorName: true,
+            avatar: true,
+            date: true,
+            sha: true,
+        });
+    });
+
+    test('setAppSettings persists history column visibility (REQ-P6-COL-002)', async () => {
+        const path = newPath();
+        const store = makeConfigStore({ configPath: path });
+        await run(
+            store.setAppSettings({
+                columns: {
+                    authorName: true,
+                    avatar: false,
+                    date: false,
+                    sha: true,
+                },
+            }),
+        );
+        const reread = await run(store.getAppSettings());
+        expect(reread.columns).toEqual({
+            authorName: true,
+            avatar: false,
+            date: false,
+            sha: true,
+        });
+        // Other defaults are untouched by a columns-only patch.
+        expect(reread.theme).toBe('system');
     });
 
     test('setAppSettings merges a partial patch + persists; defaults preserved', async () => {

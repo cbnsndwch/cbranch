@@ -243,13 +243,29 @@ export class KeyBinding extends Schema.Class<KeyBinding>('KeyBinding')({
 }) {}
 
 /**
+ * Which optional history-grid columns are shown (REQ-P6-COL-001/002). The graph cell and
+ * commit summary are always present and are NOT represented here; only the four toggleable
+ * columns are. Persisted as an app setting, never in git config (REQ-P6-COL-003).
+ */
+export class HistoryColumnVisibility extends Schema.Class<HistoryColumnVisibility>(
+    'HistoryColumnVisibility',
+)({
+    authorName: Schema.Boolean,
+    avatar: Schema.Boolean,
+    date: Schema.Boolean,
+    sha: Schema.Boolean,
+}) {}
+
+/**
  * cbranch's own app settings (REQ-P5-CFG-006), persisted to the host `config.json`,
- * NEVER to git config (REQ-P5-CFG-005). `keybindings` carries user overrides only.
+ * NEVER to git config (REQ-P5-CFG-005). `keybindings` carries user overrides only;
+ * `columns` is the persisted history-grid column visibility (REQ-P6-COL-002).
  */
 export class AppSettings extends Schema.Class<AppSettings>('AppSettings')({
     theme: ThemePref,
     locale: Schema.String,
     keybindings: Schema.Array(KeyBinding),
+    columns: HistoryColumnVisibility,
 }) {}
 
 // ─── S8: interactive rebase ──────────────────────────────────────────────────────

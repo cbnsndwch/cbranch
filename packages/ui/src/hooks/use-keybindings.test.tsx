@@ -1,5 +1,9 @@
 // @vitest-environment jsdom
-import { AppSettings, KeyBinding } from '@cbranch/rpc-contract';
+import {
+    AppSettings,
+    HistoryColumnVisibility,
+    KeyBinding,
+} from '@cbranch/rpc-contract';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
     act,
@@ -19,7 +23,17 @@ const makeApi = (keybindings: KeyBinding[]): CbranchApi =>
     ({
         appSettingsGet: vi.fn(
             async () =>
-                new AppSettings({ theme: 'system', locale: 'en', keybindings }),
+                new AppSettings({
+                    theme: 'system',
+                    locale: 'en',
+                    keybindings,
+                    columns: new HistoryColumnVisibility({
+                        authorName: true,
+                        avatar: true,
+                        date: true,
+                        sha: true,
+                    }),
+                }),
         ),
         recentList: vi.fn(async () => []),
         subscribe: vi.fn(() => () => undefined),

@@ -37,6 +37,7 @@ import {
     type GcResult,
     type GitConfigEntry,
     type GitConfigValue,
+    type HistoryColumnVisibility,
     type InvalidationEvent,
     type KeyBinding,
     type ThemePref,
@@ -427,6 +428,7 @@ export interface CbranchApi {
         theme?: ThemePref;
         locale?: string;
         keybindings?: ReadonlyArray<KeyBinding>;
+        columns?: HistoryColumnVisibility;
     }): Promise<AppSettings>;
     // ── interactive rebase (P5) ─────────────────────────────────────────────────
     rebasePlan(

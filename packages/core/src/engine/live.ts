@@ -16,7 +16,12 @@ import {
     type InvalidationEvent,
     type RepoId,
 } from '@cbranch/rpc-contract';
-import { AppSettings, KeyBinding, RepoHandle } from '@cbranch/rpc-contract';
+import {
+    AppSettings,
+    HistoryColumnVisibility,
+    KeyBinding,
+    RepoHandle,
+} from '@cbranch/rpc-contract';
 import { type Cause, Effect, Layer, Queue, Scope, Stream } from 'effect';
 
 import {
@@ -183,6 +188,7 @@ const toAppSettings = (data: AppSettingsData): AppSettings =>
         keybindings: Object.entries(data.keybindings).map(
             ([commandId, chord]) => new KeyBinding({ commandId, chord }),
         ),
+        columns: new HistoryColumnVisibility(data.columns),
     });
 
 /** Wire wire-form {@link KeyBinding}[] back to the host's native `Record<commandId, chord>`. */
@@ -1065,6 +1071,15 @@ export const makeGitEngine = (
                             patch.keybindings === undefined
                                 ? undefined
                                 : fromKeyBindings(patch.keybindings),
+                        columns:
+                            patch.columns === undefined
+                                ? undefined
+                                : {
+                                      authorName: patch.columns.authorName,
+                                      avatar: patch.columns.avatar,
+                                      date: patch.columns.date,
+                                      sha: patch.columns.sha,
+                                  },
                     }),
                     toAppSettings,
                 ),

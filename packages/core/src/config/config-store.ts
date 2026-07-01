@@ -42,6 +42,21 @@ export interface RecentRepoEntry {
     readonly lastOpenedAt: number;
 }
 
+/** History-grid column visibility (REQ-P6-COL-002); every column defaults to shown. */
+export interface HistoryColumns {
+    readonly authorName: boolean;
+    readonly avatar: boolean;
+    readonly date: boolean;
+    readonly sha: boolean;
+}
+
+export const DEFAULT_COLUMNS: HistoryColumns = {
+    authorName: true,
+    avatar: true,
+    date: true,
+    sha: true,
+};
+
 export interface Config {
     readonly version: number;
     readonly recentRepos: ReadonlyArray<RecentRepoEntry>;
@@ -51,6 +66,7 @@ export interface Config {
     readonly bind: { readonly address: string; readonly port: number };
     readonly thresholds: Record<string, number>;
     readonly keybindings: Record<string, string>;
+    readonly columns: HistoryColumns;
 }
 
 export const defaultConfig = (): Config => ({
@@ -62,6 +78,7 @@ export const defaultConfig = (): Config => ({
     bind: { ...DEFAULT_BIND },
     thresholds: { ...DEFAULT_THRESHOLDS },
     keybindings: {},
+    columns: { ...DEFAULT_COLUMNS },
 });
 
 /** Resolve the config file path with the documented precedence (NF-CFG-7 / NF-PKG-9). */
@@ -94,6 +111,7 @@ export interface AppSettingsData {
     readonly theme: Config['theme'];
     readonly locale: string;
     readonly keybindings: Record<string, string>;
+    readonly columns: HistoryColumns;
 }
 
 export interface ConfigStore {
@@ -202,6 +220,7 @@ export const makeConfigStore = (opts?: {
                 theme: config.theme,
                 locale: config.locale,
                 keybindings: config.keybindings,
+                columns: config.columns,
             })),
         setAppSettings: patch =>
             writeLock.withPermits(1)(
@@ -210,6 +229,7 @@ export const makeConfigStore = (opts?: {
                         theme: patch.theme ?? config.theme,
                         locale: patch.locale ?? config.locale,
                         keybindings: patch.keybindings ?? config.keybindings,
+                        columns: patch.columns ?? config.columns,
                     };
                     return Effect.as(save({ ...config, ...next }), next);
                 }),
@@ -242,6 +262,25 @@ const normalizeConfig = (raw: string): Config => {
         bind: normalizeBind(obj.bind, base.bind),
         thresholds: { ...base.thresholds, ...pickNumbers(obj.thresholds) },
         keybindings: pickStrings(obj.keybindings),
+        columns: normalizeColumns(obj.columns),
+    };
+};
+
+/** Column visibility: each known flag is a boolean if present, else defaults to shown. */
+const normalizeColumns = (value: unknown): HistoryColumns => {
+    const obj =
+        typeof value === 'object' && value !== null
+            ? (value as Record<string, unknown>)
+            : {};
+    const flag = (key: keyof HistoryColumns): boolean =>
+        typeof obj[key] === 'boolean'
+            ? (obj[key] as boolean)
+            : DEFAULT_COLUMNS[key];
+    return {
+        authorName: flag('authorName'),
+        avatar: flag('avatar'),
+        date: flag('date'),
+        sha: flag('sha'),
     };
 };
 

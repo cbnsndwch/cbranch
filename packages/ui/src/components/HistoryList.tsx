@@ -8,6 +8,7 @@ import {
     useRef,
     useState,
 } from 'react';
+import { toast } from 'sonner';
 
 import { layoutCommits, maxLaneCount } from '../graph/layout';
 import { cn } from '../lib/cn';
@@ -18,13 +19,12 @@ import {
     formatRelativeMs,
     shortOid,
 } from '../lib/format';
-import { toast } from 'sonner';
-
 import { findMatches, stepMatch } from '../lib/quick-find';
 import { useLogStream } from '../rpc/hooks';
 import { useUiStore } from '../state/store';
 import { FindBar } from './FindBar';
 import { GraphCell } from './GraphCell';
+import { HistoryColumnMenu, useHistoryColumns } from './HistoryColumnMenu';
 import { RefChips } from './RefChips';
 import {
     ContextMenu,
@@ -77,6 +77,7 @@ export function HistoryList({
     readonly onSelectOid: (oid: Oid) => void;
 }) {
     const { rows, status } = useLogStream(query);
+    const cols = useHistoryColumns();
     const setKnownRefStrings = useUiStore(s => s.setKnownRefStrings);
     const setPickDialog = useUiStore(s => s.setPickDialog);
     const setArchiveDialog = useUiStore(s => s.setArchiveDialog);
@@ -298,6 +299,9 @@ export function HistoryList({
     return (
         <div className="flex h-full flex-col">
             {findBar}
+            <div className="flex shrink-0 items-center justify-end border-b px-2 py-0.5">
+                <HistoryColumnMenu />
+            </div>
             <div
                 ref={parentRef}
                 tabIndex={0}
@@ -364,28 +368,39 @@ export function HistoryList({
                                     <span className="flex-1 truncate">
                                         {row.subject}
                                     </span>
-                                    <div
-                                        className="flex size-5.5 shrink-0 items-center justify-center text-[9px] font-semibold text-white"
-                                        style={{
-                                            background:
-                                                'var(--color-status-staged)',
-                                        }}
-                                        aria-hidden="true"
-                                    >
-                                        {initials(row.authorName)}
-                                    </div>
-                                    <span className="w-30 truncate">
-                                        {row.authorName}
-                                    </span>
-                                    <span
-                                        className="w-27.5 truncate"
-                                        title={alternate}
-                                    >
-                                        {formatDate(row.authorDate, dateMode)}
-                                    </span>
-                                    <span className="w-20 font-mono">
-                                        {shortOid(row.oid)}
-                                    </span>
+                                    {cols.avatar && (
+                                        <div
+                                            className="flex size-5.5 shrink-0 items-center justify-center text-[9px] font-semibold text-white"
+                                            style={{
+                                                background:
+                                                    'var(--color-status-staged)',
+                                            }}
+                                            aria-hidden="true"
+                                        >
+                                            {initials(row.authorName)}
+                                        </div>
+                                    )}
+                                    {cols.authorName && (
+                                        <span className="w-30 truncate">
+                                            {row.authorName}
+                                        </span>
+                                    )}
+                                    {cols.date && (
+                                        <span
+                                            className="w-27.5 truncate"
+                                            title={alternate}
+                                        >
+                                            {formatDate(
+                                                row.authorDate,
+                                                dateMode,
+                                            )}
+                                        </span>
+                                    )}
+                                    {cols.sha && (
+                                        <span className="w-20 font-mono">
+                                            {shortOid(row.oid)}
+                                        </span>
+                                    )}
                                     <DropdownMenu>
                                         <DropdownMenuTrigger
                                             onClick={e => e.stopPropagation()}

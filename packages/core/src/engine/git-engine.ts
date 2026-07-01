@@ -616,6 +616,7 @@ export interface GitEngineApi {
         theme?: AppSettings['theme'];
         locale?: string;
         keybindings?: ReadonlyArray<KeyBinding>;
+        columns?: AppSettings['columns'];
     }) => Effect.Effect<AppSettings, GitError>;
 
     // ── interactive rebase (P5, S8) ─────────────────────────────────────────────
