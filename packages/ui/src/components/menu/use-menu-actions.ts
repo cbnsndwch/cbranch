@@ -120,6 +120,15 @@ export function useMenuActions(): MenuActions {
             // Tools → Git command log opens the routed diagnostic log view. REQ-P6-CLOG-001.
             handlers['tools.commandLog'] = () =>
                 useUiStore.getState().setActiveView('commandLog');
+            // Patch interchange: export a range (seeded from the selection) / apply a patch.
+            handlers['commands.exportPatch'] = () =>
+                useUiStore.getState().setPatchExportDialog({
+                    range: selectedOid
+                        ? `${selectedOid}~1..${selectedOid}`
+                        : '',
+                });
+            handlers['commands.applyPatch'] = () =>
+                useUiStore.getState().setPatchApplyDialogOpen(true);
             // Repository → metadata-file editors open the editor on a specific file. REQ-P6-META-001.
             handlers['repository.editGitignore'] = () =>
                 useUiStore.getState().setMetaFileDialog('gitignore');

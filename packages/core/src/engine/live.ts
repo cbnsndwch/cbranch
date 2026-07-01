@@ -79,6 +79,12 @@ import {
     notesRemove as notesRemoveGit,
     notesSet as notesSetGit,
 } from '../git/notes';
+import {
+    patchApply as patchApplyGit,
+    patchFormatPrepare as patchFormatPrepareGit,
+    patchFormatStream as patchFormatStreamGit,
+    patchInspect as patchInspectGit,
+} from '../git/patch-io';
 import { fileHistory as fileHistoryGit } from '../git/file-history';
 import {
     configGet as configGetGit,
@@ -506,6 +512,46 @@ export const makeGitEngine = (
                 Effect.flatMap(resolveById(repoId), repo =>
                     locks.withRepoLock(repoId)(
                         notesRemoveGit(repoCwd(repo), oid, ref, env),
+                    ),
+                ),
+
+            // ── Patch interchange (P6) ─────────────────────────────────────────────
+            patchFormatPrepare: (repoId, range) =>
+                Effect.flatMap(resolveById(repoId), repo =>
+                    patchFormatPrepareGit(repoCwd(repo), range, env),
+                ),
+            patchFormatStream: (repoId, range, includeCover) =>
+                Stream.unwrap(
+                    Effect.map(resolveById(repoId), repo =>
+                        patchFormatStreamGit(
+                            repoCwd(repo),
+                            range,
+                            includeCover ?? false,
+                            env,
+                        ),
+                    ),
+                ),
+            patchInspect: (repoId, patch, mode, threeWay) =>
+                Effect.flatMap(resolveById(repoId), repo =>
+                    patchInspectGit(
+                        repoCwd(repo),
+                        patch,
+                        mode,
+                        threeWay ?? false,
+                        env,
+                    ),
+                ),
+            patchApply: (repoId, patch, mode, threeWay) =>
+                Effect.flatMap(resolveById(repoId), repo =>
+                    locks.withRepoLock(repoId)(
+                        patchApplyGit(
+                            repoCwd(repo),
+                            repo.gitDir,
+                            patch,
+                            mode,
+                            threeWay ?? false,
+                            env,
+                        ),
                     ),
                 ),
 

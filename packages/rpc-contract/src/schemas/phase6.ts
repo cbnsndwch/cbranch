@@ -87,3 +87,50 @@ export class NoteContent extends Schema.Class<NoteContent>('NoteContent')({
     present: Schema.Boolean,
     text: Schema.String,
 }) {}
+
+// ─── patch.* ───────────────────────────────────────────────────────────────────
+
+/**
+ * How a patch is applied (REQ-P6-PATCH-002): to the **working** tree, to the **index**
+ * (cached), or as **commits** via `git am` (preserving authorship/message).
+ */
+export const PatchApplyMode = Schema.Literals(['working', 'index', 'am']);
+export type PatchApplyMode = typeof PatchApplyMode.Type;
+
+/**
+ * Describes the `format-patch` bundle the browser downloads over `GET /sidechannel/patch`
+ * (REQ-P6-PATCH-001). `count` is the number of commits in the range (0 = nothing to
+ * export); `filename` is the suggested download name.
+ */
+export class PatchBundleDescriptor extends Schema.Class<PatchBundleDescriptor>(
+    'PatchBundleDescriptor',
+)({
+    range: Schema.String,
+    count: Schema.Number,
+    filename: Schema.String,
+}) {}
+
+/**
+ * The dry-run result of `patch.inspect` (REQ-P6-PATCH-003): whether the patch applies
+ * cleanly, the files it touches, and (for a 3-way probe) any conflicting paths.
+ */
+export class PatchApplyReport extends Schema.Class<PatchApplyReport>(
+    'PatchApplyReport',
+)({
+    clean: Schema.Boolean,
+    files: Schema.Array(Schema.String),
+    conflicts: Schema.optional(Schema.Array(Schema.String)),
+}) {}
+
+/**
+ * The outcome of `patch.apply` (REQ-P6-PATCH-002/004). `applied` is true on a clean apply;
+ * for `am` that hits a conflict, `applied` is false and `inProgress` names the sequencer
+ * op (`am`) the Phase 4 flow then drives (continue/skip/abort).
+ */
+export class PatchApplyResult extends Schema.Class<PatchApplyResult>(
+    'PatchApplyResult',
+)({
+    applied: Schema.Boolean,
+    inProgress: Schema.optional(Schema.String),
+    message: Schema.String,
+}) {}

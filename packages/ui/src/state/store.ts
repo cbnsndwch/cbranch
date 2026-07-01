@@ -297,6 +297,15 @@ export interface UiState {
     /** The commit whose note is being edited, or null when the note editor is closed. */
     readonly noteEditor: { readonly oid: Oid } | null;
     readonly setNoteEditor: (state: { readonly oid: Oid } | null) => void;
+    // ── P6: patch interchange (REQ-P6-PATCH-001..006) ─────────────────────────────
+    /** The export-patch dialog, or null when closed. `range` pre-seeds the range input. */
+    readonly patchExportDialog: { readonly range: string } | null;
+    readonly setPatchExportDialog: (
+        state: { readonly range: string } | null,
+    ) => void;
+    /** Whether the apply-patch dialog is open. */
+    readonly patchApplyDialogOpen: boolean;
+    readonly setPatchApplyDialogOpen: (open: boolean) => void;
     // ── P5: settings & git config dialog ─────────────────────────────────────────
     /** Whether the settings modal (git config + app settings) is open (REQ-P5-CFG-001). App-global. */
     readonly settingsDialogOpen: boolean;
@@ -356,6 +365,8 @@ export const useUiStore = create<UiState>(set => ({
     metaFileDialog: null,
     showNotes: false,
     noteEditor: null,
+    patchExportDialog: null,
+    patchApplyDialogOpen: false,
     goToDialogOpen: false,
     gotoRequest: null,
     logLimit: DEFAULT_LOG_LIMIT,
@@ -388,6 +399,8 @@ export const useUiStore = create<UiState>(set => ({
             undoDialogOpen: false,
             metaFileDialog: null,
             noteEditor: null,
+            patchExportDialog: null,
+            patchApplyDialogOpen: false,
             goToDialogOpen: false,
             gotoRequest: null,
             logLimit: DEFAULT_LOG_LIMIT,
@@ -424,6 +437,9 @@ export const useUiStore = create<UiState>(set => ({
     setMetaFileDialog: metaFileDialog => set({ metaFileDialog }),
     setShowNotes: showNotes => set({ showNotes }),
     setNoteEditor: noteEditor => set({ noteEditor }),
+    setPatchExportDialog: patchExportDialog => set({ patchExportDialog }),
+    setPatchApplyDialogOpen: patchApplyDialogOpen =>
+        set({ patchApplyDialogOpen }),
     setGoToDialogOpen: goToDialogOpen => set({ goToDialogOpen }),
     setGotoRequest: gotoRequest => set({ gotoRequest }),
     setLogLimit: logLimit => set({ logLimit }),

@@ -45,6 +45,10 @@ import {
     type MetaFileContent,
     type NoteContent,
     type NotedObject,
+    type PatchApplyMode,
+    type PatchApplyReport,
+    type PatchApplyResult,
+    type PatchBundleDescriptor,
     type ThemePref,
     type WritableScope,
     type LogQuery,
@@ -178,6 +182,30 @@ export interface CbranchApi {
         ref?: string,
     ): Promise<void>;
     notesRemove(repoId: RepoId, oid: Oid, ref?: string): Promise<void>;
+    // ── Patch interchange (P6) ──────────────────────────────────────────────────
+    patchFormatPrepare(
+        repoId: RepoId,
+        range: string,
+        includeCover?: boolean,
+    ): Promise<PatchBundleDescriptor>;
+    patchInspect(
+        repoId: RepoId,
+        args: {
+            patch: string;
+            mode: PatchApplyMode;
+            threeWay?: boolean;
+            uploadId?: string;
+        },
+    ): Promise<PatchApplyReport>;
+    patchApply(
+        repoId: RepoId,
+        args: {
+            patch: string;
+            mode: PatchApplyMode;
+            threeWay?: boolean;
+            uploadId?: string;
+        },
+    ): Promise<PatchApplyResult>;
     // ── branches (P3) ─────────────────────────────────────────────────────────
     branchList(repoId: RepoId): Promise<BranchListing>;
     branchCreate(
@@ -604,6 +632,20 @@ export const makeApi = (runtime: AppRuntime): CbranchApi => {
         notesRemove: (repoId, oid, ref) =>
             runtime.runPromise(
                 withClient(c => c.NotesRemove({ repoId, oid, ref })),
+            ),
+        patchFormatPrepare: (repoId, range, includeCover) =>
+            runtime.runPromise(
+                withClient(c =>
+                    c.PatchFormatPrepare({ repoId, range, includeCover }),
+                ),
+            ),
+        patchInspect: (repoId, args) =>
+            runtime.runPromise(
+                withClient(c => c.PatchInspect({ repoId, ...args })),
+            ),
+        patchApply: (repoId, args) =>
+            runtime.runPromise(
+                withClient(c => c.PatchApply({ repoId, ...args })),
             ),
         // ── branches (P3) ───────────────────────────────────────────────────────
         branchList: repoId =>

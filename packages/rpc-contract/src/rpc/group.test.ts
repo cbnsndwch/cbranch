@@ -82,6 +82,9 @@ import {
     MetaFileContent,
     NoteContent,
     NotedObject,
+    PatchApplyReport,
+    PatchApplyResult,
+    PatchBundleDescriptor,
     RepoInitResult,
 } from '../schemas/phase6';
 import { Oid, RepoId } from '../schemas/primitives';
@@ -682,6 +685,22 @@ const handlers = CbranchRpcs.toLayer({
         Effect.succeed(new NoteContent({ present: true, text: 'a note\n' })),
     NotesSet: () => Effect.void,
     NotesRemove: () => Effect.void,
+
+    // ── P6: patch interchange ───────────────────────────────────────────────────────
+    PatchFormatPrepare: ({ range }) =>
+        Effect.succeed(
+            new PatchBundleDescriptor({
+                range,
+                count: 2,
+                filename: 'cbranch.patch',
+            }),
+        ),
+    PatchInspect: () =>
+        Effect.succeed(new PatchApplyReport({ clean: true, files: ['a.txt'] })),
+    PatchApply: () =>
+        Effect.succeed(
+            new PatchApplyResult({ applied: true, message: 'Patch applied.' }),
+        ),
 });
 
 describe('CbranchRpcs P1 contract (in-memory RpcTest round-trip)', () => {
@@ -1398,6 +1417,32 @@ describe('CbranchRpcs P5 power-features round-trip', () => {
         expect(r.list).toHaveLength(1);
         expect(r.got.present).toBe(true);
         expect(r.got.text).toBe('a note\n');
+    });
+
+    test('patch methods round-trip prepare + inspect + apply', async () => {
+        const program = Effect.gen(function* () {
+            const client = yield* RpcTest.makeClient(CbranchRpcs);
+            const desc = yield* client.PatchFormatPrepare({
+                repoId,
+                range: 'HEAD~2..HEAD',
+            });
+            const report = yield* client.PatchInspect({
+                repoId,
+                patch: 'diff',
+                mode: 'working',
+            });
+            const result = yield* client.PatchApply({
+                repoId,
+                patch: 'diff',
+                mode: 'am',
+            });
+            return { desc, report, result };
+        }).pipe(Effect.provide(handlers), Effect.scoped);
+
+        const r = await Effect.runPromise(program);
+        expect(r.desc.count).toBe(2);
+        expect(r.report.clean).toBe(true);
+        expect(r.result.applied).toBe(true);
     });
 
     test('RebasePlan accepts an empty range (commits:[])', () => {

@@ -42,6 +42,10 @@ import {
     type NoteContent,
     type NotedObject,
     type Oid,
+    type PatchApplyMode,
+    type PatchApplyReport,
+    type PatchApplyResult,
+    type PatchBundleDescriptor,
     type PatchSelection,
     type RebasePlan,
     type RebaseStatus,
@@ -367,6 +371,61 @@ export const useRemoveNote = (repoId: RepoId) => {
     return useMutation<void, unknown, { oid: Oid }>({
         mutationFn: ({ oid }) => api.notesRemove(repoId, oid),
         onSuccess: () => invalidateNotes(qc, repoId),
+    });
+};
+
+// ── patch interchange (P6) ──────────────────────────────────────────────────────
+
+/** Validate a range for export and mint a descriptor (REQ-P6-PATCH-001). */
+export const usePatchFormatPrepare = (repoId: RepoId) => {
+    const api = useApi();
+    return useMutation<
+        PatchBundleDescriptor,
+        unknown,
+        { range: string; includeCover?: boolean }
+    >({
+        mutationFn: ({ range, includeCover }) =>
+            api.patchFormatPrepare(repoId, range, includeCover),
+    });
+};
+
+/** Dry-run a patch (REQ-P6-PATCH-003). No mutation. */
+export const useInspectPatch = (repoId: RepoId) => {
+    const api = useApi();
+    return useMutation<
+        PatchApplyReport,
+        unknown,
+        {
+            patch: string;
+            mode: PatchApplyMode;
+            threeWay?: boolean;
+            uploadId?: string;
+        }
+    >({
+        mutationFn: args => api.patchInspect(repoId, args),
+    });
+};
+
+/** Apply a patch; refresh status/commits/in-progress after (REQ-P6-PATCH-002/004). */
+export const useApplyPatch = (repoId: RepoId) => {
+    const api = useApi();
+    const qc = useQueryClient();
+    return useMutation<
+        PatchApplyResult,
+        unknown,
+        {
+            patch: string;
+            mode: PatchApplyMode;
+            threeWay?: boolean;
+            uploadId?: string;
+        }
+    >({
+        mutationFn: args => api.patchApply(repoId, args),
+        onSettled: () => {
+            void qc.invalidateQueries({ queryKey: [repoId, 'status'] });
+            void qc.invalidateQueries({ queryKey: [repoId, 'commits'] });
+            void qc.invalidateQueries({ queryKey: [repoId, 'inProgress'] });
+        },
     });
 };
 

@@ -2,7 +2,7 @@ import { join } from 'node:path';
 
 import { type GitError, type RepoId } from '@cbranch/rpc-contract';
 import { Oid as OidBrand, RepoId as RepoIdBrand } from '@cbranch/rpc-contract';
-import { Effect, Exit } from 'effect';
+import { Effect, Exit, Stream } from 'effect';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 
 import { runGit } from '../git/run-git';
@@ -428,6 +428,99 @@ describe('GitEngine notes (P6-NOTE)', () => {
         expect(result.list.some(n => n.oid === oid)).toBe(true);
         expect(result.removed.present).toBe(false);
         expect(result.headOid).toBe(oid);
+    });
+});
+
+describe('GitEngine patch interchange (P6-PATCH)', () => {
+    test('exports a range, then a clean apply round-trips through the working tree', async () => {
+        // Source repo with two commits: export the second as a patch.
+        const src = await ws.createRepo('patch-src');
+        await src.commit({ message: 'base', files: { 'a.txt': 'one\n' } });
+        await src.commit({
+            message: 'change',
+            files: { 'a.txt': 'one\ntwo\n' },
+        });
+        const cfg = newCfg();
+
+        const patchBytes = await withEngine(cfg, e =>
+            Effect.gen(function* () {
+                const h = yield* e.open(src.dir);
+                const desc = yield* e.patchFormatPrepare(
+                    h.repoId,
+                    'HEAD~1..HEAD',
+                );
+                expect(desc.count).toBe(1);
+                const chunks: Uint8Array[] = [];
+                yield* Stream.runForEach(
+                    e.patchFormatStream(h.repoId, 'HEAD~1..HEAD'),
+                    chunk =>
+                        Effect.sync(() => {
+                            chunks.push(chunk);
+                        }),
+                );
+                return Buffer.concat(chunks).toString('utf8');
+            }),
+        );
+        expect(patchBytes).toContain('Subject: [PATCH] change');
+
+        // Target repo at the base state: dry-run then apply the exported patch.
+        const dst = await ws.createRepo('patch-dst');
+        await dst.commit({ message: 'base', files: { 'a.txt': 'one\n' } });
+        const cfg2 = newCfg();
+        const result = await withEngine(cfg2, e =>
+            Effect.gen(function* () {
+                const h = yield* e.open(dst.dir);
+                const report = yield* e.patchInspect(
+                    h.repoId,
+                    patchBytes,
+                    'working',
+                );
+                const applied = yield* e.patchApply(
+                    h.repoId,
+                    patchBytes,
+                    'working',
+                );
+                return { report, applied };
+            }),
+        );
+        expect(result.report.clean).toBe(true);
+        expect(result.report.files).toContain('a.txt');
+        expect(result.applied.applied).toBe(true);
+    });
+
+    test('a non-applying patch is reported and changes nothing', async () => {
+        const dst = await ws.createRepo('patch-noapply');
+        await dst.commit({ message: 'base', files: { 'a.txt': 'one\n' } });
+        const cfg = newCfg();
+        // A patch that expects different context than the target has.
+        const badPatch = [
+            'diff --git a/a.txt b/a.txt',
+            '--- a/a.txt',
+            '+++ b/a.txt',
+            '@@ -1 +1 @@',
+            '-totally different',
+            '+changed',
+            '',
+        ].join('\n');
+        const code = await withEngine(cfg, e =>
+            Effect.gen(function* () {
+                const h = yield* e.open(dst.dir);
+                const report = yield* e.patchInspect(
+                    h.repoId,
+                    badPatch,
+                    'working',
+                );
+                expect(report.clean).toBe(false);
+                return yield* Effect.match(
+                    e.patchApply(h.repoId, badPatch, 'working'),
+                    {
+                        onSuccess: () => 'ok',
+                        onFailure: err => err.code,
+                    },
+                );
+            }),
+        );
+        expect(code).toBe('patchDoesNotApply');
     });
 });
 

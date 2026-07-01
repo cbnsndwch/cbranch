@@ -74,6 +74,10 @@ import {
     MetaFileContent,
     NoteContent,
     NotedObject,
+    PatchApplyMode,
+    PatchApplyReport,
+    PatchApplyResult,
+    PatchBundleDescriptor,
     RepoInitResult,
 } from '../schemas/phase6';
 import { Oid, RepoId } from '../schemas/primitives';
@@ -958,6 +962,45 @@ export const CbranchRpcs = RpcGroup.make(
             ref: Schema.optional(Schema.String),
         },
         success: Schema.Void,
+        error: GitError,
+    }),
+
+    // ── P6: patch interchange ────────────────────────────────────────────────────
+    // patch.formatPrepare — validate a commit range for export; bytes stream over
+    // `GET /sidechannel/patch` (REQ-P6-PATCH-001).
+    Rpc.make('PatchFormatPrepare', {
+        payload: {
+            repoId: RepoId,
+            range: Schema.String,
+            includeCover: Schema.optional(Schema.Boolean),
+        },
+        success: PatchBundleDescriptor,
+        error: GitError,
+    }),
+    // patch.inspect — dry-run: does the patch apply cleanly, and what does it touch?
+    // Inline `patch` text, or an `uploadId` for an oversized patch (REQ-P6-PATCH-003/006).
+    Rpc.make('PatchInspect', {
+        payload: {
+            repoId: RepoId,
+            patch: Schema.String,
+            mode: PatchApplyMode,
+            threeWay: Schema.optional(Schema.Boolean),
+            uploadId: Schema.optional(Schema.String),
+        },
+        success: PatchApplyReport,
+        error: GitError,
+    }),
+    // patch.apply ✎ — apply to working/index/am; `am` conflicts route to the Phase 4 flow
+    // (REQ-P6-PATCH-002/004).
+    Rpc.make('PatchApply', {
+        payload: {
+            repoId: RepoId,
+            patch: Schema.String,
+            mode: PatchApplyMode,
+            threeWay: Schema.optional(Schema.Boolean),
+            uploadId: Schema.optional(Schema.String),
+        },
+        success: PatchApplyResult,
         error: GitError,
     }),
 );

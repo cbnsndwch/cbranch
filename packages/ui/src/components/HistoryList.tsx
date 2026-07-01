@@ -92,6 +92,7 @@ export function HistoryList({
     const setBisectStartDialog = useUiStore(s => s.setBisectStartDialog);
     const setRebaseDialog = useUiStore(s => s.setRebaseDialog);
     const setResetDialog = useUiStore(s => s.setResetDialog);
+    const setPatchExportDialog = useUiStore(s => s.setPatchExportDialog);
     useEffect(() => {
         const allRefs = [...new Set(rows.flatMap(r => r.refs))];
         setKnownRefStrings(allRefs);
@@ -270,6 +271,9 @@ export function HistoryList({
         setArchiveDialog({ treeish: target });
     const bisectFrom = (target: Oid) => setBisectStartDialog({ bad: target });
     const resetToCommit = (target: Oid) => setResetDialog({ target });
+    // "Export patch" seeds a single-commit range (parent..commit).
+    const exportPatch = (target: Oid) =>
+        setPatchExportDialog({ range: `${target}~1..${target}` });
     // "Rebase commits since here" seeds the upstream to the commit's first parent, so the
     // replayed range (parent..HEAD) includes the selected commit (REQ-P5-IR-001).
     const rebaseSince = (parents: ReadonlyArray<Oid>) =>
@@ -479,6 +483,13 @@ export function HistoryList({
                                             >
                                                 Reset to this commit…
                                             </DropdownMenuItem>
+                                            <DropdownMenuItem
+                                                onClick={() =>
+                                                    exportPatch(row.oid)
+                                                }
+                                            >
+                                                Export patch…
+                                            </DropdownMenuItem>
                                         </DropdownMenuContent>
                                     </DropdownMenu>
                                 </ContextMenuTrigger>
@@ -519,6 +530,11 @@ export function HistoryList({
                                         onClick={() => resetToCommit(row.oid)}
                                     >
                                         Reset to this commit…
+                                    </ContextMenuItem>
+                                    <ContextMenuItem
+                                        onClick={() => exportPatch(row.oid)}
+                                    >
+                                        Export patch…
                                     </ContextMenuItem>
                                 </ContextMenuContent>
                             </ContextMenu>

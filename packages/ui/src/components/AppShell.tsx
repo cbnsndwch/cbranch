@@ -21,6 +21,8 @@ import { GoToCommitDialog } from './GoToCommitDialog';
 import { MetaFileEditorDialog } from './MetaFileEditorDialog';
 import { NewRepoDialog } from './NewRepoDialog';
 import { NoteEditorDialog } from './NoteEditorDialog';
+import { PatchApplyDialog } from './PatchApplyDialog';
+import { PatchExportDialog } from './PatchExportDialog';
 import { CommitTab } from './CommitTab';
 import { ConflictsPanel } from './ConflictsPanel';
 import { DiffPanel } from './DiffPanel';
@@ -199,6 +201,8 @@ export function AppShell() {
             {repoId && <UndoLastCommitDialog repoId={repoId} />}
             {repoId && <MetaFileEditorDialog repoId={repoId} />}
             {repoId && <NoteEditorDialog repoId={repoId} />}
+            {repoId && <PatchExportDialog repoId={repoId} />}
+            {repoId && <PatchApplyDialog repoId={repoId} />}
             {repoId && <GoToCommitDialog repoId={repoId} />}
             {repoId && editPath !== null && (
                 <MergeEditor

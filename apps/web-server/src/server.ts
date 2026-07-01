@@ -25,6 +25,7 @@ import { Layer } from 'effect';
 import { archiveChannelRoute } from './archive-channel';
 import { type ServerConfig } from './config';
 import { makeOriginGuard } from './origin-guard';
+import { patchChannelRoute, patchUploadRoute } from './patch-channel';
 import { handlersLayer } from './rpc-handlers';
 import { sideChannelRoute } from './side-channel';
 
@@ -61,6 +62,8 @@ export const buildServerLive = (
         }),
         sideChannelRoute,
         archiveChannelRoute,
+        patchChannelRoute,
+        patchUploadRoute,
     ).pipe(
         Layer.provide(handlersLayer),
         Layer.provide(RpcSerialization.layerNdjson),

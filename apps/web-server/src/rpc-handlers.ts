@@ -12,6 +12,8 @@ import { GitEngine } from '@cbranch/core';
 import { CbranchRpcs } from '@cbranch/rpc-contract';
 import { Effect, Stream } from 'effect';
 
+import { getUpload } from './patch-channel';
+
 /** Layer providing the P1 RPC handlers; requires `GitEngine` (supplied by `gitEngineLayer`). */
 export const handlersLayer = CbranchRpcs.toLayer({
     // ── repository & live state ────────────────────────────────────────────────
@@ -430,4 +432,36 @@ export const handlersLayer = CbranchRpcs.toLayer({
         Effect.flatMap(GitEngine, engine =>
             engine.notesRemove(repoId, oid, ref),
         ),
+
+    // ── P6: patch interchange ──────────────────────────────────────────────────
+    PatchFormatPrepare: ({ repoId, range, includeCover }) =>
+        Effect.flatMap(GitEngine, engine =>
+            engine.patchFormatPrepare(repoId, range, includeCover),
+        ),
+    // An `uploadId` (an oversized patch parked on the side-channel) takes precedence over
+    // the inline text (REQ-P6-PATCH-006).
+    PatchInspect: ({ repoId, patch, mode, threeWay, uploadId }) =>
+        Effect.flatMap(GitEngine, engine =>
+            engine.patchInspect(
+                repoId,
+                resolvePatch(patch, uploadId),
+                mode,
+                threeWay,
+            ),
+        ),
+    PatchApply: ({ repoId, patch, mode, threeWay, uploadId }) =>
+        Effect.flatMap(GitEngine, engine =>
+            engine.patchApply(
+                repoId,
+                resolvePatch(patch, uploadId),
+                mode,
+                threeWay,
+            ),
+        ),
 });
+
+/** Resolve an inline patch or a side-channel upload token to the patch text. */
+const resolvePatch = (inline: string, uploadId: string | undefined): string => {
+    if (uploadId === undefined) return inline;
+    return getUpload(uploadId) ?? inline;
+};

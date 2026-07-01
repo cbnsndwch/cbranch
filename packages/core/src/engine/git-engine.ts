@@ -47,6 +47,10 @@ import {
     type MetaFileContent,
     type NoteContent,
     type NotedObject,
+    type PatchApplyMode,
+    type PatchApplyReport,
+    type PatchApplyResult,
+    type PatchBundleDescriptor,
     type ReflogPage,
     type InvalidationEvent,
     type LogQuery,
@@ -158,6 +162,34 @@ export interface GitEngineApi {
         oid: Oid,
         ref?: string,
     ) => Effect.Effect<void, GitError>;
+
+    // ── Patch interchange (P6) ──────────────────────────────────────────────────
+    /** patch.formatPrepare — validate a commit range for export; bytes over the side-channel. */
+    readonly patchFormatPrepare: (
+        repoId: RepoId,
+        range: string,
+        includeCover?: boolean,
+    ) => Effect.Effect<PatchBundleDescriptor, GitError>;
+    /** Stream the `format-patch --stdout` bundle for the range (side-channel body). */
+    readonly patchFormatStream: (
+        repoId: RepoId,
+        range: string,
+        includeCover?: boolean,
+    ) => Stream.Stream<Uint8Array, GitError>;
+    /** patch.inspect — dry-run: does the patch apply cleanly, and what does it touch? */
+    readonly patchInspect: (
+        repoId: RepoId,
+        patch: string,
+        mode: PatchApplyMode,
+        threeWay?: boolean,
+    ) => Effect.Effect<PatchApplyReport, GitError>;
+    /** patch.apply ✎ — apply to working/index/am; `am` conflicts route to the Phase 4 flow. */
+    readonly patchApply: (
+        repoId: RepoId,
+        patch: string,
+        mode: PatchApplyMode,
+        threeWay?: boolean,
+    ) => Effect.Effect<PatchApplyResult, GitError>;
 
     // ── history & diff (P1, core-B) ────────────────────────────────────────────
     /** log.stream — the single streaming history feed. core-B. */
