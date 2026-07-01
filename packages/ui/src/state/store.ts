@@ -276,6 +276,10 @@ export interface UiState {
     readonly setResetDialog: (
         state: { readonly target: string } | null,
     ) => void;
+    // ── P6: undo last commit (REQ-P6-UNDO-001..005) ──────────────────────────────
+    /** Whether the undo-last-commit confirmation dialog is open. */
+    readonly undoDialogOpen: boolean;
+    readonly setUndoDialogOpen: (open: boolean) => void;
     // ── P5: settings & git config dialog ─────────────────────────────────────────
     /** Whether the settings modal (git config + app settings) is open (REQ-P5-CFG-001). App-global. */
     readonly settingsDialogOpen: boolean;
@@ -330,6 +334,7 @@ export const useUiStore = create<UiState>(set => ({
     bisectStartDialog: null,
     rebaseDialog: null,
     resetDialog: null,
+    undoDialogOpen: false,
     goToDialogOpen: false,
     gotoRequest: null,
     logLimit: DEFAULT_LOG_LIMIT,
@@ -359,6 +364,7 @@ export const useUiStore = create<UiState>(set => ({
             bisectStartDialog: null,
             rebaseDialog: null,
             resetDialog: null,
+            undoDialogOpen: false,
             goToDialogOpen: false,
             gotoRequest: null,
             logLimit: DEFAULT_LOG_LIMIT,
@@ -390,6 +396,7 @@ export const useUiStore = create<UiState>(set => ({
     resetCommitDraft: () => set({ commitDraft: DEFAULT_DRAFT }),
     setCommitDialogOpen: commitDialogOpen => set({ commitDialogOpen }),
     setResetDialog: resetDialog => set({ resetDialog }),
+    setUndoDialogOpen: undoDialogOpen => set({ undoDialogOpen }),
     setGoToDialogOpen: goToDialogOpen => set({ goToDialogOpen }),
     setGotoRequest: gotoRequest => set({ gotoRequest }),
     setLogLimit: logLimit => set({ logLimit }),

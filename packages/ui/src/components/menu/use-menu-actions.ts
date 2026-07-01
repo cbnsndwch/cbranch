@@ -111,6 +111,9 @@ export function useMenuActions(): MenuActions {
             // Go to commit… opens the hash/ref input (also bound to Ctrl+G). REQ-P6-NAV-001.
             handlers['navigate.goto'] = () =>
                 useUiStore.getState().setGoToDialogOpen(true);
+            // Undo last commit… opens the guarded soft-reset confirmation. REQ-P6-UNDO-001.
+            handlers['commands.undoLastCommit'] = () =>
+                useUiStore.getState().setUndoDialogOpen(true);
             // Repository → Maintenance → Compress opens the gc dialog (REQ-P5-GC-001).
             handlers['repository.maintenance.compress'] = () =>
                 useUiStore.getState().setGcDialogOpen(true);

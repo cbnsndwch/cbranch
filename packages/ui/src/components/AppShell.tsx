@@ -29,6 +29,7 @@ import { MenuBar } from './MenuBar';
 import { RepositorySidebar } from './RepositorySidebar';
 import { RebaseDialog } from './RebaseDialog';
 import { ResetDialog } from './ResetDialog';
+import { UndoLastCommitDialog } from './UndoLastCommitDialog';
 import { PickDialogs } from './SequencerDialogs';
 import { SettingsDialog } from './SettingsDialog';
 import { StashPanel } from './StashPanel';
@@ -187,6 +188,7 @@ export function AppShell() {
             )}
             {repoId && <RebaseDialog repoId={repoId} />}
             {repoId && <ResetDialog repoId={repoId} />}
+            {repoId && <UndoLastCommitDialog repoId={repoId} />}
             {repoId && <GoToCommitDialog repoId={repoId} />}
             {repoId && editPath !== null && (
                 <MergeEditor
