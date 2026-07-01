@@ -43,3 +43,31 @@ export class CommandLogEntry extends Schema.Class<CommandLogEntry>(
     success: Schema.Boolean,
     stderrExcerpt: Schema.optional(Schema.String),
 }) {}
+
+// ─── metaFile.* ────────────────────────────────────────────────────────────────
+
+/**
+ * The CLOSED, enumerated set of editable repository metadata files (REQ-P6-META-001).
+ * `gitignore`/`gitattributes`/`mailmap` live at the repository root; `info-exclude` is
+ * the private `.git/info/exclude` inside the git dir. The set is fixed — this feature is
+ * never a general file read/write primitive (REQ-P6-META-004).
+ */
+export const MetaFile = Schema.Literals([
+    'gitignore',
+    'gitattributes',
+    'mailmap',
+    'info-exclude',
+]);
+export type MetaFile = typeof MetaFile.Type;
+
+/**
+ * The current content of a metadata file (REQ-P6-META-002). `exists` is false when the
+ * file is not yet on disk (the editor opens empty and creates it on save).
+ */
+export class MetaFileContent extends Schema.Class<MetaFileContent>(
+    'MetaFileContent',
+)({
+    file: MetaFile,
+    exists: Schema.Boolean,
+    text: Schema.String,
+}) {}

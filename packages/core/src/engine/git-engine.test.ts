@@ -358,6 +358,46 @@ describe('GitEngine repo.init (P6-INIT)', () => {
     });
 });
 
+describe('GitEngine metaFile (P6-META)', () => {
+    test('reads an absent file as empty, then round-trips a written file', async () => {
+        const repo = await ws.createRepo('meta');
+        await repo.commit({ message: 'c', files: { 'a.txt': 'a\n' } });
+        const cfg = newCfg();
+        const { before, after } = await withEngine(cfg, e =>
+            Effect.gen(function* () {
+                const h = yield* e.open(repo.dir);
+                const b = yield* e.metaFileRead(h.repoId, 'gitignore');
+                yield* e.metaFileWrite(
+                    h.repoId,
+                    'gitignore',
+                    'node_modules\ndist\n',
+                );
+                const a = yield* e.metaFileRead(h.repoId, 'gitignore');
+                return { before: b, after: a };
+            }),
+        );
+        expect(before.exists).toBe(false);
+        expect(before.text).toBe('');
+        expect(after.exists).toBe(true);
+        expect(after.text).toBe('node_modules\ndist\n');
+    });
+
+    test('writes the private info/exclude inside the git dir', async () => {
+        const repo = await ws.createRepo('meta-exclude');
+        await repo.commit({ message: 'c', files: { 'a.txt': 'a\n' } });
+        const cfg = newCfg();
+        const content = await withEngine(cfg, e =>
+            Effect.gen(function* () {
+                const h = yield* e.open(repo.dir);
+                yield* e.metaFileWrite(h.repoId, 'info-exclude', '*.local\n');
+                return yield* e.metaFileRead(h.repoId, 'info-exclude');
+            }),
+        );
+        expect(content.exists).toBe(true);
+        expect(content.text).toBe('*.local\n');
+    });
+});
+
 describe('GitEngine commandLog (P6-CLOG)', () => {
     test('records host git invocations and filters to the active repository', async () => {
         const repo = await ws.createRepo('logged');

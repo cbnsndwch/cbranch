@@ -18,6 +18,7 @@ import { ReflogPanel } from './ReflogPanel';
 import { CommitDialog } from './CommitDialog';
 import { GcDialog } from './GcDialog';
 import { GoToCommitDialog } from './GoToCommitDialog';
+import { MetaFileEditorDialog } from './MetaFileEditorDialog';
 import { NewRepoDialog } from './NewRepoDialog';
 import { CommitTab } from './CommitTab';
 import { ConflictsPanel } from './ConflictsPanel';
@@ -195,6 +196,7 @@ export function AppShell() {
             {repoId && <RebaseDialog repoId={repoId} />}
             {repoId && <ResetDialog repoId={repoId} />}
             {repoId && <UndoLastCommitDialog repoId={repoId} />}
+            {repoId && <MetaFileEditorDialog repoId={repoId} />}
             {repoId && <GoToCommitDialog repoId={repoId} />}
             {repoId && editPath !== null && (
                 <MergeEditor

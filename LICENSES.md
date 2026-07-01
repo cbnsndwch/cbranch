@@ -32,6 +32,7 @@ TypeScript is in any case a build-time-only dependency that is not shipped.
 | react-diff-view (3.3.x) | MIT | Yes | Yes | Yes — retain copyright + MIT text | https://github.com/otakustay/react-diff-view |
 | codemirror (6.0.x) | MIT | Yes | Yes | Yes — retain copyright + MIT text | https://github.com/codemirror/dev |
 | @codemirror/merge (6.12.x) | MIT | Yes | Yes | Yes — retain copyright + MIT text | https://github.com/codemirror/merge |
+| @codemirror/commands (6.10.x) | MIT | Yes | Yes | Yes — retain copyright + MIT text | https://github.com/codemirror/commands |
 | @codemirror/view (6.43.x) | MIT | Yes | Yes | Yes — retain copyright + MIT text | https://github.com/codemirror/view |
 | @codemirror/state (6.6.x) | MIT | Yes | Yes | Yes — retain copyright + MIT text | https://github.com/codemirror/state |
 | shiki (4.2.x) | MIT | Yes | Yes | Yes — retain copyright + MIT text | https://github.com/shikijs/shiki |

@@ -77,7 +77,11 @@ import {
     SubmoduleStatus,
     WritableScope,
 } from '../schemas/phase5';
-import { CommandLogEntry, RepoInitResult } from '../schemas/phase6';
+import {
+    CommandLogEntry,
+    MetaFileContent,
+    RepoInitResult,
+} from '../schemas/phase6';
 import { Oid, RepoId } from '../schemas/primitives';
 import { LogQuery } from '../schemas/queries';
 import {
@@ -662,6 +666,13 @@ const handlers = CbranchRpcs.toLayer({
     // ── P6: Git command log ───────────────────────────────────────────────────────
     CommandLogList: () => Effect.succeed([commandLogEntry]),
     CommandLogSubscribe: () => Stream.make(commandLogEntry),
+
+    // ── P6: repository metadata-file editors ──────────────────────────────────────
+    MetaFileRead: ({ file }) =>
+        Effect.succeed(
+            new MetaFileContent({ file, exists: true, text: 'node_modules\n' }),
+        ),
+    MetaFileWrite: () => Effect.void,
 });
 
 describe('CbranchRpcs P1 contract (in-memory RpcTest round-trip)', () => {
@@ -1352,6 +1363,18 @@ describe('CbranchRpcs P5 power-features round-trip', () => {
         expect(rows).toHaveLength(1);
         expect(rows[0]?.argv).toEqual(['status', '--porcelain=v2']);
         expect(rows[0]?.success).toBe(true);
+    });
+
+    test('MetaFileRead round-trips a metadata file content', async () => {
+        const program = Effect.gen(function* () {
+            const client = yield* RpcTest.makeClient(CbranchRpcs);
+            return yield* client.MetaFileRead({ repoId, file: 'gitignore' });
+        }).pipe(Effect.provide(handlers), Effect.scoped);
+
+        const content = await Effect.runPromise(program);
+        expect(content.file).toBe('gitignore');
+        expect(content.exists).toBe(true);
+        expect(content.text).toBe('node_modules\n');
     });
 
     test('RebasePlan accepts an empty range (commits:[])', () => {

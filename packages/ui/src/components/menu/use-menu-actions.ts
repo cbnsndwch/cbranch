@@ -120,6 +120,15 @@ export function useMenuActions(): MenuActions {
             // Tools → Git command log opens the routed diagnostic log view. REQ-P6-CLOG-001.
             handlers['tools.commandLog'] = () =>
                 useUiStore.getState().setActiveView('commandLog');
+            // Repository → metadata-file editors open the editor on a specific file. REQ-P6-META-001.
+            handlers['repository.editGitignore'] = () =>
+                useUiStore.getState().setMetaFileDialog('gitignore');
+            handlers['repository.editGitattributes'] = () =>
+                useUiStore.getState().setMetaFileDialog('gitattributes');
+            handlers['repository.editMailmap'] = () =>
+                useUiStore.getState().setMetaFileDialog('mailmap');
+            handlers['repository.editExclude'] = () =>
+                useUiStore.getState().setMetaFileDialog('info-exclude');
             // Repository → Maintenance → Compress opens the gc dialog (REQ-P5-GC-001).
             handlers['repository.maintenance.compress'] = () =>
                 useUiStore.getState().setGcDialogOpen(true);

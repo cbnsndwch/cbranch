@@ -43,6 +43,8 @@ import {
     type GcResult,
     type CommandLogEntry,
     type GitError,
+    type MetaFile,
+    type MetaFileContent,
     type ReflogPage,
     type InvalidationEvent,
     type LogQuery,
@@ -115,6 +117,19 @@ export interface GitEngineApi {
     readonly commandLogSubscribe: (
         repoId?: RepoId,
     ) => Stream.Stream<CommandLogEntry, GitError>;
+
+    // ── Repository metadata-file editors (P6) ───────────────────────────────────
+    /** metaFile.read — read one enumerated, path-contained metadata file. */
+    readonly metaFileRead: (
+        repoId: RepoId,
+        file: MetaFile,
+    ) => Effect.Effect<MetaFileContent, GitError>;
+    /** metaFile.write ✎ — atomic, path-contained write; creates the file if absent. */
+    readonly metaFileWrite: (
+        repoId: RepoId,
+        file: MetaFile,
+        text: string,
+    ) => Effect.Effect<void, GitError>;
 
     // ── history & diff (P1, core-B) ────────────────────────────────────────────
     /** log.stream — the single streaming history feed. core-B. */

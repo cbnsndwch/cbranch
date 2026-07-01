@@ -72,6 +72,7 @@ import {
 } from '../git/command-log';
 import { gitError } from '../git/errors';
 import { initRepo } from '../git/init';
+import { readMetaFile, writeMetaFile } from '../git/meta-files';
 import { fileHistory as fileHistoryGit } from '../git/file-history';
 import {
     configGet as configGetGit,
@@ -470,6 +471,16 @@ export const makeGitEngine = (
                         ),
                     ),
                 ),
+            // ── Repository metadata-file editors (P6) ──────────────────────────────
+            metaFileRead: (repoId, file) =>
+                Effect.flatMap(resolveById(repoId), repo =>
+                    readMetaFile(repo, file),
+                ),
+            metaFileWrite: (repoId, file, text) =>
+                Effect.flatMap(resolveById(repoId), repo =>
+                    locks.withRepoLock(repoId)(writeMetaFile(repo, file, text)),
+                ),
+
             logStream: query =>
                 Stream.unwrap(
                     Effect.map(resolveById(query.repoId), repo =>

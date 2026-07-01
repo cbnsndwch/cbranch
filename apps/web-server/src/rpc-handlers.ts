@@ -408,4 +408,12 @@ export const handlersLayer = CbranchRpcs.toLayer({
         Stream.unwrap(
             Effect.map(GitEngine, engine => engine.commandLogSubscribe(repoId)),
         ),
+
+    // ── P6: repository metadata-file editors ───────────────────────────────────
+    MetaFileRead: ({ repoId, file }) =>
+        Effect.flatMap(GitEngine, engine => engine.metaFileRead(repoId, file)),
+    MetaFileWrite: ({ repoId, file, text }) =>
+        Effect.flatMap(GitEngine, engine =>
+            engine.metaFileWrite(repoId, file, text),
+        ),
 });

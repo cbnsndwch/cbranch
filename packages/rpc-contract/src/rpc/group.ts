@@ -68,7 +68,12 @@ import {
     ThemePref,
     WritableScope,
 } from '../schemas/phase5';
-import { CommandLogEntry, RepoInitResult } from '../schemas/phase6';
+import {
+    CommandLogEntry,
+    MetaFile,
+    MetaFileContent,
+    RepoInitResult,
+} from '../schemas/phase6';
 import { Oid, RepoId } from '../schemas/primitives';
 import { DiffSpec, LogQuery } from '../schemas/queries';
 import {
@@ -899,5 +904,19 @@ export const CbranchRpcs = RpcGroup.make(
         success: CommandLogEntry,
         error: GitError,
         stream: true,
+    }),
+
+    // ── P6: repository metadata-file editors ─────────────────────────────────────
+    // metaFile.read — read one enumerated, path-contained metadata file (REQ-P6-META-002).
+    Rpc.make('MetaFileRead', {
+        payload: { repoId: RepoId, file: MetaFile },
+        success: MetaFileContent,
+        error: GitError,
+    }),
+    // metaFile.write ✎ — atomic, path-contained write; creates the file if absent (REQ-P6-META-003).
+    Rpc.make('MetaFileWrite', {
+        payload: { repoId: RepoId, file: MetaFile, text: Schema.String },
+        success: Schema.Void,
+        error: GitError,
     }),
 );

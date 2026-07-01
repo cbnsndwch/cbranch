@@ -37,6 +37,8 @@ import {
     type LogQuery,
     type MergeMode,
     type MergeResult,
+    type MetaFile,
+    type MetaFileContent,
     type Oid,
     type PatchSelection,
     type RebasePlan,
@@ -263,6 +265,39 @@ export const useCommandLog = (
     }, [api, repoId, live]);
 
     return entries;
+};
+
+/** Read one enumerated metadata file's current content (REQ-P6-META-002). */
+export const useMetaFile = (
+    repoId: RepoId | null,
+    file: MetaFile | null,
+): UseQueryResult<MetaFileContent> => {
+    const api = useApi();
+    return useQuery({
+        queryKey: repoId && file ? ['metaFile', repoId, file] : ['inactive'],
+        queryFn: () => api.metaFileRead(repoId as RepoId, file as MetaFile),
+        enabled: repoId !== null && file !== null,
+    });
+};
+
+/**
+ * Write a metadata file, then refresh its content and the state it affects (REQ-P6-META-003):
+ * ignore/attributes change status + diffs; a `.mailmap` change alters displayed identities
+ * (the `commits` domain).
+ */
+export const useWriteMetaFile = (repoId: RepoId) => {
+    const api = useApi();
+    const qc = useQueryClient();
+    return useMutation<void, unknown, { file: MetaFile; text: string }>({
+        mutationFn: ({ file, text }) => api.metaFileWrite(repoId, file, text),
+        onSuccess: (_v, { file }) => {
+            void qc.invalidateQueries({
+                queryKey: ['metaFile', repoId, file],
+            });
+            void qc.invalidateQueries({ queryKey: [repoId, 'status'] });
+            void qc.invalidateQueries({ queryKey: [repoId, 'commits'] });
+        },
+    });
 };
 
 export type LogStreamStatus =

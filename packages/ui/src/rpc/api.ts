@@ -41,6 +41,8 @@ import {
     type HistoryColumnVisibility,
     type InvalidationEvent,
     type KeyBinding,
+    type MetaFile,
+    type MetaFileContent,
     type ThemePref,
     type WritableScope,
     type LogQuery,
@@ -158,6 +160,9 @@ export interface CbranchApi {
         repoId: RepoId | undefined,
         handlers: StreamHandlers<CommandLogEntry>,
     ): Unsubscribe;
+    // ── Repository metadata-file editors (P6) ───────────────────────────────────
+    metaFileRead(repoId: RepoId, file: MetaFile): Promise<MetaFileContent>;
+    metaFileWrite(repoId: RepoId, file: MetaFile, text: string): Promise<void>;
     // ── branches (P3) ─────────────────────────────────────────────────────────
     branchList(repoId: RepoId): Promise<BranchListing>;
     branchCreate(
@@ -562,6 +567,14 @@ export const makeApi = (runtime: AppRuntime): CbranchApi => {
             runStream(
                 streamWithClient(c => c.CommandLogSubscribe({ repoId })),
                 handlers,
+            ),
+        metaFileRead: (repoId, file) =>
+            runtime.runPromise(
+                withClient(c => c.MetaFileRead({ repoId, file })),
+            ),
+        metaFileWrite: (repoId, file, text) =>
+            runtime.runPromise(
+                withClient(c => c.MetaFileWrite({ repoId, file, text })),
             ),
         // ── branches (P3) ───────────────────────────────────────────────────────
         branchList: repoId =>
