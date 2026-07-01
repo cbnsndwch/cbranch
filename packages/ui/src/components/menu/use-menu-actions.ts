@@ -108,6 +108,9 @@ export function useMenuActions(): MenuActions {
                 useUiStore
                     .getState()
                     .setResetDialog({ target: selectedOid ?? '' });
+            // Go to commit… opens the hash/ref input (also bound to Ctrl+G). REQ-P6-NAV-001.
+            handlers['navigate.goto'] = () =>
+                useUiStore.getState().setGoToDialogOpen(true);
             // Repository → Maintenance → Compress opens the gc dialog (REQ-P5-GC-001).
             handlers['repository.maintenance.compress'] = () =>
                 useUiStore.getState().setGcDialogOpen(true);

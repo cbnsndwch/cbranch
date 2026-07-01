@@ -19,7 +19,11 @@ import {
     writeKeepOpen,
 } from '../lib/commit-ui';
 import { type DiffView, readDiffView, writeDiffView } from '../lib/diff';
-import { emptyFilters, type LogFilters } from '../lib/filters';
+import {
+    DEFAULT_LOG_LIMIT,
+    emptyFilters,
+    type LogFilters,
+} from '../lib/filters';
 import { type DateMode, readDateMode, writeDateMode } from '../lib/format';
 import { readHistorySplit, writeHistorySplit } from '../lib/layout';
 import { applyTheme, readThemePref, type ThemePref } from '../theme/theme';
@@ -244,6 +248,23 @@ export interface UiState {
     readonly setRebaseDialog: (
         state: { upstream: string | null; onto?: string } | null,
     ) => void;
+    // ── P6: go-to-commit (REQ-P6-NAV-001..003) ──────────────────────────────────
+    /** Whether the go-to-commit input dialog is open. */
+    readonly goToDialogOpen: boolean;
+    readonly setGoToDialogOpen: (open: boolean) => void;
+    /**
+     * A resolved commit oid the history view must scroll to and select, loading more
+     * history first if it is not yet in the loaded window (REQ-P6-NAV-001). Cleared by
+     * the history view once fulfilled (or once it gives up).
+     */
+    readonly gotoRequest: { readonly oid: Oid } | null;
+    readonly setGotoRequest: (state: { readonly oid: Oid } | null) => void;
+    /**
+     * The history feed's current commit-count cap. Go-to-commit raises it to page more
+     * history in when a target is beyond the loaded window; reset on repo change.
+     */
+    readonly logLimit: number;
+    readonly setLogLimit: (limit: number) => void;
     // ── P6: reset-to-commit dialog ───────────────────────────────────────────────
     /**
      * The reset-to-commit dialog, or `null` when closed. `target` pre-seeds the
@@ -309,6 +330,9 @@ export const useUiStore = create<UiState>(set => ({
     bisectStartDialog: null,
     rebaseDialog: null,
     resetDialog: null,
+    goToDialogOpen: false,
+    gotoRequest: null,
+    logLimit: DEFAULT_LOG_LIMIT,
     settingsDialogOpen: false,
     findOpen: false,
     branchCreate: null,
@@ -335,6 +359,9 @@ export const useUiStore = create<UiState>(set => ({
             bisectStartDialog: null,
             rebaseDialog: null,
             resetDialog: null,
+            goToDialogOpen: false,
+            gotoRequest: null,
+            logLimit: DEFAULT_LOG_LIMIT,
             findOpen: false,
             branchCreate: null,
             tagCreateOpen: false,
@@ -363,6 +390,9 @@ export const useUiStore = create<UiState>(set => ({
     resetCommitDraft: () => set({ commitDraft: DEFAULT_DRAFT }),
     setCommitDialogOpen: commitDialogOpen => set({ commitDialogOpen }),
     setResetDialog: resetDialog => set({ resetDialog }),
+    setGoToDialogOpen: goToDialogOpen => set({ goToDialogOpen }),
+    setGotoRequest: gotoRequest => set({ gotoRequest }),
+    setLogLimit: logLimit => set({ logLimit }),
     setSettingsDialogOpen: settingsDialogOpen => set({ settingsDialogOpen }),
     setFindOpen: findOpen => set({ findOpen }),
     setKeepOpenAfterCommit: keepOpenAfterCommit => {

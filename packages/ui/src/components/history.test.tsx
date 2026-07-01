@@ -244,4 +244,53 @@ describe('HistoryList (P1-HIST-1/2/3; spec 10)', () => {
         expect(onSelect).toHaveBeenCalledWith(oid('c'));
         expect(screen.getByText('1 / 1')).toBeTruthy();
     });
+
+    test('go-to-commit selects the requested loaded row (REQ-P6-NAV-001)', async () => {
+        const onSelect = vi.fn();
+        const api = fakeApi([
+            summary('a', ['b']),
+            summary('b', ['c']),
+            summary('c', []),
+        ]);
+        useUiStore.setState({ gotoRequest: null, logLimit: 500 });
+        renderWithApi(
+            <HistoryList
+                query={defaultQuery}
+                dateMode="relative"
+                filtersActive={false}
+                selectedOid={null}
+                onSelectOid={onSelect}
+            />,
+            api,
+        );
+        expect(await screen.findByText('commit a')).toBeTruthy();
+        act(() => useUiStore.setState({ gotoRequest: { oid: oid('c') } }));
+        await waitFor(() => expect(onSelect).toHaveBeenCalledWith(oid('c')));
+        // The request is consumed once fulfilled.
+        expect(useUiStore.getState().gotoRequest).toBeNull();
+    });
+
+    test('go-to-commit for an absent commit clears the request without selecting', async () => {
+        const onSelect = vi.fn();
+        const api = fakeApi([summary('a', ['b']), summary('b', [])]);
+        useUiStore.setState({ gotoRequest: null, logLimit: 500 });
+        renderWithApi(
+            <HistoryList
+                query={defaultQuery}
+                dateMode="relative"
+                filtersActive={false}
+                selectedOid={null}
+                onSelectOid={onSelect}
+            />,
+            api,
+        );
+        expect(await screen.findByText('commit a')).toBeTruthy();
+        act(() => useUiStore.setState({ gotoRequest: { oid: oid('z') } }));
+        // The stream is fully loaded (< limit) and the oid isn't present, so the request
+        // is dropped and the selection is left unchanged.
+        await waitFor(() =>
+            expect(useUiStore.getState().gotoRequest).toBeNull(),
+        );
+        expect(onSelect).not.toHaveBeenCalled();
+    });
 });

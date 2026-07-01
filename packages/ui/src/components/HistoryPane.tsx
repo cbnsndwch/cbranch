@@ -16,10 +16,11 @@ export function HistoryPane({
 }) {
     const filters = useUiStore(s => s.filters);
     const dateMode = useUiStore(s => s.dateMode);
+    const logLimit = useUiStore(s => s.logLimit);
 
     const query = useMemo(
-        () => buildLogQuery(repoId, filters),
-        [repoId, filters],
+        () => buildLogQuery(repoId, filters, logLimit),
+        [repoId, filters, logLimit],
     );
     const filtersActive = hasActiveFilters(filters);
 

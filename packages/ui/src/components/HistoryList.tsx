@@ -18,6 +18,8 @@ import {
     formatRelativeMs,
     shortOid,
 } from '../lib/format';
+import { toast } from 'sonner';
+
 import { findMatches, stepMatch } from '../lib/quick-find';
 import { useLogStream } from '../rpc/hooks';
 import { useUiStore } from '../state/store';
@@ -40,6 +42,9 @@ import { Placeholder } from './ui/placeholder';
 
 const ROW_HEIGHT = 26;
 const DEFAULT_PAGE = 10;
+// Upper bound on how far go-to-commit will page history in before giving up (a commit
+// beyond this, or not reachable in the current ref scope, is reported as not found).
+const MAX_LOG_LIMIT = 100_000;
 
 const initials = (name: string): string => {
     const parts = name.trim().split(/\s+/);
@@ -130,6 +135,45 @@ export function HistoryList({
         },
         [rows, onSelectOid, virtualizer],
     );
+
+    // Go-to-commit (REQ-P6-NAV-001): fulfil a resolved-oid request by scrolling to and
+    // selecting its row, paging more history in first when the target is beyond the loaded
+    // window. When the log is fully loaded and the commit still isn't present (e.g. it is
+    // filtered out of the current ref scope), report it and clear the request.
+    const gotoRequest = useUiStore(s => s.gotoRequest);
+    const setGotoRequest = useUiStore(s => s.setGotoRequest);
+    const logLimit = useUiStore(s => s.logLimit);
+    const setLogLimit = useUiStore(s => s.setLogLimit);
+    useEffect(() => {
+        if (gotoRequest === null) return;
+        const idx = rows.findIndex(r => r.oid === gotoRequest.oid);
+        if (idx >= 0) {
+            selectIndex(idx);
+            setGotoRequest(null);
+            return;
+        }
+        // Still streaming this window — wait for it to settle before deciding.
+        if (status === 'loading' || status === 'streaming' || status === 'idle')
+            return;
+        // Window is capped (full page loaded) and there may be more: page in and retry.
+        if (rows.length >= logLimit && logLimit < MAX_LOG_LIMIT) {
+            setLogLimit(Math.min(logLimit * 2, MAX_LOG_LIMIT));
+            return;
+        }
+        // Everything reachable is loaded and the commit isn't here — leave selection intact.
+        setGotoRequest(null);
+        toast.error(
+            `Commit ${shortOid(gotoRequest.oid)} is not in the current history view (it may be filtered out).`,
+        );
+    }, [
+        gotoRequest,
+        rows,
+        status,
+        logLimit,
+        selectIndex,
+        setGotoRequest,
+        setLogLimit,
+    ]);
 
     // Changing any filter resets virtualization/scroll to the top of the new results (P1-FILT-8).
     const queryKey = query === null ? null : JSON.stringify(query);

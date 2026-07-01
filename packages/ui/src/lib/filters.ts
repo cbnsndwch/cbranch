@@ -47,10 +47,14 @@ const trimmed = (value: string): string | undefined => {
 };
 
 /** Build the server `LogQuery` for `repoId` from the active filters (only present fields). */
-export const buildLogQuery = (repoId: RepoId, filters: LogFilters): LogQuery =>
+export const buildLogQuery = (
+    repoId: RepoId,
+    filters: LogFilters,
+    limit: number = DEFAULT_LOG_LIMIT,
+): LogQuery =>
     new LogQuery({
         repoId,
-        limit: DEFAULT_LOG_LIMIT,
+        limit,
         refScope: filters.refScope,
         refPattern:
             filters.refScope === 'pattern'

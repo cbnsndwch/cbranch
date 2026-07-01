@@ -14,6 +14,7 @@ const KEYBINDING_ACTIONS: Readonly<Record<string, () => void>> = {
     'view.commandPalette': () => useUiStore.getState().setPaletteOpen(true),
     'commands.commit': () => useUiStore.getState().setCommitDialogOpen(true),
     'history.find': () => useUiStore.getState().setFindOpen(true),
+    'navigate.goto': () => useUiStore.getState().setGoToDialogOpen(true),
 };
 
 // Root view: the browse shell plus the global command palette. Global shortcuts

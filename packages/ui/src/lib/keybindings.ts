@@ -18,6 +18,7 @@ export const KEYBINDING_COMMANDS: ReadonlyArray<KeybindingCommand> = [
     { id: 'view.commandPalette', label: 'Open command palette' },
     { id: 'commands.commit', label: 'Open commit dialog' },
     { id: 'history.find', label: 'Find in history' },
+    { id: 'navigate.goto', label: 'Go to commit' },
 ];
 
 /** Factory-default chord per command id (the shipped shortcuts). */
@@ -25,6 +26,7 @@ export const DEFAULT_KEYBINDINGS: Readonly<Record<string, string>> = {
     'view.commandPalette': 'Mod+K',
     'commands.commit': 'Mod+Shift+Enter',
     'history.find': 'Mod+F',
+    'navigate.goto': 'Mod+G',
 };
 
 /** Reduce the wire `KeyBinding[]` form to the native `Record<commandId, chord>`. */
