@@ -41,6 +41,10 @@ export * from './schemas/phase4';
 // settings-config / interactive-rebase (each slice appends; D18).
 export * from './schemas/phase5';
 
+// P6 completion & utilities Schemas: repo init / command log / metadata files / notes /
+// patch interchange (each slice appends).
+export * from './schemas/phase6';
+
 // The P1 method catalog.
 export * from './rpc/group';
 

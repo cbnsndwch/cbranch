@@ -47,6 +47,7 @@ import {
     type RemoteInfo,
     type RepoHandle,
     type RepoId,
+    type RepoInitResult,
     type RepoState,
     type SequencerResult,
     type StashEntry,
@@ -205,6 +206,24 @@ export const useOpenRepo = () => {
     const queryClient = useQueryClient();
     return useMutation<RepoHandle, unknown, string>({
         mutationFn: (path: string) => api.repoOpen(path),
+        onSuccess: () => {
+            void queryClient.invalidateQueries({
+                queryKey: queryKeys.recentList(),
+            });
+        },
+    });
+};
+
+/** Initialize a new repository on the host, then refresh the recent list (REQ-P6-INIT-001). */
+export const useInitRepo = () => {
+    const api = useApi();
+    const queryClient = useQueryClient();
+    return useMutation<
+        RepoInitResult,
+        unknown,
+        { path: string; defaultBranch?: string; bare?: boolean }
+    >({
+        mutationFn: input => api.repoInit(input),
         onSuccess: () => {
             void queryClient.invalidateQueries({
                 queryKey: queryKeys.recentList(),

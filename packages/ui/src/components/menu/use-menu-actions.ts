@@ -70,6 +70,9 @@ export function useMenuActions(): MenuActions {
                     description: 'A desktop-style git client. MIT licensed.',
                 }),
             'tools.settings': openSettings,
+            // New repository is app-global (usable with no repo open). REQ-P6-INIT-001.
+            'repository.new': () =>
+                useUiStore.getState().setNewRepoDialogOpen(true),
         };
         // Repo-scoped commands need an open repository.
         if (repoId) {

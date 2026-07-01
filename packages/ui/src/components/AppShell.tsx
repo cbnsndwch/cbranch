@@ -17,6 +17,7 @@ import { ReflogPanel } from './ReflogPanel';
 import { CommitDialog } from './CommitDialog';
 import { GcDialog } from './GcDialog';
 import { GoToCommitDialog } from './GoToCommitDialog';
+import { NewRepoDialog } from './NewRepoDialog';
 import { CommitTab } from './CommitTab';
 import { ConflictsPanel } from './ConflictsPanel';
 import { DiffPanel } from './DiffPanel';
@@ -183,6 +184,7 @@ export function AppShell() {
             <CleanDialog />
             <ArchiveDialog />
             <SettingsDialog />
+            <NewRepoDialog />
             {repoId && (
                 <BisectStartDialog repoId={repoId} onSelectOid={selectOid} />
             )}

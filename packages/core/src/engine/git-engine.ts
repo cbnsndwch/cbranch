@@ -56,6 +56,7 @@ import {
     type RemoteInfo,
     type RepoHandle,
     type RepoId,
+    type RepoInitResult,
     type RepoState,
     type SequencerResult,
     type SubmoduleInfo,
@@ -81,6 +82,12 @@ export interface GitEngineApi {
     // ── repository & live state (P1, core-A) ───────────────────────────────────
     /** repo.open — resolve identity + state, upsert recent list. */
     readonly open: (path: string) => Effect.Effect<RepoHandle, GitError>;
+    /** repo.init ✎ — `git init` at a fresh/empty path, then open it. REQ-P6-INIT-001. */
+    readonly init: (input: {
+        readonly path: string;
+        readonly defaultBranch?: string;
+        readonly bare?: boolean;
+    }) => Effect.Effect<RepoInitResult, GitError>;
     /** repo.recentList — the persisted recent-repos list. */
     readonly recentList: () => Effect.Effect<
         ReadonlyArray<RecentRepo>,

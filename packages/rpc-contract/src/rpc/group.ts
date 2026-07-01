@@ -68,6 +68,7 @@ import {
     ThemePref,
     WritableScope,
 } from '../schemas/phase5';
+import { RepoInitResult } from '../schemas/phase6';
 import { Oid, RepoId } from '../schemas/primitives';
 import { DiffSpec, LogQuery } from '../schemas/queries';
 import {
@@ -863,6 +864,19 @@ export const CbranchRpcs = RpcGroup.make(
     Rpc.make('RebaseStatus', {
         payload: { repoId: RepoId },
         success: RebaseStatus,
+        error: GitError,
+    }),
+
+    // ── P6: create / initialize a repository ─────────────────────────────────────
+    // repo.init ✎ — `git init [--bare] [--initial-branch=<name>] <path>`; rejects an
+    // existing repository (offer open), never creates arbitrary deep paths (REQ-P6-INIT-001..005).
+    Rpc.make('RepoInit', {
+        payload: {
+            path: Schema.String,
+            defaultBranch: Schema.optional(Schema.String),
+            bare: Schema.optional(Schema.Boolean),
+        },
+        success: RepoInitResult,
         error: GitError,
     }),
 );

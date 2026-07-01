@@ -55,6 +55,7 @@ import {
     type RemoteInfo,
     type RepoHandle,
     type RepoId,
+    type RepoInitResult,
     type RepoState,
     type SequencerResult,
     type StashEntry,
@@ -87,6 +88,11 @@ export type Unsubscribe = () => void;
 /** The transport-agnostic host API the UI depends on (mockable for component tests). */
 export interface CbranchApi {
     repoOpen(path: string): Promise<RepoHandle>;
+    repoInit(input: {
+        path: string;
+        defaultBranch?: string;
+        bare?: boolean;
+    }): Promise<RepoInitResult>;
     recentList(): Promise<ReadonlyArray<RecentRepo>>;
     recentRemove(repoId: RepoId): Promise<void>;
     repoState(repoId: RepoId): Promise<RepoState>;
@@ -470,6 +476,8 @@ export const makeApi = (runtime: AppRuntime): CbranchApi => {
     return {
         repoOpen: path =>
             runtime.runPromise(withClient(c => c.RepoOpen({ path }))),
+        repoInit: input =>
+            runtime.runPromise(withClient(c => c.RepoInit(input))),
         recentList: () =>
             runtime.runPromise(withClient(c => c.RepoRecentList({}))),
         recentRemove: repoId =>

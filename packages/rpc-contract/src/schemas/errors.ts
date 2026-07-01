@@ -10,8 +10,10 @@ import { Schema } from 'effect';
 
 /**
  * The closed set of failure codes carried by {@link GitError.code} (14 §4, VERBATIM).
- * Grouped exactly as the spec groups them; the order is not significant but the
- * 23 string literals are reproduced verbatim and must not drift.
+ * Grouped exactly as the spec groups them; the order is not significant. The original
+ * 23 P1 literals are reproduced verbatim and must not drift; Phase 6 appends new
+ * literals to this one closed array rather than introducing a second error class
+ * (docs/spec/17 §"GitError codes").
  */
 export const GitErrorCode = Schema.Literals([
     // process / environment
@@ -40,6 +42,9 @@ export const GitErrorCode = Schema.Literals([
     'emptyOrAlreadyApplied',
     'detachedHead',
     'unsupportedRepoShape',
+    // P6 additions (docs/spec/17 §"GitError codes")
+    'repoExists',
+    'patchDoesNotApply',
 ]);
 export type GitErrorCode = typeof GitErrorCode.Type;
 

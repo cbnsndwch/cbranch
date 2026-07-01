@@ -101,6 +101,18 @@ export function CommandPalette() {
                                 Could not open that path.
                             </div>
                         ) : null}
+                        {/* New repository is available even with no repo open (REQ-P6-INIT-001). */}
+                        {term === '' ||
+                        'new repository'.includes(term) ||
+                        'init'.includes(term) ? (
+                            <Command.Item
+                                value="command:repository.new"
+                                onSelect={() => runCommand('repository.new')}
+                                className="data-[selected=true]:bg-accent flex cursor-pointer items-center px-3 py-2 text-sm"
+                            >
+                                New repository…
+                            </Command.Item>
+                        ) : null}
                         {commandMatches.length > 0 ? (
                             <Command.Group
                                 heading="Commands"

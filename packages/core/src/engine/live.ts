@@ -21,6 +21,7 @@ import {
     HistoryColumnVisibility,
     KeyBinding,
     RepoHandle,
+    RepoInitResult,
 } from '@cbranch/rpc-contract';
 import { type Cause, Effect, Layer, Queue, Scope, Stream } from 'effect';
 
@@ -64,6 +65,7 @@ import {
 import { fileContentAtRev } from '../git/content';
 import { commitDiff, diffWorkingFile } from '../git/diff';
 import { gitError } from '../git/errors';
+import { initRepo } from '../git/init';
 import { fileHistory as fileHistoryGit } from '../git/file-history';
 import {
     configGet as configGetGit,
@@ -296,8 +298,73 @@ export const makeGitEngine = (
                 });
             });
 
+        const init = (input: {
+            readonly path: string;
+            readonly defaultBranch?: string;
+            readonly bare?: boolean;
+        }): Effect.Effect<RepoInitResult, GitError> =>
+            Effect.gen(function* () {
+                // Probe the destination: resolving succeeds iff a repository already exists
+                // at (or above) the path, so we refuse and let the client offer to open it
+                // (REQ-P6-INIT-003). `repoNotFound` = the path itself is absent (we create a
+                // single leaf); `notARepository` = the path exists but holds no repo (init in
+                // place). Any other fs failure surfaces unchanged.
+                type Probe =
+                    | { readonly kind: 'exists'; readonly repoId: RepoId }
+                    | { readonly kind: 'create' }
+                    | { readonly kind: 'initInPlace' };
+                const probe: Probe = yield* Effect.matchEffect(
+                    resolveRepo(input.path),
+                    {
+                        onSuccess: (repo): Effect.Effect<Probe, GitError> =>
+                            Effect.succeed({
+                                kind: 'exists',
+                                repoId: repo.repoId,
+                            }),
+                        onFailure: (err): Effect.Effect<Probe, GitError> =>
+                            err.code === 'repoNotFound'
+                                ? Effect.succeed({ kind: 'create' })
+                                : err.code === 'notARepository'
+                                  ? Effect.succeed({ kind: 'initInPlace' })
+                                  : Effect.fail(err),
+                    },
+                );
+                if (probe.kind === 'exists') {
+                    return yield* Effect.fail(
+                        gitError(
+                            'repoExists',
+                            'a repository already exists at or above this path',
+                            { repoId: probe.repoId },
+                        ),
+                    );
+                }
+                const existed = probe.kind === 'initInPlace';
+                yield* initRepo(
+                    input.path,
+                    { bare: input.bare, defaultBranch: input.defaultBranch },
+                    existed,
+                    env,
+                );
+                // Resolve the fresh repo, cache its location, and add it to the recent list
+                // so the client can switch to it (REQ-P6-INIT-005).
+                const repo = yield* resolveRepo(input.path);
+                locations.set(repo.repoId, repo);
+                const name =
+                    basename(repo.root) === ''
+                        ? repo.root
+                        : basename(repo.root);
+                yield* configStore.upsertRecent({
+                    path: repo.root,
+                    name,
+                    repoId: repo.repoId,
+                    lastOpenedAt: Date.now(),
+                });
+                return new RepoInitResult({ repoId: repo.repoId });
+            });
+
         const api: GitEngineApi = {
             open,
+            init,
             recentList: () => configStore.listRecent(),
             recentRemove: repoId => configStore.removeRecent(repoId),
             state: repoId => Effect.flatMap(resolveById(repoId), readRepoState),

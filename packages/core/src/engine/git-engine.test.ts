@@ -5,6 +5,7 @@ import { RepoId as RepoIdBrand } from '@cbranch/rpc-contract';
 import { Effect, Exit } from 'effect';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 
+import { runGit } from '../git/run-git';
 import { type GitEngineApi, makeGitEngine } from '../index';
 import { runScoped } from '../testing/effect-run';
 import {
@@ -279,5 +280,80 @@ describe('GitEngine repo-lock wiring (P5 mutations serialize; reads stay lockles
         );
 
         expect(labels).toEqual(['ok', 'ok']);
+    });
+});
+
+describe('GitEngine repo.init (P6-INIT)', () => {
+    test('initializes a fresh leaf directory, records it, and can be opened', async () => {
+        const dest = join(ws.root, 'init-fresh');
+        const cfg = newCfg();
+        const { result, recents, state } = await withEngine(cfg, e =>
+            Effect.gen(function* () {
+                const r = yield* e.init({ path: dest });
+                const list = yield* e.recentList();
+                const h = yield* e.open(dest);
+                return { result: r, recents: list, state: h.state };
+            }),
+        );
+        expect(result.repoId).toMatch(/^[0-9a-f]{64}$/);
+        expect(recents.some(x => x.repoId === result.repoId)).toBe(true);
+        expect(state.isBare).toBe(false);
+        expect(state.isEmpty).toBe(true);
+    });
+
+    test('honors the initial branch name', async () => {
+        const dest = join(ws.root, 'init-branch');
+        const cfg = newCfg();
+        await withEngine(cfg, e =>
+            e.init({ path: dest, defaultBranch: 'trunk' }),
+        );
+        const head = await runScoped(
+            Effect.map(
+                runGit({
+                    cwd: dest,
+                    args: ['symbolic-ref', '--short', 'HEAD'],
+                }),
+                r => r.stdout.toString('utf8').trim(),
+            ),
+        );
+        expect(head).toBe('trunk');
+    });
+
+    test('creates a bare repository when requested', async () => {
+        const dest = join(ws.root, 'init-bare');
+        const cfg = newCfg();
+        const state = await withEngine(cfg, e =>
+            Effect.gen(function* () {
+                yield* e.init({ path: dest, bare: true });
+                const h = yield* e.open(dest);
+                return h.state;
+            }),
+        );
+        expect(state.isBare).toBe(true);
+    });
+
+    test('refuses to reinitialize an existing repository (offer open)', async () => {
+        const repo = await ws.createRepo('already');
+        await repo.commit({ message: 'c', files: { 'a.txt': 'a\n' } });
+        const cfg = newCfg();
+        const code = await withEngine(cfg, e =>
+            Effect.match(e.init({ path: repo.dir }), {
+                onSuccess: () => 'ok',
+                onFailure: err => err.code,
+            }),
+        );
+        expect(code).toBe('repoExists');
+    });
+
+    test('does not create deep paths: a missing parent is a clear error', async () => {
+        const dest = join(ws.root, 'no-such-parent', 'leaf');
+        const cfg = newCfg();
+        const code = await withEngine(cfg, e =>
+            Effect.match(e.init({ path: dest }), {
+                onSuccess: () => 'ok',
+                onFailure: err => err.code,
+            }),
+        );
+        expect(code).toBe('fsError');
     });
 });

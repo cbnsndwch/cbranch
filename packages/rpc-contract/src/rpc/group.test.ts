@@ -77,6 +77,7 @@ import {
     SubmoduleStatus,
     WritableScope,
 } from '../schemas/phase5';
+import { RepoInitResult } from '../schemas/phase6';
 import { Oid, RepoId } from '../schemas/primitives';
 import { LogQuery } from '../schemas/queries';
 import {
@@ -427,6 +428,7 @@ const appSettings = new AppSettings({
         sha: true,
     }),
 });
+const repoInitResult = new RepoInitResult({ repoId });
 const rebasePlan = new RebasePlan({
     upstream: 'main',
     onto: 'release',
@@ -644,6 +646,9 @@ const handlers = CbranchRpcs.toLayer({
     RebasePlan: () => Effect.succeed(rebasePlan),
     RebaseStart: () => Effect.succeed(rebaseStatus),
     RebaseStatus: () => Effect.succeed(rebaseStatus),
+
+    // ── P6: create / initialize a repository ──────────────────────────────────────
+    RepoInit: () => Effect.succeed(repoInitResult),
 });
 
 describe('CbranchRpcs P1 contract (in-memory RpcTest round-trip)', () => {
@@ -1308,6 +1313,20 @@ describe('CbranchRpcs P5 power-features round-trip', () => {
         expect(plan.commits).toHaveLength(1);
         expect(plan.commits[0]?.subject).toBe('feat: thing');
         expect(plan.commits[0]?.body).toBe('A longer body.\n');
+    });
+
+    test('RepoInit round-trips its payload and result', async () => {
+        const program = Effect.gen(function* () {
+            const client = yield* RpcTest.makeClient(CbranchRpcs);
+            return yield* client.RepoInit({
+                path: '/tmp/new-repo',
+                defaultBranch: 'main',
+                bare: false,
+            });
+        }).pipe(Effect.provide(handlers), Effect.scoped);
+
+        const r = await Effect.runPromise(program);
+        expect(r.repoId).toBe(repoId);
     });
 
     test('RebasePlan accepts an empty range (commits:[])', () => {

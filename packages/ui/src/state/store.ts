@@ -280,6 +280,10 @@ export interface UiState {
     /** Whether the undo-last-commit confirmation dialog is open. */
     readonly undoDialogOpen: boolean;
     readonly setUndoDialogOpen: (open: boolean) => void;
+    // ── P6: create / initialize a repository (REQ-P6-INIT-001..005) ───────────────
+    /** Whether the new-repository dialog is open. App-global (works with no repo open). */
+    readonly newRepoDialogOpen: boolean;
+    readonly setNewRepoDialogOpen: (open: boolean) => void;
     // ── P5: settings & git config dialog ─────────────────────────────────────────
     /** Whether the settings modal (git config + app settings) is open (REQ-P5-CFG-001). App-global. */
     readonly settingsDialogOpen: boolean;
@@ -335,6 +339,7 @@ export const useUiStore = create<UiState>(set => ({
     rebaseDialog: null,
     resetDialog: null,
     undoDialogOpen: false,
+    newRepoDialogOpen: false,
     goToDialogOpen: false,
     gotoRequest: null,
     logLimit: DEFAULT_LOG_LIMIT,
@@ -397,6 +402,7 @@ export const useUiStore = create<UiState>(set => ({
     setCommitDialogOpen: commitDialogOpen => set({ commitDialogOpen }),
     setResetDialog: resetDialog => set({ resetDialog }),
     setUndoDialogOpen: undoDialogOpen => set({ undoDialogOpen }),
+    setNewRepoDialogOpen: newRepoDialogOpen => set({ newRepoDialogOpen }),
     setGoToDialogOpen: goToDialogOpen => set({ goToDialogOpen }),
     setGotoRequest: gotoRequest => set({ gotoRequest }),
     setLogLimit: logLimit => set({ logLimit }),
