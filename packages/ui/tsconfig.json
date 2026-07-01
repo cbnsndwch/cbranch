@@ -1,6 +1,6 @@
 {
   "extends": "../../tsconfig.base.json",
-  "_comment": "App project (Vite-built, not part of the `tsc -b` reference graph). Non-composite + noEmit: Vite/Rolldown owns the bundle, tsc only typechecks. `types` is left to auto-discovery so @types/react and @types/react-dom are picked up (vite/client globals come from src/vite-env.d.ts). `rootDirs` overlays React Router's generated route types (`.react-router/types`) so route modules can `import type { Route } from \"./+types/<name>\"`.",
+  "_comment": "App project (Vite-built, not part of the `tsc -b` reference graph). Non-composite + noEmit: Vite/Rolldown owns the bundle, tsc only typechecks. `types: [\"node\"]` supplies Node globals for the build-time SSR entry (`entry.server.tsx` imports `node:stream`); TS 6 no longer auto-discovers @types/node here. @types/react and @types/react-dom resolve via their imports, and vite/client globals come from src/vite-env.d.ts. `rootDirs` overlays React Router's generated route types (`.react-router/types`) so route modules can `import type { Route } from \"./+types/<name>\"`.",
   "compilerOptions": {
     "composite": false,
     "declaration": false,
@@ -8,7 +8,7 @@
     "noEmit": true,
     "lib": ["ES2023", "DOM", "DOM.Iterable"],
     "jsx": "react-jsx",
-    "baseUrl": ".",
+    "types": ["node"],
     "rootDirs": [".", "./.react-router/types"],
     "paths": {
       "@/*": ["./src/*"]
