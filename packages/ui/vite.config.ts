@@ -52,6 +52,11 @@ export default defineConfig({
                 changeOrigin: true,
             },
         },
+
+        // Listens on all interfaces
+        host: true,
+
+        allowedHosts: ['cbranch.beastie.local'],
     },
     build: {
         // REQ-STACK-011: emit source maps + tree-shake (tree-shaking is on by default
