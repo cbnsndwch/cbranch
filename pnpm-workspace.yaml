@@ -27,3 +27,6 @@ minimumReleaseAgeExclude:
   - vite
   - "@tanstack/react-virtual"
   - "@tanstack/virtual-core"
+
+patchedDependencies:
+  react-router-devtools@6.2.1: patches/react-router-devtools@6.2.1.patch

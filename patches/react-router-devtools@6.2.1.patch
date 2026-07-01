@@ -1,0 +1,13 @@
+diff --git a/dist/index.js b/dist/index.js
+index cd777e6ede147be030d8d7a3ed9b78ba7dd2635c..d50feee2ed4c436ba9731a1d1c15671b81a9c5f2 100644
+--- a/dist/index.js
++++ b/dist/index.js
+@@ -26,7 +26,7 @@ var server = await createServer({
+     noDiscovery: true
+   },
+   configFile: false,
+-  envFile: false,
++  envDir: false,
+   plugins: []
+ });
+ if (Number(viteVersion.split(".")[0]) < 6) {
