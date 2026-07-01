@@ -68,7 +68,7 @@ import {
     ThemePref,
     WritableScope,
 } from '../schemas/phase5';
-import { RepoInitResult } from '../schemas/phase6';
+import { CommandLogEntry, RepoInitResult } from '../schemas/phase6';
 import { Oid, RepoId } from '../schemas/primitives';
 import { DiffSpec, LogQuery } from '../schemas/queries';
 import {
@@ -878,5 +878,26 @@ export const CbranchRpcs = RpcGroup.make(
         },
         success: RepoInitResult,
         error: GitError,
+    }),
+
+    // ── P6: Git command log ──────────────────────────────────────────────────────
+    // commandLog.list — newest-first ring-buffer read; `repoId` filters to one repo's
+    // invocations (by working dir), `limit` caps the count (REQ-P6-CLOG-001).
+    Rpc.make('CommandLogList', {
+        payload: {
+            repoId: Schema.optional(RepoId),
+            limit: Schema.optional(Schema.Number),
+        },
+        success: Schema.Array(CommandLogEntry),
+        error: GitError,
+    }),
+    // commandLog.subscribe ⇉ — live tail of new invocations. The top-level error is
+    // `Never` under the streaming rule; a per-item `GitError` only surfaces if a supplied
+    // `repoId` cannot be resolved (REQ-P6-CLOG-005).
+    Rpc.make('CommandLogSubscribe', {
+        payload: { repoId: Schema.optional(RepoId) },
+        success: CommandLogEntry,
+        error: GitError,
+        stream: true,
     }),
 );

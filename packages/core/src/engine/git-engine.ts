@@ -41,6 +41,7 @@ import {
     type FileHistoryPage,
     type GcPrune,
     type GcResult,
+    type CommandLogEntry,
     type GitError,
     type ReflogPage,
     type InvalidationEvent,
@@ -103,6 +104,17 @@ export interface GitEngineApi {
     readonly subscribe: (
         repoId: RepoId,
     ) => Stream.Stream<InvalidationEvent, GitError>;
+
+    // ── Git command log (P6) ────────────────────────────────────────────────────
+    /** commandLog.list — newest-first ring-buffer read, filtered by repo + limit. */
+    readonly commandLogList: (
+        repoId?: RepoId,
+        limit?: number,
+    ) => Effect.Effect<ReadonlyArray<CommandLogEntry>, GitError>;
+    /** commandLog.subscribe — live tail of new invocations (fails only on a bad repoId). */
+    readonly commandLogSubscribe: (
+        repoId?: RepoId,
+    ) => Stream.Stream<CommandLogEntry, GitError>;
 
     // ── history & diff (P1, core-B) ────────────────────────────────────────────
     /** log.stream — the single streaming history feed. core-B. */

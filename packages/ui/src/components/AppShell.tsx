@@ -13,6 +13,7 @@ import { ArchiveDialog } from './ArchiveDialog';
 import { BisectBanner } from './BisectBanner';
 import { BisectStartDialog } from './BisectStartDialog';
 import { CleanDialog } from './CleanDialog';
+import { CommandLogPanel } from './CommandLogPanel';
 import { ReflogPanel } from './ReflogPanel';
 import { CommitDialog } from './CommitDialog';
 import { GcDialog } from './GcDialog';
@@ -50,6 +51,7 @@ const VIEWS: ReadonlyArray<readonly [ActiveView, string]> = [
     ['tags', 'Tags'],
     ['reflog', 'Reflog'],
     ['submodules', 'Submodules'],
+    ['commandLog', 'Command log'],
 ];
 
 // Web layout: menu bar → toolbar → view nav → main split (sidebar + content). There is no
@@ -138,6 +140,8 @@ export function AppShell() {
                 return <ReflogPanel repoId={repoId} onSelectOid={selectOid} />;
             case 'submodules':
                 return <SubmodulesPanel repoId={repoId} />;
+            case 'commandLog':
+                return <CommandLogPanel repoId={repoId} />;
             default:
                 return (
                     <div className="grid min-h-0 grid-rows-[46px_1fr]">

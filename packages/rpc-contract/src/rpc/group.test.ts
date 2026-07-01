@@ -77,7 +77,7 @@ import {
     SubmoduleStatus,
     WritableScope,
 } from '../schemas/phase5';
-import { RepoInitResult } from '../schemas/phase6';
+import { CommandLogEntry, RepoInitResult } from '../schemas/phase6';
 import { Oid, RepoId } from '../schemas/primitives';
 import { LogQuery } from '../schemas/queries';
 import {
@@ -429,6 +429,15 @@ const appSettings = new AppSettings({
     }),
 });
 const repoInitResult = new RepoInitResult({ repoId });
+const commandLogEntry = new CommandLogEntry({
+    seq: 0,
+    argv: ['status', '--porcelain=v2'],
+    cwd: '/repo',
+    startedAt: 1000,
+    durationMs: 12,
+    exitCode: 0,
+    success: true,
+});
 const rebasePlan = new RebasePlan({
     upstream: 'main',
     onto: 'release',
@@ -649,6 +658,10 @@ const handlers = CbranchRpcs.toLayer({
 
     // ── P6: create / initialize a repository ──────────────────────────────────────
     RepoInit: () => Effect.succeed(repoInitResult),
+
+    // ── P6: Git command log ───────────────────────────────────────────────────────
+    CommandLogList: () => Effect.succeed([commandLogEntry]),
+    CommandLogSubscribe: () => Stream.make(commandLogEntry),
 });
 
 describe('CbranchRpcs P1 contract (in-memory RpcTest round-trip)', () => {
@@ -1327,6 +1340,18 @@ describe('CbranchRpcs P5 power-features round-trip', () => {
 
         const r = await Effect.runPromise(program);
         expect(r.repoId).toBe(repoId);
+    });
+
+    test('CommandLogList round-trips recorded invocations', async () => {
+        const program = Effect.gen(function* () {
+            const client = yield* RpcTest.makeClient(CbranchRpcs);
+            return yield* client.CommandLogList({ limit: 10 });
+        }).pipe(Effect.provide(handlers), Effect.scoped);
+
+        const rows = await Effect.runPromise(program);
+        expect(rows).toHaveLength(1);
+        expect(rows[0]?.argv).toEqual(['status', '--porcelain=v2']);
+        expect(rows[0]?.success).toBe(true);
     });
 
     test('RebasePlan accepts an empty range (commits:[])', () => {

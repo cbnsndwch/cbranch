@@ -398,4 +398,14 @@ export const handlersLayer = CbranchRpcs.toLayer({
         Effect.flatMap(GitEngine, engine =>
             engine.init({ path, defaultBranch, bare }),
         ),
+
+    // ── P6: Git command log ────────────────────────────────────────────────────
+    CommandLogList: ({ repoId, limit }) =>
+        Effect.flatMap(GitEngine, engine =>
+            engine.commandLogList(repoId, limit),
+        ),
+    CommandLogSubscribe: ({ repoId }) =>
+        Stream.unwrap(
+            Effect.map(GitEngine, engine => engine.commandLogSubscribe(repoId)),
+        ),
 });

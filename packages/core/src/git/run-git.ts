@@ -18,6 +18,7 @@ import { type ChildProcessWithoutNullStreams, spawn } from 'node:child_process';
 import { type GitError } from '@cbranch/rpc-contract';
 import { Cause, Effect, Queue, Stream } from 'effect';
 
+import { excerptStderr, recordInvocation } from './command-log';
 import { classifyExit, classifyGitSpawnError, gitError } from './errors';
 
 /** Result of a single host-`git` invocation. stdout/stderr are raw bytes. */
@@ -92,6 +93,7 @@ export const runGit = (
             opts.read === false
                 ? [...opts.args]
                 : [...READ_FLAGS, ...opts.args];
+        const startedAt = Date.now();
 
         let child: ChildProcessWithoutNullStreams;
         try {
@@ -101,6 +103,15 @@ export const runGit = (
                 windowsHide: true,
             });
         } catch (err) {
+            recordInvocation({
+                argv: args,
+                cwd: opts.cwd,
+                startedAt,
+                durationMs: Date.now() - startedAt,
+                exitCode: null,
+                success: false,
+                stderrExcerpt: String(err),
+            });
             resume(Effect.fail(classifyGitSpawnError(err)));
             return;
         }
@@ -126,6 +137,15 @@ export const runGit = (
             if (settled) return;
             settled = true;
             signal.removeEventListener('abort', onAbort);
+            recordInvocation({
+                argv: args,
+                cwd: opts.cwd,
+                startedAt,
+                durationMs: Date.now() - startedAt,
+                exitCode: null,
+                success: false,
+                stderrExcerpt: String(err),
+            });
             resume(Effect.fail(classifyGitSpawnError(err)));
         });
 
@@ -133,12 +153,25 @@ export const runGit = (
             if (settled) return;
             settled = true;
             signal.removeEventListener('abort', onAbort);
+            const stderrBuf = Buffer.concat(stderr);
+            recordInvocation({
+                argv: args,
+                cwd: opts.cwd,
+                startedAt,
+                durationMs: Date.now() - startedAt,
+                exitCode: code,
+                success: code === 0,
+                stderrExcerpt:
+                    code === 0
+                        ? undefined
+                        : excerptStderr(decodeUtf8(stderrBuf)),
+            });
             resume(
                 Effect.succeed({
                     exitCode: code,
                     signal: sig,
                     stdout: Buffer.concat(stdout),
-                    stderr: Buffer.concat(stderr),
+                    stderr: stderrBuf,
                 }),
             );
         });
@@ -205,6 +238,7 @@ export const streamGit = (
                     opts.read === false
                         ? [...opts.args]
                         : [...READ_FLAGS, ...opts.args];
+                const startedAt = Date.now();
                 const classify =
                     opts.classifyFailure ??
                     ((code, _stdout, stderr) => classifyExit(code, stderr));
@@ -223,6 +257,15 @@ export const streamGit = (
                     });
                 } catch (err) {
                     handle.settled = true;
+                    recordInvocation({
+                        argv: args,
+                        cwd: opts.cwd,
+                        startedAt,
+                        durationMs: Date.now() - startedAt,
+                        exitCode: null,
+                        success: false,
+                        stderrExcerpt: String(err),
+                    });
                     Queue.failCauseUnsafe(
                         queue,
                         Cause.fail(classifyGitSpawnError(err)),
@@ -272,6 +315,15 @@ export const streamGit = (
                 child.on('error', err => {
                     if (handle.settled) return;
                     handle.settled = true;
+                    recordInvocation({
+                        argv: args,
+                        cwd: opts.cwd,
+                        startedAt,
+                        durationMs: Date.now() - startedAt,
+                        exitCode: null,
+                        success: false,
+                        stderrExcerpt: String(err),
+                    });
                     Queue.failCauseUnsafe(
                         queue,
                         Cause.fail(classifyGitSpawnError(err)),
@@ -292,6 +344,16 @@ export const streamGit = (
                             source: 'stderr',
                             text: errBuf,
                         });
+                    recordInvocation({
+                        argv: args,
+                        cwd: opts.cwd,
+                        startedAt,
+                        durationMs: Date.now() - startedAt,
+                        exitCode: code,
+                        success: code === 0,
+                        stderrExcerpt:
+                            code === 0 ? undefined : excerptStderr(errText),
+                    });
                     if (code === 0) {
                         Queue.endUnsafe(queue);
                     } else {
@@ -332,6 +394,7 @@ export const streamGitBytes = (
                     opts.read === false
                         ? [...opts.args]
                         : [...READ_FLAGS, ...opts.args];
+                const startedAt = Date.now();
 
                 const handle: {
                     settled: boolean;
@@ -347,6 +410,15 @@ export const streamGitBytes = (
                     });
                 } catch (err) {
                     handle.settled = true;
+                    recordInvocation({
+                        argv: args,
+                        cwd: opts.cwd,
+                        startedAt,
+                        durationMs: Date.now() - startedAt,
+                        exitCode: null,
+                        success: false,
+                        stderrExcerpt: String(err),
+                    });
                     Queue.failCauseUnsafe(
                         queue,
                         Cause.fail(classifyGitSpawnError(err)),
@@ -370,6 +442,15 @@ export const streamGitBytes = (
                 child.on('error', err => {
                     if (handle.settled) return;
                     handle.settled = true;
+                    recordInvocation({
+                        argv: args,
+                        cwd: opts.cwd,
+                        startedAt,
+                        durationMs: Date.now() - startedAt,
+                        exitCode: null,
+                        success: false,
+                        stderrExcerpt: String(err),
+                    });
                     Queue.failCauseUnsafe(
                         queue,
                         Cause.fail(classifyGitSpawnError(err)),
@@ -379,6 +460,20 @@ export const streamGitBytes = (
                 child.on('close', code => {
                     if (handle.settled) return;
                     handle.settled = true;
+                    recordInvocation({
+                        argv: args,
+                        cwd: opts.cwd,
+                        startedAt,
+                        durationMs: Date.now() - startedAt,
+                        exitCode: code,
+                        success: code === 0,
+                        stderrExcerpt:
+                            code === 0
+                                ? undefined
+                                : excerptStderr(
+                                      decodeUtf8(Buffer.concat(stderr)),
+                                  ),
+                    });
                     if (code === 0) {
                         Queue.endUnsafe(queue);
                     } else {

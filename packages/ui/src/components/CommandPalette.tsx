@@ -19,6 +19,7 @@ const PALETTE_COMMANDS: ReadonlyArray<{ id: string; label: string }> = [
     { id: 'navigate.goto', label: 'Go to commit' },
     { id: 'commands.reset', label: 'Reset to commit' },
     { id: 'commands.undoLastCommit', label: 'Undo last commit' },
+    { id: 'tools.commandLog', label: 'Git command log' },
     { id: 'commands.rebase', label: 'Interactive rebase' },
     { id: 'commands.reflog', label: 'Reflog' },
     { id: 'commands.bisect', label: 'Bisect: start' },

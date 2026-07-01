@@ -357,3 +357,23 @@ describe('GitEngine repo.init (P6-INIT)', () => {
         expect(code).toBe('fsError');
     });
 });
+
+describe('GitEngine commandLog (P6-CLOG)', () => {
+    test('records host git invocations and filters to the active repository', async () => {
+        const repo = await ws.createRepo('logged');
+        await repo.commit({ message: 'c', files: { 'a.txt': 'a\n' } });
+        const cfg = newCfg();
+        const rows = await withEngine(cfg, e =>
+            Effect.gen(function* () {
+                const h = yield* e.open(repo.dir);
+                // Any read runs host git; the invocation must appear in the log.
+                yield* e.statusGet(h.repoId, false);
+                return yield* e.commandLogList(h.repoId, 100);
+            }),
+        );
+        expect(rows.length).toBeGreaterThan(0);
+        // A recorded status read carries the argv and a working directory in the repo.
+        expect(rows.some(r => r.argv.some(a => a === 'status'))).toBe(true);
+        expect(rows.every(r => r.cwd.startsWith(ws.root))).toBe(true);
+    });
+});

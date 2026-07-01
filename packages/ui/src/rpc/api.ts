@@ -17,6 +17,7 @@ import {
     type BranchInfo,
     type BranchListing,
     type BranchSwitchStrategy,
+    type CommandLogEntry,
     type CommitCreated,
     type CommitDetail,
     type CleanPreview,
@@ -147,6 +148,15 @@ export interface CbranchApi {
     subscribe(
         repoId: RepoId,
         handlers: StreamHandlers<InvalidationEvent>,
+    ): Unsubscribe;
+    // ── Git command log (P6) ────────────────────────────────────────────────────
+    commandLogList(
+        repoId?: RepoId,
+        limit?: number,
+    ): Promise<ReadonlyArray<CommandLogEntry>>;
+    commandLogSubscribe(
+        repoId: RepoId | undefined,
+        handlers: StreamHandlers<CommandLogEntry>,
     ): Unsubscribe;
     // ── branches (P3) ─────────────────────────────────────────────────────────
     branchList(repoId: RepoId): Promise<BranchListing>;
@@ -542,6 +552,15 @@ export const makeApi = (runtime: AppRuntime): CbranchApi => {
         subscribe: (repoId, handlers) =>
             runStream(
                 streamWithClient(c => c.RepoSubscribe({ repoId })),
+                handlers,
+            ),
+        commandLogList: (repoId, limit) =>
+            runtime.runPromise(
+                withClient(c => c.CommandLogList({ repoId, limit })),
+            ),
+        commandLogSubscribe: (repoId, handlers) =>
+            runStream(
+                streamWithClient(c => c.CommandLogSubscribe({ repoId })),
                 handlers,
             ),
         // ── branches (P3) ───────────────────────────────────────────────────────

@@ -117,6 +117,9 @@ export function useMenuActions(): MenuActions {
             // Undo last commit… opens the guarded soft-reset confirmation. REQ-P6-UNDO-001.
             handlers['commands.undoLastCommit'] = () =>
                 useUiStore.getState().setUndoDialogOpen(true);
+            // Tools → Git command log opens the routed diagnostic log view. REQ-P6-CLOG-001.
+            handlers['tools.commandLog'] = () =>
+                useUiStore.getState().setActiveView('commandLog');
             // Repository → Maintenance → Compress opens the gc dialog (REQ-P5-GC-001).
             handlers['repository.maintenance.compress'] = () =>
                 useUiStore.getState().setGcDialogOpen(true);

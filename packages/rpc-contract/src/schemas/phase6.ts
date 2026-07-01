@@ -20,3 +20,26 @@ export class RepoInitResult extends Schema.Class<RepoInitResult>(
 )({
     repoId: RepoId,
 }) {}
+
+// ─── commandLog.* ──────────────────────────────────────────────────────────────
+
+/**
+ * One recorded host-`git` invocation for the Git command log (REQ-P6-CLOG-001/002).
+ * `argv` is the exact spawned argument vector (never a reconstructed shell string) with
+ * credential tokens redacted; `exitCode` is absent when the process was killed;
+ * `stderrExcerpt` is a bounded, credential-scrubbed excerpt present only on failure —
+ * there is deliberately no stdout/object-byte channel. `seq` is a monotonic id for
+ * ordering + keying. The working directory doubles as the repo association for filtering.
+ */
+export class CommandLogEntry extends Schema.Class<CommandLogEntry>(
+    'CommandLogEntry',
+)({
+    seq: Schema.Number,
+    argv: Schema.Array(Schema.String),
+    cwd: Schema.String,
+    startedAt: Schema.Number,
+    durationMs: Schema.Number,
+    exitCode: Schema.optional(Schema.Number),
+    success: Schema.Boolean,
+    stderrExcerpt: Schema.optional(Schema.String),
+}) {}

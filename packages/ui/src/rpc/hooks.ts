@@ -45,6 +45,7 @@ import {
     type RecentRepo,
     type ReflogPage,
     type RemoteInfo,
+    type CommandLogEntry,
     type RepoHandle,
     type RepoId,
     type RepoInitResult,
@@ -230,6 +231,38 @@ export const useInitRepo = () => {
             });
         },
     });
+};
+
+/**
+ * The Git command log (REQ-P6-CLOG-001/005): seed newest-first from the ring buffer, then
+ * live-tail new invocations by prepending them. `repoId` filters to one repo (undefined =
+ * all); `live` gates the subscription so the user can pause the tail.
+ */
+export const useCommandLog = (
+    repoId: RepoId | undefined,
+    live: boolean,
+): ReadonlyArray<CommandLogEntry> => {
+    const api = useApi();
+    const [entries, setEntries] = useState<ReadonlyArray<CommandLogEntry>>([]);
+
+    useEffect(() => {
+        let active = true;
+        void api.commandLogList(repoId, 500).then(rows => {
+            if (active) setEntries(rows);
+        });
+        return () => {
+            active = false;
+        };
+    }, [api, repoId]);
+
+    useEffect(() => {
+        if (!live) return;
+        return api.commandLogSubscribe(repoId, {
+            onItem: entry => setEntries(prev => [entry, ...prev].slice(0, 500)),
+        });
+    }, [api, repoId, live]);
+
+    return entries;
 };
 
 export type LogStreamStatus =

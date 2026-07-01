@@ -9,7 +9,7 @@
 // a known repo. Phase 1 is read-only, so nothing acquires the per-repo mutation lock
 // (P1-X-1); the lock registry (`makeRepoLockRegistry`) is exported infra for P2.
 
-import { basename } from 'node:path';
+import { basename, sep } from 'node:path';
 
 import {
     type GitError,
@@ -18,6 +18,7 @@ import {
 } from '@cbranch/rpc-contract';
 import {
     AppSettings,
+    CommandLogEntry,
     HistoryColumnVisibility,
     KeyBinding,
     RepoHandle,
@@ -64,6 +65,11 @@ import {
 } from '../git/conflicts';
 import { fileContentAtRev } from '../git/content';
 import { commitDiff, diffWorkingFile } from '../git/diff';
+import {
+    type CommandLogRecord,
+    listInvocations,
+    subscribeInvocations,
+} from '../git/command-log';
 import { gitError } from '../git/errors';
 import { initRepo } from '../git/init';
 import { fileHistory as fileHistoryGit } from '../git/file-history';
@@ -181,6 +187,26 @@ export interface MakeGitEngineOptions {
     /** Working directory for the one-time `git --version` probe (default `process.cwd()`). */
     readonly versionProbeCwd?: string;
 }
+
+/** Map a ring-buffer command record to its wire form (null exit → absent). */
+const toCommandLogEntry = (r: CommandLogRecord): CommandLogEntry =>
+    new CommandLogEntry({
+        seq: r.seq,
+        argv: [...r.argv],
+        cwd: r.cwd,
+        startedAt: r.startedAt,
+        durationMs: r.durationMs,
+        exitCode: r.exitCode === null ? undefined : r.exitCode,
+        success: r.success,
+        stderrExcerpt: r.stderrExcerpt,
+    });
+
+/** Whether an invocation's working directory belongs to `repo` (for repo-scoped filtering). */
+const cwdBelongsToRepo = (repo: ResolvedRepo, cwd: string): boolean =>
+    cwd === repo.root ||
+    cwd === repo.gitDir ||
+    cwd === repo.commonDir ||
+    cwd.startsWith(repo.root + sep);
 
 /** Wire app settings (host `config.json`, Record keybindings) → the {@link AppSettings} class. */
 const toAppSettings = (data: AppSettingsData): AppSettings =>
@@ -388,6 +414,59 @@ export const makeGitEngine = (
                                     ),
                                     dispose => Effect.sync(() => dispose()),
                                 ),
+                        ),
+                    ),
+                ),
+
+            // ── Git command log (P6) ───────────────────────────────────────────────
+            commandLogList: (repoId, limit) =>
+                repoId === undefined
+                    ? Effect.sync(() =>
+                          listInvocations(undefined, limit).map(
+                              toCommandLogEntry,
+                          ),
+                      )
+                    : Effect.map(resolveById(repoId), repo =>
+                          listInvocations(
+                              r => cwdBelongsToRepo(repo, r.cwd),
+                              limit,
+                          ).map(toCommandLogEntry),
+                      ),
+            commandLogSubscribe: repoId =>
+                Stream.unwrap(
+                    (repoId === undefined
+                        ? Effect.succeed(undefined)
+                        : Effect.map(resolveById(repoId), repo => repo)
+                    ).pipe(
+                        Effect.map((repo: ResolvedRepo | undefined) =>
+                            Stream.callback<CommandLogEntry, GitError>(
+                                (
+                                    queue: Queue.Queue<
+                                        CommandLogEntry,
+                                        GitError | Cause.Done
+                                    >,
+                                ) =>
+                                    Effect.acquireRelease(
+                                        Effect.sync(() =>
+                                            subscribeInvocations(record => {
+                                                if (
+                                                    repo === undefined ||
+                                                    cwdBelongsToRepo(
+                                                        repo,
+                                                        record.cwd,
+                                                    )
+                                                )
+                                                    Queue.offerUnsafe(
+                                                        queue,
+                                                        toCommandLogEntry(
+                                                            record,
+                                                        ),
+                                                    );
+                                            }),
+                                        ),
+                                        dispose => Effect.sync(() => dispose()),
+                                    ),
+                            ),
                         ),
                     ),
                 ),
