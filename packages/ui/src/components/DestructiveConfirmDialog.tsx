@@ -16,6 +16,13 @@ interface DestructiveConfirmDialogProps {
     description: string;
     confirmLabel?: string;
     onConfirm: () => void;
+    /**
+     * Optional set of affected paths, enumerated in a scrollable list beneath the
+     * description so a bulk destructive action names exactly what it will act on
+     * (REQ-P6-GUARD-001/003). A <ul> cannot live inside the description <p>, so it
+     * is rendered as a sibling block.
+     */
+    paths?: readonly string[];
 }
 
 export function DestructiveConfirmDialog({
@@ -25,6 +32,7 @@ export function DestructiveConfirmDialog({
     description,
     confirmLabel = 'Confirm',
     onConfirm,
+    paths,
 }: DestructiveConfirmDialogProps) {
     return (
         <AlertDialog open={open} onOpenChange={onOpenChange}>
@@ -35,6 +43,15 @@ export function DestructiveConfirmDialog({
                         {description}
                     </AlertDialogDescription>
                 </AlertDialogHeader>
+                {paths && paths.length > 0 && (
+                    <ul className="bg-muted/30 my-2 max-h-48 overflow-auto rounded border p-2 text-xs">
+                        {paths.map(p => (
+                            <li key={p} className="truncate font-mono">
+                                {p}
+                            </li>
+                        ))}
+                    </ul>
+                )}
                 <AlertDialogFooter>
                     <AlertDialogClose onClick={() => onOpenChange(false)}>
                         Cancel

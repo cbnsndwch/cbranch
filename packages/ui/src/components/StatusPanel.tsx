@@ -1,4 +1,5 @@
 import { type RepoId } from '@cbranch/rpc-contract';
+import { useState } from 'react';
 
 import { groupStatusEntries } from '../lib/status';
 import {
@@ -10,11 +11,50 @@ import {
 } from '../rpc/hooks';
 import { useUiStore } from '../state/store';
 import { ChangeListToolbar } from './ChangeListToolbar';
+import { DestructiveConfirmDialog } from './DestructiveConfirmDialog';
 import { StatusChangeList } from './StatusChangeList';
 import { Separator } from './ui/separator';
 
 interface StatusPanelProps {
     repoId: RepoId;
+}
+
+/** The split of a discard request into tracked (revert) and untracked (delete) paths. */
+interface DiscardRequest {
+    tracked: string[];
+    untracked: string[];
+}
+
+const plural = (n: number, one: string, many: string) => (n === 1 ? one : many);
+
+/**
+ * Human-readable, effect-naming confirmation copy for a discard request. Names the
+ * two irreversible effects separately (tracked changes are reverted; untracked files
+ * are deleted) so the user knows exactly what will be lost (REQ-P6-GUARD-001).
+ */
+function discardConfirmText(req: DiscardRequest): string {
+    const parts: string[] = [];
+    if (req.tracked.length > 0) {
+        parts.push(
+            `discard changes to ${req.tracked.length} tracked ${plural(
+                req.tracked.length,
+                'file',
+                'files',
+            )}, reverting ${plural(req.tracked.length, 'it', 'them')} to the last committed state`,
+        );
+    }
+    if (req.untracked.length > 0) {
+        parts.push(
+            `delete ${req.untracked.length} untracked ${plural(
+                req.untracked.length,
+                'file',
+                'files',
+            )} from disk`,
+        );
+    }
+    return `This will permanently ${parts.join(
+        ' and ',
+    )}. This action is irreversible and cannot be undone.`;
 }
 
 export function StatusPanel({ repoId }: StatusPanelProps) {
@@ -32,6 +72,13 @@ export function StatusPanel({ repoId }: StatusPanelProps) {
     const setStagedSelection = useUiStore(s => s.setStagedSelection);
     const setUnstagedSelection = useUiStore(s => s.setUnstagedSelection);
     const setSelectedDiffFile = useUiStore(s => s.setSelectedDiffFile);
+
+    // Pending discard/delete awaiting confirmation. The destructive mutation never runs
+    // as a side effect of any other action (REQ-P6-GUARD-002); it fires only from the
+    // dialog's confirm control, which is not the default-focused button.
+    const [pendingDiscard, setPendingDiscard] = useState<DiscardRequest | null>(
+        null,
+    );
 
     if (isLoading) {
         return (
@@ -60,6 +107,7 @@ export function StatusPanel({ repoId }: StatusPanelProps) {
         else setUnstagedSelection(unstaged.map(e => e.path));
     };
 
+    // Open the confirmation naming the exact paths; do NOT mutate here (REQ-P6-GUARD-001).
     const handleDiscard = (paths: string[]) => {
         const tracked = paths.filter(p => {
             const entry = unstaged.find(e => e.path === p);
@@ -69,9 +117,25 @@ export function StatusPanel({ repoId }: StatusPanelProps) {
             const entry = unstaged.find(e => e.path === p);
             return entry?.isUntracked;
         });
+        if (tracked.length === 0 && untracked.length === 0) return;
+        setPendingDiscard({ tracked, untracked });
+    };
+
+    // Only reached from the confirm control of the destructive dialog.
+    const confirmDiscard = () => {
+        if (pendingDiscard === null) return;
+        const { tracked, untracked } = pendingDiscard;
         if (tracked.length > 0) discardFiles.mutate({ paths: tracked });
         if (untracked.length > 0) deleteUntracked.mutate({ paths: untracked });
+        // Drop only the just-discarded paths from the selection; leave the rest intact.
+        const acted = new Set([...tracked, ...untracked]);
+        setUnstagedSelection([...unstagedSelection].filter(p => !acted.has(p)));
+        setPendingDiscard(null);
     };
+
+    const selectedUnstaged = [...unstagedSelection].filter(p =>
+        unstaged.some(e => e.path === p),
+    );
 
     return (
         <div className="flex h-full flex-col overflow-hidden">
@@ -139,6 +203,15 @@ export function StatusPanel({ repoId }: StatusPanelProps) {
                         label: 'Clean…',
                         onClick: () => setCleanDialogOpen(true),
                     }}
+                    destructiveAction={
+                        selectedUnstaged.length > 0
+                            ? {
+                                  label: `Discard ${selectedUnstaged.length}`,
+                                  onClick: () =>
+                                      handleDiscard(selectedUnstaged),
+                              }
+                            : undefined
+                    }
                 />
                 <div className="min-h-0 overflow-y-auto">
                     <StatusChangeList
@@ -163,6 +236,34 @@ export function StatusPanel({ repoId }: StatusPanelProps) {
                     </p>
                 </div>
             )}
+
+            <DestructiveConfirmDialog
+                open={pendingDiscard !== null}
+                onOpenChange={open => {
+                    if (!open) setPendingDiscard(null);
+                }}
+                title={
+                    pendingDiscard !== null &&
+                    pendingDiscard.tracked.length === 0
+                        ? 'Delete untracked files?'
+                        : 'Discard working-tree changes?'
+                }
+                description={
+                    pendingDiscard !== null
+                        ? discardConfirmText(pendingDiscard)
+                        : ''
+                }
+                paths={
+                    pendingDiscard !== null
+                        ? [
+                              ...pendingDiscard.tracked,
+                              ...pendingDiscard.untracked,
+                          ]
+                        : undefined
+                }
+                confirmLabel="Discard"
+                onConfirm={confirmDiscard}
+            />
         </div>
     );
 }

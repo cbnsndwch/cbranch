@@ -169,6 +169,123 @@ describe('StatusPanel', () => {
         );
     });
 
+    test('per-file Discard opens confirmation and does not mutate until confirmed', async () => {
+        const entry = makeEntry({
+            path: 'tracked.ts',
+            staged: 'unmodified',
+            unstaged: 'modified',
+        });
+        const status = new WorkingTreeStatus({
+            entries: [entry],
+            hasConflicts: false,
+        });
+        const discardFn = vi.fn(async () => undefined);
+        renderPanel(
+            makeFakeApi({
+                statusGet: vi.fn(async () => status),
+                discardFiles: discardFn,
+            }),
+        );
+
+        // The row's Discard button is revealed on hover but present in the DOM.
+        const discardBtn = await screen.findByRole('button', {
+            name: 'Discard',
+        });
+        fireEvent.click(discardBtn);
+
+        // Confirmation names the exact path and states irreversibility; nothing ran yet.
+        expect(
+            await screen.findByText('Discard working-tree changes?'),
+        ).toBeTruthy();
+        // Path appears both in the row and enumerated in the dialog.
+        expect(screen.getAllByText('tracked.ts').length).toBeGreaterThan(1);
+        expect(screen.getByText(/irreversible/)).toBeTruthy();
+        expect(discardFn).not.toHaveBeenCalled();
+
+        // The confirm control (labeled "Discard") in the dialog fires the mutation.
+        const confirmBtns = screen.getAllByRole('button', { name: 'Discard' });
+        fireEvent.click(confirmBtns[confirmBtns.length - 1]);
+        await waitFor(() =>
+            expect(discardFn).toHaveBeenCalledWith(repoId, ['tracked.ts']),
+        );
+    });
+
+    test('cancelling the discard confirmation leaves the working tree untouched', async () => {
+        const entry = makeEntry({
+            path: 'new.ts',
+            staged: 'unmodified',
+            unstaged: 'unmodified',
+            isUntracked: true,
+        });
+        const status = new WorkingTreeStatus({
+            entries: [entry],
+            hasConflicts: false,
+        });
+        const deleteFn = vi.fn(async () => undefined);
+        renderPanel(
+            makeFakeApi({
+                statusGet: vi.fn(async () => status),
+                deleteUntracked: deleteFn,
+            }),
+        );
+
+        const deleteBtn = await screen.findByRole('button', { name: 'Delete' });
+        fireEvent.click(deleteBtn);
+        expect(await screen.findByText('Delete untracked files?')).toBeTruthy();
+        fireEvent.click(screen.getByText('Cancel'));
+        await waitFor(() =>
+            expect(screen.queryByText('Delete untracked files?')).toBeNull(),
+        );
+        expect(deleteFn).not.toHaveBeenCalled();
+    });
+
+    test('bulk Discard over a multi-selection uses one confirmation naming every path', async () => {
+        const a = makeEntry({
+            path: 'a.ts',
+            staged: 'unmodified',
+            unstaged: 'modified',
+        });
+        const b = makeEntry({
+            path: 'b.ts',
+            staged: 'unmodified',
+            unstaged: 'modified',
+        });
+        const status = new WorkingTreeStatus({
+            entries: [a, b],
+            hasConflicts: false,
+        });
+        const discardFn = vi.fn(async () => undefined);
+        renderPanel(
+            makeFakeApi({
+                statusGet: vi.fn(async () => status),
+                discardFiles: discardFn,
+            }),
+        );
+
+        await screen.findByText('Unstaged Changes');
+        useUiStore.setState({ unstagedSelection: new Set(['a.ts', 'b.ts']) });
+
+        const bulkBtn = await screen.findByRole('button', {
+            name: 'Discard 2',
+        });
+        fireEvent.click(bulkBtn);
+
+        // A single confirmation enumerates both paths.
+        expect(
+            await screen.findByText('Discard working-tree changes?'),
+        ).toBeTruthy();
+        const dialog = screen.getByText('Discard working-tree changes?')
+            .parentElement!.parentElement!;
+        expect(dialog.textContent).toContain('a.ts');
+        expect(dialog.textContent).toContain('b.ts');
+
+        const confirmBtns = screen.getAllByRole('button', { name: 'Discard' });
+        fireEvent.click(confirmBtns[confirmBtns.length - 1]);
+        await waitFor(() =>
+            expect(discardFn).toHaveBeenCalledWith(repoId, ['a.ts', 'b.ts']),
+        );
+    });
+
     test('clicking a file row sets selectedDiffFile in the store', async () => {
         const entry = makeEntry({
             path: 'changed.ts',

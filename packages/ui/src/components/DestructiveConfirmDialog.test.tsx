@@ -68,6 +68,21 @@ describe('DestructiveConfirmDialog', () => {
         expect(onOpenChange).toHaveBeenCalledWith(false);
     });
 
+    test('enumerates affected paths when provided', () => {
+        render(
+            <DestructiveConfirmDialog
+                open={true}
+                onOpenChange={vi.fn()}
+                title="Discard changes"
+                description="Irreversible."
+                paths={['a.ts', 'nested/b.ts']}
+                onConfirm={vi.fn()}
+            />,
+        );
+        expect(screen.getByText('a.ts')).toBeTruthy();
+        expect(screen.getByText('nested/b.ts')).toBeTruthy();
+    });
+
     test('custom confirmLabel renders on confirm button', () => {
         render(
             <DestructiveConfirmDialog
