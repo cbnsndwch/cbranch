@@ -1,37 +1,37 @@
 {
-  "name": "cbranch",
-  "version": "0.0.0",
-  "private": true,
-  "description": "A cross-platform, browser-based Git GUI",
-  "license": "MIT",
-  "type": "module",
-  "scripts": {
-    "lint": "oxlint",
-    "format": "oxfmt",
-    "format:check": "oxfmt --check",
-    "typecheck": "tsc -b tsconfig.json && pnpm --filter @cbranch/ui typecheck && pnpm --filter @cbranch/rpc-contract typecheck:test && pnpm --filter @cbranch/core typecheck:test",
-    "build": "pnpm -r build",
-    "dev": "pnpm build:libs && concurrently \"pnpm --filter @cbranch/web-server dev\" \"pnpm --filter @cbranch/ui dev\"",
-    "build:libs": "pnpm --filter @cbranch/core build && pnpm --filter @cbranch/rpc-contract build",
-    "test": "vitest run",
-    "coverage": "vitest run --coverage --config vitest.coverage.config.ts",
-    "license-audit": "node scripts/license-audit.mjs",
-    "depcheck": "node scripts/check-deps.mjs",
-    "check:primitives": "pnpm --filter @cbranch/ui check:primitives",
-    "gate": "pnpm license-audit && pnpm lint && pnpm format:check && pnpm typecheck && pnpm build && pnpm test && pnpm coverage && pnpm depcheck"
-  },
-  "devDependencies": {
-    "@types/node": "^26.0.1",
-    "@vitest/coverage-v8": "^4.1.9",
-    "concurrently": "^10.0.3",
-    "oxfmt": "0.57.0",
-    "oxlint": "1.72.0",
-    "typescript": "^6.0.3",
-    "vitest": "^4.1.9"
-  },
-  "engines": {
-    "node": ">=20",
-    "pnpm": ">=9"
-  },
-  "packageManager": "pnpm@11.9.0"
+    "name": "cbranch",
+    "version": "0.0.0",
+    "private": true,
+    "description": "A cross-platform, browser-based Git GUI",
+    "license": "MIT",
+    "type": "module",
+    "scripts": {
+        "lint": "oxlint",
+        "format": "oxfmt",
+        "format:check": "oxfmt --check",
+        "typecheck": "tsc -b tsconfig.json && pnpm --filter @cbranch/ui typecheck && pnpm --filter @cbranch/rpc-contract typecheck:test && pnpm --filter @cbranch/core typecheck:test",
+        "build": "pnpm -r build",
+        "dev": "pnpm build:libs && concurrently \"pnpm --filter @cbranch/web-server dev\" \"pnpm --filter @cbranch/ui dev\"",
+        "build:libs": "pnpm --filter @cbranch/core build && pnpm --filter @cbranch/rpc-contract build",
+        "test": "vitest run",
+        "coverage": "vitest run --coverage --config vitest.coverage.config.ts",
+        "license-audit": "node scripts/license-audit.mjs",
+        "depcheck": "node scripts/check-deps.mjs",
+        "check:primitives": "pnpm --filter @cbranch/ui check:primitives",
+        "gate": "pnpm license-audit && pnpm lint && pnpm format:check && pnpm typecheck && pnpm build && pnpm test && pnpm coverage && pnpm depcheck"
+    },
+    "devDependencies": {
+        "@types/node": "^26.0.1",
+        "@vitest/coverage-v8": "^4.1.9",
+        "concurrently": "^10.0.3",
+        "oxfmt": "0.57.0",
+        "oxlint": "1.72.0",
+        "typescript": "^6.0.3",
+        "vitest": "^4.1.9"
+    },
+    "engines": {
+        "node": ">=20",
+        "pnpm": ">=9"
+    },
+    "packageManager": "pnpm@11.9.0"
 }

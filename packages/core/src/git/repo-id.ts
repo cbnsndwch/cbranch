@@ -5,12 +5,12 @@
 // dir makes sibling worktrees of one repository collapse to a SINGLE `repoId` (and
 // therefore one mutation lock and one set of synced collections).
 
-import { createHash } from "node:crypto";
-import { realpathSync } from "node:fs";
-import { isAbsolute, resolve } from "node:path";
+import { createHash } from 'node:crypto';
+import { realpathSync } from 'node:fs';
+import { isAbsolute, resolve } from 'node:path';
 
-import { type RepoId } from "@cbranch/rpc-contract";
-import { RepoId as RepoIdBrand } from "@cbranch/rpc-contract";
+import { type RepoId } from '@cbranch/rpc-contract';
+import { RepoId as RepoIdBrand } from '@cbranch/rpc-contract';
 
 /**
  * Resolve a possibly-relative path to an absolute, canonical, normalized form. Uses
@@ -18,22 +18,22 @@ import { RepoId as RepoIdBrand } from "@cbranch/rpc-contract";
  * paths to one git dir hash identically); falls back to `resolve` otherwise.
  */
 export const normalizeAbsolute = (base: string, p: string): string => {
-  const absolute = isAbsolute(p) ? p : resolve(base, p);
-  try {
-    return realpathSync.native(absolute);
-  } catch {
-    return resolve(absolute);
-  }
+    const absolute = isAbsolute(p) ? p : resolve(base, p);
+    try {
+        return realpathSync.native(absolute);
+    } catch {
+        return resolve(absolute);
+    }
 };
 
 /** Compute the branded {@link RepoId} from a normalized absolute common-dir path. */
 export const computeRepoId = (normalizedCommonDir: string): RepoId =>
-  RepoIdBrand.make(
-    createHash("sha256")
-      .update(Buffer.from(normalizedCommonDir, "utf8"))
-      .digest("hex"),
-  );
+    RepoIdBrand.make(
+        createHash('sha256')
+            .update(Buffer.from(normalizedCommonDir, 'utf8'))
+            .digest('hex'),
+    );
 
 /** A repoId is a 64-char lowercase SHA-256 hex string. */
 export const isRepoId = (value: string): boolean =>
-  /^[0-9a-f]{64}$/.test(value);
+    /^[0-9a-f]{64}$/.test(value);

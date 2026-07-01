@@ -4,12 +4,12 @@
 // RpcGroup to webview.postMessage and reuses @cbranch/core in the extension host.
 // It MUST NOT open any network socket (REQ-ARCH-074).
 
-import type { RpcContractPlaceholder } from "@cbranch/rpc-contract";
+import type { RpcContractPlaceholder } from '@cbranch/rpc-contract';
 
-export const version = "0.0.0" as const;
+export const version = '0.0.0' as const;
 
 /** Placeholder extension entry; realized in the VSCode track. */
 export type VscodeExtPlaceholder = {
-  readonly version: typeof version;
-  readonly contract: RpcContractPlaceholder["version"];
+    readonly version: typeof version;
+    readonly contract: RpcContractPlaceholder['version'];
 };

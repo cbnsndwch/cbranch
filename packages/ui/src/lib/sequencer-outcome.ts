@@ -7,18 +7,18 @@
 // route into the Conflicts view, or open the empty-result prompt — so the mapping is
 // unit-testable in isolation from React (the components own the toast/navigation effects).
 
-import { type Oid, type SequencerResult } from "@cbranch/rpc-contract";
+import { type Oid, type SequencerResult } from '@cbranch/rpc-contract';
 
 export type SequencerAction =
-  | { readonly kind: "success"; readonly message: string }
-  | { readonly kind: "conflicts"; readonly message: string }
-  | {
-      readonly kind: "empty";
-      readonly currentOid?: Oid;
-      readonly currentSubject?: string;
-    };
+    | { readonly kind: 'success'; readonly message: string }
+    | { readonly kind: 'conflicts'; readonly message: string }
+    | {
+          readonly kind: 'empty';
+          readonly currentOid?: Oid;
+          readonly currentSubject?: string;
+      };
 
-const plural = (n: number): string => (n === 1 ? "" : "s");
+const plural = (n: number): string => (n === 1 ? '' : 's');
 
 /**
  * Translate a {@link SequencerResult} into the next UI step. `opLabel` is the
@@ -26,35 +26,35 @@ const plural = (n: number): string => (n === 1 ? "" : "s");
  * since the underlying operation is unchanged.
  */
 export function planSequencerAction(
-  result: SequencerResult,
-  opLabel: string,
+    result: SequencerResult,
+    opLabel: string,
 ): SequencerAction {
-  switch (result.outcome) {
-    case "completed":
-      return {
-        kind: "success",
-        message:
-          result.committed > 0
-            ? `${opLabel} complete — ${result.committed} commit${plural(
-                result.committed,
-              )}.`
-            : `${opLabel} complete.`,
-      };
-    case "staged":
-      return {
-        kind: "success",
-        message: `${opLabel} staged — commit it when you are ready.`,
-      };
-    case "conflicts":
-      return {
-        kind: "conflicts",
-        message: `${opLabel} stopped on a conflict — resolve it in the Conflicts view.`,
-      };
-    case "empty":
-      return {
-        kind: "empty",
-        currentOid: result.currentOid,
-        currentSubject: result.currentSubject,
-      };
-  }
+    switch (result.outcome) {
+        case 'completed':
+            return {
+                kind: 'success',
+                message:
+                    result.committed > 0
+                        ? `${opLabel} complete — ${result.committed} commit${plural(
+                              result.committed,
+                          )}.`
+                        : `${opLabel} complete.`,
+            };
+        case 'staged':
+            return {
+                kind: 'success',
+                message: `${opLabel} staged — commit it when you are ready.`,
+            };
+        case 'conflicts':
+            return {
+                kind: 'conflicts',
+                message: `${opLabel} stopped on a conflict — resolve it in the Conflicts view.`,
+            };
+        case 'empty':
+            return {
+                kind: 'empty',
+                currentOid: result.currentOid,
+                currentSubject: result.currentSubject,
+            };
+    }
 }

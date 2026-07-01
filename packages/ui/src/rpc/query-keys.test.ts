@@ -1,101 +1,98 @@
-import { DiffSpec, LogQuery, Oid, RepoId } from "@cbranch/rpc-contract";
-import { describe, expect, test } from "vitest";
+import { DiffSpec, LogQuery, Oid, RepoId } from '@cbranch/rpc-contract';
+import { describe, expect, test } from 'vitest';
 
-import { domainKey, queryKeys, repoScopeKey } from "./query-keys";
+import { domainKey, queryKeys, repoScopeKey } from './query-keys';
 
-const repoId = RepoId.make("repo-1");
+const repoId = RepoId.make('repo-1');
 
-describe("query keys (D9 / spec 15 §2)", () => {
-  test("repoScopeKey is the [repoId] reconnect resnapshot target", () => {
-    expect(repoScopeKey(repoId)).toEqual([repoId]);
-  });
-
-  test("domainKey maps a changed domain to [repoId, domain]", () => {
-    expect(domainKey(repoId, "commits")).toEqual([repoId, "commits"]);
-    expect(domainKey(repoId, "inProgress")).toEqual([repoId, "inProgress"]);
-  });
-
-  test("repoState sits under the inProgress domain so repo.state invalidates with it", () => {
-    expect(queryKeys.repoState(repoId)[1]).toBe("inProgress");
-  });
-
-  test("log key is under the commits domain and carries the query", () => {
-    const query = new LogQuery({ repoId, limit: 500 });
-    const key = queryKeys.log(query);
-    expect(key[1]).toBe("commits");
-    expect(key[3]).toBe(query);
-  });
-
-  test("commit detail/diff and blobs are content-addressed (non-domain, never invalidated)", () => {
-    const oid = Oid.make("abc123");
-    expect(queryKeys.commitDetail(repoId, oid)).toEqual([
-      repoId,
-      "commit",
-      oid,
-      "detail",
-    ]);
-    const spec = new DiffSpec({
-      repoId,
-      target: "abc123",
-      cached: false,
-      whitespace: "show",
-      context: 3,
-      renames: true,
-      combined: false,
+describe('query keys (D9 / spec 15 §2)', () => {
+    test('repoScopeKey is the [repoId] reconnect resnapshot target', () => {
+        expect(repoScopeKey(repoId)).toEqual([repoId]);
     });
-    expect(queryKeys.commitDiff(spec)).toEqual([
-      repoId,
-      "commit",
-      "abc123",
-      "diff",
-      {
-        base: "^1",
-        whitespace: "show",
-        context: 3,
-        combined: false,
-        paths: undefined,
-      },
-    ]);
-    expect(queryKeys.fileContentAtRev(repoId, "abc123", "src/a.ts")).toEqual([
-      repoId,
-      "blob",
-      "abc123",
-      "src/a.ts",
-    ]);
-  });
 
-  test("a path-scoped diff keys distinctly from the whole-commit diff (REQ-FH-003)", () => {
-    const base = {
-      repoId,
-      target: "abc123",
-      cached: false,
-      whitespace: "show",
-      context: 3,
-      renames: true,
-      combined: false,
-    } as const;
-    const whole = queryKeys.commitDiff(new DiffSpec(base));
-    const scoped = queryKeys.commitDiff(
-      new DiffSpec({ ...base, paths: ["src/a.ts"] }),
-    );
-    expect(scoped).not.toEqual(whole);
-    expect(scoped[4]).toMatchObject({ paths: ["src/a.ts"] });
-  });
+    test('domainKey maps a changed domain to [repoId, domain]', () => {
+        expect(domainKey(repoId, 'commits')).toEqual([repoId, 'commits']);
+        expect(domainKey(repoId, 'inProgress')).toEqual([repoId, 'inProgress']);
+    });
 
-  test("fileHistory: tip under commits domain, startRev-pinned is content-addressed (REQ-FH-004)", () => {
-    // Tip case tracks the branch head → invalidatable `commits` domain.
-    expect(queryKeys.fileHistory(repoId, "src/a.ts")).toEqual([
-      repoId,
-      "commits",
-      "fileHistory",
-      "src/a.ts",
-    ]);
-    // Pinned to a concrete rev → immutable, non-domain prefix (never invalidated, like blame).
-    expect(queryKeys.fileHistory(repoId, "src/a.ts", "abc123")).toEqual([
-      repoId,
-      "fileHistory",
-      "src/a.ts",
-      "abc123",
-    ]);
-  });
+    test('repoState sits under the inProgress domain so repo.state invalidates with it', () => {
+        expect(queryKeys.repoState(repoId)[1]).toBe('inProgress');
+    });
+
+    test('log key is under the commits domain and carries the query', () => {
+        const query = new LogQuery({ repoId, limit: 500 });
+        const key = queryKeys.log(query);
+        expect(key[1]).toBe('commits');
+        expect(key[3]).toBe(query);
+    });
+
+    test('commit detail/diff and blobs are content-addressed (non-domain, never invalidated)', () => {
+        const oid = Oid.make('abc123');
+        expect(queryKeys.commitDetail(repoId, oid)).toEqual([
+            repoId,
+            'commit',
+            oid,
+            'detail',
+        ]);
+        const spec = new DiffSpec({
+            repoId,
+            target: 'abc123',
+            cached: false,
+            whitespace: 'show',
+            context: 3,
+            renames: true,
+            combined: false,
+        });
+        expect(queryKeys.commitDiff(spec)).toEqual([
+            repoId,
+            'commit',
+            'abc123',
+            'diff',
+            {
+                base: '^1',
+                whitespace: 'show',
+                context: 3,
+                combined: false,
+                paths: undefined,
+            },
+        ]);
+        expect(
+            queryKeys.fileContentAtRev(repoId, 'abc123', 'src/a.ts'),
+        ).toEqual([repoId, 'blob', 'abc123', 'src/a.ts']);
+    });
+
+    test('a path-scoped diff keys distinctly from the whole-commit diff (REQ-FH-003)', () => {
+        const base = {
+            repoId,
+            target: 'abc123',
+            cached: false,
+            whitespace: 'show',
+            context: 3,
+            renames: true,
+            combined: false,
+        } as const;
+        const whole = queryKeys.commitDiff(new DiffSpec(base));
+        const scoped = queryKeys.commitDiff(
+            new DiffSpec({ ...base, paths: ['src/a.ts'] }),
+        );
+        expect(scoped).not.toEqual(whole);
+        expect(scoped[4]).toMatchObject({ paths: ['src/a.ts'] });
+    });
+
+    test('fileHistory: tip under commits domain, startRev-pinned is content-addressed (REQ-FH-004)', () => {
+        // Tip case tracks the branch head → invalidatable `commits` domain.
+        expect(queryKeys.fileHistory(repoId, 'src/a.ts')).toEqual([
+            repoId,
+            'commits',
+            'fileHistory',
+            'src/a.ts',
+        ]);
+        // Pinned to a concrete rev → immutable, non-domain prefix (never invalidated, like blame).
+        expect(queryKeys.fileHistory(repoId, 'src/a.ts', 'abc123')).toEqual([
+            repoId,
+            'fileHistory',
+            'src/a.ts',
+            'abc123',
+        ]);
+    });
 });

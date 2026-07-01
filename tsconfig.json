@@ -1,10 +1,10 @@
 {
-  "_comment": "Root solution file. `tsc -b` walks these references in dependency order. packages/ui is an app (non-composite, Vite-built) and is typechecked via its own `pnpm --filter @cbranch/ui typecheck`, so it is intentionally not referenced here.",
-  "files": [],
-  "references": [
-    { "path": "packages/rpc-contract" },
-    { "path": "packages/core" },
-    { "path": "apps/web-server" },
-    { "path": "apps/vscode-ext" }
-  ]
+    "_comment": "Root solution file. `tsc -b` walks these references in dependency order. packages/ui is an app (non-composite, Vite-built) and is typechecked via its own `pnpm --filter @cbranch/ui typecheck`, so it is intentionally not referenced here.",
+    "files": [],
+    "references": [
+        { "path": "packages/rpc-contract" },
+        { "path": "packages/core" },
+        { "path": "apps/web-server" },
+        { "path": "apps/vscode-ext" }
+    ]
 }

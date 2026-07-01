@@ -5,25 +5,25 @@
 // `useLayoutEffect` runs before paint so the store is consistent with the URL on the first
 // frame of a deep-link load — no flash of the empty/previous state.
 
-import { type Oid, type RepoId } from "@cbranch/rpc-contract";
-import { useLayoutEffect } from "react";
-import { useParams } from "react-router";
+import { type Oid, type RepoId } from '@cbranch/rpc-contract';
+import { useLayoutEffect } from 'react';
+import { useParams } from 'react-router';
 
-import { useUiStore } from "./store";
+import { useUiStore } from './store';
 
 export function SyncRouteToStore() {
-  const { repoId, oid } = useParams<{ repoId?: string; oid?: string }>();
-  const activeRepoId = useUiStore((s) => s.activeRepoId);
+    const { repoId, oid } = useParams<{ repoId?: string; oid?: string }>();
+    const activeRepoId = useUiStore(s => s.activeRepoId);
 
-  // Repo changes reset selection + filters (P1-OPEN-4), so only fire when it actually changes.
-  useLayoutEffect(() => {
-    const next: RepoId | null = repoId ? (repoId as RepoId) : null;
-    if (next !== activeRepoId) useUiStore.getState().setActiveRepoId(next);
-  }, [repoId, activeRepoId]);
+    // Repo changes reset selection + filters (P1-OPEN-4), so only fire when it actually changes.
+    useLayoutEffect(() => {
+        const next: RepoId | null = repoId ? (repoId as RepoId) : null;
+        if (next !== activeRepoId) useUiStore.getState().setActiveRepoId(next);
+    }, [repoId, activeRepoId]);
 
-  useLayoutEffect(() => {
-    useUiStore.getState().setSelectedOid(oid ? (oid as Oid) : null);
-  }, [oid]);
+    useLayoutEffect(() => {
+        useUiStore.getState().setSelectedOid(oid ? (oid as Oid) : null);
+    }, [oid]);
 
-  return null;
+    return null;
 }

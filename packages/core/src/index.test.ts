@@ -1,7 +1,7 @@
-import { expect, test } from "vitest";
+import { expect, test } from 'vitest';
 
-import { version } from "./index";
+import { version } from './index';
 
-test("core exposes a version", () => {
-  expect(version).toBe("0.0.0");
+test('core exposes a version', () => {
+    expect(version).toBe('0.0.0');
 });

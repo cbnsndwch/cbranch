@@ -21,12 +21,12 @@ allowBuilds:
 minimumReleaseAgeExclude:
   # Effect ecosystem — we follow effect v4 beta releases closely.
   - effect
-  - "@effect/*"
+  - '@effect/*'
   # TEMPORARY (added 2026-07-01): unblock this dep sweep's just-published bumps;
   # safe to remove once they are >24h old.
   - vite
-  - "@tanstack/react-virtual"
-  - "@tanstack/virtual-core"
+  - '@tanstack/react-virtual'
+  - '@tanstack/virtual-core'
 
 patchedDependencies:
   react-router-devtools@6.2.1: patches/react-router-devtools@6.2.1.patch

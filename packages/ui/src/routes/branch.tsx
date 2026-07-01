@@ -1,5 +1,5 @@
-import { PlaceholderPage } from "../components/PlaceholderPage";
+import { PlaceholderPage } from '../components/PlaceholderPage';
 
 export default function Branch() {
-  return <PlaceholderPage title="Branch history" />;
+    return <PlaceholderPage title="Branch history" />;
 }

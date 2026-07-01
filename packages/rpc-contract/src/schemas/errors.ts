@@ -6,7 +6,7 @@
 // the same `GitError` on their per-item error channel (the top-level error becomes
 // `Never` under `stream: true`, per 14 §4).
 
-import { Schema } from "effect";
+import { Schema } from 'effect';
 
 /**
  * The closed set of failure codes carried by {@link GitError.code} (14 §4, VERBATIM).
@@ -14,32 +14,32 @@ import { Schema } from "effect";
  * 23 string literals are reproduced verbatim and must not drift.
  */
 export const GitErrorCode = Schema.Literals([
-  // process / environment
-  "hostGitMissing",
-  "hostGitTooOld",
-  "gitFailed",
-  "fsError",
-  "permissionDenied",
-  "repoUnavailable",
-  // concurrency / lifecycle
-  "repoLocked",
-  "lockTimeout",
-  "cancelled",
-  // domain
-  "repoNotFound",
-  "notARepository",
-  "dirtyWorkingTree",
-  "nonFastForward",
-  "mergeConflict",
-  "hookRejected",
-  "authRequired",
-  "authFailed",
-  "networkError",
-  "refExists",
-  "invalidRefName",
-  "emptyOrAlreadyApplied",
-  "detachedHead",
-  "unsupportedRepoShape",
+    // process / environment
+    'hostGitMissing',
+    'hostGitTooOld',
+    'gitFailed',
+    'fsError',
+    'permissionDenied',
+    'repoUnavailable',
+    // concurrency / lifecycle
+    'repoLocked',
+    'lockTimeout',
+    'cancelled',
+    // domain
+    'repoNotFound',
+    'notARepository',
+    'dirtyWorkingTree',
+    'nonFastForward',
+    'mergeConflict',
+    'hookRejected',
+    'authRequired',
+    'authFailed',
+    'networkError',
+    'refExists',
+    'invalidRefName',
+    'emptyOrAlreadyApplied',
+    'detachedHead',
+    'unsupportedRepoShape',
 ]);
 export type GitErrorCode = typeof GitErrorCode.Type;
 
@@ -55,8 +55,8 @@ export type GitErrorCode = typeof GitErrorCode.Type;
  * still uses this single class; the narrowing is documented at the method, not
  * modeled as a second error type (DECISIONS D7).
  */
-export class GitError extends Schema.TaggedErrorClass<GitError>()("GitError", {
-  code: GitErrorCode,
-  message: Schema.String,
-  detail: Schema.optional(Schema.Unknown),
+export class GitError extends Schema.TaggedErrorClass<GitError>()('GitError', {
+    code: GitErrorCode,
+    message: Schema.String,
+    detail: Schema.optional(Schema.Unknown),
 }) {}

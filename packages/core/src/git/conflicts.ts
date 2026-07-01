@@ -8,26 +8,26 @@
 // in-progress operation kind is detected by the caller (git-dir markers) and passed
 // in, keeping this module free of a `repo/` import.
 
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 import {
-  type ConflictClassification,
-  ConflictFile,
-  ConflictListing,
-  ConflictSides,
-  ConflictStage,
-  type GitError,
-  type OperationKind,
-  OperationProgress,
-} from "@cbranch/rpc-contract";
-import { Effect } from "effect";
+    type ConflictClassification,
+    ConflictFile,
+    ConflictListing,
+    ConflictSides,
+    ConflictStage,
+    type GitError,
+    type OperationKind,
+    OperationProgress,
+} from '@cbranch/rpc-contract';
+import { Effect } from 'effect';
 
-import { type CatFilePool } from "./cat-file-pool";
-import { gitError } from "./errors";
-import { decodeUtf8, runGitOk } from "./run-git";
+import { type CatFilePool } from './cat-file-pool';
+import { gitError } from './errors';
+import { decodeUtf8, runGitOk } from './run-git';
 
-const GITLINK_MODE = "160000";
+const GITLINK_MODE = '160000';
 // Sniff window: a NUL within the first chunk of a blob marks it binary (matches
 // git's own "is this a binary file" heuristic closely enough for the editor gate).
 const BINARY_SNIFF_BYTES = 8000;
@@ -37,13 +37,13 @@ const MAX_EDITABLE_BYTES = 5 * 1024 * 1024;
 
 /** Per-path unmerged stages parsed from `git ls-files -u -z`. */
 interface UnmergedStage {
-  readonly mode: string;
-  readonly oid: string;
+    readonly mode: string;
+    readonly oid: string;
 }
 interface UnmergedEntry {
-  base?: UnmergedStage;
-  ours?: UnmergedStage;
-  theirs?: UnmergedStage;
+    base?: UnmergedStage;
+    ours?: UnmergedStage;
+    theirs?: UnmergedStage;
 }
 
 /**
@@ -52,53 +52,53 @@ interface UnmergedEntry {
  * first-seen path order so the conflict list is stable.
  */
 export const parseLsFilesUnmerged = (
-  buf: Buffer,
+    buf: Buffer,
 ): Map<string, UnmergedEntry> => {
-  const out = new Map<string, UnmergedEntry>();
-  for (const record of decodeUtf8(buf).split("\0")) {
-    if (record.length === 0) continue;
-    const tab = record.indexOf("\t");
-    if (tab === -1) continue;
-    const meta = record.slice(0, tab).split(" ");
-    const path = record.slice(tab + 1);
-    const mode = meta[0];
-    const oid = meta[1];
-    const stage = meta[2];
-    if (mode === undefined || oid === undefined || stage === undefined)
-      continue;
-    const entry = out.get(path) ?? {};
-    if (stage === "1") entry.base = { mode, oid };
-    else if (stage === "2") entry.ours = { mode, oid };
-    else if (stage === "3") entry.theirs = { mode, oid };
-    out.set(path, entry);
-  }
-  return out;
+    const out = new Map<string, UnmergedEntry>();
+    for (const record of decodeUtf8(buf).split('\0')) {
+        if (record.length === 0) continue;
+        const tab = record.indexOf('\t');
+        if (tab === -1) continue;
+        const meta = record.slice(0, tab).split(' ');
+        const path = record.slice(tab + 1);
+        const mode = meta[0];
+        const oid = meta[1];
+        const stage = meta[2];
+        if (mode === undefined || oid === undefined || stage === undefined)
+            continue;
+        const entry = out.get(path) ?? {};
+        if (stage === '1') entry.base = { mode, oid };
+        else if (stage === '2') entry.ours = { mode, oid };
+        else if (stage === '3') entry.theirs = { mode, oid };
+        out.set(path, entry);
+    }
+    return out;
 };
 
 /** Derive the conflict class from which stages are present (REQ-CN-002). */
 export const classifyConflict = (
-  hasBase: boolean,
-  hasOurs: boolean,
-  hasTheirs: boolean,
+    hasBase: boolean,
+    hasOurs: boolean,
+    hasTheirs: boolean,
 ): ConflictClassification => {
-  if (hasBase && hasOurs && hasTheirs) return "bothModified";
-  if (!hasBase && hasOurs && hasTheirs) return "bothAdded";
-  if (hasBase && !hasOurs && !hasTheirs) return "bothDeleted";
-  if (!hasBase && hasOurs && !hasTheirs) return "addedByUs";
-  if (!hasBase && !hasOurs && hasTheirs) return "addedByThem";
-  if (hasBase && hasOurs && !hasTheirs) return "deletedByThem";
-  // hasBase && !hasOurs && hasTheirs
-  return "deletedByUs";
+    if (hasBase && hasOurs && hasTheirs) return 'bothModified';
+    if (!hasBase && hasOurs && hasTheirs) return 'bothAdded';
+    if (hasBase && !hasOurs && !hasTheirs) return 'bothDeleted';
+    if (!hasBase && hasOurs && !hasTheirs) return 'addedByUs';
+    if (!hasBase && !hasOurs && hasTheirs) return 'addedByThem';
+    if (hasBase && hasOurs && !hasTheirs) return 'deletedByThem';
+    // hasBase && !hasOurs && hasTheirs
+    return 'deletedByUs';
 };
 
 /** Read a small integer from a git-dir state file, or `undefined`. */
 const readNum = (...segments: string[]): number | undefined => {
-  try {
-    const n = parseInt(readFileSync(join(...segments), "utf8").trim(), 10);
-    return Number.isFinite(n) ? n : undefined;
-  } catch {
-    return undefined;
-  }
+    try {
+        const n = parseInt(readFileSync(join(...segments), 'utf8').trim(), 10);
+        return Number.isFinite(n) ? n : undefined;
+    } catch {
+        return undefined;
+    }
 };
 
 /**
@@ -107,131 +107,135 @@ const readNum = (...segments: string[]): number | undefined => {
  * deferred to S5 (no single "done" counter exists post-hoc).
  */
 const readProgress = (
-  gitDir: string,
-  operation: OperationKind,
+    gitDir: string,
+    operation: OperationKind,
 ): OperationProgress | undefined => {
-  if (operation !== "rebase") return undefined;
-  const current = readNum(gitDir, "rebase-merge", "msgnum");
-  const total = readNum(gitDir, "rebase-merge", "end");
-  if (current !== undefined && total !== undefined)
-    return new OperationProgress({ current, total });
-  const next = readNum(gitDir, "rebase-apply", "next");
-  const last = readNum(gitDir, "rebase-apply", "last");
-  if (next !== undefined && last !== undefined)
-    return new OperationProgress({ current: next, total: last });
-  return undefined;
+    if (operation !== 'rebase') return undefined;
+    const current = readNum(gitDir, 'rebase-merge', 'msgnum');
+    const total = readNum(gitDir, 'rebase-merge', 'end');
+    if (current !== undefined && total !== undefined)
+        return new OperationProgress({ current, total });
+    const next = readNum(gitDir, 'rebase-apply', 'next');
+    const last = readNum(gitDir, 'rebase-apply', 'last');
+    if (next !== undefined && last !== undefined)
+        return new OperationProgress({ current: next, total: last });
+    return undefined;
 };
 
 /** True when a present stage blob contains a NUL within the sniff window. */
 const sniffBinary = (
-  pool: CatFilePool,
-  oid: string,
+    pool: CatFilePool,
+    oid: string,
 ): Effect.Effect<boolean, GitError> =>
-  Effect.map(pool.readObject(oid), (obj) => {
-    if (obj === null) return false;
-    const end = Math.min(obj.data.length, BINARY_SNIFF_BYTES);
-    return obj.data.subarray(0, end).includes(0);
-  });
+    Effect.map(pool.readObject(oid), obj => {
+        if (obj === null) return false;
+        const end = Math.min(obj.data.length, BINARY_SNIFF_BYTES);
+        return obj.data.subarray(0, end).includes(0);
+    });
 
 /**
  * conflict.list — the in-progress operation summary plus every conflicted path with
  * its classification, submodule/binary flags, and stage presence. READ, no lock.
  */
 export const conflictList = (
-  cwd: string,
-  gitDir: string,
-  operation: OperationKind,
-  pool: CatFilePool,
-  env?: NodeJS.ProcessEnv,
+    cwd: string,
+    gitDir: string,
+    operation: OperationKind,
+    pool: CatFilePool,
+    env?: NodeJS.ProcessEnv,
 ): Effect.Effect<ConflictListing, GitError> =>
-  Effect.gen(function* () {
-    const unmerged = yield* Effect.map(
-      runGitOk({ cwd, args: ["ls-files", "-u", "-z"], env }),
-      (r) => parseLsFilesUnmerged(r.stdout),
-    );
+    Effect.gen(function* () {
+        const unmerged = yield* Effect.map(
+            runGitOk({ cwd, args: ['ls-files', '-u', '-z'], env }),
+            r => parseLsFilesUnmerged(r.stdout),
+        );
 
-    const conflicted: ConflictFile[] = [];
-    for (const [path, entry] of unmerged) {
-      const hasBase = entry.base !== undefined;
-      const hasOurs = entry.ours !== undefined;
-      const hasTheirs = entry.theirs !== undefined;
-      const present = entry.ours ?? entry.theirs ?? entry.base;
-      const isSubmodule =
-        entry.base?.mode === GITLINK_MODE ||
-        entry.ours?.mode === GITLINK_MODE ||
-        entry.theirs?.mode === GITLINK_MODE;
-      const isBinary =
-        !isSubmodule && present !== undefined
-          ? yield* sniffBinary(pool, present.oid)
-          : false;
-      conflicted.push(
-        new ConflictFile({
-          path,
-          classification: classifyConflict(hasBase, hasOurs, hasTheirs),
-          hasBase,
-          hasOurs,
-          hasTheirs,
-          isBinary,
-          isSubmodule,
-        }),
-      );
-    }
+        const conflicted: ConflictFile[] = [];
+        for (const [path, entry] of unmerged) {
+            const hasBase = entry.base !== undefined;
+            const hasOurs = entry.ours !== undefined;
+            const hasTheirs = entry.theirs !== undefined;
+            const present = entry.ours ?? entry.theirs ?? entry.base;
+            const isSubmodule =
+                entry.base?.mode === GITLINK_MODE ||
+                entry.ours?.mode === GITLINK_MODE ||
+                entry.theirs?.mode === GITLINK_MODE;
+            const isBinary =
+                !isSubmodule && present !== undefined
+                    ? yield* sniffBinary(pool, present.oid)
+                    : false;
+            conflicted.push(
+                new ConflictFile({
+                    path,
+                    classification: classifyConflict(
+                        hasBase,
+                        hasOurs,
+                        hasTheirs,
+                    ),
+                    hasBase,
+                    hasOurs,
+                    hasTheirs,
+                    isBinary,
+                    isSubmodule,
+                }),
+            );
+        }
 
-    const conflictedCount = conflicted.length;
-    const isResumable =
-      operation === "merge" ||
-      operation === "rebase" ||
-      operation === "cherryPick" ||
-      operation === "revert";
+        const conflictedCount = conflicted.length;
+        const isResumable =
+            operation === 'merge' ||
+            operation === 'rebase' ||
+            operation === 'cherryPick' ||
+            operation === 'revert';
 
-    return new ConflictListing({
-      operation,
-      progress: readProgress(gitDir, operation),
-      conflicted,
-      conflictedCount,
-      canContinue: isResumable && conflictedCount === 0,
-      canSkip: operation === "rebase",
+        return new ConflictListing({
+            operation,
+            progress: readProgress(gitDir, operation),
+            conflicted,
+            conflictedCount,
+            canContinue: isResumable && conflictedCount === 0,
+            canSkip: operation === 'rebase',
+        });
     });
-  });
 
 const ABSENT_STAGE = new ConflictStage({
-  present: false,
-  isBinary: false,
-  encoding: "utf8",
-  content: "",
-  size: 0,
+    present: false,
+    isBinary: false,
+    encoding: 'utf8',
+    content: '',
+    size: 0,
 });
 
 /** Turn raw blob/working-tree bytes into a present {@link ConflictStage}. */
 const bytesToStage = (data: Buffer): ConflictStage => {
-  const isBinary = data.subarray(0, BINARY_SNIFF_BYTES).includes(0);
-  return new ConflictStage({
-    present: true,
-    isBinary,
-    encoding: isBinary ? "base64" : "utf8",
-    content: isBinary ? data.toString("base64") : data.toString("utf8"),
-    size: data.length,
-  });
+    const isBinary = data.subarray(0, BINARY_SNIFF_BYTES).includes(0);
+    return new ConflictStage({
+        present: true,
+        isBinary,
+        encoding: isBinary ? 'base64' : 'utf8',
+        content: isBinary ? data.toString('base64') : data.toString('utf8'),
+        size: data.length,
+    });
 };
 
 /** Read an index stage by its blob OID through the pool; absent OID → absent stage. */
 const readStage = (
-  pool: CatFilePool,
-  stage: UnmergedStage | undefined,
+    pool: CatFilePool,
+    stage: UnmergedStage | undefined,
 ): Effect.Effect<ConflictStage, GitError> => {
-  if (stage === undefined) return Effect.succeed(ABSENT_STAGE);
-  return Effect.map(pool.readObject(stage.oid), (obj) =>
-    obj === null ? ABSENT_STAGE : bytesToStage(obj.data),
-  );
+    if (stage === undefined) return Effect.succeed(ABSENT_STAGE);
+    return Effect.map(pool.readObject(stage.oid), obj =>
+        obj === null ? ABSENT_STAGE : bytesToStage(obj.data),
+    );
 };
 
 /** The working-tree bytes git wrote (the marker-laden Result seed); absent if no file. */
 const readMergedSeed = (cwd: string, path: string): ConflictStage => {
-  try {
-    return bytesToStage(readFileSync(join(cwd, path)));
-  } catch {
-    return ABSENT_STAGE;
-  }
+    try {
+        return bytesToStage(readFileSync(join(cwd, path)));
+    } catch {
+        return ABSENT_STAGE;
+    }
 };
 
 /**
@@ -242,69 +246,72 @@ const readMergedSeed = (cwd: string, path: string): ConflictStage => {
  * `reason` surfaced so the UI can disable the text editor (REQ-MERGE-020). READ.
  */
 export const conflictSides = (
-  cwd: string,
-  path: string,
-  pool: CatFilePool,
-  env?: NodeJS.ProcessEnv,
+    cwd: string,
+    path: string,
+    pool: CatFilePool,
+    env?: NodeJS.ProcessEnv,
 ): Effect.Effect<ConflictSides, GitError> =>
-  Effect.gen(function* () {
-    const unmerged = yield* Effect.map(
-      runGitOk({ cwd, args: ["ls-files", "-u", "-z", "--", path], env }),
-      parseStagesFor(path),
-    );
-    if (unmerged === undefined) {
-      return yield* Effect.fail(
-        gitError(
-          "gitFailed",
-          "path has no unmerged entries (already resolved or not conflicted)",
-          { path },
-        ),
-      );
-    }
+    Effect.gen(function* () {
+        const unmerged = yield* Effect.map(
+            runGitOk({ cwd, args: ['ls-files', '-u', '-z', '--', path], env }),
+            parseStagesFor(path),
+        );
+        if (unmerged === undefined) {
+            return yield* Effect.fail(
+                gitError(
+                    'gitFailed',
+                    'path has no unmerged entries (already resolved or not conflicted)',
+                    { path },
+                ),
+            );
+        }
 
-    const base = yield* readStage(pool, unmerged.base);
-    const ours = yield* readStage(pool, unmerged.ours);
-    const theirs = yield* readStage(pool, unmerged.theirs);
-    const merged = readMergedSeed(cwd, path);
+        const base = yield* readStage(pool, unmerged.base);
+        const ours = yield* readStage(pool, unmerged.ours);
+        const theirs = yield* readStage(pool, unmerged.theirs);
+        const merged = readMergedSeed(cwd, path);
 
-    const isSubmodule =
-      unmerged.base?.mode === GITLINK_MODE ||
-      unmerged.ours?.mode === GITLINK_MODE ||
-      unmerged.theirs?.mode === GITLINK_MODE;
-    const anyBinary =
-      base.isBinary || ours.isBinary || theirs.isBinary || merged.isBinary;
-    const anyOversize = [base, ours, theirs, merged].some(
-      (s) => s.size > MAX_EDITABLE_BYTES,
-    );
+        const isSubmodule =
+            unmerged.base?.mode === GITLINK_MODE ||
+            unmerged.ours?.mode === GITLINK_MODE ||
+            unmerged.theirs?.mode === GITLINK_MODE;
+        const anyBinary =
+            base.isBinary ||
+            ours.isBinary ||
+            theirs.isBinary ||
+            merged.isBinary;
+        const anyOversize = [base, ours, theirs, merged].some(
+            s => s.size > MAX_EDITABLE_BYTES,
+        );
 
-    const reason = isSubmodule
-      ? "submodule"
-      : anyBinary
-        ? "binary"
-        : anyOversize
-          ? "oversize"
-          : undefined;
+        const reason = isSubmodule
+            ? 'submodule'
+            : anyBinary
+              ? 'binary'
+              : anyOversize
+                ? 'oversize'
+                : undefined;
 
-    return new ConflictSides({
-      path,
-      classification: classifyConflict(
-        unmerged.base !== undefined,
-        unmerged.ours !== undefined,
-        unmerged.theirs !== undefined,
-      ),
-      isBinary: anyBinary,
-      isSubmodule,
-      base,
-      ours,
-      theirs,
-      merged,
-      mergeable: reason === undefined,
-      reason,
+        return new ConflictSides({
+            path,
+            classification: classifyConflict(
+                unmerged.base !== undefined,
+                unmerged.ours !== undefined,
+                unmerged.theirs !== undefined,
+            ),
+            isBinary: anyBinary,
+            isSubmodule,
+            base,
+            ours,
+            theirs,
+            merged,
+            mergeable: reason === undefined,
+            reason,
+        });
     });
-  });
 
 /** Parse `ls-files -u -z` scoped to one path, returning its stages (or undefined). */
 const parseStagesFor =
-  (path: string) =>
-  (r: { stdout: Buffer }): UnmergedEntry | undefined =>
-    parseLsFilesUnmerged(r.stdout).get(path);
+    (path: string) =>
+    (r: { stdout: Buffer }): UnmergedEntry | undefined =>
+        parseLsFilesUnmerged(r.stdout).get(path);

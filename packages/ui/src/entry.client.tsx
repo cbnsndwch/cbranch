@@ -5,15 +5,15 @@
 // `applyStoredTheme()` call here. Runtime theme changes still flow through the store (`setTheme`
 // → `applyTheme`); `applyStoredTheme` remains for tests and any non-prerendered entry path.
 
-import { startTransition, StrictMode } from "react";
-import { hydrateRoot } from "react-dom/client";
-import { HydratedRouter } from "react-router/dom";
+import { startTransition, StrictMode } from 'react';
+import { hydrateRoot } from 'react-dom/client';
+import { HydratedRouter } from 'react-router/dom';
 
 startTransition(() => {
-  hydrateRoot(
-    document,
-    <StrictMode>
-      <HydratedRouter />
-    </StrictMode>,
-  );
+    hydrateRoot(
+        document,
+        <StrictMode>
+            <HydratedRouter />
+        </StrictMode>,
+    );
 });

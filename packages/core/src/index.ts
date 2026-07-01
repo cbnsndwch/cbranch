@@ -10,120 +10,120 @@
 // core-B and land as typed stubs on the same interface.
 
 // ── the engine ───────────────────────────────────────────────────────────────
-export { GitEngine, type GitEngineApi } from "./engine/git-engine";
+export { GitEngine, type GitEngineApi } from './engine/git-engine';
 export {
-  gitEngineLayer,
-  makeGitEngine,
-  type MakeGitEngineOptions,
-} from "./engine/live";
+    gitEngineLayer,
+    makeGitEngine,
+    type MakeGitEngineOptions,
+} from './engine/live';
 
 // ── host-git execution infrastructure ──────────────────────────────────────────
 export {
-  assertNoLeadingDash,
-  decodeUtf8,
-  type GitResult,
-  isHexOid,
-  nonInteractiveEnv,
-  runGit,
-  runGitOk,
-  type RunGitOptions,
-} from "./git/run-git";
+    assertNoLeadingDash,
+    decodeUtf8,
+    type GitResult,
+    isHexOid,
+    nonInteractiveEnv,
+    runGit,
+    runGitOk,
+    type RunGitOptions,
+} from './git/run-git';
 export {
-  classifyExit,
-  classifyGitSpawnError,
-  classifyNodeError,
-  gitError,
-  gitStderrExcerpt,
-  scrubSecrets,
-} from "./git/errors";
+    classifyExit,
+    classifyGitSpawnError,
+    classifyNodeError,
+    gitError,
+    gitStderrExcerpt,
+    scrubSecrets,
+} from './git/errors';
 export {
-  atLeast,
-  detectGitVersion,
-  type GitVersion,
-  MIN_GIT_MAJOR,
-  MIN_GIT_MINOR,
-  parseGitVersion,
-} from "./git/version";
-export { computeRepoId, isRepoId, normalizeAbsolute } from "./git/repo-id";
-export { makeRepoLockRegistry, type RepoLockRegistry } from "./git/locks";
+    atLeast,
+    detectGitVersion,
+    type GitVersion,
+    MIN_GIT_MAJOR,
+    MIN_GIT_MINOR,
+    parseGitVersion,
+} from './git/version';
+export { computeRepoId, isRepoId, normalizeAbsolute } from './git/repo-id';
+export { makeRepoLockRegistry, type RepoLockRegistry } from './git/locks';
 export {
-  type CatFilePool,
-  makeCatFilePool,
-  type ObjectData,
-  type ObjectInfo,
-} from "./git/cat-file-pool";
+    type CatFilePool,
+    makeCatFilePool,
+    type ObjectData,
+    type ObjectInfo,
+} from './git/cat-file-pool';
 
 // ── history / diff / content / watcher (P1, core-B) ─────────────────────────────
 export {
-  buildLogArgs,
-  cappedLimit,
-  decodeLogCursor,
-  encodeLogCursor,
-  LOG_FORMAT,
-  LOG_WINDOW_CAP,
-  type LogCursor,
-  makeLogStream,
-  nextLogCursor,
-  parseCommitSummaries,
-} from "./git/history";
-export { commitDetail, parseTzOffsetMinutes } from "./git/commit";
+    buildLogArgs,
+    cappedLimit,
+    decodeLogCursor,
+    encodeLogCursor,
+    LOG_FORMAT,
+    LOG_WINDOW_CAP,
+    type LogCursor,
+    makeLogStream,
+    nextLogCursor,
+    parseCommitSummaries,
+} from './git/history';
+export { commitDetail, parseTzOffsetMinutes } from './git/commit';
 export {
-  buildDiffFiles,
-  commitDiff,
-  diffWorkingFile,
-  mapStatusLetter,
-  type NameStatusEntry,
-  type NumstatEntry,
-  parseNameStatus,
-  parseNumstat,
-  parsePatch,
-  type PatchFile,
-} from "./git/diff";
+    buildDiffFiles,
+    commitDiff,
+    diffWorkingFile,
+    mapStatusLetter,
+    type NameStatusEntry,
+    type NumstatEntry,
+    parseNameStatus,
+    parseNumstat,
+    parsePatch,
+    type PatchFile,
+} from './git/diff';
 export {
-  fileContentAtRev,
-  INLINE_CONTENT_CAP,
-  looksBinary,
-  sidechannelBlobUrl,
-} from "./git/content";
+    fileContentAtRev,
+    INLINE_CONTENT_CAP,
+    looksBinary,
+    sidechannelBlobUrl,
+} from './git/content';
 export {
-  classifyChange,
-  COALESCE_MS,
-  type WatchTarget,
-  WatcherRegistry,
-} from "./git/watcher";
+    classifyChange,
+    COALESCE_MS,
+    type WatchTarget,
+    WatcherRegistry,
+} from './git/watcher';
 
 // ── config store ───────────────────────────────────────────────────────────────
 export {
-  type Config,
-  CONFIG_VERSION,
-  type ConfigStore,
-  defaultConfig,
-  DEFAULT_BIND,
-  DEFAULT_THRESHOLDS,
-  makeConfigStore,
-  type RecentRepoEntry,
-  resolveConfigPath,
-} from "./config/config-store";
+    type Config,
+    CONFIG_VERSION,
+    type ConfigStore,
+    defaultConfig,
+    DEFAULT_BIND,
+    DEFAULT_THRESHOLDS,
+    makeConfigStore,
+    type RecentRepoEntry,
+    resolveConfigPath,
+} from './config/config-store';
 
 // ── repository operations (parsers + resolvers reused by core-B) ────────────────
-export { repoCwd, type ResolvedRepo, resolveRepo } from "./repo/resolve";
+export { repoCwd, type ResolvedRepo, resolveRepo } from './repo/resolve';
 export {
-  detectInProgress,
-  parseBranchHeader,
-  readRepoState,
-} from "./repo/state";
+    detectInProgress,
+    parseBranchHeader,
+    readRepoState,
+} from './repo/state';
 
 // ── test-only fixture harness (NF-TEST-3/4) ────────────────────────────────────
-export * from "./testing/fixtures";
-export { run, runExit, runScoped, runScopedExit } from "./testing/effect-run";
+export * from './testing/fixtures';
+export { run, runExit, runScoped, runScopedExit } from './testing/effect-run';
 
 // ── P0 compatibility bridge (kept so apps/web-server compiles UNCHANGED) ─────────
 // The P0 scaffold in apps/web-server references `GitEnginePlaceholder["version"]`.
 // Kept here (now with NO dependency on the rpc-contract placeholder) until that app
 // migrates to the real `GitEngine`.
-export const version = "0.0.0" as const;
+export const version = '0.0.0' as const;
 
 /** @deprecated P0 placeholder; superseded by the real {@link GitEngine}. */
 export type GitEnginePlaceholder = {
-  readonly version: typeof version;
+    readonly version: typeof version;
 };

@@ -1,4 +1,4 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
 /* Tailwind v4 dark-mode driven by a `.dark` class on the root element
    (REQ-STACK-UX-002). No tailwind.config.js, no PostCSS — @tailwindcss/vite only. */
@@ -8,230 +8,231 @@
    PLACEHOLDER oklch values — exact brand palette is a design decision (BRANDING.md).
    base-lyra is the square-edged style, so --radius is 0. */
 :root {
-  --radius: 0rem;
+    --radius: 0rem;
 
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.62 0.12 165);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.62 0.12 165);
+    --background: oklch(1 0 0);
+    --foreground: oklch(0.145 0 0);
+    --card: oklch(1 0 0);
+    --card-foreground: oklch(0.145 0 0);
+    --popover: oklch(1 0 0);
+    --popover-foreground: oklch(0.145 0 0);
+    --primary: oklch(0.62 0.12 165);
+    --primary-foreground: oklch(0.985 0 0);
+    --secondary: oklch(0.97 0 0);
+    --secondary-foreground: oklch(0.205 0 0);
+    --muted: oklch(0.97 0 0);
+    --muted-foreground: oklch(0.556 0 0);
+    --accent: oklch(0.97 0 0);
+    --accent-foreground: oklch(0.205 0 0);
+    --destructive: oklch(0.577 0.245 27.325);
+    --destructive-foreground: oklch(0.985 0 0);
+    --border: oklch(0.922 0 0);
+    --input: oklch(0.922 0 0);
+    --ring: oklch(0.62 0.12 165);
 
-  /* Git domain tokens (BRANDING.md) — placeholders. */
-  --diff-add: oklch(0.92 0.06 150);
-  --diff-add-foreground: oklch(0.3 0.08 150);
-  --diff-remove: oklch(0.92 0.07 25);
-  --diff-remove-foreground: oklch(0.35 0.12 25);
-  --diff-context: oklch(0.97 0 0);
-  --diff-word-add: oklch(0.85 0.1 150);
-  --diff-word-remove: oklch(0.85 0.11 25);
+    /* Git domain tokens (BRANDING.md) — placeholders. */
+    --diff-add: oklch(0.92 0.06 150);
+    --diff-add-foreground: oklch(0.3 0.08 150);
+    --diff-remove: oklch(0.92 0.07 25);
+    --diff-remove-foreground: oklch(0.35 0.12 25);
+    --diff-context: oklch(0.97 0 0);
+    --diff-word-add: oklch(0.85 0.1 150);
+    --diff-word-remove: oklch(0.85 0.11 25);
 
-  --status-ahead: oklch(0.62 0.12 165);
-  --status-behind: oklch(0.6 0.13 50);
-  --status-conflict: oklch(0.577 0.245 27.325);
-  --status-staged: oklch(0.62 0.12 165);
-  --status-unstaged: oklch(0.6 0.13 50);
-  --status-untracked: oklch(0.556 0 0);
-  --status-ignored: oklch(0.7 0 0);
+    --status-ahead: oklch(0.62 0.12 165);
+    --status-behind: oklch(0.6 0.13 50);
+    --status-conflict: oklch(0.577 0.245 27.325);
+    --status-staged: oklch(0.62 0.12 165);
+    --status-unstaged: oklch(0.6 0.13 50);
+    --status-untracked: oklch(0.556 0 0);
+    --status-ignored: oklch(0.7 0 0);
 
-  /* Commit-graph lane palette: the Tailwind 500 shades (curated vivid hues, grays
+    /* Commit-graph lane palette: the Tailwind 500 shades (curated vivid hues, grays
      omitted — they read as disabled lanes against the chrome). Plain `:root` custom
      properties on purpose: a lane's color is consumed via raw `var(--graph-N)` in an
      inline SVG style, which Tailwind's class scanner never sees — so these MUST NOT
      live under `@theme`, where unused theme tokens are tree-shaken out of the build
      and would resolve to nothing at runtime (fills → black, strokes → none). The 500
      shades stay legible on both the light and dark surfaces, so they are not themed. */
-  --graph-1: #ef4444; /* red-500 */
-  --graph-2: #f97316; /* orange-500 */
-  --graph-3: #f59e0b; /* amber-500 */
-  --graph-4: #84cc16; /* lime-500 */
-  --graph-5: #22c55e; /* green-500 */
-  --graph-6: #10b981; /* emerald-500 */
-  --graph-7: #14b8a6; /* teal-500 */
-  --graph-8: #06b6d4; /* cyan-500 */
-  --graph-9: #0ea5e9; /* sky-500 */
-  --graph-10: #3b82f6; /* blue-500 */
-  --graph-11: #6366f1; /* indigo-500 */
-  --graph-12: #8b5cf6; /* violet-500 */
-  --graph-13: #a855f7; /* purple-500 */
-  --graph-14: #d946ef; /* fuchsia-500 */
-  --graph-15: #ec4899; /* pink-500 */
-  --graph-16: #f43f5e; /* rose-500 */
-  --selection-bg: oklch(0.62 0.12 165);
-  --selection-fg: oklch(0.985 0 0);
+    --graph-1: #ef4444; /* red-500 */
+    --graph-2: #f97316; /* orange-500 */
+    --graph-3: #f59e0b; /* amber-500 */
+    --graph-4: #84cc16; /* lime-500 */
+    --graph-5: #22c55e; /* green-500 */
+    --graph-6: #10b981; /* emerald-500 */
+    --graph-7: #14b8a6; /* teal-500 */
+    --graph-8: #06b6d4; /* cyan-500 */
+    --graph-9: #0ea5e9; /* sky-500 */
+    --graph-10: #3b82f6; /* blue-500 */
+    --graph-11: #6366f1; /* indigo-500 */
+    --graph-12: #8b5cf6; /* violet-500 */
+    --graph-13: #a855f7; /* purple-500 */
+    --graph-14: #d946ef; /* fuchsia-500 */
+    --graph-15: #ec4899; /* pink-500 */
+    --graph-16: #f43f5e; /* rose-500 */
+    --selection-bg: oklch(0.62 0.12 165);
+    --selection-fg: oklch(0.985 0 0);
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.7 0.13 165);
-  --primary-foreground: oklch(0.145 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(1 0 0 / 12%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.7 0.13 165);
+    --background: oklch(0.145 0 0);
+    --foreground: oklch(0.985 0 0);
+    --card: oklch(0.205 0 0);
+    --card-foreground: oklch(0.985 0 0);
+    --popover: oklch(0.205 0 0);
+    --popover-foreground: oklch(0.985 0 0);
+    --primary: oklch(0.7 0.13 165);
+    --primary-foreground: oklch(0.145 0 0);
+    --secondary: oklch(0.269 0 0);
+    --secondary-foreground: oklch(0.985 0 0);
+    --muted: oklch(0.269 0 0);
+    --muted-foreground: oklch(0.708 0 0);
+    --accent: oklch(0.269 0 0);
+    --accent-foreground: oklch(0.985 0 0);
+    --destructive: oklch(0.704 0.191 22.216);
+    --destructive-foreground: oklch(0.985 0 0);
+    --border: oklch(1 0 0 / 12%);
+    --input: oklch(1 0 0 / 15%);
+    --ring: oklch(0.7 0.13 165);
 
-  --diff-add: oklch(0.3 0.06 150);
-  --diff-add-foreground: oklch(0.9 0.08 150);
-  --diff-remove: oklch(0.32 0.09 25);
-  --diff-remove-foreground: oklch(0.9 0.1 25);
-  --diff-context: oklch(0.205 0 0);
-  --diff-word-add: oklch(0.45 0.1 150);
-  --diff-word-remove: oklch(0.45 0.12 25);
+    --diff-add: oklch(0.3 0.06 150);
+    --diff-add-foreground: oklch(0.9 0.08 150);
+    --diff-remove: oklch(0.32 0.09 25);
+    --diff-remove-foreground: oklch(0.9 0.1 25);
+    --diff-context: oklch(0.205 0 0);
+    --diff-word-add: oklch(0.45 0.1 150);
+    --diff-word-remove: oklch(0.45 0.12 25);
 
-  --status-ahead: oklch(0.7 0.13 165);
-  --status-behind: oklch(0.72 0.14 50);
-  --status-conflict: oklch(0.704 0.191 22.216);
-  --status-staged: oklch(0.7 0.13 165);
-  --status-unstaged: oklch(0.72 0.14 50);
-  --status-untracked: oklch(0.708 0 0);
-  --status-ignored: oklch(0.5 0 0);
+    --status-ahead: oklch(0.7 0.13 165);
+    --status-behind: oklch(0.72 0.14 50);
+    --status-conflict: oklch(0.704 0.191 22.216);
+    --status-staged: oklch(0.7 0.13 165);
+    --status-unstaged: oklch(0.72 0.14 50);
+    --status-untracked: oklch(0.708 0 0);
+    --status-ignored: oklch(0.5 0 0);
 
-  /* Graph lane colors are theme-independent Tailwind 500 shades (defined once in
+    /* Graph lane colors are theme-independent Tailwind 500 shades (defined once in
      `:root`); only the selection accent shifts for dark. */
-  --selection-bg: oklch(0.62 0.12 165);
-  --selection-fg: oklch(0.985 0 0);
+    --selection-bg: oklch(0.62 0.12 165);
+    --selection-fg: oklch(0.985 0 0);
 }
 
 /* Map the CSS variables onto Tailwind's token namespace so utilities like
    `bg-primary`, `text-muted-foreground`, `ring-ring`, `border-input` resolve. */
 @theme inline {
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+    --radius-sm: calc(var(--radius) - 4px);
+    --radius-md: calc(var(--radius) - 2px);
+    --radius-lg: var(--radius);
+    --radius-xl: calc(var(--radius) + 4px);
 
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-card: var(--card);
-  --color-card-foreground: var(--card-foreground);
-  --color-popover: var(--popover);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-secondary: var(--secondary);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-accent: var(--accent);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-destructive: var(--destructive);
-  --color-destructive-foreground: var(--destructive-foreground);
-  --color-border: var(--border);
-  --color-input: var(--input);
-  --color-ring: var(--ring);
+    --color-background: var(--background);
+    --color-foreground: var(--foreground);
+    --color-card: var(--card);
+    --color-card-foreground: var(--card-foreground);
+    --color-popover: var(--popover);
+    --color-popover-foreground: var(--popover-foreground);
+    --color-primary: var(--primary);
+    --color-primary-foreground: var(--primary-foreground);
+    --color-secondary: var(--secondary);
+    --color-secondary-foreground: var(--secondary-foreground);
+    --color-muted: var(--muted);
+    --color-muted-foreground: var(--muted-foreground);
+    --color-accent: var(--accent);
+    --color-accent-foreground: var(--accent-foreground);
+    --color-destructive: var(--destructive);
+    --color-destructive-foreground: var(--destructive-foreground);
+    --color-border: var(--border);
+    --color-input: var(--input);
+    --color-ring: var(--ring);
 
-  --color-diff-add: var(--diff-add);
-  --color-diff-add-foreground: var(--diff-add-foreground);
-  --color-diff-remove: var(--diff-remove);
-  --color-diff-remove-foreground: var(--diff-remove-foreground);
-  --color-diff-context: var(--diff-context);
+    --color-diff-add: var(--diff-add);
+    --color-diff-add-foreground: var(--diff-add-foreground);
+    --color-diff-remove: var(--diff-remove);
+    --color-diff-remove-foreground: var(--diff-remove-foreground);
+    --color-diff-context: var(--diff-context);
 
-  --color-status-ahead: var(--status-ahead);
-  --color-status-behind: var(--status-behind);
-  --color-status-conflict: var(--status-conflict);
+    --color-status-ahead: var(--status-ahead);
+    --color-status-behind: var(--status-behind);
+    --color-status-conflict: var(--status-conflict);
 
-  --color-selection-bg: var(--selection-bg);
-  --color-selection-fg: var(--selection-fg);
-  --color-status-staged: var(--status-staged);
+    --color-selection-bg: var(--selection-bg);
+    --color-selection-fg: var(--selection-fg);
+    --color-status-staged: var(--status-staged);
 }
 
 /* Theme react-diff-view through its own CSS variables so the rendered diff follows our
    light/dark diff tokens instead of its hardcoded light palette (the raw `--diff-*` tokens
    above already switch per theme). Loaded after the library stylesheet, so these win. */
 :root {
-  --diff-background-color: transparent;
-  --diff-text-color: var(--foreground);
-  --diff-font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  --diff-selection-background-color: var(--accent);
-  --diff-gutter-insert-background-color: var(--diff-word-add);
-  --diff-gutter-delete-background-color: var(--diff-word-remove);
-  --diff-gutter-selected-background-color: var(--accent);
-  --diff-code-insert-background-color: var(--diff-add);
-  --diff-code-delete-background-color: var(--diff-remove);
-  --diff-code-insert-edit-background-color: var(--diff-word-add);
-  --diff-code-delete-edit-background-color: var(--diff-word-remove);
-  --diff-code-selected-background-color: var(--accent);
-  --diff-omit-gutter-line-color: var(--border);
+    --diff-background-color: transparent;
+    --diff-text-color: var(--foreground);
+    --diff-font-family:
+        ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --diff-selection-background-color: var(--accent);
+    --diff-gutter-insert-background-color: var(--diff-word-add);
+    --diff-gutter-delete-background-color: var(--diff-word-remove);
+    --diff-gutter-selected-background-color: var(--accent);
+    --diff-code-insert-background-color: var(--diff-add);
+    --diff-code-delete-background-color: var(--diff-remove);
+    --diff-code-insert-edit-background-color: var(--diff-word-add);
+    --diff-code-delete-edit-background-color: var(--diff-word-remove);
+    --diff-code-selected-background-color: var(--accent);
+    --diff-omit-gutter-line-color: var(--border);
 }
 
 @layer base {
-  * {
-    border-color: var(--color-border);
-  }
+    * {
+        border-color: var(--color-border);
+    }
 
-  body {
-    background-color: var(--color-background);
-    color: var(--color-foreground);
-    font-size: 12px;
-  }
+    body {
+        background-color: var(--color-background);
+        color: var(--color-foreground);
+        font-size: 12px;
+    }
 
-  /* Scrollbars blend with the surface instead of using the default OS chrome — subtle
+    /* Scrollbars blend with the surface instead of using the default OS chrome — subtle
      thumb in the muted tone, transparent track, for both Firefox and Chromium. */
-  * {
-    scrollbar-width: thin;
-    scrollbar-color: color-mix(
-        in oklch,
-        var(--color-muted-foreground) 40%,
-        transparent
-      )
-      transparent;
-  }
+    * {
+        scrollbar-width: thin;
+        scrollbar-color: color-mix(
+                in oklch,
+                var(--color-muted-foreground) 40%,
+                transparent
+            )
+            transparent;
+    }
 
-  button:not(:disabled),
-  [role="button"]:not(:disabled) {
-    cursor: pointer;
-  }
+    button:not(:disabled),
+    [role='button']:not(:disabled) {
+        cursor: pointer;
+    }
 
-  ::-webkit-scrollbar {
-    width: 10px;
-    height: 10px;
-  }
+    ::-webkit-scrollbar {
+        width: 10px;
+        height: 10px;
+    }
 
-  ::-webkit-scrollbar-track,
-  ::-webkit-scrollbar-corner {
-    background: transparent;
-  }
+    ::-webkit-scrollbar-track,
+    ::-webkit-scrollbar-corner {
+        background: transparent;
+    }
 
-  ::-webkit-scrollbar-thumb {
-    background-color: color-mix(
-      in oklch,
-      var(--color-muted-foreground) 35%,
-      transparent
-    );
-    border: 2px solid transparent;
-    background-clip: padding-box;
-  }
+    ::-webkit-scrollbar-thumb {
+        background-color: color-mix(
+            in oklch,
+            var(--color-muted-foreground) 35%,
+            transparent
+        );
+        border: 2px solid transparent;
+        background-clip: padding-box;
+    }
 
-  ::-webkit-scrollbar-thumb:hover {
-    background-color: color-mix(
-      in oklch,
-      var(--color-muted-foreground) 60%,
-      transparent
-    );
-  }
+    ::-webkit-scrollbar-thumb:hover {
+        background-color: color-mix(
+            in oklch,
+            var(--color-muted-foreground) 60%,
+            transparent
+        );
+    }
 }

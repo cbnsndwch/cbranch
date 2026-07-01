@@ -1,7 +1,7 @@
-import { expect, test } from "vitest";
+import { expect, test } from 'vitest';
 
-import { version } from "./version";
+import { version } from './version';
 
-test("ui exposes a version", () => {
-  expect(version).toBe("0.0.0");
+test('ui exposes a version', () => {
+    expect(version).toBe('0.0.0');
 });

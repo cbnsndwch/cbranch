@@ -6,11 +6,11 @@
 // consolidated set, no duplication (D18); reuse `Oid`/`RepoId` from `primitives` and
 // `CommitSummary` from `domain` rather than re-declaring.
 
-import { Schema } from "effect";
+import { Schema } from 'effect';
 
-import { CommitSummary } from "./domain";
-import { OperationProgress } from "./phase4";
-import { Oid } from "./primitives";
+import { CommitSummary } from './domain';
+import { OperationProgress } from './phase4';
+import { Oid } from './primitives';
 
 // ─── S1: repository maintenance (gc) ─────────────────────────────────────────────
 
@@ -19,7 +19,7 @@ import { Oid } from "./primitives";
  * deliberate Select opt-in); `"default"` omits `--prune`, keeping git's default
  * expiry. gc removes no tracked content, so neither needs an extra confirmation.
  */
-export const GcPrune = Schema.Literals(["default", "now"]);
+export const GcPrune = Schema.Literals(['default', 'now']);
 export type GcPrune = typeof GcPrune.Type;
 
 /**
@@ -27,9 +27,9 @@ export type GcPrune = typeof GcPrune.Type;
  * git stdout/stderr surfaced for DISPLAY only — never parsed for control flow (a
  * non-zero exit is the authoritative failure, mapped to `gitFailed`).
  */
-export class GcResult extends Schema.Class<GcResult>("GcResult")({
-  stdout: Schema.String,
-  stderr: Schema.String,
+export class GcResult extends Schema.Class<GcResult>('GcResult')({
+    stdout: Schema.String,
+    stderr: Schema.String,
 }) {}
 
 // ─── S2: clean working directory ─────────────────────────────────────────────────
@@ -39,25 +39,25 @@ export class GcResult extends Schema.Class<GcResult>("GcResult")({
  * trailing `/`, which the `path` retains so the destructive run can pass it back as a
  * pathspec unchanged.
  */
-export class CleanEntry extends Schema.Class<CleanEntry>("CleanEntry")({
-  path: Schema.String,
-  isDirectory: Schema.Boolean,
+export class CleanEntry extends Schema.Class<CleanEntry>('CleanEntry')({
+    path: Schema.String,
+    isDirectory: Schema.Boolean,
 }) {}
 
 /** The dry-run preview: exactly what a clean with the same options would remove. */
-export class CleanPreview extends Schema.Class<CleanPreview>("CleanPreview")({
-  entries: Schema.Array(CleanEntry),
+export class CleanPreview extends Schema.Class<CleanPreview>('CleanPreview')({
+    entries: Schema.Array(CleanEntry),
 }) {}
 
 /** The destructive clean outcome: the count of previewed entries removed (REQ-P5-CL-005). */
-export class CleanResult extends Schema.Class<CleanResult>("CleanResult")({
-  removed: Schema.Number,
+export class CleanResult extends Schema.Class<CleanResult>('CleanResult')({
+    removed: Schema.Number,
 }) {}
 
 // ─── S3: archive export ──────────────────────────────────────────────────────────
 
 /** A host-git archive format (REQ-P5-AR-002). `tar.gz` is the supported compressed tar. */
-export const ArchiveFormat = Schema.Literals(["zip", "tar", "tar.gz"]);
+export const ArchiveFormat = Schema.Literals(['zip', 'tar', 'tar.gz']);
 export type ArchiveFormat = typeof ArchiveFormat.Type;
 
 /**
@@ -68,12 +68,12 @@ export type ArchiveFormat = typeof ArchiveFormat.Type;
  * WS/NDJSON bus.
  */
 export class ArchiveDescriptor extends Schema.Class<ArchiveDescriptor>(
-  "ArchiveDescriptor",
+    'ArchiveDescriptor',
 )({
-  url: Schema.String,
-  filename: Schema.String,
-  contentType: Schema.String,
-  format: ArchiveFormat,
+    url: Schema.String,
+    filename: Schema.String,
+    contentType: Schema.String,
+    format: ArchiveFormat,
 }) {}
 
 // ─── S4: reflog viewer ───────────────────────────────────────────────────────────
@@ -84,23 +84,23 @@ export class ArchiveDescriptor extends Schema.Class<ArchiveDescriptor>(
  * `message` is the remainder. `oid` is the entry's RESOLVED commit (writes target it,
  * not `HEAD@{n}`, to dodge the prune/expire reparse race).
  */
-export class ReflogEntry extends Schema.Class<ReflogEntry>("ReflogEntry")({
-  selector: Schema.String,
-  oid: Oid,
-  action: Schema.String,
-  message: Schema.String,
+export class ReflogEntry extends Schema.Class<ReflogEntry>('ReflogEntry')({
+    selector: Schema.String,
+    oid: Oid,
+    action: Schema.String,
+    message: Schema.String,
 }) {}
 
 /** A reflog page; `nextCursor` reuses the history skip-cursor codec (present iff a full window). */
-export class ReflogPage extends Schema.Class<ReflogPage>("ReflogPage")({
-  entries: Schema.Array(ReflogEntry),
-  nextCursor: Schema.optional(Schema.String),
+export class ReflogPage extends Schema.Class<ReflogPage>('ReflogPage')({
+    entries: Schema.Array(ReflogEntry),
+    nextCursor: Schema.optional(Schema.String),
 }) {}
 
 // ─── S5: bisect ──────────────────────────────────────────────────────────────────
 
 /** A bisect mark verb (REQ-P5-BS-003). Custom terms are out of scope. */
-export const BisectMark = Schema.Literals(["good", "bad", "skip"]);
+export const BisectMark = Schema.Literals(['good', 'bad', 'skip']);
 export type BisectMark = typeof BisectMark.Type;
 
 /**
@@ -108,10 +108,10 @@ export type BisectMark = typeof BisectMark.Type;
  * `unbisectable` (skips can't isolate) are non-error outcomes carried here (D18).
  */
 export const BisectState = Schema.Literals([
-  "inactive",
-  "bisecting",
-  "concluded",
-  "unbisectable",
+    'inactive',
+    'bisecting',
+    'concluded',
+    'unbisectable',
 ]);
 export type BisectState = typeof BisectState.Type;
 
@@ -121,16 +121,16 @@ export type BisectState = typeof BisectState.Type;
  * git's reported estimates; `candidates` is the ambiguous remaining set when
  * `unbisectable`; `startPoint` is the original HEAD restored on reset.
  */
-export class BisectStatus extends Schema.Class<BisectStatus>("BisectStatus")({
-  state: BisectState,
-  current: Schema.optional(CommitSummary),
-  badTerm: Schema.String,
-  goodTerm: Schema.String,
-  revisionsRemaining: Schema.optional(Schema.Number),
-  stepsRemaining: Schema.optional(Schema.Number),
-  firstBad: Schema.optional(CommitSummary),
-  candidates: Schema.optional(Schema.Array(Oid)),
-  startPoint: Schema.optional(Schema.String),
+export class BisectStatus extends Schema.Class<BisectStatus>('BisectStatus')({
+    state: BisectState,
+    current: Schema.optional(CommitSummary),
+    badTerm: Schema.String,
+    goodTerm: Schema.String,
+    revisionsRemaining: Schema.optional(Schema.Number),
+    stepsRemaining: Schema.optional(Schema.Number),
+    firstBad: Schema.optional(CommitSummary),
+    candidates: Schema.optional(Schema.Array(Oid)),
+    startPoint: Schema.optional(Schema.String),
 }) {}
 
 // ─── S6: submodules ────────────────────────────────────────────────────────────
@@ -142,10 +142,10 @@ export class BisectStatus extends Schema.Class<BisectStatus>("BisectStatus")({
  * (`U` / a merge-conflicted index entry with no stage-0 gitlink).
  */
 export const SubmoduleStatus = Schema.Literals([
-  "uninitialized",
-  "upToDate",
-  "outOfSync",
-  "conflicted",
+    'uninitialized',
+    'upToDate',
+    'outOfSync',
+    'conflicted',
 ]);
 export type SubmoduleStatus = typeof SubmoduleStatus.Type;
 
@@ -157,18 +157,18 @@ export type SubmoduleStatus = typeof SubmoduleStatus.Type;
  * `branch` come from `.gitmodules`; `absPath` is the host-resolved working path the
  * "Open" action reuses via `RepoOpen`.
  */
-export class SubmoduleInfo extends Schema.Class<SubmoduleInfo>("SubmoduleInfo")(
-  {
-    path: Schema.String,
-    name: Schema.optional(Schema.String),
-    absPath: Schema.String,
-    recordedOid: Schema.optional(Oid),
-    checkedOutOid: Schema.optional(Oid),
-    status: SubmoduleStatus,
-    describe: Schema.optional(Schema.String),
-    url: Schema.optional(Schema.String),
-    branch: Schema.optional(Schema.String),
-  },
+export class SubmoduleInfo extends Schema.Class<SubmoduleInfo>('SubmoduleInfo')(
+    {
+        path: Schema.String,
+        name: Schema.optional(Schema.String),
+        absPath: Schema.String,
+        recordedOid: Schema.optional(Oid),
+        checkedOutOid: Schema.optional(Oid),
+        status: SubmoduleStatus,
+        describe: Schema.optional(Schema.String),
+        url: Schema.optional(Schema.String),
+        branch: Schema.optional(Schema.String),
+    },
 ) {}
 
 // ─── S7: settings & git config ─────────────────────────────────────────────────
@@ -180,11 +180,11 @@ export class SubmoduleInfo extends Schema.Class<SubmoduleInfo>("SubmoduleInfo")(
  * suppress via `read:false`, but the parser still tolerates).
  */
 export const ConfigScope = Schema.Literals([
-  "system",
-  "global",
-  "local",
-  "worktree",
-  "command",
+    'system',
+    'global',
+    'local',
+    'worktree',
+    'command',
 ]);
 export type ConfigScope = typeof ConfigScope.Type;
 
@@ -193,7 +193,7 @@ export type ConfigScope = typeof ConfigScope.Type;
  * `system` is read-only in the picker AND refused by the engine; `worktree` is
  * deferred. A narrower literal so an unwritable scope can never reach a write method.
  */
-export const WritableScope = Schema.Literals(["global", "local"]);
+export const WritableScope = Schema.Literals(['global', 'local']);
 export type WritableScope = typeof WritableScope.Type;
 
 /**
@@ -201,7 +201,7 @@ export type WritableScope = typeof WritableScope.Type;
  * NEVER written into git config (REQ-P5-CFG-005). Mirrors the UI `theme.ts` `ThemePref`
  * and the host `Config.theme` verbatim.
  */
-export const ThemePref = Schema.Literals(["light", "dark", "system"]);
+export const ThemePref = Schema.Literals(['light', 'dark', 'system']);
 export type ThemePref = typeof ThemePref.Type;
 
 /**
@@ -210,12 +210,12 @@ export type ThemePref = typeof ThemePref.Type;
  * by scope precedence. `origin` is git's `--show-origin` file path (DISPLAY).
  */
 export class GitConfigEntry extends Schema.Class<GitConfigEntry>(
-  "GitConfigEntry",
+    'GitConfigEntry',
 )({
-  key: Schema.String,
-  value: Schema.String,
-  scope: ConfigScope,
-  origin: Schema.String,
+    key: Schema.String,
+    value: Schema.String,
+    scope: ConfigScope,
+    origin: Schema.String,
 }) {}
 
 /**
@@ -224,12 +224,12 @@ export class GitConfigEntry extends Schema.Class<GitConfigEntry>(
  * scope); on an effective/merged read it is absent. `value` is absent when `!present`.
  */
 export class GitConfigValue extends Schema.Class<GitConfigValue>(
-  "GitConfigValue",
+    'GitConfigValue',
 )({
-  key: Schema.String,
-  scope: Schema.optional(ConfigScope),
-  present: Schema.Boolean,
-  value: Schema.optional(Schema.String),
+    key: Schema.String,
+    scope: Schema.optional(ConfigScope),
+    present: Schema.Boolean,
+    value: Schema.optional(Schema.String),
 }) {}
 
 /**
@@ -237,19 +237,19 @@ export class GitConfigValue extends Schema.Class<GitConfigValue>(
  * the bound key chord. The wire form is an array; the host stores it as a native
  * `Record<commandId, chord>` (user OVERRIDES only; defaults live client-side).
  */
-export class KeyBinding extends Schema.Class<KeyBinding>("KeyBinding")({
-  commandId: Schema.String,
-  chord: Schema.String,
+export class KeyBinding extends Schema.Class<KeyBinding>('KeyBinding')({
+    commandId: Schema.String,
+    chord: Schema.String,
 }) {}
 
 /**
  * cbranch's own app settings (REQ-P5-CFG-006), persisted to the host `config.json`,
  * NEVER to git config (REQ-P5-CFG-005). `keybindings` carries user overrides only.
  */
-export class AppSettings extends Schema.Class<AppSettings>("AppSettings")({
-  theme: ThemePref,
-  locale: Schema.String,
-  keybindings: Schema.Array(KeyBinding),
+export class AppSettings extends Schema.Class<AppSettings>('AppSettings')({
+    theme: ThemePref,
+    locale: Schema.String,
+    keybindings: Schema.Array(KeyBinding),
 }) {}
 
 // ─── S8: interactive rebase ──────────────────────────────────────────────────────
@@ -260,12 +260,12 @@ export class AppSettings extends Schema.Class<AppSettings>("AppSettings")({
  * message (never an interactive editor); `fixup` discards the commit's own message.
  */
 export const RebaseAction = Schema.Literals([
-  "pick",
-  "reword",
-  "edit",
-  "squash",
-  "fixup",
-  "drop",
+    'pick',
+    'reword',
+    'edit',
+    'squash',
+    'fixup',
+    'drop',
 ]);
 export type RebaseAction = typeof RebaseAction.Type;
 
@@ -278,10 +278,10 @@ export type RebaseAction = typeof RebaseAction.Type;
  * stop, which the UI resumes with a plain Continue/Skip).
  */
 export const RebaseStopReason = Schema.Literals([
-  "none",
-  "conflict",
-  "edit",
-  "execFailed",
+    'none',
+    'conflict',
+    'edit',
+    'execFailed',
 ]);
 export type RebaseStopReason = typeof RebaseStopReason.Type;
 
@@ -291,14 +291,14 @@ export type RebaseStopReason = typeof RebaseStopReason.Type;
  * default message from the concatenated bodies; `subject`/author identify the row.
  */
 export class RebaseTodoCommit extends Schema.Class<RebaseTodoCommit>(
-  "RebaseTodoCommit",
+    'RebaseTodoCommit',
 )({
-  oid: Oid,
-  authorName: Schema.String,
-  authorEmail: Schema.String,
-  authorDate: Schema.String,
-  subject: Schema.String,
-  body: Schema.String,
+    oid: Oid,
+    authorName: Schema.String,
+    authorEmail: Schema.String,
+    authorDate: Schema.String,
+    subject: Schema.String,
+    body: Schema.String,
 }) {}
 
 /**
@@ -306,10 +306,10 @@ export class RebaseTodoCommit extends Schema.Class<RebaseTodoCommit>(
  * (optionally replayed `--onto` a different base), oldest-first. `commits:[]` means an
  * empty range (nothing to rebase). DISPLAY input to the todo editor; not an operation.
  */
-export class RebasePlan extends Schema.Class<RebasePlan>("RebasePlan")({
-  upstream: Schema.String,
-  onto: Schema.optional(Schema.String),
-  commits: Schema.Array(RebaseTodoCommit),
+export class RebasePlan extends Schema.Class<RebasePlan>('RebasePlan')({
+    upstream: Schema.String,
+    onto: Schema.optional(Schema.String),
+    commits: Schema.Array(RebaseTodoCommit),
 }) {}
 
 /**
@@ -317,10 +317,10 @@ export class RebasePlan extends Schema.Class<RebasePlan>("RebasePlan")({
  * order. `message` carries the non-empty `reword` text or the combined `squash` message
  * (validated non-empty in-engine before the todo is written; never `--allow-empty-message`).
  */
-export class RebaseStep extends Schema.Class<RebaseStep>("RebaseStep")({
-  oid: Oid,
-  action: RebaseAction,
-  message: Schema.optional(Schema.String),
+export class RebaseStep extends Schema.Class<RebaseStep>('RebaseStep')({
+    oid: Oid,
+    action: RebaseAction,
+    message: Schema.optional(Schema.String),
 }) {}
 
 /**
@@ -331,11 +331,11 @@ export class RebaseStep extends Schema.Class<RebaseStep>("RebaseStep")({
  * `detail` carries the failing command on `execFailed`; `onto`/`headName` are the
  * replay target and the branch being rebased.
  */
-export class RebaseStatus extends Schema.Class<RebaseStatus>("RebaseStatus")({
-  inProgress: Schema.Boolean,
-  stopReason: RebaseStopReason,
-  progress: Schema.optional(OperationProgress),
-  detail: Schema.optional(Schema.String),
-  onto: Schema.optional(Schema.String),
-  headName: Schema.optional(Schema.String),
+export class RebaseStatus extends Schema.Class<RebaseStatus>('RebaseStatus')({
+    inProgress: Schema.Boolean,
+    stopReason: RebaseStopReason,
+    progress: Schema.optional(OperationProgress),
+    detail: Schema.optional(Schema.String),
+    onto: Schema.optional(Schema.String),
+    headName: Schema.optional(Schema.String),
 }) {}

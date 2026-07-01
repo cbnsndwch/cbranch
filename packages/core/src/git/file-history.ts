@@ -7,43 +7,43 @@
 // name-status block with a single `\n` (e.g. `\nR100\0old\0new`).
 
 import {
-  type ChangeCode,
-  FileHistoryEntry,
-  FileHistoryPage,
-  type GitError,
-  Oid as OidBrand,
-} from "@cbranch/rpc-contract";
-import { Effect } from "effect";
+    type ChangeCode,
+    FileHistoryEntry,
+    FileHistoryPage,
+    type GitError,
+    Oid as OidBrand,
+} from '@cbranch/rpc-contract';
+import { Effect } from 'effect';
 
-import { classifyExit } from "./errors";
-import { cappedLimit, decodeLogCursor, encodeLogCursor } from "./history";
-import { assertNoLeadingDash, decodeUtf8, runGit } from "./run-git";
+import { classifyExit } from './errors';
+import { cappedLimit, decodeLogCursor, encodeLogCursor } from './history';
+import { assertNoLeadingDash, decodeUtf8, runGit } from './run-git';
 
-const REC = "\x01"; // record sentinel at the start of each commit's format output
-const FSEP = "\x1f"; // unit separator between format fields
+const REC = '\x01'; // record sentinel at the start of each commit's format output
+const FSEP = '\x1f'; // unit separator between format fields
 const FH_FORMAT = `${REC}%H${FSEP}%an${FSEP}%ae${FSEP}%aI${FSEP}%s`;
 
 export interface FileHistoryOptions {
-  readonly limit: number;
-  readonly cursor?: string;
-  readonly startRev?: string;
+    readonly limit: number;
+    readonly cursor?: string;
+    readonly startRev?: string;
 }
 
 const mapStatus = (code: string): ChangeCode => {
-  switch (code.charAt(0)) {
-    case "A":
-      return "added";
-    case "D":
-      return "deleted";
-    case "R":
-      return "renamed";
-    case "C":
-      return "copied";
-    case "T":
-      return "typeChanged";
-    default:
-      return "modified";
-  }
+    switch (code.charAt(0)) {
+        case 'A':
+            return 'added';
+        case 'D':
+            return 'deleted';
+        case 'R':
+            return 'renamed';
+        case 'C':
+            return 'copied';
+        case 'T':
+            return 'typeChanged';
+        default:
+            return 'modified';
+    }
 };
 
 /**
@@ -54,55 +54,57 @@ const mapStatus = (code: string): ChangeCode => {
  * the first name-status entry is the file's change in that revision.
  */
 export const parseFileHistory = (stdout: Buffer): FileHistoryEntry[] => {
-  const tokens = decodeUtf8(stdout).split("\0");
-  const entries: FileHistoryEntry[] = [];
-  let i = 0;
-  while (i < tokens.length) {
-    const tok = tokens[i];
-    if (tok === undefined || !tok.startsWith(REC)) {
-      i++;
-      continue;
+    const tokens = decodeUtf8(stdout).split('\0');
+    const entries: FileHistoryEntry[] = [];
+    let i = 0;
+    while (i < tokens.length) {
+        const tok = tokens[i];
+        if (tok === undefined || !tok.startsWith(REC)) {
+            i++;
+            continue;
+        }
+        const fields = tok.slice(1).split(FSEP);
+        const oid = fields[0];
+        i++;
+
+        const ns: string[] = [];
+        while (i < tokens.length && !(tokens[i] ?? '').startsWith(REC)) {
+            const t = tokens[i] ?? '';
+            if (t !== '') ns.push(t);
+            i++;
+        }
+        if (oid === undefined || oid === '') continue;
+        if (ns.length > 0) ns[0] = (ns[0] as string).replace(/^\n/, '');
+
+        const status = ns[0];
+        const isMove =
+            status !== undefined &&
+            (status.startsWith('R') || status.startsWith('C'));
+        const path = (isMove ? ns[2] : ns[1]) ?? '';
+        const oldPath = isMove ? ns[1] : undefined;
+        const renameScore =
+            isMove && status !== undefined
+                ? Number(status.slice(1))
+                : undefined;
+
+        entries.push(
+            new FileHistoryEntry({
+                oid: OidBrand.make(oid),
+                authorName: fields[1] ?? '',
+                authorEmail: fields[2] ?? '',
+                authorDate: fields[3] ?? '',
+                subject: fields[4] ?? '',
+                path,
+                status: mapStatus(status ?? 'M'),
+                oldPath,
+                renameScore:
+                    renameScore !== undefined && Number.isFinite(renameScore)
+                        ? renameScore
+                        : undefined,
+            }),
+        );
     }
-    const fields = tok.slice(1).split(FSEP);
-    const oid = fields[0];
-    i++;
-
-    const ns: string[] = [];
-    while (i < tokens.length && !(tokens[i] ?? "").startsWith(REC)) {
-      const t = tokens[i] ?? "";
-      if (t !== "") ns.push(t);
-      i++;
-    }
-    if (oid === undefined || oid === "") continue;
-    if (ns.length > 0) ns[0] = (ns[0] as string).replace(/^\n/, "");
-
-    const status = ns[0];
-    const isMove =
-      status !== undefined &&
-      (status.startsWith("R") || status.startsWith("C"));
-    const path = (isMove ? ns[2] : ns[1]) ?? "";
-    const oldPath = isMove ? ns[1] : undefined;
-    const renameScore =
-      isMove && status !== undefined ? Number(status.slice(1)) : undefined;
-
-    entries.push(
-      new FileHistoryEntry({
-        oid: OidBrand.make(oid),
-        authorName: fields[1] ?? "",
-        authorEmail: fields[2] ?? "",
-        authorDate: fields[3] ?? "",
-        subject: fields[4] ?? "",
-        path,
-        status: mapStatus(status ?? "M"),
-        oldPath,
-        renameScore:
-          renameScore !== undefined && Number.isFinite(renameScore)
-            ? renameScore
-            : undefined,
-      }),
-    );
-  }
-  return entries;
+    return entries;
 };
 
 /**
@@ -111,46 +113,47 @@ export const parseFileHistory = (stdout: Buffer): FileHistoryEntry[] => {
  * page rather than an error. READ.
  */
 export const fileHistory = (
-  cwd: string,
-  path: string,
-  opts: FileHistoryOptions,
-  env?: NodeJS.ProcessEnv,
+    cwd: string,
+    path: string,
+    opts: FileHistoryOptions,
+    env?: NodeJS.ProcessEnv,
 ): Effect.Effect<FileHistoryPage, GitError> =>
-  Effect.gen(function* () {
-    const startRev = opts.startRev ?? "HEAD";
-    yield* assertNoLeadingDash(startRev, "revision");
-    const limit = cappedLimit(opts.limit);
-    const skip = decodeLogCursor(opts.cursor)?.skip ?? 0;
+    Effect.gen(function* () {
+        const startRev = opts.startRev ?? 'HEAD';
+        yield* assertNoLeadingDash(startRev, 'revision');
+        const limit = cappedLimit(opts.limit);
+        const skip = decodeLogCursor(opts.cursor)?.skip ?? 0;
 
-    const args = [
-      "log",
-      "--follow",
-      "-z",
-      `--format=${FH_FORMAT}`,
-      "--name-status",
-      `--max-count=${limit}`,
-    ];
-    if (skip > 0) args.push(`--skip=${skip}`);
-    args.push(startRev, "--", path);
+        const args = [
+            'log',
+            '--follow',
+            '-z',
+            `--format=${FH_FORMAT}`,
+            '--name-status',
+            `--max-count=${limit}`,
+        ];
+        if (skip > 0) args.push(`--skip=${skip}`);
+        args.push(startRev, '--', path);
 
-    const res = yield* runGit({ cwd, args, env });
-    if (res.exitCode !== 0) {
-      const head = yield* runGit({
-        cwd,
-        args: ["rev-parse", "--quiet", "--verify", "HEAD"],
-        env,
-      });
-      if (head.exitCode !== 0) return new FileHistoryPage({ entries: [] });
-      return yield* Effect.fail(
-        classifyExit(res.exitCode, decodeUtf8(res.stderr)),
-      );
-    }
+        const res = yield* runGit({ cwd, args, env });
+        if (res.exitCode !== 0) {
+            const head = yield* runGit({
+                cwd,
+                args: ['rev-parse', '--quiet', '--verify', 'HEAD'],
+                env,
+            });
+            if (head.exitCode !== 0)
+                return new FileHistoryPage({ entries: [] });
+            return yield* Effect.fail(
+                classifyExit(res.exitCode, decodeUtf8(res.stderr)),
+            );
+        }
 
-    const entries = parseFileHistory(res.stdout);
-    const last = entries[entries.length - 1];
-    const nextCursor =
-      entries.length === limit && last !== undefined
-        ? encodeLogCursor(skip + entries.length, last.oid)
-        : undefined;
-    return new FileHistoryPage({ entries, nextCursor });
-  });
+        const entries = parseFileHistory(res.stdout);
+        const last = entries[entries.length - 1];
+        const nextCursor =
+            entries.length === limit && last !== undefined
+                ? encodeLogCursor(skip + entries.length, last.oid)
+                : undefined;
+        return new FileHistoryPage({ entries, nextCursor });
+    });

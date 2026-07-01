@@ -4,7 +4,7 @@
 // is on Effect's STABLE track, so it is imported directly (NOT through the unstable
 // adapter — that quarantine is only for `effect/unstable/*`; see DECISIONS D10).
 
-import { Schema } from "effect";
+import { Schema } from 'effect';
 
 /**
  * A Git object id (`repo.open` HEAD, commit oids, tree/blob oids, …).
@@ -14,7 +14,7 @@ import { Schema } from "effect";
  * (DM-001 / 14 §5). Kept as a plain branded string — exactly verbatim per 14 §5 —
  * so both widths (and short oids handed back from git) round-trip unchanged.
  */
-export const Oid = Schema.String.pipe(Schema.brand("Oid"));
+export const Oid = Schema.String.pipe(Schema.brand('Oid'));
 export type Oid = typeof Oid.Type;
 
 /**
@@ -23,5 +23,5 @@ export type Oid = typeof Oid.Type;
  * single `RepoId` (and thus one mutation lock and one set of synced collections).
  * The contract treats it as an opaque branded `string`.
  */
-export const RepoId = Schema.String.pipe(Schema.brand("RepoId"));
+export const RepoId = Schema.String.pipe(Schema.brand('RepoId'));
 export type RepoId = typeof RepoId.Type;

@@ -6,27 +6,27 @@
 // web-server is therefore bundled with esbuild: the workspace packages (@cbranch/core,
 // @cbranch/rpc-contract) are inlined, while `effect` and `@effect/platform-node` stay
 // external and resolve from node_modules at runtime (they ship Node-ready ESM).
-import { copyFileSync, mkdirSync, writeFileSync } from "node:fs";
-import { dirname } from "node:path";
-import { fileURLToPath } from "node:url";
+import { copyFileSync, mkdirSync, writeFileSync } from 'node:fs';
+import { dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-import { build } from "esbuild";
+import { build } from 'esbuild';
 
 await build({
-  entryPoints: ["src/main.ts"],
-  outfile: "dist/main.js",
-  bundle: true,
-  platform: "node",
-  format: "esm",
-  target: "node20",
-  sourcemap: true,
-  external: [
-    "effect",
-    "effect/*",
-    "@effect/platform-node",
-    "@effect/platform-node/*",
-  ],
-  logLevel: "warning",
+    entryPoints: ['src/main.ts'],
+    outfile: 'dist/main.js',
+    bundle: true,
+    platform: 'node',
+    format: 'esm',
+    target: 'node20',
+    sourcemap: true,
+    external: [
+        'effect',
+        'effect/*',
+        '@effect/platform-node',
+        '@effect/platform-node/*',
+    ],
+    logLevel: 'warning',
 });
 
 // esbuild inlines JS imports but NOT a standalone `.mjs` asset that @cbranch/core
@@ -37,18 +37,21 @@ await build({
 copyRebaseShim();
 
 function copyRebaseShim() {
-  const src = fileURLToPath(
-    new URL(
-      "../../packages/core/src/git/shims/rebase-seq-editor.mjs",
-      import.meta.url,
-    ),
-  );
-  const dest = fileURLToPath(
-    new URL("./dist/shims/rebase-seq-editor.mjs", import.meta.url),
-  );
-  mkdirSync(dirname(dest), { recursive: true });
-  copyFileSync(src, dest);
-  // A build-only marker: ONLY this esbuild step writes it (tsc never does), so the
-  // packaged-shim test can distinguish a real bundle from a typecheck-only `dist/`.
-  writeFileSync(fileURLToPath(new URL("./dist/.bundled", import.meta.url)), "");
+    const src = fileURLToPath(
+        new URL(
+            '../../packages/core/src/git/shims/rebase-seq-editor.mjs',
+            import.meta.url,
+        ),
+    );
+    const dest = fileURLToPath(
+        new URL('./dist/shims/rebase-seq-editor.mjs', import.meta.url),
+    );
+    mkdirSync(dirname(dest), { recursive: true });
+    copyFileSync(src, dest);
+    // A build-only marker: ONLY this esbuild step writes it (tsc never does), so the
+    // packaged-shim test can distinguish a real bundle from a typecheck-only `dist/`.
+    writeFileSync(
+        fileURLToPath(new URL('./dist/.bundled', import.meta.url)),
+        '',
+    );
 }

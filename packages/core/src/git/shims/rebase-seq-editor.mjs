@@ -11,29 +11,29 @@
 // then exit. No human edits the todo; the rebase runs fully scripted. We exit
 // non-zero on any problem so a misconfiguration aborts the rebase loudly rather than
 // replaying git's default (unedited) todo.
-import { readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from 'node:fs';
 
 const gitTodoPath = process.argv[2];
 const authoredPath = process.env.CBRANCH_REBASE_TODO;
 
 if (
-  gitTodoPath === undefined ||
-  authoredPath === undefined ||
-  authoredPath === ""
+    gitTodoPath === undefined ||
+    authoredPath === undefined ||
+    authoredPath === ''
 ) {
-  process.stderr.write(
-    "cbranch rebase shim: missing todo path or CBRANCH_REBASE_TODO\n",
-  );
-  process.exit(1);
+    process.stderr.write(
+        'cbranch rebase shim: missing todo path or CBRANCH_REBASE_TODO\n',
+    );
+    process.exit(1);
 }
 
 try {
-  // Byte-for-byte copy: never decode/re-encode the authored todo.
-  writeFileSync(gitTodoPath, readFileSync(authoredPath));
-  // Drop a marker so the engine can tell OUR rebase actually started (git ran this
-  // editor) from a foreign rebase that occupied the repo before git reached the editor.
-  writeFileSync(`${authoredPath}.applied`, "");
+    // Byte-for-byte copy: never decode/re-encode the authored todo.
+    writeFileSync(gitTodoPath, readFileSync(authoredPath));
+    // Drop a marker so the engine can tell OUR rebase actually started (git ran this
+    // editor) from a foreign rebase that occupied the repo before git reached the editor.
+    writeFileSync(`${authoredPath}.applied`, '');
 } catch (err) {
-  process.stderr.write(`cbranch rebase shim: ${String(err)}\n`);
-  process.exit(1);
+    process.stderr.write(`cbranch rebase shim: ${String(err)}\n`);
+    process.exit(1);
 }

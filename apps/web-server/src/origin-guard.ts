@@ -8,20 +8,20 @@
 // middleware to both the request handler and the upgrade handler, so the single guard
 // below covers the static routes, the side-channel, and the `/rpc` WS upgrade.
 
-import { Http } from "@cbranch/rpc-contract/effect-rpc-adapter";
-import { Effect } from "effect";
+import { Http } from '@cbranch/rpc-contract/effect-rpc-adapter';
+import { Effect } from 'effect';
 
-import { normalizeHostname } from "./config";
+import { normalizeHostname } from './config';
 
 /** Extract the lowercased hostname from a `Host` (`h:p`) or `Origin` (URL) header. */
 const hostnameOf = (value: string | undefined): string | undefined => {
-  if (value === undefined || value === "") return undefined;
-  try {
-    const url = new URL(value.includes("://") ? value : `http://${value}`);
-    return normalizeHostname(url.hostname);
-  } catch {
-    return undefined;
-  }
+    if (value === undefined || value === '') return undefined;
+    try {
+        const url = new URL(value.includes('://') ? value : `http://${value}`);
+        return normalizeHostname(url.hostname);
+    } catch {
+        return undefined;
+    }
 };
 
 /**
@@ -32,15 +32,15 @@ const hostnameOf = (value: string | undefined): string | undefined => {
  * tested without a live server.
  */
 export const isAllowedRequest = (
-  headers: Readonly<Record<string, string | undefined>>,
-  allowedHostnames: ReadonlySet<string>,
+    headers: Readonly<Record<string, string | undefined>>,
+    allowedHostnames: ReadonlySet<string>,
 ): boolean => {
-  const host = hostnameOf(headers["host"]);
-  if (host === undefined || !allowedHostnames.has(host)) return false;
-  const origin = headers["origin"];
-  if (origin === undefined || origin === "") return true;
-  const originHost = hostnameOf(origin);
-  return originHost !== undefined && allowedHostnames.has(originHost);
+    const host = hostnameOf(headers['host']);
+    if (host === undefined || !allowedHostnames.has(host)) return false;
+    const origin = headers['origin'];
+    if (origin === undefined || origin === '') return true;
+    const originHost = hostnameOf(origin);
+    return originHost !== undefined && allowedHostnames.has(originHost);
 };
 
 type HttpResponse = Http.HttpServerResponse.HttpServerResponse;
@@ -58,17 +58,17 @@ type HttpRequest = Http.HttpServerRequest.HttpServerRequest;
  * context instead of the `any` the broad `HttpMiddleware` interface would introduce.
  */
 export const makeOriginGuard =
-  (allowedHostnames: ReadonlySet<string>) =>
-  <E, R>(
-    httpEffect: Effect.Effect<HttpResponse, E, R>,
-  ): Effect.Effect<HttpResponse, E, R | HttpRequest> =>
-    Effect.gen(function* () {
-      const request = yield* Http.HttpServerRequest.HttpServerRequest;
-      if (!isAllowedRequest(request.headers, allowedHostnames)) {
-        return Http.HttpServerResponse.text(
-          "forbidden: origin/host not in allowlist",
-          { status: 403 },
-        );
-      }
-      return yield* httpEffect;
-    });
+    (allowedHostnames: ReadonlySet<string>) =>
+    <E, R>(
+        httpEffect: Effect.Effect<HttpResponse, E, R>,
+    ): Effect.Effect<HttpResponse, E, R | HttpRequest> =>
+        Effect.gen(function* () {
+            const request = yield* Http.HttpServerRequest.HttpServerRequest;
+            if (!isAllowedRequest(request.headers, allowedHostnames)) {
+                return Http.HttpServerResponse.text(
+                    'forbidden: origin/host not in allowlist',
+                    { status: 403 },
+                );
+            }
+            return yield* httpEffect;
+        });

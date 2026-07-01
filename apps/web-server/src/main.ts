@@ -7,31 +7,31 @@
 // graceful teardown). The host-git version gate (NF-PKG-5) runs inside the engine
 // layer build, so an absent/too-old git fails startup with a typed `GitError`.
 
-import { gitEngineLayer, makeConfigStore } from "@cbranch/core";
-import * as NodeRuntime from "@effect/platform-node/NodeRuntime";
-import { Effect, Layer } from "effect";
+import { gitEngineLayer, makeConfigStore } from '@cbranch/core';
+import * as NodeRuntime from '@effect/platform-node/NodeRuntime';
+import { Effect, Layer } from 'effect';
 
-import { ensureClientDir, resolveServerConfig } from "./config";
-import { buildServerLive } from "./server";
+import { ensureClientDir, resolveServerConfig } from './config';
+import { buildServerLive } from './server';
 
 const program = Effect.gen(function* () {
-  const persisted = yield* makeConfigStore({ env: process.env }).load();
-  const config = resolveServerConfig({ env: process.env, config: persisted });
-  ensureClientDir(config.clientDir);
+    const persisted = yield* makeConfigStore({ env: process.env }).load();
+    const config = resolveServerConfig({ env: process.env, config: persisted });
+    ensureClientDir(config.clientDir);
 
-  yield* Effect.logInfo(
-    `cbranch web-server starting on http://${config.host}:${config.port} (static bundle: ${config.clientDir})`,
-  );
-  if (!config.isLoopback) {
-    yield* Effect.logWarning(
-      `Binding to non-loopback address ${config.host}: cbranch ships with NO application-level authentication. ` +
-        "Expose it only behind a trusted perimeter (LAN / VPN / SSH tunnel) — never on the public internet.",
+    yield* Effect.logInfo(
+        `cbranch web-server starting on http://${config.host}:${config.port} (static bundle: ${config.clientDir})`,
     );
-  }
+    if (!config.isLoopback) {
+        yield* Effect.logWarning(
+            `Binding to non-loopback address ${config.host}: cbranch ships with NO application-level authentication. ` +
+                'Expose it only behind a trusted perimeter (LAN / VPN / SSH tunnel) — never on the public internet.',
+        );
+    }
 
-  yield* Layer.launch(
-    buildServerLive(config, gitEngineLayer({ env: process.env })),
-  );
+    yield* Layer.launch(
+        buildServerLive(config, gitEngineLayer({ env: process.env })),
+    );
 });
 
 NodeRuntime.runMain(program);

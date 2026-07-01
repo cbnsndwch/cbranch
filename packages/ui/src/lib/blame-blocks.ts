@@ -6,15 +6,15 @@
 // attributed to the same owning commit: the gutter shows the commit attribution once at the
 // block's first line, while every line keeps its own row for selection/navigation.
 
-import { type BlameCommit, type BlameLine } from "@cbranch/rpc-contract";
+import { type BlameCommit, type BlameLine } from '@cbranch/rpc-contract';
 
 export interface BlameBlock {
-  /** The owning commit oid shared by every line in the block. */
-  readonly ownerOid: string;
-  /** Index of the block's first line in the flat `lines` array. */
-  readonly startIndex: number;
-  /** Number of consecutive lines in the block. */
-  readonly count: number;
+    /** The owning commit oid shared by every line in the block. */
+    readonly ownerOid: string;
+    /** Index of the block's first line in the flat `lines` array. */
+    readonly startIndex: number;
+    /** Number of consecutive lines in the block. */
+    readonly count: number;
 }
 
 /**
@@ -23,29 +23,29 @@ export interface BlameBlock {
  * separate blocks — grouping is by adjacency, not by owner identity overall.
  */
 export const groupBlameBlocks = (
-  lines: ReadonlyArray<BlameLine>,
+    lines: ReadonlyArray<BlameLine>,
 ): ReadonlyArray<BlameBlock> => {
-  const blocks: BlameBlock[] = [];
-  for (let i = 0; i < lines.length; i++) {
-    const owner = lines[i]!.ownerOid;
-    const last = blocks[blocks.length - 1];
-    // `last` always ends at line i-1 (each iteration extends it or pushes a new block), so a
-    // matching owner is necessarily adjacent — extend it; otherwise the run is broken, start anew.
-    if (last !== undefined && last.ownerOid === owner) {
-      blocks[blocks.length - 1] = { ...last, count: last.count + 1 };
-    } else {
-      blocks.push({ ownerOid: owner, startIndex: i, count: 1 });
+    const blocks: BlameBlock[] = [];
+    for (let i = 0; i < lines.length; i++) {
+        const owner = lines[i]!.ownerOid;
+        const last = blocks[blocks.length - 1];
+        // `last` always ends at line i-1 (each iteration extends it or pushes a new block), so a
+        // matching owner is necessarily adjacent — extend it; otherwise the run is broken, start anew.
+        if (last !== undefined && last.ownerOid === owner) {
+            blocks[blocks.length - 1] = { ...last, count: last.count + 1 };
+        } else {
+            blocks.push({ ownerOid: owner, startIndex: i, count: 1 });
+        }
     }
-  }
-  return blocks;
+    return blocks;
 };
 
 /** Index the deduped commit headers by oid for O(1) owner lookups during render. */
 export const indexCommits = (
-  commits: ReadonlyArray<BlameCommit>,
-): ReadonlyMap<string, BlameCommit> => new Map(commits.map((c) => [c.oid, c]));
+    commits: ReadonlyArray<BlameCommit>,
+): ReadonlyMap<string, BlameCommit> => new Map(commits.map(c => [c.oid, c]));
 
 /** The set of line indices that open a block (where the gutter attribution is drawn). */
 export const blockStartIndices = (
-  blocks: ReadonlyArray<BlameBlock>,
-): ReadonlySet<number> => new Set(blocks.map((b) => b.startIndex));
+    blocks: ReadonlyArray<BlameBlock>,
+): ReadonlySet<number> => new Set(blocks.map(b => b.startIndex));

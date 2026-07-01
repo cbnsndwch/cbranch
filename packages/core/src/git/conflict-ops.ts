@@ -9,64 +9,66 @@
 // cat-file pool (never `:n:PATH`); the merged write is byte-faithful (no EOL/BOM
 // normalization — REQ-MERGE-019 / REQ-KDIFF-057).
 
-import { writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 import {
-  type ConflictResolution,
-  type ContentEncoding,
-  type GitError,
-} from "@cbranch/rpc-contract";
-import { Effect } from "effect";
+    type ConflictResolution,
+    type ContentEncoding,
+    type GitError,
+} from '@cbranch/rpc-contract';
+import { Effect } from 'effect';
 
-import { type CatFilePool } from "./cat-file-pool";
-import { parseLsFilesUnmerged } from "./conflicts";
-import { gitError } from "./errors";
-import { runGitOk } from "./run-git";
+import { type CatFilePool } from './cat-file-pool';
+import { parseLsFilesUnmerged } from './conflicts';
+import { gitError } from './errors';
+import { runGitOk } from './run-git';
 
 type UnmergedMap = ReturnType<typeof parseLsFilesUnmerged>;
 
 /** Re-read unmerged stages; fail if any requested path is no longer conflicted. */
 const requireUnmerged = (
-  cwd: string,
-  paths: ReadonlyArray<string>,
-  env?: NodeJS.ProcessEnv,
+    cwd: string,
+    paths: ReadonlyArray<string>,
+    env?: NodeJS.ProcessEnv,
 ): Effect.Effect<UnmergedMap, GitError> =>
-  Effect.flatMap(
-    runGitOk({ cwd, args: ["ls-files", "-u", "-z", "--", ...paths], env }),
-    (r) => {
-      const map = parseLsFilesUnmerged(r.stdout);
-      const missing = paths.filter((p) => !map.has(p));
-      return missing.length > 0
-        ? Effect.fail(
-            gitError(
-              "gitFailed",
-              "path is no longer conflicted (resolved or changed outside cbranch)",
-              { paths: missing },
-            ),
-          )
-        : Effect.succeed(map);
-    },
-  );
+    Effect.flatMap(
+        runGitOk({ cwd, args: ['ls-files', '-u', '-z', '--', ...paths], env }),
+        r => {
+            const map = parseLsFilesUnmerged(r.stdout);
+            const missing = paths.filter(p => !map.has(p));
+            return missing.length > 0
+                ? Effect.fail(
+                      gitError(
+                          'gitFailed',
+                          'path is no longer conflicted (resolved or changed outside cbranch)',
+                          { paths: missing },
+                      ),
+                  )
+                : Effect.succeed(map);
+        },
+    );
 
 const mutate = (
-  cwd: string,
-  args: ReadonlyArray<string>,
-  env?: NodeJS.ProcessEnv,
+    cwd: string,
+    args: ReadonlyArray<string>,
+    env?: NodeJS.ProcessEnv,
 ): Effect.Effect<void, GitError> =>
-  Effect.asVoid(runGitOk({ cwd, args, env, read: false }));
+    Effect.asVoid(runGitOk({ cwd, args, env, read: false }));
 
 /** Byte-faithful working-tree write (no normalization), surfaced as fsError. */
 const writeWorktreeFile = (
-  cwd: string,
-  path: string,
-  bytes: Buffer,
+    cwd: string,
+    path: string,
+    bytes: Buffer,
 ): Effect.Effect<void, GitError> =>
-  Effect.try({
-    try: () => writeFileSync(join(cwd, path), bytes),
-    catch: () =>
-      gitError("fsError", "failed to write the working-tree file", { path }),
-  });
+    Effect.try({
+        try: () => writeFileSync(join(cwd, path), bytes),
+        catch: () =>
+            gitError('fsError', 'failed to write the working-tree file', {
+                path,
+            }),
+    });
 
 /**
  * conflict.resolve — apply one whole-file resolution to every given path and stage
@@ -75,52 +77,58 @@ const writeWorktreeFile = (
  * `git rm`. Refuses if any path is no longer unmerged.
  */
 export const conflictResolve = (
-  cwd: string,
-  paths: ReadonlyArray<string>,
-  resolution: ConflictResolution,
-  pool: CatFilePool,
-  env?: NodeJS.ProcessEnv,
+    cwd: string,
+    paths: ReadonlyArray<string>,
+    resolution: ConflictResolution,
+    pool: CatFilePool,
+    env?: NodeJS.ProcessEnv,
 ): Effect.Effect<void, GitError> =>
-  Effect.gen(function* () {
-    if (paths.length === 0) return;
-    const map = yield* requireUnmerged(cwd, paths, env);
-    const writable = [...paths];
+    Effect.gen(function* () {
+        if (paths.length === 0) return;
+        const map = yield* requireUnmerged(cwd, paths, env);
+        const writable = [...paths];
 
-    if (resolution === "ours" || resolution === "theirs") {
-      const side = resolution === "ours" ? "--ours" : "--theirs";
-      yield* mutate(cwd, ["checkout", side, "--", ...writable], env);
-      yield* mutate(cwd, ["add", "--", ...writable], env);
-      return;
-    }
-    if (resolution === "keepFile") {
-      // The modified side is already in the working tree (modify/delete) — stage it.
-      yield* mutate(cwd, ["add", "--", ...writable], env);
-      return;
-    }
-    if (resolution === "deleteFile") {
-      yield* mutate(cwd, ["rm", "--", ...writable], env);
-      return;
-    }
-    // base: write each path's common-ancestor blob (read by OID), then stage it.
-    for (const p of paths) {
-      const base = map.get(p)?.base;
-      if (base === undefined) {
-        return yield* Effect.fail(
-          gitError("gitFailed", "no common-ancestor (base) version to take", {
-            path: p,
-          }),
-        );
-      }
-      const obj = yield* pool.readObject(base.oid);
-      if (obj === null) {
-        return yield* Effect.fail(
-          gitError("gitFailed", "the base blob is unavailable", { path: p }),
-        );
-      }
-      yield* writeWorktreeFile(cwd, p, obj.data);
-      yield* mutate(cwd, ["add", "--", p], env);
-    }
-  });
+        if (resolution === 'ours' || resolution === 'theirs') {
+            const side = resolution === 'ours' ? '--ours' : '--theirs';
+            yield* mutate(cwd, ['checkout', side, '--', ...writable], env);
+            yield* mutate(cwd, ['add', '--', ...writable], env);
+            return;
+        }
+        if (resolution === 'keepFile') {
+            // The modified side is already in the working tree (modify/delete) — stage it.
+            yield* mutate(cwd, ['add', '--', ...writable], env);
+            return;
+        }
+        if (resolution === 'deleteFile') {
+            yield* mutate(cwd, ['rm', '--', ...writable], env);
+            return;
+        }
+        // base: write each path's common-ancestor blob (read by OID), then stage it.
+        for (const p of paths) {
+            const base = map.get(p)?.base;
+            if (base === undefined) {
+                return yield* Effect.fail(
+                    gitError(
+                        'gitFailed',
+                        'no common-ancestor (base) version to take',
+                        {
+                            path: p,
+                        },
+                    ),
+                );
+            }
+            const obj = yield* pool.readObject(base.oid);
+            if (obj === null) {
+                return yield* Effect.fail(
+                    gitError('gitFailed', 'the base blob is unavailable', {
+                        path: p,
+                    }),
+                );
+            }
+            yield* writeWorktreeFile(cwd, p, obj.data);
+            yield* mutate(cwd, ['add', '--', p], env);
+        }
+    });
 
 /**
  * conflict.saveMerged — write the editor's exact Result bytes to the working tree
@@ -129,44 +137,44 @@ export const conflictResolve = (
  * (REQ-EDGE-008).
  */
 export const conflictSaveMerged = (
-  cwd: string,
-  path: string,
-  content: string,
-  encoding: ContentEncoding,
-  env?: NodeJS.ProcessEnv,
+    cwd: string,
+    path: string,
+    content: string,
+    encoding: ContentEncoding,
+    env?: NodeJS.ProcessEnv,
 ): Effect.Effect<void, GitError> =>
-  Effect.gen(function* () {
-    yield* requireUnmerged(cwd, [path], env);
-    const bytes = Buffer.from(
-      content,
-      encoding === "base64" ? "base64" : "utf8",
-    );
-    yield* writeWorktreeFile(cwd, path, bytes);
-    yield* mutate(cwd, ["add", "--", path], env);
-  });
+    Effect.gen(function* () {
+        yield* requireUnmerged(cwd, [path], env);
+        const bytes = Buffer.from(
+            content,
+            encoding === 'base64' ? 'base64' : 'utf8',
+        );
+        yield* writeWorktreeFile(cwd, path, bytes);
+        yield* mutate(cwd, ['add', '--', path], env);
+    });
 
 /**
  * conflict.markResolved — stage the current working-tree content for each path. Refuses
  * if any path is no longer unmerged (REQ-EDGE-008).
  */
 export const conflictMarkResolved = (
-  cwd: string,
-  paths: ReadonlyArray<string>,
-  env?: NodeJS.ProcessEnv,
+    cwd: string,
+    paths: ReadonlyArray<string>,
+    env?: NodeJS.ProcessEnv,
 ): Effect.Effect<void, GitError> =>
-  paths.length === 0
-    ? Effect.void
-    : Effect.gen(function* () {
-        yield* requireUnmerged(cwd, paths, env);
-        yield* mutate(cwd, ["add", "--", ...paths], env);
-      });
+    paths.length === 0
+        ? Effect.void
+        : Effect.gen(function* () {
+              yield* requireUnmerged(cwd, paths, env);
+              yield* mutate(cwd, ['add', '--', ...paths], env);
+          });
 
 /** conflict.markUnresolved — recreate the conflicted merge for each path. */
 export const conflictMarkUnresolved = (
-  cwd: string,
-  paths: ReadonlyArray<string>,
-  env?: NodeJS.ProcessEnv,
+    cwd: string,
+    paths: ReadonlyArray<string>,
+    env?: NodeJS.ProcessEnv,
 ): Effect.Effect<void, GitError> =>
-  paths.length === 0
-    ? Effect.void
-    : mutate(cwd, ["checkout", "-m", "--", ...paths], env);
+    paths.length === 0
+        ? Effect.void
+        : mutate(cwd, ['checkout', '-m', '--', ...paths], env);

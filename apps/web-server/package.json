@@ -1,36 +1,36 @@
 {
-  "name": "@cbranch/web-server",
-  "version": "0.0.0",
-  "private": true,
-  "description": "Node host service + static bundle server. The ONLY package allowed to open a listening socket.",
-  "license": "MIT",
-  "files": [
-    "dist",
-    "public"
-  ],
-  "type": "module",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "default": "./dist/index.js"
+    "name": "@cbranch/web-server",
+    "version": "0.0.0",
+    "private": true,
+    "description": "Node host service + static bundle server. The ONLY package allowed to open a listening socket.",
+    "license": "MIT",
+    "files": [
+        "dist",
+        "public"
+    ],
+    "type": "module",
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "default": "./dist/index.js"
+        }
+    },
+    "scripts": {
+        "build": "tsc -b tsconfig.json && node build.mjs",
+        "typecheck": "tsc -b tsconfig.json",
+        "start": "node dist/main.js",
+        "dev": "node dev.mjs"
+    },
+    "dependencies": {
+        "@cbranch/core": "workspace:*",
+        "@cbranch/rpc-contract": "workspace:*",
+        "@effect/platform-node": "4.0.0-beta.92",
+        "effect": "4.0.0-beta.92"
+    },
+    "devDependencies": {
+        "@types/node": "^26.0.1",
+        "esbuild": "^0.28.1"
     }
-  },
-  "scripts": {
-    "build": "tsc -b tsconfig.json && node build.mjs",
-    "typecheck": "tsc -b tsconfig.json",
-    "start": "node dist/main.js",
-    "dev": "node dev.mjs"
-  },
-  "dependencies": {
-    "@cbranch/core": "workspace:*",
-    "@cbranch/rpc-contract": "workspace:*",
-    "@effect/platform-node": "4.0.0-beta.92",
-    "effect": "4.0.0-beta.92"
-  },
-  "devDependencies": {
-    "@types/node": "^26.0.1",
-    "esbuild": "^0.28.1"
-  }
 }

@@ -1,5 +1,5 @@
-import { PlaceholderPage } from "../components/PlaceholderPage";
+import { PlaceholderPage } from '../components/PlaceholderPage';
 
 export default function Blame() {
-  return <PlaceholderPage title="File blame" />;
+    return <PlaceholderPage title="File blame" />;
 }
