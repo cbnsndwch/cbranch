@@ -141,7 +141,26 @@ Per-feature vertical slices, easiest-first (D18). Each = a `core` commit then a 
   REQ-P5-SM-001..006.
 - ⬜ S7 settings/config · ⬜ S8 interactive rebase.
 
-## ▶ RESUME HERE — P5 COMPLETE ✅ (S1–S8 all landed: gc, clean, archive, reflog, bisect, submodules, settings/config, interactive rebase)
+## ▶ RESUME HERE — P6 COMPLETE ✅ (all 11 slices landed: GUARD, RESET, LINE, NAV, COL, UNDO, INIT, CLOG, META, NOTE, PATCH)
+
+**P6 (completion & utilities, `docs/spec/17`) is done.** Eleven gate-green slices on `main`.
+Completion & safety hardening (UI-only over existing methods): destructive-change
+confirmation for per-file/bulk discard+delete (closes the SC-4 gap), reset-to-commit from
+the stage surface, line-level staging (populates `HunkSelection.selectedLines`), go-to-commit
+by hash (palette + Ctrl+G, pages history in), and persisted history-column visibility (new
+`HistoryColumnVisibility` app-setting). Net-new utilities: undo-last-commit (guarded soft
+reset, message preserved), repo init (`repo.init` + `repoExists` GitError), the Git command
+log (bounded ring buffer tapped from the run-git runners + `commandLog.list/subscribe` +
+routed panel), repository metadata-file editors (`metaFile.read/write`, closed enumerated set,
+CodeMirror; added `@codemirror/commands`), git notes (`notes.list/get/set/remove` + commit-
+detail view/edit/remove + history indicator), and patch interchange (`patch.formatPrepare/
+inspect/apply` + `GET /sidechannel/patch` + inbound `POST /sidechannel/patch-upload`). New
+`GitErrorCode` literals `repoExists`/`patchDoesNotApply` appended to the one closed union;
+new schemas in `schemas/phase6.ts`. **Next: user review.**
+
+---
+
+## P5 COMPLETE ✅ (S1–S8 all landed: gc, clean, archive, reflog, bisect, submodules, settings/config, interactive rebase)
 
 **P5 (power features) is done.** All eight vertical slices landed on `main` core+UI, gate
 green. The last slice, **S8 interactive rebase**, shipped: a scripted `git rebase -i`
