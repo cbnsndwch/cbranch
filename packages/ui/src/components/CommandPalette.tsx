@@ -16,6 +16,7 @@ const looksLikePath = (value: string): boolean =>
 // / NF-A11Y-6). Each dispatches its existing menu command id through the shared handler
 // map, so the palette adds no new behavior. Shown only with a repo open (D18).
 const PALETTE_COMMANDS: ReadonlyArray<{ id: string; label: string }> = [
+    { id: 'commands.reset', label: 'Reset to commit' },
     { id: 'commands.rebase', label: 'Interactive rebase' },
     { id: 'commands.reflog', label: 'Reflog' },
     { id: 'commands.bisect', label: 'Bisect: start' },

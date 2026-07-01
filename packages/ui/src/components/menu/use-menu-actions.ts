@@ -102,6 +102,12 @@ export function useMenuActions(): MenuActions {
             // Commands → Commit… opens the dedicated commit dialog (commit-surface.md §9.4).
             handlers['commands.commit'] = () =>
                 useUiStore.getState().setCommitDialogOpen(true);
+            // Commands → Reset to commit… opens the reset dialog, pre-seeding the selected
+            // commit as the target when one is selected, else empty (REQ-P6-RESET-001).
+            handlers['commands.reset'] = () =>
+                useUiStore
+                    .getState()
+                    .setResetDialog({ target: selectedOid ?? '' });
             // Repository → Maintenance → Compress opens the gc dialog (REQ-P5-GC-001).
             handlers['repository.maintenance.compress'] = () =>
                 useUiStore.getState().setGcDialogOpen(true);

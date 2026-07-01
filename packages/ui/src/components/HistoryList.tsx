@@ -77,6 +77,7 @@ export function HistoryList({
     const setArchiveDialog = useUiStore(s => s.setArchiveDialog);
     const setBisectStartDialog = useUiStore(s => s.setBisectStartDialog);
     const setRebaseDialog = useUiStore(s => s.setRebaseDialog);
+    const setResetDialog = useUiStore(s => s.setResetDialog);
     useEffect(() => {
         const allRefs = [...new Set(rows.flatMap(r => r.refs))];
         setKnownRefStrings(allRefs);
@@ -215,6 +216,7 @@ export function HistoryList({
     const archiveCommit = (target: Oid) =>
         setArchiveDialog({ treeish: target });
     const bisectFrom = (target: Oid) => setBisectStartDialog({ bad: target });
+    const resetToCommit = (target: Oid) => setResetDialog({ target });
     // "Rebase commits since here" seeds the upstream to the commit's first parent, so the
     // replayed range (parent..HEAD) includes the selected commit (REQ-P5-IR-001).
     const rebaseSince = (parents: ReadonlyArray<Oid>) =>
@@ -393,6 +395,13 @@ export function HistoryList({
                                             >
                                                 Rebase commits since here…
                                             </DropdownMenuItem>
+                                            <DropdownMenuItem
+                                                onClick={() =>
+                                                    resetToCommit(row.oid)
+                                                }
+                                            >
+                                                Reset to this commit…
+                                            </DropdownMenuItem>
                                         </DropdownMenuContent>
                                     </DropdownMenu>
                                 </ContextMenuTrigger>
@@ -428,6 +437,11 @@ export function HistoryList({
                                         onClick={() => rebaseSince(row.parents)}
                                     >
                                         Rebase commits since here…
+                                    </ContextMenuItem>
+                                    <ContextMenuItem
+                                        onClick={() => resetToCommit(row.oid)}
+                                    >
+                                        Reset to this commit…
                                     </ContextMenuItem>
                                 </ContextMenuContent>
                             </ContextMenu>

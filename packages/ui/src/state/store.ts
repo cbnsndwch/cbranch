@@ -244,6 +244,17 @@ export interface UiState {
     readonly setRebaseDialog: (
         state: { upstream: string | null; onto?: string } | null,
     ) => void;
+    // ── P6: reset-to-commit dialog ───────────────────────────────────────────────
+    /**
+     * The reset-to-commit dialog, or `null` when closed. `target` pre-seeds the
+     * target ref/oid input (the selected commit from "Reset to this commit…", or ''
+     * to let the user type one). The dialog picks soft/mixed/hard; hard is
+     * confirmation-gated. REQ-P6-RESET-001.
+     */
+    readonly resetDialog: { readonly target: string } | null;
+    readonly setResetDialog: (
+        state: { readonly target: string } | null,
+    ) => void;
     // ── P5: settings & git config dialog ─────────────────────────────────────────
     /** Whether the settings modal (git config + app settings) is open (REQ-P5-CFG-001). App-global. */
     readonly settingsDialogOpen: boolean;
@@ -297,6 +308,7 @@ export const useUiStore = create<UiState>(set => ({
     archiveDialog: null,
     bisectStartDialog: null,
     rebaseDialog: null,
+    resetDialog: null,
     settingsDialogOpen: false,
     findOpen: false,
     branchCreate: null,
@@ -322,6 +334,7 @@ export const useUiStore = create<UiState>(set => ({
             archiveDialog: null,
             bisectStartDialog: null,
             rebaseDialog: null,
+            resetDialog: null,
             findOpen: false,
             branchCreate: null,
             tagCreateOpen: false,
@@ -349,6 +362,7 @@ export const useUiStore = create<UiState>(set => ({
         set(s => ({ commitDraft: { ...s.commitDraft, ...patch } })),
     resetCommitDraft: () => set({ commitDraft: DEFAULT_DRAFT }),
     setCommitDialogOpen: commitDialogOpen => set({ commitDialogOpen }),
+    setResetDialog: resetDialog => set({ resetDialog }),
     setSettingsDialogOpen: settingsDialogOpen => set({ settingsDialogOpen }),
     setFindOpen: findOpen => set({ findOpen }),
     setKeepOpenAfterCommit: keepOpenAfterCommit => {

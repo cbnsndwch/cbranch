@@ -65,6 +65,8 @@ export function StatusPanel({ repoId }: StatusPanelProps) {
     const deleteUntracked = useDeleteUntracked(repoId);
 
     const setCleanDialogOpen = useUiStore(s => s.setCleanDialogOpen);
+    const setResetDialog = useUiStore(s => s.setResetDialog);
+    const selectedOid = useUiStore(s => s.selectedOid);
     const stagedSelection = useUiStore(s => s.stagedSelection);
     const unstagedSelection = useUiStore(s => s.unstagedSelection);
     const toggleStagedSelection = useUiStore(s => s.toggleStagedSelection);
@@ -164,6 +166,11 @@ export function StatusPanel({ repoId }: StatusPanelProps) {
                     }
                     actionLabel="Unstage All"
                     disabled={staged.length === 0}
+                    secondaryAction={{
+                        label: 'Reset…',
+                        onClick: () =>
+                            setResetDialog({ target: selectedOid ?? '' }),
+                    }}
                 />
                 <div className="min-h-0 overflow-y-auto">
                     <StatusChangeList
