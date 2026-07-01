@@ -290,6 +290,13 @@ export interface UiState {
     /** The metadata file currently being edited, or null when the editor is closed. */
     readonly metaFileDialog: MetaFile | null;
     readonly setMetaFileDialog: (file: MetaFile | null) => void;
+    // ── P6: git notes (REQ-P6-NOTE-001..005) ─────────────────────────────────────
+    /** "Show git notes" view toggle — gates the history note indicator (REQ-P6-NOTE-003). */
+    readonly showNotes: boolean;
+    readonly setShowNotes: (show: boolean) => void;
+    /** The commit whose note is being edited, or null when the note editor is closed. */
+    readonly noteEditor: { readonly oid: Oid } | null;
+    readonly setNoteEditor: (state: { readonly oid: Oid } | null) => void;
     // ── P5: settings & git config dialog ─────────────────────────────────────────
     /** Whether the settings modal (git config + app settings) is open (REQ-P5-CFG-001). App-global. */
     readonly settingsDialogOpen: boolean;
@@ -347,6 +354,8 @@ export const useUiStore = create<UiState>(set => ({
     undoDialogOpen: false,
     newRepoDialogOpen: false,
     metaFileDialog: null,
+    showNotes: false,
+    noteEditor: null,
     goToDialogOpen: false,
     gotoRequest: null,
     logLimit: DEFAULT_LOG_LIMIT,
@@ -378,6 +387,7 @@ export const useUiStore = create<UiState>(set => ({
             resetDialog: null,
             undoDialogOpen: false,
             metaFileDialog: null,
+            noteEditor: null,
             goToDialogOpen: false,
             gotoRequest: null,
             logLimit: DEFAULT_LOG_LIMIT,
@@ -412,6 +422,8 @@ export const useUiStore = create<UiState>(set => ({
     setUndoDialogOpen: undoDialogOpen => set({ undoDialogOpen }),
     setNewRepoDialogOpen: newRepoDialogOpen => set({ newRepoDialogOpen }),
     setMetaFileDialog: metaFileDialog => set({ metaFileDialog }),
+    setShowNotes: showNotes => set({ showNotes }),
+    setNoteEditor: noteEditor => set({ noteEditor }),
     setGoToDialogOpen: goToDialogOpen => set({ goToDialogOpen }),
     setGotoRequest: gotoRequest => set({ gotoRequest }),
     setLogLimit: logLimit => set({ logLimit }),

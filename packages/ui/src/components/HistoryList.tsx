@@ -20,7 +20,7 @@ import {
     shortOid,
 } from '../lib/format';
 import { findMatches, stepMatch } from '../lib/quick-find';
-import { useLogStream } from '../rpc/hooks';
+import { useLogStream, useNotedObjects } from '../rpc/hooks';
 import { useUiStore } from '../state/store';
 import { FindBar } from './FindBar';
 import { GraphCell } from './GraphCell';
@@ -78,6 +78,14 @@ export function HistoryList({
 }) {
     const { rows, status } = useLogStream(query);
     const cols = useHistoryColumns();
+    // "Show git notes" gates the per-row note indicator (REQ-P6-NOTE-003).
+    const showNotes = useUiStore(s => s.showNotes);
+    const repoIdForNotes = query?.repoId ?? null;
+    const notedQuery = useNotedObjects(repoIdForNotes, showNotes);
+    const notedOids = useMemo(
+        () => new Set((notedQuery.data ?? []).map(n => n.oid)),
+        [notedQuery.data],
+    );
     const setKnownRefStrings = useUiStore(s => s.setKnownRefStrings);
     const setPickDialog = useUiStore(s => s.setPickDialog);
     const setArchiveDialog = useUiStore(s => s.setArchiveDialog);
@@ -366,6 +374,16 @@ export function HistoryList({
                                         <RefChips refs={row.refs} />
                                     ) : null}
                                     <span className="flex-1 truncate">
+                                        {showNotes &&
+                                            notedOids.has(row.oid) && (
+                                                <span
+                                                    title="This commit has a git note"
+                                                    aria-label="Has a git note"
+                                                    className="text-muted-foreground mr-1"
+                                                >
+                                                    🗒
+                                                </span>
+                                            )}
                                         {row.subject}
                                     </span>
                                     {cols.avatar && (

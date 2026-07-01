@@ -72,6 +72,8 @@ import {
     CommandLogEntry,
     MetaFile,
     MetaFileContent,
+    NoteContent,
+    NotedObject,
     RepoInitResult,
 } from '../schemas/phase6';
 import { Oid, RepoId } from '../schemas/primitives';
@@ -916,6 +918,45 @@ export const CbranchRpcs = RpcGroup.make(
     // metaFile.write ✎ — atomic, path-contained write; creates the file if absent (REQ-P6-META-003).
     Rpc.make('MetaFileWrite', {
         payload: { repoId: RepoId, file: MetaFile, text: Schema.String },
+        success: Schema.Void,
+        error: GitError,
+    }),
+
+    // ── P6: git notes ────────────────────────────────────────────────────────────
+    // notes.list — which commits carry a note (for the history indicator, REQ-P6-NOTE-003).
+    Rpc.make('NotesList', {
+        payload: { repoId: RepoId, ref: Schema.optional(Schema.String) },
+        success: Schema.Array(NotedObject),
+        error: GitError,
+    }),
+    // notes.get — the note on a commit; absence is `present:false`, not an error (REQ-P6-NOTE-001).
+    Rpc.make('NotesGet', {
+        payload: {
+            repoId: RepoId,
+            oid: Oid,
+            ref: Schema.optional(Schema.String),
+        },
+        success: NoteContent,
+        error: GitError,
+    }),
+    // notes.set ✎ — add or edit a commit's note (`git notes add -f -F -`, REQ-P6-NOTE-002).
+    Rpc.make('NotesSet', {
+        payload: {
+            repoId: RepoId,
+            oid: Oid,
+            text: Schema.String,
+            ref: Schema.optional(Schema.String),
+        },
+        success: Schema.Void,
+        error: GitError,
+    }),
+    // notes.remove ✎ — remove a commit's note (`git notes remove`, REQ-P6-NOTE-002).
+    Rpc.make('NotesRemove', {
+        payload: {
+            repoId: RepoId,
+            oid: Oid,
+            ref: Schema.optional(Schema.String),
+        },
         success: Schema.Void,
         error: GitError,
     }),

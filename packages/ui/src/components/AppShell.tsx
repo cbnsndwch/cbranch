@@ -20,6 +20,7 @@ import { GcDialog } from './GcDialog';
 import { GoToCommitDialog } from './GoToCommitDialog';
 import { MetaFileEditorDialog } from './MetaFileEditorDialog';
 import { NewRepoDialog } from './NewRepoDialog';
+import { NoteEditorDialog } from './NoteEditorDialog';
 import { CommitTab } from './CommitTab';
 import { ConflictsPanel } from './ConflictsPanel';
 import { DiffPanel } from './DiffPanel';
@@ -197,6 +198,7 @@ export function AppShell() {
             {repoId && <ResetDialog repoId={repoId} />}
             {repoId && <UndoLastCommitDialog repoId={repoId} />}
             {repoId && <MetaFileEditorDialog repoId={repoId} />}
+            {repoId && <NoteEditorDialog repoId={repoId} />}
             {repoId && <GoToCommitDialog repoId={repoId} />}
             {repoId && editPath !== null && (
                 <MergeEditor

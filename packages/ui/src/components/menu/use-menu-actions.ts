@@ -259,14 +259,26 @@ export function useMenuActions(): MenuActions {
             handlers['commands.solveConflicts'] = () =>
                 useUiStore.getState().setActiveView('solveConflicts');
         }
-        // State-bound checkbox: the date column's relative/absolute mode (P1-HIST-8).
+        // Notes: edit the selected commit's note (REQ-P6-NOTE-002).
+        if (repoId && selectedOid) {
+            handlers['commands.editNote'] = () =>
+                useUiStore.getState().setNoteEditor({ oid: selectedOid });
+        }
+        // State-bound checkboxes: the date column's relative/absolute mode (P1-HIST-8) and
+        // the "Show git notes" indicator toggle (REQ-P6-NOTE-003).
+        const showNotes = useUiStore.getState().showNotes;
         const checkboxes: Record<string, boolean> = {
             'view.showRelativeDate': dateMode === 'relative',
+            'view.showNotes': showNotes,
         };
         handlers['view.showRelativeDate'] = () =>
             useUiStore
                 .getState()
                 .setDateMode(dateMode === 'relative' ? 'absolute' : 'relative');
+        handlers['view.showNotes'] = () =>
+            useUiStore
+                .getState()
+                .setShowNotes(!useUiStore.getState().showNotes);
 
         const recent: DynamicItem[] = (recentQuery.data ?? []).map(r => ({
             id: r.repoId,

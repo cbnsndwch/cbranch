@@ -1,8 +1,10 @@
 import { type Oid, type RepoId } from '@cbranch/rpc-contract';
+import { toast } from 'sonner';
 
 import { formatEpoch, formatInstant, shortOid } from '../lib/format';
-import { useCommitDetail } from '../rpc/hooks';
+import { useCommitDetail, useNote, useRemoveNote } from '../rpc/hooks';
 import { useUiStore } from '../state/store';
+import { Button } from './ui/button';
 import { Placeholder } from './ui/placeholder';
 
 // Commit details (P1-DET-1/3 + P1-UI-DET-1): identity, author/committer, full message,
@@ -18,6 +20,9 @@ export function DetailsPanel({
 }) {
     const { data, isLoading, isError } = useCommitDetail(repoId, oid);
     const dateMode = useUiStore(s => s.dateMode);
+    const setNoteEditor = useUiStore(s => s.setNoteEditor);
+    const note = useNote(repoId, oid);
+    const removeNote = useRemoveNote(repoId);
 
     if (oid === null)
         return <Placeholder>Select a commit to see its details.</Placeholder>;
@@ -74,6 +79,59 @@ export function DetailsPanel({
                     ))}
                 </div>
             ) : null}
+
+            {/* Git note (REQ-P6-NOTE-001/002/004): editing a note rewrites the notes ref,
+          never the commit — the hash is unchanged. */}
+            <div className="mt-1 border-t pt-2">
+                <div className="mb-1 flex items-center gap-2">
+                    <span className="text-muted-foreground text-xs font-medium">
+                        Note
+                    </span>
+                    <div className="ml-auto flex gap-1">
+                        <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-5 px-1.5 text-xs"
+                            onClick={() => setNoteEditor({ oid: data.oid })}
+                        >
+                            {note.data?.present ? 'Edit' : 'Add'}
+                        </Button>
+                        {note.data?.present && (
+                            <Button
+                                size="sm"
+                                variant="ghost"
+                                className="text-destructive hover:text-destructive h-5 px-1.5 text-xs"
+                                disabled={removeNote.isPending}
+                                onClick={() =>
+                                    removeNote.mutate(
+                                        { oid: data.oid },
+                                        {
+                                            onSuccess: () =>
+                                                toast.success('Note removed'),
+                                            onError: () =>
+                                                toast.error(
+                                                    'Could not remove the note',
+                                                ),
+                                        },
+                                    )
+                                }
+                            >
+                                Remove
+                            </Button>
+                        )}
+                    </div>
+                </div>
+                {note.data?.present ? (
+                    <pre className="bg-muted/30 border p-2 text-xs whitespace-pre-wrap">
+                        {note.data.text}
+                    </pre>
+                ) : (
+                    <p className="text-muted-foreground text-xs">
+                        No note on this commit. A note does not change the
+                        commit's hash.
+                    </p>
+                )}
+            </div>
         </div>
     );
 }

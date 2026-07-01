@@ -39,6 +39,8 @@ import {
     type MergeResult,
     type MetaFile,
     type MetaFileContent,
+    type NoteContent,
+    type NotedObject,
     type Oid,
     type PatchSelection,
     type RebasePlan,
@@ -297,6 +299,74 @@ export const useWriteMetaFile = (repoId: RepoId) => {
             void qc.invalidateQueries({ queryKey: [repoId, 'status'] });
             void qc.invalidateQueries({ queryKey: [repoId, 'commits'] });
         },
+    });
+};
+
+// ── git notes (P6) ────────────────────────────────────────────────────────────
+
+/** The default notes ref used across the UI (REQ-P6-NOTE-005). */
+export const DEFAULT_NOTES_REF = 'commits';
+
+/** Which commits carry a note (for the history indicator); gated by `enabled` (the toggle). */
+export const useNotedObjects = (
+    repoId: RepoId | null,
+    enabled: boolean,
+): UseQueryResult<ReadonlyArray<NotedObject>> => {
+    const api = useApi();
+    return useQuery({
+        queryKey: repoId
+            ? [repoId, 'refs', 'notes', DEFAULT_NOTES_REF, 'list']
+            : ['inactive'],
+        queryFn: () => api.notesList(repoId as RepoId),
+        enabled: repoId !== null && enabled,
+    });
+};
+
+/** The note attached to a commit; `present:false` when there is none (REQ-P6-NOTE-001). */
+export const useNote = (
+    repoId: RepoId | null,
+    oid: Oid | null,
+): UseQueryResult<NoteContent> => {
+    const api = useApi();
+    return useQuery({
+        queryKey:
+            repoId && oid
+                ? [repoId, 'refs', 'notes', DEFAULT_NOTES_REF, oid]
+                : ['inactive'],
+        queryFn: () => api.notesGet(repoId as RepoId, oid as Oid),
+        enabled: repoId !== null && oid !== null,
+    });
+};
+
+/** Invalidate the note queries for a repo after a notes mutation. */
+const invalidateNotes = (
+    qc: ReturnType<typeof useQueryClient>,
+    repoId: RepoId,
+) => {
+    void qc.invalidateQueries({
+        queryKey: [repoId, 'refs', 'notes'],
+    });
+    // Displayed identities/indicators live under the commits domain too.
+    void qc.invalidateQueries({ queryKey: [repoId, 'commits'] });
+};
+
+/** Add or edit a commit's note (REQ-P6-NOTE-002). */
+export const useSetNote = (repoId: RepoId) => {
+    const api = useApi();
+    const qc = useQueryClient();
+    return useMutation<void, unknown, { oid: Oid; text: string }>({
+        mutationFn: ({ oid, text }) => api.notesSet(repoId, oid, text),
+        onSuccess: () => invalidateNotes(qc, repoId),
+    });
+};
+
+/** Remove a commit's note (REQ-P6-NOTE-002). */
+export const useRemoveNote = (repoId: RepoId) => {
+    const api = useApi();
+    const qc = useQueryClient();
+    return useMutation<void, unknown, { oid: Oid }>({
+        mutationFn: ({ oid }) => api.notesRemove(repoId, oid),
+        onSuccess: () => invalidateNotes(qc, repoId),
     });
 };
 

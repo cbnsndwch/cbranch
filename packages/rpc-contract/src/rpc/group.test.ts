@@ -80,6 +80,8 @@ import {
 import {
     CommandLogEntry,
     MetaFileContent,
+    NoteContent,
+    NotedObject,
     RepoInitResult,
 } from '../schemas/phase6';
 import { Oid, RepoId } from '../schemas/primitives';
@@ -673,6 +675,13 @@ const handlers = CbranchRpcs.toLayer({
             new MetaFileContent({ file, exists: true, text: 'node_modules\n' }),
         ),
     MetaFileWrite: () => Effect.void,
+
+    // ── P6: git notes ─────────────────────────────────────────────────────────────
+    NotesList: () => Effect.succeed([new NotedObject({ oid: oid1 })]),
+    NotesGet: () =>
+        Effect.succeed(new NoteContent({ present: true, text: 'a note\n' })),
+    NotesSet: () => Effect.void,
+    NotesRemove: () => Effect.void,
 });
 
 describe('CbranchRpcs P1 contract (in-memory RpcTest round-trip)', () => {
@@ -1375,6 +1384,20 @@ describe('CbranchRpcs P5 power-features round-trip', () => {
         expect(content.file).toBe('gitignore');
         expect(content.exists).toBe(true);
         expect(content.text).toBe('node_modules\n');
+    });
+
+    test('notes methods round-trip listing + get', async () => {
+        const program = Effect.gen(function* () {
+            const client = yield* RpcTest.makeClient(CbranchRpcs);
+            const list = yield* client.NotesList({ repoId });
+            const got = yield* client.NotesGet({ repoId, oid: oid1 });
+            return { list, got };
+        }).pipe(Effect.provide(handlers), Effect.scoped);
+
+        const r = await Effect.runPromise(program);
+        expect(r.list).toHaveLength(1);
+        expect(r.got.present).toBe(true);
+        expect(r.got.text).toBe('a note\n');
     });
 
     test('RebasePlan accepts an empty range (commits:[])', () => {

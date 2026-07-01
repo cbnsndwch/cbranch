@@ -416,4 +416,18 @@ export const handlersLayer = CbranchRpcs.toLayer({
         Effect.flatMap(GitEngine, engine =>
             engine.metaFileWrite(repoId, file, text),
         ),
+
+    // ── P6: git notes ──────────────────────────────────────────────────────────
+    NotesList: ({ repoId, ref }) =>
+        Effect.flatMap(GitEngine, engine => engine.notesList(repoId, ref)),
+    NotesGet: ({ repoId, oid, ref }) =>
+        Effect.flatMap(GitEngine, engine => engine.notesGet(repoId, oid, ref)),
+    NotesSet: ({ repoId, oid, text, ref }) =>
+        Effect.flatMap(GitEngine, engine =>
+            engine.notesSet(repoId, oid, text, ref),
+        ),
+    NotesRemove: ({ repoId, oid, ref }) =>
+        Effect.flatMap(GitEngine, engine =>
+            engine.notesRemove(repoId, oid, ref),
+        ),
 });

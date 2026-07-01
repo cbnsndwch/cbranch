@@ -43,6 +43,8 @@ import {
     type KeyBinding,
     type MetaFile,
     type MetaFileContent,
+    type NoteContent,
+    type NotedObject,
     type ThemePref,
     type WritableScope,
     type LogQuery,
@@ -163,6 +165,19 @@ export interface CbranchApi {
     // ── Repository metadata-file editors (P6) ───────────────────────────────────
     metaFileRead(repoId: RepoId, file: MetaFile): Promise<MetaFileContent>;
     metaFileWrite(repoId: RepoId, file: MetaFile, text: string): Promise<void>;
+    // ── Git notes (P6) ──────────────────────────────────────────────────────────
+    notesList(
+        repoId: RepoId,
+        ref?: string,
+    ): Promise<ReadonlyArray<NotedObject>>;
+    notesGet(repoId: RepoId, oid: Oid, ref?: string): Promise<NoteContent>;
+    notesSet(
+        repoId: RepoId,
+        oid: Oid,
+        text: string,
+        ref?: string,
+    ): Promise<void>;
+    notesRemove(repoId: RepoId, oid: Oid, ref?: string): Promise<void>;
     // ── branches (P3) ─────────────────────────────────────────────────────────
     branchList(repoId: RepoId): Promise<BranchListing>;
     branchCreate(
@@ -575,6 +590,20 @@ export const makeApi = (runtime: AppRuntime): CbranchApi => {
         metaFileWrite: (repoId, file, text) =>
             runtime.runPromise(
                 withClient(c => c.MetaFileWrite({ repoId, file, text })),
+            ),
+        notesList: (repoId, ref) =>
+            runtime.runPromise(withClient(c => c.NotesList({ repoId, ref }))),
+        notesGet: (repoId, oid, ref) =>
+            runtime.runPromise(
+                withClient(c => c.NotesGet({ repoId, oid, ref })),
+            ),
+        notesSet: (repoId, oid, text, ref) =>
+            runtime.runPromise(
+                withClient(c => c.NotesSet({ repoId, oid, text, ref })),
+            ),
+        notesRemove: (repoId, oid, ref) =>
+            runtime.runPromise(
+                withClient(c => c.NotesRemove({ repoId, oid, ref })),
             ),
         // ── branches (P3) ───────────────────────────────────────────────────────
         branchList: repoId =>

@@ -73,6 +73,12 @@ import {
 import { gitError } from '../git/errors';
 import { initRepo } from '../git/init';
 import { readMetaFile, writeMetaFile } from '../git/meta-files';
+import {
+    notesGet as notesGetGit,
+    notesList as notesListGit,
+    notesRemove as notesRemoveGit,
+    notesSet as notesSetGit,
+} from '../git/notes';
 import { fileHistory as fileHistoryGit } from '../git/file-history';
 import {
     configGet as configGetGit,
@@ -479,6 +485,28 @@ export const makeGitEngine = (
             metaFileWrite: (repoId, file, text) =>
                 Effect.flatMap(resolveById(repoId), repo =>
                     locks.withRepoLock(repoId)(writeMetaFile(repo, file, text)),
+                ),
+
+            // ── Git notes (P6) ─────────────────────────────────────────────────────
+            notesList: (repoId, ref) =>
+                Effect.flatMap(resolveById(repoId), repo =>
+                    notesListGit(repoCwd(repo), ref, env),
+                ),
+            notesGet: (repoId, oid, ref) =>
+                Effect.flatMap(resolveById(repoId), repo =>
+                    notesGetGit(repoCwd(repo), oid, ref, env),
+                ),
+            notesSet: (repoId, oid, text, ref) =>
+                Effect.flatMap(resolveById(repoId), repo =>
+                    locks.withRepoLock(repoId)(
+                        notesSetGit(repoCwd(repo), oid, text, ref, env),
+                    ),
+                ),
+            notesRemove: (repoId, oid, ref) =>
+                Effect.flatMap(resolveById(repoId), repo =>
+                    locks.withRepoLock(repoId)(
+                        notesRemoveGit(repoCwd(repo), oid, ref, env),
+                    ),
                 ),
 
             logStream: query =>

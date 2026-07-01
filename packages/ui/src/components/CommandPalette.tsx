@@ -24,6 +24,8 @@ const PALETTE_COMMANDS: ReadonlyArray<{ id: string; label: string }> = [
     { id: 'repository.editGitattributes', label: 'Edit .gitattributes' },
     { id: 'repository.editMailmap', label: 'Edit .mailmap' },
     { id: 'repository.editExclude', label: 'Edit info/exclude' },
+    { id: 'commands.editNote', label: 'Notes: edit' },
+    { id: 'view.showNotes', label: 'Toggle git notes' },
     { id: 'commands.rebase', label: 'Interactive rebase' },
     { id: 'commands.reflog', label: 'Reflog' },
     { id: 'commands.bisect', label: 'Bisect: start' },

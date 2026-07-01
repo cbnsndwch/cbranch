@@ -1,7 +1,7 @@
 import { join } from 'node:path';
 
 import { type GitError, type RepoId } from '@cbranch/rpc-contract';
-import { RepoId as RepoIdBrand } from '@cbranch/rpc-contract';
+import { Oid as OidBrand, RepoId as RepoIdBrand } from '@cbranch/rpc-contract';
 import { Effect, Exit } from 'effect';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 
@@ -395,6 +395,39 @@ describe('GitEngine metaFile (P6-META)', () => {
         );
         expect(content.exists).toBe(true);
         expect(content.text).toBe('*.local\n');
+    });
+});
+
+describe('GitEngine notes (P6-NOTE)', () => {
+    test('add, read, list, and remove a note without changing the commit', async () => {
+        const repo = await ws.createRepo('noted');
+        const oid = OidBrand.make(
+            await repo.commit({
+                message: 'c',
+                files: { 'a.txt': 'a\n' },
+            }),
+        );
+        const cfg = newCfg();
+        const result = await withEngine(cfg, e =>
+            Effect.gen(function* () {
+                const h = yield* e.open(repo.dir);
+                const before = yield* e.notesGet(h.repoId, oid);
+                yield* e.notesSet(h.repoId, oid, 'a helpful note\n');
+                const after = yield* e.notesGet(h.repoId, oid);
+                const list = yield* e.notesList(h.repoId);
+                yield* e.notesRemove(h.repoId, oid);
+                const removed = yield* e.notesGet(h.repoId, oid);
+                // The commit itself is untouched by note edits (REQ-P6-NOTE-004).
+                const state = yield* e.state(h.repoId);
+                return { before, after, list, removed, headOid: state.headOid };
+            }),
+        );
+        expect(result.before.present).toBe(false);
+        expect(result.after.present).toBe(true);
+        expect(result.after.text).toBe('a helpful note\n');
+        expect(result.list.some(n => n.oid === oid)).toBe(true);
+        expect(result.removed.present).toBe(false);
+        expect(result.headOid).toBe(oid);
     });
 });
 

@@ -7,7 +7,7 @@
 
 import { Schema } from 'effect';
 
-import { RepoId } from './primitives';
+import { Oid, RepoId } from './primitives';
 
 // ─── repo.init ───────────────────────────────────────────────────────────────────
 
@@ -69,5 +69,21 @@ export class MetaFileContent extends Schema.Class<MetaFileContent>(
 )({
     file: MetaFile,
     exists: Schema.Boolean,
+    text: Schema.String,
+}) {}
+
+// ─── notes.* ───────────────────────────────────────────────────────────────────
+
+/** A commit that carries a git note, for the history indicator (REQ-P6-NOTE-003). */
+export class NotedObject extends Schema.Class<NotedObject>('NotedObject')({
+    oid: Oid,
+}) {}
+
+/**
+ * The note attached to a commit (REQ-P6-NOTE-001). Absence is an ordinary
+ * `present:false` result with empty text — never an error (docs/spec/17 §GitError codes).
+ */
+export class NoteContent extends Schema.Class<NoteContent>('NoteContent')({
+    present: Schema.Boolean,
     text: Schema.String,
 }) {}

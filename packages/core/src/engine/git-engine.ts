@@ -45,6 +45,8 @@ import {
     type GitError,
     type MetaFile,
     type MetaFileContent,
+    type NoteContent,
+    type NotedObject,
     type ReflogPage,
     type InvalidationEvent,
     type LogQuery,
@@ -129,6 +131,32 @@ export interface GitEngineApi {
         repoId: RepoId,
         file: MetaFile,
         text: string,
+    ) => Effect.Effect<void, GitError>;
+
+    // ── Git notes (P6) ──────────────────────────────────────────────────────────
+    /** notes.list — commits that carry a note on the given (default `commits`) ref. */
+    readonly notesList: (
+        repoId: RepoId,
+        ref?: string,
+    ) => Effect.Effect<ReadonlyArray<NotedObject>, GitError>;
+    /** notes.get — the note on a commit; absence is `present:false`, not an error. */
+    readonly notesGet: (
+        repoId: RepoId,
+        oid: Oid,
+        ref?: string,
+    ) => Effect.Effect<NoteContent, GitError>;
+    /** notes.set ✎ — add or edit a commit's note. */
+    readonly notesSet: (
+        repoId: RepoId,
+        oid: Oid,
+        text: string,
+        ref?: string,
+    ) => Effect.Effect<void, GitError>;
+    /** notes.remove ✎ — remove a commit's note. */
+    readonly notesRemove: (
+        repoId: RepoId,
+        oid: Oid,
+        ref?: string,
     ) => Effect.Effect<void, GitError>;
 
     // ── history & diff (P1, core-B) ────────────────────────────────────────────
