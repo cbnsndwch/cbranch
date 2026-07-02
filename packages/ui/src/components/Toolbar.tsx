@@ -521,11 +521,13 @@ export function Toolbar() {
                         <Tooltip>
                             <TooltipTrigger
                                 render={
-                                    <button
+                                    <Button
                                         type="button"
+                                        variant="outline"
+                                        size="sm"
                                         onClick={handleCancel}
                                         aria-label="Cancel sync"
-                                        className="flex h-5.5 items-center gap-0.5 border border-orange-400 px-1.5 text-[11px] text-orange-600"
+                                        className="h-5.5 gap-0.5 border-orange-400 px-1.5 text-[11px] text-orange-600"
                                     />
                                 }
                             >
@@ -544,12 +546,14 @@ export function Toolbar() {
                     <Tooltip>
                         <TooltipTrigger
                             render={
-                                <button
+                                <Button
                                     type="button"
+                                    variant="outline"
+                                    size="sm"
                                     onClick={handleCommit}
                                     disabled={!repoId}
                                     aria-label="Stage & commit changes"
-                                    className="flex h-5.5 items-center gap-0.5 border px-1.5 text-[11px] disabled:opacity-40"
+                                    className="h-5.5 gap-0.5 px-1.5 text-[11px]"
                                 />
                             }
                         >
@@ -695,12 +699,14 @@ function IconButton({ icon: Icon, label, onClick, disabled }: IconButtonProps) {
         <Tooltip>
             <TooltipTrigger
                 render={
-                    <button
+                    <Button
                         type="button"
+                        variant="outline"
+                        size="sm"
                         onClick={onClick}
                         disabled={disabled}
                         aria-label={label}
-                        className="flex h-5.5 items-center border px-1 py-0.5 disabled:opacity-40"
+                        className="h-5.5 px-1 py-0.5"
                     />
                 }
             >
@@ -738,12 +744,14 @@ function SplitButton({
             <Tooltip>
                 <TooltipTrigger
                     render={
-                        <button
+                        <Button
                             type="button"
+                            variant="outline"
+                            size="sm"
                             onClick={onPrimary}
                             disabled={disabled}
                             aria-label={label}
-                            className="flex items-center gap-0.5 border-y border-l px-1 text-[11px]"
+                            className="h-5.5 gap-0.5 border-r-0 px-1 text-[11px]"
                         />
                     }
                 >
@@ -759,7 +767,14 @@ function SplitButton({
                             <DropdownMenuTrigger
                                 disabled={disabled}
                                 aria-label={label + ' options'}
-                                className="flex items-center border px-0.5 text-[11px]"
+                                render={
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        className="h-5.5 px-0.5 text-[11px]"
+                                    />
+                                }
                             />
                         }
                     >
