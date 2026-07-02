@@ -99,6 +99,27 @@ into the shipped browser artifact. `MIT-0` is added to the permissive allow-list
 `scripts/license-audit.mjs` (it is non-copyleft and MIT-compatible); the bundled
 verdict above is unaffected.
 
+### Test-time tooling note — browser-mode test runner (Vitest Browser Mode)
+
+The interaction-fidelity component tests (`*.browser.test.tsx`, run only via
+`pnpm test:browser`) execute in a real headless Chromium through Vitest Browser Mode.
+Its packages are **devDependencies** used only by the test runner and are **never**
+bundled into the shipped browser artifact:
+
+| Package | License | Role |
+|---|---|---|
+| `@vitest/browser` (4.1.9) | MIT | Vitest browser-mode runtime |
+| `@vitest/browser-playwright` (4.1.9) | MIT | Playwright provider factory for the runtime |
+| `vitest-browser-react` (2.2.0) | MIT | `render` for React components in the browser |
+| `playwright` (1.61.1) | Apache-2.0 | Drives the browser; downloads a Chromium build |
+
+All four are on the existing permissive allow-lists (MIT + Apache-2.0), so
+`scripts/license-audit.mjs` needs **no** allow-list change. Playwright downloads a
+Chromium browser build at install time; that browser is an **external process**
+(like the host `git` binary — see below), launched at arm's length and not linked
+into or emitted with cbranch's artifact, so its own licenses do not reach the shipped
+MIT bundle. The bundled-dependency verdict above is unaffected.
+
 ### Build-time tooling note — `caniuse-lite` (CC-BY-4.0)
 
 The Vite / react-router dev tooling pulls in **`browserslist`** transitively, which

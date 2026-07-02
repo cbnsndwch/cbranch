@@ -51,6 +51,12 @@ jobs:
       - name: Test (vitest)
         run: pnpm test
 
+      - name: Install Playwright browser (chromium)
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Browser tests (vitest browser mode)
+        run: pnpm test:browser
+
       - name: Dependency-direction check
         run: pnpm depcheck
 

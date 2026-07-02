@@ -19,6 +19,10 @@ export default defineConfig({
             'packages/*/src/**/*.test.{ts,tsx}',
             'apps/*/src/**/*.test.{ts,tsx}',
         ],
+        // Browser-mode specs (`*.browser.test.tsx`) run in a real Chromium via the
+        // separate `vitest.browser.config.ts`; keep them out of the node/jsdom runner.
+        // Vitest REPLACES (not merges) the default exclude, so restate node_modules/dist.
+        exclude: ['**/node_modules/**', '**/dist/**', '**/*.browser.test.tsx'],
         environment: 'node',
         testTimeout: 15_000,
     },

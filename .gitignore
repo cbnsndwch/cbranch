@@ -23,6 +23,10 @@ coverage/
 # vite cache
 .vite/
 
+# vitest browser-mode artifacts (failure screenshots + attachments/traces)
+**/__screenshots__/
+.vitest-attachments/
+
 # logs / os cruft
 *.log
 .DS_Store
