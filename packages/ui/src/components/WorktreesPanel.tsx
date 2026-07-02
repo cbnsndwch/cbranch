@@ -25,6 +25,13 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from './ui/dropdown-menu';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from './ui/select';
 
 interface WorktreesPanelProps {
     repoId: RepoId;
@@ -172,18 +179,33 @@ export function WorktreesPanel({ repoId }: WorktreesPanelProps) {
                         </label>
                         <label className="flex flex-col gap-1">
                             <span className="text-xs font-medium">Mode</span>
-                            <select
+                            <Select
                                 value={addMode}
-                                onChange={e =>
-                                    setAddMode(e.target.value as AddMode)
+                                onValueChange={value =>
+                                    setAddMode((value ?? 'new') as AddMode)
                                 }
-                                className="h-8 border px-1 text-sm"
                             >
-                                <option value="new">New branch</option>
-                                <option value="existing">
-                                    Existing branch
-                                </option>
-                            </select>
+                                <SelectTrigger
+                                    aria-label="Mode"
+                                    className="h-8 w-full"
+                                >
+                                    <SelectValue>
+                                        {(value: AddMode) =>
+                                            value === 'existing'
+                                                ? 'Existing branch'
+                                                : 'New branch'
+                                        }
+                                    </SelectValue>
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="new">
+                                        New branch
+                                    </SelectItem>
+                                    <SelectItem value="existing">
+                                        Existing branch
+                                    </SelectItem>
+                                </SelectContent>
+                            </Select>
                         </label>
                         <label className="flex flex-col gap-1">
                             <span className="text-xs font-medium">

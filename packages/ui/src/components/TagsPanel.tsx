@@ -29,6 +29,13 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from './ui/dropdown-menu';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from './ui/select';
 
 interface TagsPanelProps {
     repoId: RepoId;
@@ -198,17 +205,40 @@ export function TagsPanel({ repoId }: TagsPanelProps) {
                         </label>
                         <label className="flex flex-col gap-1">
                             <span className="text-xs font-medium">Type</span>
-                            <select
+                            <Select
                                 value={tagType}
-                                onChange={e =>
-                                    setTagType(e.target.value as TagType)
+                                onValueChange={value =>
+                                    setTagType(
+                                        (value ?? 'lightweight') as TagType,
+                                    )
                                 }
-                                className="h-8 border px-1 text-sm"
                             >
-                                <option value="lightweight">Lightweight</option>
-                                <option value="annotated">Annotated</option>
-                                <option value="signed">Signed</option>
-                            </select>
+                                <SelectTrigger
+                                    aria-label="Tag type"
+                                    className="h-8 w-full"
+                                >
+                                    <SelectValue>
+                                        {(value: TagType) =>
+                                            value === 'annotated'
+                                                ? 'Annotated'
+                                                : value === 'signed'
+                                                  ? 'Signed'
+                                                  : 'Lightweight'
+                                        }
+                                    </SelectValue>
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="lightweight">
+                                        Lightweight
+                                    </SelectItem>
+                                    <SelectItem value="annotated">
+                                        Annotated
+                                    </SelectItem>
+                                    <SelectItem value="signed">
+                                        Signed
+                                    </SelectItem>
+                                </SelectContent>
+                            </Select>
                         </label>
                         <label className="flex flex-col gap-1">
                             <span className="text-xs font-medium">Target</span>
@@ -296,23 +326,29 @@ export function TagsPanel({ repoId }: TagsPanelProps) {
                                 <span className="text-xs font-medium">
                                     Remote
                                 </span>
-                                <select
+                                <Select
                                     value={selectedRemote}
-                                    onChange={e =>
-                                        setSelectedRemote(e.target.value)
+                                    onValueChange={value =>
+                                        setSelectedRemote(value ?? '')
                                     }
-                                    className="h-8 border px-1 text-sm"
-                                    aria-label="Remote"
                                 >
-                                    {remoteList.map(remote => (
-                                        <option
-                                            key={remote.name}
-                                            value={remote.name}
-                                        >
-                                            {remote.name}
-                                        </option>
-                                    ))}
-                                </select>
+                                    <SelectTrigger
+                                        aria-label="Remote"
+                                        className="h-8 w-full"
+                                    >
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {remoteList.map(remote => (
+                                            <SelectItem
+                                                key={remote.name}
+                                                value={remote.name}
+                                            >
+                                                {remote.name}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
                             </label>
                         )}
                     </div>

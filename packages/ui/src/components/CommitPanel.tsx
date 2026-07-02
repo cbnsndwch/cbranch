@@ -27,6 +27,13 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from './ui/dropdown-menu';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from './ui/select';
 import { Switch } from './ui/switch';
 import {
     Tooltip,
@@ -298,21 +305,32 @@ export const CommitPanel = forwardRef<CommitPanelHandle, CommitPanelProps>(
                             <span>Sign</span>
                         </span>
                         {commitDraft.sign && (
-                            <select
+                            <Select
                                 value={commitDraft.signFormat}
-                                onChange={e =>
+                                onValueChange={value =>
                                     updateCommitDraft({
-                                        signFormat: e.target.value as
+                                        signFormat: (value ?? 'gpg') as
                                             | 'gpg'
                                             | 'ssh',
                                     })
                                 }
-                                aria-label="Signing format"
-                                className="border-input h-5.5 rounded-none border bg-transparent text-[11px]"
                             >
-                                <option value="gpg">GPG</option>
-                                <option value="ssh">SSH</option>
-                            </select>
+                                <SelectTrigger
+                                    size="sm"
+                                    aria-label="Signing format"
+                                    className="h-5.5 gap-1 px-1 text-[11px]"
+                                >
+                                    <SelectValue>
+                                        {(value: 'gpg' | 'ssh') =>
+                                            value === 'ssh' ? 'SSH' : 'GPG'
+                                        }
+                                    </SelectValue>
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="gpg">GPG</SelectItem>
+                                    <SelectItem value="ssh">SSH</SelectItem>
+                                </SelectContent>
+                            </Select>
                         )}
                         <span className="flex items-center gap-1.5">
                             <Switch

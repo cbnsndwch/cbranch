@@ -1,4 +1,5 @@
-// @vitest-environment jsdom
+// Browser-mode spec: the "Remote" picker is a Base UI popup Select whose value can
+// only be committed in a real browser (jsdom can't lay the popup out).
 import { RepoId } from '@cbranch/rpc-contract';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
@@ -60,6 +61,16 @@ afterEach(() => {
     vi.restoreAllMocks();
 });
 
+/** Open the "Remote" popup Select and commit the option named `name`. In a real
+ * browser Base UI commits on the pointer sequence (jsdom cannot drive this). */
+const chooseRemote = async (name: string) => {
+    fireEvent.click(screen.getByLabelText('Remote'));
+    const option = await screen.findByRole('option', { name });
+    fireEvent.pointerDown(option);
+    fireEvent.pointerUp(option);
+    fireEvent.click(option);
+};
+
 describe('TagsPanel remote selection (UI-011)', () => {
     test('push lets the user choose the remote', async () => {
         const tagPush = vi.fn(async () => undefined);
@@ -70,8 +81,8 @@ describe('TagsPanel remote selection (UI-011)', () => {
         const pushItem = await screen.findByText('Push to remote…');
         act(() => fireEvent.click(pushItem));
 
-        const select = await screen.findByLabelText('Remote');
-        act(() => fireEvent.change(select, { target: { value: 'upstream' } }));
+        await screen.findByLabelText('Remote');
+        await chooseRemote('upstream');
         act(() => fireEvent.click(screen.getByText('Push')));
 
         await waitFor(() =>
@@ -92,8 +103,8 @@ describe('TagsPanel remote selection (UI-011)', () => {
         const deleteItem = await screen.findByText('Delete from remote…');
         act(() => fireEvent.click(deleteItem));
 
-        const select = await screen.findByLabelText('Remote');
-        act(() => fireEvent.change(select, { target: { value: 'upstream' } }));
+        await screen.findByLabelText('Remote');
+        await chooseRemote('upstream');
         act(() => fireEvent.click(screen.getByText('Delete')));
 
         await waitFor(() =>

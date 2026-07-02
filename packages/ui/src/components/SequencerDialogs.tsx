@@ -28,6 +28,13 @@ import { type PickCommit, useUiStore } from '../state/store';
 import { Button } from './ui/button';
 import { Checkbox } from './ui/checkbox';
 import { Dialog, DialogContent, DialogTitle } from './ui/dialog';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from './ui/select';
 
 const NL = String.fromCharCode(10);
 
@@ -181,25 +188,35 @@ function MainlineSelect({
                 This is a merge commit; pick which parent line of history to
                 treat as the mainline.
             </p>
-            <select
-                id="pick-mainline"
+            <Select
                 value={value === null ? '' : String(value)}
-                onChange={e =>
-                    onChange(
-                        e.target.value === '' ? null : Number(e.target.value),
-                    )
+                onValueChange={v =>
+                    onChange(v == null || v === '' ? null : Number(v))
                 }
-                className="border-input h-7 w-full rounded-none border bg-transparent px-1 text-xs focus:outline-none"
             >
-                <option value="" disabled>
-                    Select a parent…
-                </option>
-                {parents.map((oid, i) => (
-                    <option key={oid} value={String(i + 1)}>
-                        Parent {i + 1} — {shortOid(oid)}
-                    </option>
-                ))}
-            </select>
+                <SelectTrigger
+                    id="pick-mainline"
+                    aria-label="Mainline parent"
+                    className="h-7 w-full"
+                >
+                    <SelectValue placeholder="Select a parent…">
+                        {(v: string) => {
+                            const i = Number(v) - 1;
+                            const oid = parents[i];
+                            // Empty/placeholder value: let the placeholder show.
+                            if (oid == null) return null;
+                            return `Parent ${i + 1} — ${shortOid(oid)}`;
+                        }}
+                    </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                    {parents.map((oid, i) => (
+                        <SelectItem key={oid} value={String(i + 1)}>
+                            Parent {i + 1} — {shortOid(oid)}
+                        </SelectItem>
+                    ))}
+                </SelectContent>
+            </Select>
         </div>
     );
 }

@@ -1,4 +1,6 @@
-// @vitest-environment jsdom
+// Browser-mode spec: the per-row action picker and the "New base" picker are Base UI
+// popup Selects whose values can only be committed in a real browser (jsdom can't lay
+// the popup out).
 import {
     BranchInfo,
     BranchListing,
@@ -98,22 +100,26 @@ const renderDialog = (api: CbranchApi) => {
     );
 };
 
-/** Set a row's action via its native select. */
-const chooseAction = (shortOid: string, action: string) => {
-    fireEvent.change(screen.getByLabelText(`Action for ${shortOid}`), {
-        target: { value: action },
-    });
+/** Commit an option in a popup Select. In a real browser Base UI commits on the
+ * pointer sequence (jsdom cannot drive this); `re` matches the option's label. */
+const chooseInSelect = async (triggerLabel: string, re: RegExp) => {
+    fireEvent.click(screen.getByLabelText(triggerLabel));
+    const option = await screen.findByRole('option', { name: re });
+    fireEvent.pointerDown(option);
+    fireEvent.pointerUp(option);
+    fireEvent.click(option);
 };
 
+/** Set a row's action via its popup action Select. */
+const chooseAction = (shortOid: string, action: string) =>
+    chooseInSelect(
+        `Action for ${shortOid}`,
+        new RegExp(`^${action[0].toUpperCase()}${action.slice(1)}$`),
+    );
+
 beforeEach(() => {
-    if (!Element.prototype.scrollIntoView)
-        Element.prototype.scrollIntoView = () => undefined;
-    (globalThis as unknown as { ResizeObserver: unknown }).ResizeObserver =
-        class {
-            observe() {}
-            unobserve() {}
-            disconnect() {}
-        };
+    // No jsdom polyfills here — this runs in a real browser (scrollIntoView /
+    // ResizeObserver are native; stubbing them would break the popup's layout).
     useUiStore.setState({ activeRepoId: repoId, rebaseDialog: null });
     vi.clearAllMocks();
 });
@@ -202,7 +208,7 @@ describe('RebaseDialog', () => {
         });
         await screen.findByText('first');
 
-        chooseAction('11111111', 'reword');
+        await chooseAction('11111111', 'reword');
         fireEvent.click(screen.getByRole('button', { name: 'Message…' }));
         const textarea = (await screen.findByLabelText(
             'Commit message',
@@ -218,7 +224,7 @@ describe('RebaseDialog', () => {
         });
         await screen.findByText('first');
 
-        chooseAction('11111111', 'reword');
+        await chooseAction('11111111', 'reword');
         fireEvent.click(screen.getByRole('button', { name: 'Message…' }));
         const textarea = await screen.findByLabelText('Commit message');
         fireEvent.change(textarea, { target: { value: '   ' } });
@@ -243,7 +249,7 @@ describe('RebaseDialog', () => {
         });
         await screen.findByText('first');
 
-        chooseAction('11111111', 'squash');
+        await chooseAction('11111111', 'squash');
         await waitFor(() =>
             expect(screen.getByRole('alert').textContent).toMatch(
                 /first commit can't be a squash/i,
@@ -265,9 +271,9 @@ describe('RebaseDialog', () => {
         });
         await screen.findByText('first');
 
-        chooseAction('11111111', 'drop');
-        chooseAction('22222222', 'drop');
-        chooseAction('33333333', 'drop');
+        await chooseAction('11111111', 'drop');
+        await chooseAction('22222222', 'drop');
+        await chooseAction('33333333', 'drop');
         await waitFor(() =>
             expect(screen.getByRole('alert').textContent).toMatch(
                 /drops every/i,
@@ -292,9 +298,8 @@ describe('RebaseDialog', () => {
             screen.getByRole('button', { name: 'Move 11111111 down' }),
         );
         fireEvent.click(screen.getByLabelText('Rebase onto a different base'));
-        fireEvent.change(await screen.findByLabelText('New base'), {
-            target: { value: 'main' },
-        });
+        await screen.findByLabelText('New base');
+        await chooseInSelect('New base', /^main$/);
         await act(async () => {
             fireEvent.click(
                 screen.getByRole('button', { name: 'Start rebase' }),
@@ -351,8 +356,8 @@ describe('RebaseDialog', () => {
         });
         await screen.findByText('first');
 
-        chooseAction('11111111', 'reword'); // base of the group, absorbed by the squash
-        chooseAction('22222222', 'squash'); // the consumed (combined) message
+        await chooseAction('11111111', 'reword'); // base of the group, absorbed by the squash
+        await chooseAction('22222222', 'squash'); // the consumed (combined) message
         // Only the squash carries a message editor; the absorbed reword does not.
         expect(
             screen.getAllByRole('button', { name: 'Message…' }),

@@ -1,3 +1,10 @@
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from './ui/select';
 import { Switch } from './ui/switch';
 
 const COMMIT_TYPES = [
@@ -29,19 +36,25 @@ export function ConventionalCommitBar({
 }: ConventionalCommitBarProps) {
     return (
         <div className="flex items-center gap-1.5 px-2 py-1 text-xs">
-            <select
+            <Select
                 value={type}
-                onChange={e => onChange(e.target.value, scope, breaking)}
-                className="border-input h-6 rounded-none border bg-transparent px-1 text-xs focus:outline-none"
-                aria-label="Commit type"
+                onValueChange={value => onChange(value ?? '', scope, breaking)}
             >
-                <option value="">type</option>
-                {COMMIT_TYPES.map(t => (
-                    <option key={t} value={t}>
-                        {t}
-                    </option>
-                ))}
-            </select>
+                <SelectTrigger
+                    size="sm"
+                    aria-label="Commit type"
+                    className="h-6 gap-1 px-1"
+                >
+                    <SelectValue placeholder="type" />
+                </SelectTrigger>
+                <SelectContent>
+                    {COMMIT_TYPES.map(t => (
+                        <SelectItem key={t} value={t}>
+                            {t}
+                        </SelectItem>
+                    ))}
+                </SelectContent>
+            </Select>
             <span className="text-muted-foreground">(</span>
             <input
                 type="text"

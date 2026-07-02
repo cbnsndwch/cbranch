@@ -34,6 +34,13 @@ import {
     DialogDescription,
     DialogTitle,
 } from './ui/dialog';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from './ui/select';
 
 const ACTIONS: ReadonlyArray<RebaseAction> = [
     'pick',
@@ -51,9 +58,6 @@ const ACTION_LABEL: Record<RebaseAction, string> = {
     fixup: 'Fixup',
     drop: 'Drop',
 };
-
-const SELECT_CLASS =
-    'border-input rounded-none border bg-transparent px-1 text-xs focus:outline-none';
 
 const shortOid = (oid: string): string => oid.slice(0, 8);
 
@@ -328,24 +332,35 @@ function RebaseBody({
         onChange: (next: string) => void,
         label: string,
     ) => (
-        <select
-            aria-label={label}
+        <Select
             value={value}
-            onChange={e => onChange(e.target.value)}
+            onValueChange={next => onChange(next ?? '')}
             disabled={start.isPending}
-            className={`h-7 flex-1 ${SELECT_CLASS}`}
         >
-            <option value="">Choose a branch or ref…</option>
-            {value !== '' && !isBranch(value) && (
-                <option value={value}>commit {shortOid(value)}</option>
-            )}
-            {branchItems.map(b => (
-                <option key={b.fullRef} value={b.name}>
-                    {b.name}
-                    {b.isRemote ? ' (remote)' : ''}
-                </option>
-            ))}
-        </select>
+            <SelectTrigger aria-label={label} className="h-7 flex-1">
+                <SelectValue placeholder="Choose a branch or ref…">
+                    {(v: string) => {
+                        if (!v) return null;
+                        if (!isBranch(v)) return `commit ${shortOid(v)}`;
+                        const b = branchItems.find(x => x.name === v);
+                        return b?.isRemote ? `${v} (remote)` : v;
+                    }}
+                </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+                {value !== '' && !isBranch(value) && (
+                    <SelectItem value={value}>
+                        commit {shortOid(value)}
+                    </SelectItem>
+                )}
+                {branchItems.map(b => (
+                    <SelectItem key={b.fullRef} value={b.name}>
+                        {b.name}
+                        {b.isRemote ? ' (remote)' : ''}
+                    </SelectItem>
+                ))}
+            </SelectContent>
+        </Select>
     );
 
     return (
@@ -451,24 +466,34 @@ function RebaseBody({
                                             ▼
                                         </button>
                                     </div>
-                                    <select
-                                        aria-label={`Action for ${shortOid(r.oid)}`}
+                                    <Select
                                         value={r.action}
-                                        onChange={e =>
+                                        onValueChange={v =>
                                             setAction(
                                                 i,
-                                                e.target.value as RebaseAction,
+                                                (v ?? 'pick') as RebaseAction,
                                             )
                                         }
                                         disabled={start.isPending}
-                                        className={`h-6 w-24 shrink-0 ${SELECT_CLASS}`}
                                     >
-                                        {ACTIONS.map(a => (
-                                            <option key={a} value={a}>
-                                                {ACTION_LABEL[a]}
-                                            </option>
-                                        ))}
-                                    </select>
+                                        <SelectTrigger
+                                            aria-label={`Action for ${shortOid(r.oid)}`}
+                                            className="h-6 w-24 shrink-0"
+                                        >
+                                            <SelectValue>
+                                                {(v: RebaseAction) =>
+                                                    ACTION_LABEL[v]
+                                                }
+                                            </SelectValue>
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {ACTIONS.map(a => (
+                                                <SelectItem key={a} value={a}>
+                                                    {ACTION_LABEL[a]}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
                                     <span className="text-muted-foreground shrink-0 font-mono text-[11px]">
                                         {shortOid(r.oid)}
                                     </span>

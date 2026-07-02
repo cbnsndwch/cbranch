@@ -2,6 +2,13 @@ import { ChevronDown, ChevronUp, Columns2, Rows3 } from 'lucide-react';
 
 import { cn } from '../lib/cn';
 import { type DiffOptions, type DiffView } from '../lib/diff';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from './ui/select';
 
 // Diff surface controls (P1-UI-DIFF-2 / P1-DET-3): inline vs side-by-side, a whitespace
 // toggle, a context-lines stepper, previous/next change navigation, and — for merges — a
@@ -138,19 +145,32 @@ export function DiffControls({
             {isMerge ? (
                 <label className="flex items-center gap-1">
                     base
-                    <select
+                    <Select
                         value={baseValue}
-                        onChange={event => onBaseChange(event.target.value)}
-                        className="bg-input/40 text-foreground border px-1 py-0.5"
-                        aria-label="Diff base"
+                        onValueChange={value => onBaseChange(value ?? '0')}
                     >
-                        {parents.map((parent, index) => (
-                            <option key={parent} value={String(index)}>
-                                parent {index + 1}
-                            </option>
-                        ))}
-                        <option value="combined">combined</option>
-                    </select>
+                        <SelectTrigger
+                            size="sm"
+                            aria-label="Diff base"
+                            className="h-6 gap-1 px-1 py-0.5"
+                        >
+                            <SelectValue>
+                                {(value: string) =>
+                                    value === 'combined'
+                                        ? 'combined'
+                                        : `parent ${Number(value) + 1}`
+                                }
+                            </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                            {parents.map((parent, index) => (
+                                <SelectItem key={parent} value={String(index)}>
+                                    parent {index + 1}
+                                </SelectItem>
+                            ))}
+                            <SelectItem value="combined">combined</SelectItem>
+                        </SelectContent>
+                    </Select>
                 </label>
             ) : null}
 

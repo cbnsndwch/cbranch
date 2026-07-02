@@ -1,4 +1,6 @@
-// @vitest-environment jsdom
+// Browser-mode spec: the "Mainline parent" picker is a Base UI popup Select whose
+// value can only be committed in a real browser (jsdom can't lay the popup out).
+// Everything else stays plain @testing-library/react on the real DOM.
 import {
     CommitDetail,
     Oid,
@@ -87,6 +89,19 @@ const openCherryPick = (subject = 'the subject') =>
 const button = (name: string) =>
     screen.getByRole('button', { name }) as HTMLButtonElement;
 
+/** Open the "Mainline parent" popup Select and commit the option matching `re`.
+ * Runs in a real browser, so fireEvent dispatched straight on the elements drives
+ * Base UI's (now properly laid-out) Select — this is exactly what jsdom cannot do,
+ * and it sidesteps the Dialog's inert overlay that blocks Playwright hit-testing. */
+const chooseMainline = async (re: RegExp) => {
+    fireEvent.click(screen.getByLabelText('Mainline parent'));
+    const option = await screen.findByRole('option', { name: re });
+    // Base UI commits selection on the pointer sequence, not a bare click.
+    fireEvent.pointerDown(option);
+    fireEvent.pointerUp(option);
+    fireEvent.click(option);
+};
+
 beforeEach(() => {
     vi.clearAllMocks();
     useUiStore.setState({
@@ -139,13 +154,11 @@ describe('CherryPickDialog (REQ-UX-001/002, AC-3/5)', () => {
             }),
         );
 
-        const select = (await screen.findByLabelText(
-            'Mainline parent',
-        )) as HTMLSelectElement;
+        await screen.findByLabelText('Mainline parent');
         expect(button('Cherry-pick').disabled).toBe(true);
 
-        fireEvent.change(select, { target: { value: '2' } });
-        expect(button('Cherry-pick').disabled).toBe(false);
+        await chooseMainline(/Parent 2/);
+        await waitFor(() => expect(button('Cherry-pick').disabled).toBe(false));
         fireEvent.click(button('Cherry-pick'));
 
         await waitFor(() =>
@@ -319,11 +332,9 @@ describe('RevertDialog (REQ-RV-001/002)', () => {
             }),
         );
 
-        const select = (await screen.findByLabelText(
-            'Mainline parent',
-        )) as HTMLSelectElement;
+        await screen.findByLabelText('Mainline parent');
         expect(button('Revert').disabled).toBe(true);
-        fireEvent.change(select, { target: { value: '1' } });
+        await chooseMainline(/Parent 1/);
         fireEvent.click(button('Revert'));
 
         await waitFor(() =>

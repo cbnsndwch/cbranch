@@ -23,6 +23,9 @@ export default defineConfig({
     test: {
         include: ['packages/ui/src/**/*.browser.test.tsx'],
         testTimeout: 15_000,
+        // Serialize browser specs: parallel Chromium contexts race over shared
+        // portals/resources and flake (a file passes alone but fails in the pack).
+        fileParallelism: false,
         browser: {
             enabled: true,
             // Vitest 4 takes a provider FACTORY (not the string 'playwright').

@@ -166,8 +166,12 @@ describe('DiffPanel (P1-DIFF-*)', () => {
             <DiffPanel repoId={repoId} oid={oid} />,
             fakeApi([file({ newPath: 'a.ts' })], [p1, p2]),
         );
-        expect(await screen.findByLabelText('Diff base')).toBeTruthy();
-        expect(screen.getByText('combined')).toBeTruthy();
+        // The base selector is a popup Select: its options mount into a portal only
+        // once opened (jsdom renders the open popup fine; only committing a choice
+        // needs a real browser — see browser-mode tests).
+        const baseSelect = await screen.findByLabelText('Diff base');
+        fireEvent.click(baseSelect);
+        expect(await screen.findByText('combined')).toBeTruthy();
     });
 
     test('submodule entries render as a placeholder, not text (P1-DIFF-10)', async () => {

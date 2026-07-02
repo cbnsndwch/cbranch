@@ -51,6 +51,13 @@ import {
     DropdownMenuTrigger,
 } from './ui/dropdown-menu';
 import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from './ui/select';
+import {
     Tooltip,
     TooltipContent,
     TooltipProvider,
@@ -574,15 +581,32 @@ export function Toolbar() {
 
                     <Separator />
 
-                    <select
+                    <Select
                         value={filters.refScope === 'all' ? 'all' : 'current'}
-                        onChange={e => handleScopeChange(e.target.value)}
-                        className="h-5 border text-[11px]"
-                        aria-label="History ref scope"
+                        onValueChange={value =>
+                            handleScopeChange(value ?? 'current')
+                        }
                     >
-                        <option value="current">Current branch</option>
-                        <option value="all">All branches</option>
-                    </select>
+                        <SelectTrigger
+                            size="sm"
+                            aria-label="History ref scope"
+                            className="h-5 gap-1 px-1 text-[11px]"
+                        >
+                            <SelectValue>
+                                {(value: string) =>
+                                    value === 'all'
+                                        ? 'All branches'
+                                        : 'Current branch'
+                                }
+                            </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="current">
+                                Current branch
+                            </SelectItem>
+                            <SelectItem value="all">All branches</SelectItem>
+                        </SelectContent>
+                    </Select>
                     <form
                         onSubmit={handleSubmit}
                         className="flex items-center gap-1"
