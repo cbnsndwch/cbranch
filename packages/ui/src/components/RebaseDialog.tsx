@@ -41,6 +41,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from './ui/select';
+import { Textarea } from './ui/textarea';
 
 const ACTIONS: ReadonlyArray<RebaseAction> = [
     'pick',
@@ -634,11 +635,11 @@ function RebaseMessageDialog({
                             ? 'Edit the commit message used when this commit is replayed.'
                             : 'Edit the combined message for the squashed commits.'}
                     </DialogDescription>
-                    <textarea
+                    <Textarea
                         aria-label="Commit message"
                         value={value}
                         onChange={e => setValue(e.target.value)}
-                        className="h-40 w-full border px-2 py-1 font-mono text-xs"
+                        className="h-40 font-mono text-xs"
                     />
                     <div className="flex justify-end gap-2">
                         <Button variant="outline" size="sm" onClick={onCancel}>

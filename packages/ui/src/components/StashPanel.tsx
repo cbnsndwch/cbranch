@@ -26,12 +26,15 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from './ui/alert-dialog';
+import { Button } from './ui/button';
+import { Checkbox } from './ui/checkbox';
 import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from './ui/dropdown-menu';
+import { Input } from './ui/input';
 
 interface StashPanelProps {
     repoId: RepoId;
@@ -135,21 +138,25 @@ export function StashPanel({ repoId }: StashPanelProps) {
                 <h2 className="text-sm font-medium">Stash ({list.length})</h2>
                 <div className="flex gap-1">
                     {list.length > 0 && (
-                        <button
+                        <Button
                             type="button"
+                            variant="outline"
+                            size="sm"
                             onClick={() => setClearConfirmOpen(true)}
-                            className="hover:bg-accent flex h-[22px] items-center border px-2 text-[11px]"
+                            className="h-[22px] px-2 text-[11px]"
                         >
                             Clear all
-                        </button>
+                        </Button>
                     )}
-                    <button
+                    <Button
                         type="button"
+                        variant="outline"
+                        size="sm"
                         onClick={() => setNewStashOpen(true)}
-                        className="hover:bg-accent flex h-[22px] items-center border px-2 text-[11px]"
+                        className="h-[22px] px-2 text-[11px]"
                     >
                         + Stash
-                    </button>
+                    </Button>
                 </div>
             </div>
 
@@ -200,38 +207,40 @@ export function StashPanel({ repoId }: StashPanelProps) {
                             <span className="text-xs font-medium">
                                 Message (optional)
                             </span>
-                            <input
-                                type="text"
+                            <Input
                                 value={stashMessage}
                                 onChange={e => setStashMessage(e.target.value)}
                                 placeholder="WIP: my changes"
-                                className="h-8 w-full border px-2 text-sm"
                                 autoFocus
                             />
                         </label>
                         <label className="flex items-center gap-2 text-sm">
-                            <input
-                                type="checkbox"
+                            <Checkbox
+                                aria-label="Stash untracked files"
                                 checked={includeUntracked}
-                                onChange={e =>
-                                    setIncludeUntracked(e.target.checked)
+                                onCheckedChange={checked =>
+                                    setIncludeUntracked(checked)
                                 }
                             />
                             Include untracked files
                         </label>
                         <label className="flex items-center gap-2 text-sm">
-                            <input
-                                type="checkbox"
+                            <Checkbox
+                                aria-label="Keep index"
                                 checked={keepIndex}
-                                onChange={e => setKeepIndex(e.target.checked)}
+                                onCheckedChange={checked =>
+                                    setKeepIndex(checked)
+                                }
                             />
                             Keep index (staged changes stay staged)
                         </label>
                         <label className="flex items-center gap-2 text-sm">
-                            <input
-                                type="checkbox"
+                            <Checkbox
+                                aria-label="Stash staged changes only"
                                 checked={stagedOnly}
-                                onChange={e => setStagedOnly(e.target.checked)}
+                                onCheckedChange={checked =>
+                                    setStagedOnly(checked)
+                                }
                             />
                             Staged only
                         </label>

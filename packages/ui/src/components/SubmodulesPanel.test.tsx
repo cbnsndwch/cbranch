@@ -264,7 +264,7 @@ describe('SubmodulesPanel', () => {
         renderPanel(makeFakeApi({ submoduleUpdate }));
 
         await screen.findByText('vendor/a');
-        act(() => fireEvent.click(screen.getByLabelText('Recursive')));
+        act(() => fireEvent.click(screen.getByLabelText('Recursive update')));
         act(() => fireEvent.click(screen.getByText('Update all')));
 
         await waitFor(() =>

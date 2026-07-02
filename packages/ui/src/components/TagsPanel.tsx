@@ -22,6 +22,8 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from './ui/alert-dialog';
+import { Button } from './ui/button';
+import { Checkbox } from './ui/checkbox';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -29,6 +31,7 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from './ui/dropdown-menu';
+import { Input } from './ui/input';
 import {
     Select,
     SelectContent,
@@ -146,13 +149,15 @@ export function TagsPanel({ repoId }: TagsPanelProps) {
             {/* Header */}
             <div className="flex items-center justify-between border-b px-3 py-1.5">
                 <h2 className="text-sm font-medium">Tags ({list.length})</h2>
-                <button
+                <Button
                     type="button"
+                    variant="outline"
+                    size="sm"
                     onClick={() => setCreateOpen(true)}
-                    className="hover:bg-accent flex h-[22px] items-center border px-2 text-[11px]"
+                    className="h-[22px] px-2 text-[11px]"
                 >
                     + New Tag
-                </button>
+                </Button>
             </div>
 
             {/* Tag list */}
@@ -194,12 +199,10 @@ export function TagsPanel({ repoId }: TagsPanelProps) {
                             <span className="text-xs font-medium">
                                 Tag name
                             </span>
-                            <input
-                                type="text"
+                            <Input
                                 value={tagName}
                                 onChange={e => setTagName(e.target.value)}
                                 placeholder="v1.0.0"
-                                className="h-8 w-full border px-2 text-sm"
                                 autoFocus
                             />
                         </label>
@@ -242,12 +245,10 @@ export function TagsPanel({ repoId }: TagsPanelProps) {
                         </label>
                         <label className="flex flex-col gap-1">
                             <span className="text-xs font-medium">Target</span>
-                            <input
-                                type="text"
+                            <Input
                                 value={tagTarget}
                                 onChange={e => setTagTarget(e.target.value)}
                                 placeholder="HEAD"
-                                className="h-8 w-full border px-2 text-sm"
                             />
                         </label>
                         {(tagType === 'annotated' || tagType === 'signed') && (
@@ -255,22 +256,22 @@ export function TagsPanel({ repoId }: TagsPanelProps) {
                                 <span className="text-xs font-medium">
                                     Message
                                 </span>
-                                <input
-                                    type="text"
+                                <Input
                                     value={tagMessage}
                                     onChange={e =>
                                         setTagMessage(e.target.value)
                                     }
                                     placeholder="Release v1.0.0"
-                                    className="h-8 w-full border px-2 text-sm"
                                 />
                             </label>
                         )}
                         <label className="flex items-center gap-2 text-sm">
-                            <input
-                                type="checkbox"
+                            <Checkbox
+                                aria-label="Force overwrite existing tag"
                                 checked={tagForce}
-                                onChange={e => setTagForce(e.target.checked)}
+                                onCheckedChange={checked =>
+                                    setTagForce(checked)
+                                }
                             />
                             Force (overwrite existing tag)
                         </label>

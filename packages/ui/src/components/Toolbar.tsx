@@ -43,6 +43,7 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from './ui/alert-dialog';
+import { Button } from './ui/button';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -50,6 +51,7 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from './ui/dropdown-menu';
+import { Input } from './ui/input';
 import {
     Select,
     SelectContent,
@@ -613,21 +615,22 @@ export function Toolbar() {
                     >
                         <label className="flex items-center gap-1 text-[11px]">
                             <Search className="size-3" aria-hidden="true" />
-                            <input
-                                type="text"
+                            <Input
                                 value={filters.grep}
                                 onChange={e => handleGrepChange(e.target.value)}
                                 placeholder="Filter commits…"
-                                className="h-5 w-40 border px-1 text-[11px]"
+                                className="h-5 w-40 px-1 text-[11px]"
                                 aria-label="Filter commits"
                             />
                         </label>
-                        <button
+                        <Button
                             type="submit"
-                            className="h-5 border px-2 text-[11px]"
+                            variant="outline"
+                            size="sm"
+                            className="h-5 px-2 text-[11px]"
                         >
                             Apply
-                        </button>
+                        </Button>
                     </form>
                 </div>
 

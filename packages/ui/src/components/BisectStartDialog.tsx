@@ -18,6 +18,7 @@ import {
     DialogDescription,
     DialogTitle,
 } from './ui/dialog';
+import { Input } from './ui/input';
 
 const errorMessage = (error: unknown): string =>
     error != null && typeof error === 'object' && 'message' in error
@@ -73,8 +74,6 @@ function BisectStartBody({
             },
         );
 
-    const field = 'h-8 w-full border px-2 text-sm font-mono';
-
     return (
         <Dialog
             open={true}
@@ -93,25 +92,23 @@ function BisectStartBody({
 
                     <div className="flex flex-col gap-1 text-sm">
                         <span>Known bad (optional)</span>
-                        <input
-                            type="text"
+                        <Input
                             aria-label="Known bad commit"
                             value={bad}
                             onChange={e => setBad(e.target.value)}
                             placeholder="commit oid"
-                            className={field}
+                            className="font-mono"
                             disabled={start.isPending}
                         />
                     </div>
                     <div className="flex flex-col gap-1 text-sm">
                         <span>Known good (optional)</span>
-                        <input
-                            type="text"
+                        <Input
                             aria-label="Known good commit"
                             value={good}
                             onChange={e => setGood(e.target.value)}
                             placeholder="commit oid"
-                            className={field}
+                            className="font-mono"
                             disabled={start.isPending}
                         />
                     </div>

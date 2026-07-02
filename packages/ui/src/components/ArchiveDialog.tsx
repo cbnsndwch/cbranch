@@ -19,6 +19,7 @@ import {
     DialogDescription,
     DialogTitle,
 } from './ui/dialog';
+import { Input } from './ui/input';
 import {
     Select,
     SelectContent,
@@ -109,8 +110,6 @@ function ArchiveDialogBody({
         }
     };
 
-    const field = 'h-8 w-full border px-2 text-sm';
-
     return (
         <Dialog
             open={true}
@@ -128,13 +127,11 @@ function ArchiveDialogBody({
 
                     <div className="flex flex-col gap-1 text-sm">
                         <span>Tree-ish</span>
-                        <input
-                            type="text"
+                        <Input
                             aria-label="Tree-ish"
                             value={treeish}
                             onChange={e => setTreeish(e.target.value)}
                             placeholder="HEAD, a branch, a tag, or a commit"
-                            className={field}
                             disabled={busy}
                         />
                     </div>
@@ -168,26 +165,22 @@ function ArchiveDialogBody({
 
                     <div className="flex flex-col gap-1 text-sm">
                         <span>Prefix (optional)</span>
-                        <input
-                            type="text"
+                        <Input
                             aria-label="Prefix"
                             value={prefix}
                             onChange={e => setPrefix(e.target.value)}
                             placeholder="e.g. my-project/"
-                            className={field}
                             disabled={busy}
                         />
                     </div>
 
                     <div className="flex flex-col gap-1 text-sm">
                         <span>Sub-path (optional)</span>
-                        <input
-                            type="text"
+                        <Input
                             aria-label="Sub-path"
                             value={subPath}
                             onChange={e => setSubPath(e.target.value)}
                             placeholder="e.g. src"
-                            className={field}
                             disabled={busy}
                         />
                     </div>

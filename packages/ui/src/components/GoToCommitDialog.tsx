@@ -18,6 +18,7 @@ import {
     DialogDescription,
     DialogTitle,
 } from './ui/dialog';
+import { Input } from './ui/input';
 
 export function GoToCommitDialog({ repoId }: { repoId: RepoId }) {
     const open = useUiStore(s => s.goToDialogOpen);
@@ -71,9 +72,8 @@ function GoToCommitDialogBody({ repoId }: { repoId: RepoId }) {
                         history will scroll to and select it, loading more if
                         needed.
                     </DialogDescription>
-                    <input
+                    <Input
                         autoFocus
-                        className="h-8 w-full border px-2 text-sm"
                         aria-label="Commit hash or ref"
                         value={value}
                         onChange={e => {

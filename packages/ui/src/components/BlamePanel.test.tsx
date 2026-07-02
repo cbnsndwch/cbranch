@@ -254,12 +254,10 @@ describe('BlamePanel (REQ-UX-009)', () => {
     test('the syntax-highlighting toggle is available and lines stay rendered when off', async () => {
         renderPanel(makeApi());
         await screen.findByText('const one = 1;');
-        const toggle = screen.getByLabelText(
-            'Syntax highlighting',
-        ) as HTMLInputElement;
-        expect(toggle.checked).toBe(true);
+        const toggle = screen.getByLabelText('Toggle syntax highlighting');
+        expect(toggle.getAttribute('aria-checked')).toBe('true');
         act(() => fireEvent.click(toggle));
-        expect(toggle.checked).toBe(false);
+        expect(toggle.getAttribute('aria-checked')).toBe('false');
         expect(screen.getByText('const one = 1;')).toBeTruthy();
     });
 });

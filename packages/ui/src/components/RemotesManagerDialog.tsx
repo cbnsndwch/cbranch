@@ -18,6 +18,8 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from './ui/alert-dialog';
+import { Button } from './ui/button';
+import { Input } from './ui/input';
 
 interface RemotesManagerDialogProps {
     repoId: RepoId;
@@ -171,8 +173,7 @@ export function RemotesManagerDialog({
                                             editState.remoteName ===
                                                 remote.name ? (
                                                 <div className="flex items-center gap-1">
-                                                    <input
-                                                        type="text"
+                                                    <Input
                                                         value={editState.value}
                                                         onChange={e =>
                                                             setEditState({
@@ -181,7 +182,7 @@ export function RemotesManagerDialog({
                                                                     .value,
                                                             })
                                                         }
-                                                        className="h-7 w-28 border px-1 text-xs"
+                                                        className="h-7 w-28 px-1 text-xs"
                                                         autoFocus
                                                         onKeyDown={e => {
                                                             if (
@@ -198,27 +199,31 @@ export function RemotesManagerDialog({
                                                                 );
                                                         }}
                                                     />
-                                                    <button
+                                                    <Button
                                                         type="button"
+                                                        variant="outline"
+                                                        size="sm"
                                                         onClick={
                                                             handleRenameConfirm
                                                         }
-                                                        className="h-7 border px-1.5 text-xs"
+                                                        className="h-7 px-1.5 text-xs"
                                                         disabled={
                                                             renameMut.isPending
                                                         }
                                                     >
                                                         OK
-                                                    </button>
-                                                    <button
+                                                    </Button>
+                                                    <Button
                                                         type="button"
+                                                        variant="outline"
+                                                        size="sm"
                                                         onClick={() =>
                                                             setEditState(null)
                                                         }
-                                                        className="h-7 border px-1.5 text-xs"
+                                                        className="h-7 px-1.5 text-xs"
                                                     >
                                                         Cancel
-                                                    </button>
+                                                    </Button>
                                                 </div>
                                             ) : (
                                                 <span className="font-mono text-xs">
@@ -231,8 +236,7 @@ export function RemotesManagerDialog({
                                             editState.remoteName ===
                                                 remote.name ? (
                                                 <div className="flex items-center gap-1">
-                                                    <input
-                                                        type="text"
+                                                    <Input
                                                         value={editState.value}
                                                         onChange={e =>
                                                             setEditState({
@@ -241,7 +245,7 @@ export function RemotesManagerDialog({
                                                                     .value,
                                                             })
                                                         }
-                                                        className="h-7 min-w-0 flex-1 border px-1 text-xs"
+                                                        className="h-7 min-w-0 flex-1 px-1 text-xs"
                                                         autoFocus
                                                         onKeyDown={e => {
                                                             if (
@@ -258,27 +262,31 @@ export function RemotesManagerDialog({
                                                                 );
                                                         }}
                                                     />
-                                                    <button
+                                                    <Button
                                                         type="button"
+                                                        variant="outline"
+                                                        size="sm"
                                                         onClick={
                                                             handleEditUrlConfirm
                                                         }
-                                                        className="h-7 shrink-0 border px-1.5 text-xs"
+                                                        className="h-7 shrink-0 px-1.5 text-xs"
                                                         disabled={
                                                             setUrlMut.isPending
                                                         }
                                                     >
                                                         OK
-                                                    </button>
-                                                    <button
+                                                    </Button>
+                                                    <Button
                                                         type="button"
+                                                        variant="outline"
+                                                        size="sm"
                                                         onClick={() =>
                                                             setEditState(null)
                                                         }
-                                                        className="h-7 shrink-0 border px-1.5 text-xs"
+                                                        className="h-7 shrink-0 px-1.5 text-xs"
                                                     >
                                                         Cancel
-                                                    </button>
+                                                    </Button>
                                                 </div>
                                             ) : (
                                                 <span
@@ -291,8 +299,10 @@ export function RemotesManagerDialog({
                                         </td>
                                         <td className="py-1.5">
                                             <div className="flex gap-1">
-                                                <button
+                                                <Button
                                                     type="button"
+                                                    variant="outline"
+                                                    size="sm"
                                                     onClick={() =>
                                                         handleEditUrlStart(
                                                             remote,
@@ -301,12 +311,14 @@ export function RemotesManagerDialog({
                                                     disabled={
                                                         editState !== null
                                                     }
-                                                    className="h-6 border px-1.5 text-[10px] disabled:opacity-40"
+                                                    className="h-6 px-1.5 text-[10px]"
                                                 >
                                                     Edit URL
-                                                </button>
-                                                <button
+                                                </Button>
+                                                <Button
                                                     type="button"
+                                                    variant="outline"
+                                                    size="sm"
                                                     onClick={() =>
                                                         handleRenameStart(
                                                             remote,
@@ -315,15 +327,17 @@ export function RemotesManagerDialog({
                                                     disabled={
                                                         editState !== null
                                                     }
-                                                    className="h-6 border px-1.5 text-[10px] disabled:opacity-40"
+                                                    className="h-6 px-1.5 text-[10px]"
                                                 >
                                                     Rename
-                                                </button>
+                                                </Button>
                                                 {confirmRemove ===
                                                 remote.name ? (
                                                     <>
-                                                        <button
+                                                        <Button
                                                             type="button"
+                                                            variant="destructive"
+                                                            size="sm"
                                                             onClick={() =>
                                                                 handleRemove(
                                                                     remote.name,
@@ -332,27 +346,31 @@ export function RemotesManagerDialog({
                                                             disabled={
                                                                 removeMut.isPending
                                                             }
-                                                            className="bg-destructive text-destructive-foreground h-6 border px-1.5 text-[10px] disabled:opacity-40"
+                                                            className="h-6 px-1.5 text-[10px]"
                                                         >
                                                             {removeMut.isPending
                                                                 ? 'Removing…'
                                                                 : 'Confirm remove'}
-                                                        </button>
-                                                        <button
+                                                        </Button>
+                                                        <Button
                                                             type="button"
+                                                            variant="outline"
+                                                            size="sm"
                                                             onClick={() =>
                                                                 setConfirmRemove(
                                                                     null,
                                                                 )
                                                             }
-                                                            className="h-6 border px-1.5 text-[10px]"
+                                                            className="h-6 px-1.5 text-[10px]"
                                                         >
                                                             Cancel
-                                                        </button>
+                                                        </Button>
                                                     </>
                                                 ) : (
-                                                    <button
+                                                    <Button
                                                         type="button"
+                                                        variant="outline"
+                                                        size="sm"
                                                         onClick={() =>
                                                             setConfirmRemove(
                                                                 remote.name,
@@ -361,10 +379,10 @@ export function RemotesManagerDialog({
                                                         disabled={
                                                             editState !== null
                                                         }
-                                                        className="text-destructive h-6 border px-1.5 text-[10px] disabled:opacity-40"
+                                                        className="text-destructive h-6 px-1.5 text-[10px]"
                                                     >
                                                         Remove
-                                                    </button>
+                                                    </Button>
                                                 )}
                                             </div>
                                         </td>
@@ -379,32 +397,31 @@ export function RemotesManagerDialog({
                 <div className="border-t pt-3">
                     <p className="mb-2 text-xs font-medium">Add remote</p>
                     <div className="flex items-center gap-2">
-                        <input
-                            type="text"
+                        <Input
                             value={newName}
                             onChange={e => setNewName(e.target.value)}
                             placeholder="Name (e.g. origin)"
-                            className="h-8 w-28 border px-2 text-sm"
+                            className="w-28"
                         />
-                        <input
-                            type="text"
+                        <Input
                             value={newUrl}
                             onChange={e => setNewUrl(e.target.value)}
                             placeholder="URL"
-                            className="h-8 min-w-0 flex-1 border px-2 text-sm"
+                            className="min-w-0 flex-1"
                         />
-                        <button
+                        <Button
                             type="button"
+                            size="sm"
                             onClick={handleAdd}
                             disabled={
                                 !newName.trim() ||
                                 !newUrl.trim() ||
                                 addMut.isPending
                             }
-                            className="bg-primary text-primary-foreground h-8 shrink-0 border px-3 text-sm disabled:opacity-40"
+                            className="h-8 shrink-0 px-3 text-sm"
                         >
                             {addMut.isPending ? 'Adding…' : 'Add'}
-                        </button>
+                        </Button>
                     </div>
                 </div>
 

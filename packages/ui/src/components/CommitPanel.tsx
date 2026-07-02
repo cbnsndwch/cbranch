@@ -21,6 +21,7 @@ import { CommitMessageEditor } from './CommitMessageEditor';
 import { ConventionalCommitBar } from './ConventionalCommitBar';
 import { Button } from './ui/button';
 import { Checkbox } from './ui/checkbox';
+import { Input } from './ui/input';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -367,8 +368,7 @@ export const CommitPanel = forwardRef<CommitPanelHandle, CommitPanelProps>(
 
                     {commitDraft.authorOverride && (
                         <div className="flex items-center gap-2 border-t px-2 py-1">
-                            <input
-                                type="text"
+                            <Input
                                 value={commitDraft.authorName}
                                 onChange={e =>
                                     updateCommitDraft({
@@ -377,9 +377,9 @@ export const CommitPanel = forwardRef<CommitPanelHandle, CommitPanelProps>(
                                 }
                                 placeholder="Author name"
                                 aria-label="Author name"
-                                className="border-input h-6 flex-1 rounded-none border bg-transparent px-1.5 text-[11px]"
+                                className="h-6 flex-1 px-1.5 text-[11px]"
                             />
-                            <input
+                            <Input
                                 type="email"
                                 value={commitDraft.authorEmail}
                                 onChange={e =>
@@ -389,7 +389,7 @@ export const CommitPanel = forwardRef<CommitPanelHandle, CommitPanelProps>(
                                 }
                                 placeholder="author@example.com"
                                 aria-label="Author email"
-                                className="border-input h-6 flex-1 rounded-none border bg-transparent px-1.5 text-[11px]"
+                                className="h-6 flex-1 px-1.5 text-[11px]"
                             />
                         </div>
                     )}

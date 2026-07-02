@@ -35,6 +35,7 @@ import {
 import { useBlame } from '../rpc/hooks';
 import { useUiStore } from '../state/store';
 import { Button } from './ui/button';
+import { Checkbox } from './ui/checkbox';
 import {
     Dialog,
     DialogContent,
@@ -222,10 +223,10 @@ export function BlamePanel({
                         </div>
                     </div>
                     <label className="text-muted-foreground flex shrink-0 items-center gap-1.5 text-xs">
-                        <input
-                            type="checkbox"
+                        <Checkbox
+                            aria-label="Toggle syntax highlighting"
                             checked={highlight}
-                            onChange={e => setHighlight(e.target.checked)}
+                            onCheckedChange={checked => setHighlight(checked)}
                         />
                         Syntax highlighting
                     </label>

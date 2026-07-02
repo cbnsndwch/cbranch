@@ -18,6 +18,7 @@ import {
     DialogDescription,
     DialogTitle,
 } from './ui/dialog';
+import { Input } from './ui/input';
 
 const errorCode = (error: unknown): string | undefined =>
     error != null && typeof error === 'object' && 'code' in error
@@ -113,9 +114,8 @@ function NewRepoDialogBody() {
 
                     <label className="flex flex-col gap-1 text-sm">
                         <span className="font-medium">Destination path</span>
-                        <input
+                        <Input
                             autoFocus
-                            className="h-8 w-full border px-2 text-sm"
                             aria-label="Destination path"
                             value={path}
                             onChange={e => {
@@ -132,8 +132,7 @@ function NewRepoDialogBody() {
                         <span className="font-medium">
                             Initial branch (optional)
                         </span>
-                        <input
-                            className="h-8 w-full border px-2 text-sm"
+                        <Input
                             aria-label="Initial branch"
                             value={branch}
                             onChange={e => setBranch(e.target.value)}

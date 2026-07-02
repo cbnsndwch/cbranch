@@ -20,12 +20,14 @@ import {
 } from '../rpc/hooks';
 import { DestructiveConfirmDialog } from './DestructiveConfirmDialog';
 import { Badge, type BadgeTone } from './ui/badge';
+import { Button } from './ui/button';
 import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from './ui/dropdown-menu';
+import { Textarea } from './ui/textarea';
 
 /** The operations whose continue/abort/skip verbs cbranch drives (REQ-CN-001). */
 const RESUMABLE = new Set<OperationKind>([
@@ -293,32 +295,37 @@ function InProgressBanner({
                     </span>
                 </div>
                 <div className="flex gap-1">
-                    <button
+                    <Button
                         type="button"
+                        size="sm"
                         onClick={onContinue}
                         disabled={!canContinue || busy || continueBlocked}
-                        className="bg-primary text-primary-foreground flex h-[22px] items-center px-2 text-[11px] disabled:opacity-40"
+                        className="h-[22px] px-2 text-[11px]"
                     >
                         Continue
-                    </button>
+                    </Button>
                     {canSkip && (
-                        <button
+                        <Button
                             type="button"
+                            variant="outline"
+                            size="sm"
                             onClick={onSkip}
                             disabled={busy}
-                            className="hover:bg-accent flex h-[22px] items-center border px-2 text-[11px] disabled:opacity-40"
+                            className="h-[22px] px-2 text-[11px]"
                         >
                             Skip
-                        </button>
+                        </Button>
                     )}
-                    <button
+                    <Button
                         type="button"
+                        variant="outline"
+                        size="sm"
                         onClick={onAbort}
                         disabled={busy}
-                        className="text-destructive hover:bg-accent flex h-[22px] items-center border px-2 text-[11px] disabled:opacity-40"
+                        className="text-destructive h-[22px] px-2 text-[11px]"
                     >
                         Abort
-                    </button>
+                    </Button>
                 </div>
             </div>
             {stopCopy !== '' && (
@@ -331,12 +338,12 @@ function InProgressBanner({
             )}
             {/* Rebase bakes reword/squash messages into the todo — no message box. */}
             {canContinue && !isRebase && (
-                <textarea
+                <Textarea
                     value={message}
                     onChange={e => onMessageChange(e.target.value)}
                     placeholder="Commit message (optional)…"
                     aria-label="Commit message"
-                    className="mt-2 h-12 w-full border px-2 py-1 text-xs"
+                    className="mt-2 h-12 text-xs"
                 />
             )}
         </div>

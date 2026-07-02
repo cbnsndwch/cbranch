@@ -20,6 +20,7 @@ import { ChangedFileList } from './ChangedFileList';
 import { DiffControls } from './DiffControls';
 import { FileAtRevision } from './FileAtRevision';
 import { RenderedDiffFile } from './RenderedDiffFile';
+import { Button } from './ui/button';
 import { Placeholder } from './ui/placeholder';
 
 // Read-only diff (P1-DIFF-*): the changed-file list, the diff controls, and the selected
@@ -161,27 +162,33 @@ export function DiffPanel({
                         <span className="truncate font-mono">
                             {filePath(active)}
                         </span>
-                        <button
+                        <Button
                             type="button"
+                            variant="outline"
+                            size="sm"
                             onClick={() => openBlame(filePath(active))}
-                            className="hover:bg-accent ml-auto shrink-0 border px-1.5"
+                            className="ml-auto h-auto shrink-0 px-1.5 py-0.5 text-[11px]"
                         >
                             Blame
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                             type="button"
+                            variant="outline"
+                            size="sm"
                             onClick={() => openHistory(filePath(active))}
-                            className="hover:bg-accent shrink-0 border px-1.5"
+                            className="h-auto shrink-0 px-1.5 py-0.5 text-[11px]"
                         >
                             History
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                             type="button"
+                            variant="outline"
+                            size="sm"
                             onClick={() => setViewingFile(v => !v)}
-                            className="hover:bg-accent shrink-0 border px-1.5"
+                            className="h-auto shrink-0 px-1.5 py-0.5 text-[11px]"
                         >
                             {viewingFile ? 'Back to diff' : 'View at revision'}
-                        </button>
+                        </Button>
                     </div>
                     <div
                         ref={scrollRef}

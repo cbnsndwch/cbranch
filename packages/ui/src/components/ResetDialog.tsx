@@ -20,6 +20,7 @@ import {
     DialogDescription,
     DialogTitle,
 } from './ui/dialog';
+import { Input } from './ui/input';
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 
 type ResetMode = 'soft' | 'mixed' | 'hard';
@@ -108,8 +109,7 @@ function ResetDialogBody({
 
                         <label className="flex flex-col gap-1 text-sm">
                             <span className="font-medium">Target</span>
-                            <input
-                                className="h-8 w-full border px-2 text-sm"
+                            <Input
                                 aria-label="Target commit"
                                 value={target}
                                 onChange={e => setTarget(e.target.value)}

@@ -16,6 +16,7 @@ import {
     DialogDescription,
     DialogTitle,
 } from './ui/dialog';
+import { Input } from './ui/input';
 
 const errorMessage = (error: unknown): string =>
     error != null && typeof error === 'object' && 'message' in error
@@ -108,9 +109,8 @@ function PatchExportBody({
                     </DialogDescription>
                     <label className="flex flex-col gap-1 text-sm">
                         <span className="font-medium">Range</span>
-                        <input
+                        <Input
                             autoFocus
-                            className="h-8 w-full border px-2 text-sm"
                             aria-label="Commit range"
                             value={range}
                             onChange={e => {

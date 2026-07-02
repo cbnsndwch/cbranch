@@ -24,6 +24,7 @@ import {
     DialogTitle,
 } from './ui/dialog';
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
+import { Textarea } from './ui/textarea';
 
 // Patches larger than this are uploaded over the side-channel rather than sent inline.
 const INLINE_CAP = 256 * 1024;
@@ -155,9 +156,9 @@ export function PatchApplyDialog({ repoId }: { repoId: RepoId }) {
                         conflicts routes to the Conflicts view.
                     </DialogDescription>
 
-                    <textarea
+                    <Textarea
                         aria-label="Patch text"
-                        className="h-40 w-full resize-none border p-2 font-mono text-xs"
+                        className="h-40 resize-none p-2 font-mono text-xs"
                         value={patch}
                         onChange={e => {
                             setPatch(e.target.value);

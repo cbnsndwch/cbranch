@@ -2,6 +2,7 @@ import { type DiffFile } from '@cbranch/rpc-contract';
 
 import { changedLineCount, filePath } from '../lib/diff';
 import { shortOid } from '../lib/format';
+import { Button } from './ui/button';
 
 // Distinct, clearly-labeled placeholder cards for diffs that are not rendered as text
 // (P1-UI-DIFF-4): binary changes (P1-DIFF-8), submodule/gitlink changes (P1-DIFF-10), and
@@ -57,13 +58,15 @@ export function LargeDiffCard({
                 {filePath(file)} has {changedLineCount(file)} changed lines and
                 is not rendered automatically.
             </div>
-            <button
+            <Button
                 type="button"
+                variant="outline"
+                size="sm"
                 onClick={onLoad}
-                className="hover:bg-accent mt-2 border px-2 py-0.5"
+                className="mt-2 h-auto px-2 py-0.5"
             >
                 Load anyway
-            </button>
+            </Button>
         </Card>
     );
 }

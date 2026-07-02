@@ -14,6 +14,7 @@ import { cn } from '../lib/cn';
 import { parseRefs } from '../lib/refs';
 import { useRepoState } from '../rpc/hooks';
 import { useUiStore } from '../state/store';
+import { Input } from './ui/input';
 
 function SectionHeader({
     label,
@@ -102,12 +103,11 @@ export function RepositorySidebar({
             </div>
             {/* Search */}
             <div className="shrink-0 border-b px-2 py-1">
-                <input
-                    type="text"
+                <Input
                     placeholder="Search refs…"
                     value={search}
                     onChange={e => setSearch(e.target.value)}
-                    className="bg-background h-[22px] w-full border px-1 text-[11px]"
+                    className="bg-background h-[22px] px-1 text-[11px]"
                 />
             </div>
             {/* Tree */}

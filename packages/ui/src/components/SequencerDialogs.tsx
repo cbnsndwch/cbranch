@@ -35,6 +35,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from './ui/select';
+import { Textarea } from './ui/textarea';
 
 const NL = String.fromCharCode(10);
 
@@ -123,15 +124,17 @@ function DialogShell({
                 <div className="flex shrink-0 items-center gap-2 border-b px-3 py-1.5">
                     <DialogTitle>{title}</DialogTitle>
                     <div className="flex-1" />
-                    <button
+                    <Button
                         type="button"
+                        variant="outline"
+                        size="icon"
                         onClick={onClose}
                         disabled={busy}
                         aria-label="Close"
-                        className="hover:bg-accent flex size-6 items-center justify-center rounded-none border disabled:opacity-40"
+                        className="size-6"
                     >
                         <X className="size-3.5" aria-hidden="true" />
-                    </button>
+                    </Button>
                 </div>
                 <div className="flex flex-col gap-3 px-3 py-3 text-xs">
                     {children}
@@ -445,11 +448,11 @@ function RevertDialog({
                     <label htmlFor="revert-message" className="font-medium">
                         Commit message
                     </label>
-                    <textarea
+                    <Textarea
                         id="revert-message"
                         value={effectiveMessage}
                         onChange={e => setMessage(e.target.value)}
-                        className="border-input h-20 w-full resize-none rounded-none border bg-transparent px-2 py-1 text-xs focus:outline-none"
+                        className="h-20 resize-none text-xs"
                     />
                 </div>
             )}

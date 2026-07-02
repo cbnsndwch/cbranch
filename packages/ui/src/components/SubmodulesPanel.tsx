@@ -25,12 +25,15 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from './ui/alert-dialog';
+import { Button } from './ui/button';
+import { Checkbox } from './ui/checkbox';
 import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from './ui/dropdown-menu';
+import { Input } from './ui/input';
 import {
     Table,
     TableBody,
@@ -199,38 +202,43 @@ export function SubmodulesPanel({ repoId }: SubmodulesPanelProps) {
                 <h2 className="text-sm font-medium">Submodules</h2>
                 <div className="flex gap-1">
                     <label className="flex h-[22px] items-center gap-1 px-1 text-[11px]">
-                        <input
-                            type="checkbox"
+                        <Checkbox
+                            aria-label="Recursive update"
                             checked={recursive}
-                            onChange={e => setRecursive(e.target.checked)}
-                            className="h-3 w-3"
+                            onCheckedChange={checked => setRecursive(checked)}
                         />
                         Recursive
                     </label>
-                    <button
+                    <Button
                         type="button"
+                        variant="outline"
+                        size="sm"
                         onClick={handleUpdateAll}
                         disabled={busy}
-                        className="hover:bg-accent flex h-[22px] items-center border px-2 text-[11px] disabled:opacity-40"
+                        className="h-[22px] px-2 text-[11px]"
                     >
                         Update all
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                         type="button"
+                        variant="outline"
+                        size="sm"
                         onClick={handleSyncAll}
                         disabled={busy}
-                        className="hover:bg-accent flex h-[22px] items-center border px-2 text-[11px] disabled:opacity-40"
+                        className="h-[22px] px-2 text-[11px]"
                     >
                         Sync all
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                         type="button"
+                        variant="outline"
+                        size="sm"
                         onClick={() => setAddOpen(true)}
                         disabled={busy}
-                        className="hover:bg-accent flex h-[22px] items-center border px-2 text-[11px] disabled:opacity-40"
+                        className="h-[22px] px-2 text-[11px]"
                     >
                         + Add
-                    </button>
+                    </Button>
                 </div>
             </div>
 
@@ -286,35 +294,29 @@ export function SubmodulesPanel({ repoId }: SubmodulesPanelProps) {
                             <span className="text-xs font-medium">
                                 Repository URL
                             </span>
-                            <input
-                                type="text"
+                            <Input
                                 value={addUrl}
                                 onChange={e => setAddUrl(e.target.value)}
                                 placeholder="https://example.com/lib.git"
-                                className="h-8 w-full border px-2 text-sm"
                                 autoFocus
                             />
                         </label>
                         <label className="flex flex-col gap-1">
                             <span className="text-xs font-medium">Path</span>
-                            <input
-                                type="text"
+                            <Input
                                 value={addPath}
                                 onChange={e => setAddPath(e.target.value)}
                                 placeholder="vendor/lib"
-                                className="h-8 w-full border px-2 text-sm"
                             />
                         </label>
                         <label className="flex flex-col gap-1">
                             <span className="text-xs font-medium">
                                 Branch (optional)
                             </span>
-                            <input
-                                type="text"
+                            <Input
                                 value={addBranch}
                                 onChange={e => setAddBranch(e.target.value)}
                                 placeholder="main"
-                                className="h-8 w-full border px-2 text-sm"
                             />
                         </label>
                     </div>

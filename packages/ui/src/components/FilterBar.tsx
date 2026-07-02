@@ -9,6 +9,8 @@ import {
     type RefScope,
 } from '../lib/filters';
 import { type DateMode } from '../lib/format';
+import { Button } from './ui/button';
+import { Input } from './ui/input';
 
 // History filter bar (P1-UI-FILT-1/3): ref-scope segmented control, path/author/message/
 // date inputs, removable active-filter chips, and the relative/absolute date toggle. Text
@@ -35,12 +37,11 @@ const Field = ({
 }) => (
     <label className="text-muted-foreground flex items-center gap-1 text-[11px]">
         {label}
-        <input
-            type="text"
+        <Input
             value={value}
             placeholder={placeholder}
             onChange={event => onChange(event.target.value)}
-            className="bg-input/40 text-foreground focus:border-ring w-28 border px-1 py-0.5 text-xs outline-none"
+            className="bg-input/40 text-foreground h-auto w-28 px-1 py-0.5 text-xs"
         />
     </label>
 );
@@ -136,12 +137,14 @@ export function FilterBar({
                     placeholder="2024-12-31"
                     onChange={until => setDraft({ ...draft, until })}
                 />
-                <button
+                <Button
                     type="submit"
-                    className="hover:bg-accent border px-1.5 py-0.5 text-[11px]"
+                    variant="outline"
+                    size="sm"
+                    className="h-auto px-1.5 py-0.5 text-[11px]"
                 >
                     Apply
-                </button>
+                </Button>
                 <div
                     className="ml-auto flex items-center"
                     role="group"

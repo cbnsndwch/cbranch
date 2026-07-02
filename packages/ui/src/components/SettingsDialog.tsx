@@ -38,6 +38,7 @@ import {
     DialogDescription,
     DialogTitle,
 } from './ui/dialog';
+import { Input } from './ui/input';
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 import {
     Select,
@@ -55,8 +56,6 @@ import {
     TableRow,
 } from './ui/table';
 import { Tabs, TabsList, TabsPanel, TabsTab } from './ui/tabs';
-
-const FIELD = 'h-8 w-full border px-2 text-sm';
 
 type WritableScope = 'global' | 'local';
 
@@ -264,16 +263,14 @@ function IdentitySection({
     return (
         <section className="flex flex-col gap-2">
             <h3 className="text-sm font-medium">Identity</h3>
-            <input
-                className={FIELD}
+            <Input
                 aria-label="user.name"
                 value={nameVal}
                 onChange={e => setName(e.target.value)}
                 placeholder="Your name"
                 disabled={busy}
             />
-            <input
-                className={FIELD}
+            <Input
                 aria-label="user.email"
                 value={emailVal}
                 onChange={e => setEmail(e.target.value)}
@@ -319,8 +316,7 @@ function GuidedKey({
         <section className="flex flex-col gap-1">
             <h3 className="text-sm font-medium">{label}</h3>
             <div className="flex gap-2">
-                <input
-                    className={FIELD}
+                <Input
                     aria-label={configKey}
                     value={current}
                     onChange={e => setVal(e.target.value)}
@@ -365,32 +361,28 @@ function DiffMergeSection({
         <section className="flex flex-col gap-2">
             <h3 className="text-sm font-medium">Diff &amp; merge tools</h3>
             <div className="grid grid-cols-2 gap-2">
-                <input
-                    className={FIELD}
+                <Input
                     aria-label="diff.tool"
                     value={diffToolVal}
                     onChange={e => setDiffTool(e.target.value)}
                     placeholder="diff.tool (e.g. vimdiff)"
                     disabled={busy}
                 />
-                <input
-                    className={FIELD}
+                <Input
                     aria-label="merge.tool"
                     value={mergeToolVal}
                     onChange={e => setMergeTool(e.target.value)}
                     placeholder="merge.tool (e.g. vimdiff)"
                     disabled={busy}
                 />
-                <input
-                    className={FIELD}
+                <Input
                     aria-label="difftool command"
                     value={diffCmdVal}
                     onChange={e => setDiffCmd(e.target.value)}
                     placeholder="custom difftool cmd (optional)"
                     disabled={busy}
                 />
-                <input
-                    className={FIELD}
+                <Input
                     aria-label="mergetool command"
                     value={mergeCmdVal}
                     onChange={e => setMergeCmd(e.target.value)}
@@ -493,16 +485,14 @@ function AdvancedConfigTable({
                 </Table>
             </div>
             <div className="flex gap-2">
-                <input
-                    className={FIELD}
+                <Input
                     aria-label="New config key"
                     value={newKey}
                     onChange={e => setNewKey(e.target.value)}
                     placeholder="section.key"
                     disabled={busy}
                 />
-                <input
-                    className={FIELD}
+                <Input
                     aria-label="New config value"
                     value={newValue}
                     onChange={e => setNewValue(e.target.value)}
@@ -634,11 +624,11 @@ function AppSettingsTab() {
                             >
                                 <span className="flex-1">{cmd.label}</span>
                                 {isRecording ? (
-                                    <input
+                                    <Input
                                         autoFocus
                                         readOnly
                                         aria-label={`Recording chord for ${cmd.label}`}
-                                        className="h-7 w-40 border px-2 text-xs"
+                                        className="h-7 w-40 text-xs"
                                         placeholder="Press a chord…"
                                         onKeyDown={(
                                             e: KeyboardEvent<HTMLInputElement>,

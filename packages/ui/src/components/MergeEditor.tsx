@@ -57,6 +57,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from './ui/dialog';
+import { Textarea } from './ui/textarea';
 
 const LF = String.fromCharCode(10);
 
@@ -517,14 +518,14 @@ export function MergeEditor({ repoId, path, onClose }: MergeEditorProps) {
                                     ))
                                 )}
                             </div>
-                            <textarea
+                            <Textarea
                                 ref={textareaRef}
                                 aria-label="Merged result"
                                 value={resultText}
                                 onChange={e => setResultText(e.target.value)}
                                 onBlur={() => setCmEpoch(e => e + 1)}
                                 spellCheck={false}
-                                className="min-h-0 flex-1 resize-none p-2 font-mono text-xs outline-none"
+                                className="min-h-0 flex-1 resize-none p-2 font-mono text-xs"
                             />
                         </div>
                     </div>
@@ -643,12 +644,14 @@ function HunkButton({
     readonly children: ReactNode;
 }) {
     return (
-        <button
+        <Button
             type="button"
+            variant="outline"
+            size="sm"
             onClick={onClick}
-            className="hover:bg-accent border px-1.5 py-0.5"
+            className="h-auto px-1.5 py-0.5 text-[11px]"
         >
             {children}
-        </button>
+        </Button>
     );
 }

@@ -31,6 +31,8 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from './ui/alert-dialog';
+import { Button } from './ui/button';
+import { Checkbox } from './ui/checkbox';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -38,6 +40,7 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from './ui/dropdown-menu';
+import { Input } from './ui/input';
 
 const ROW_HEIGHT = 30;
 const HEADER_HEIGHT = 22;
@@ -435,20 +438,24 @@ export function BranchesPanel({ repoId }: BranchesPanelProps) {
             <div className="flex items-center justify-between border-b px-3 py-1.5">
                 <h2 className="text-sm font-medium">Branches</h2>
                 <div className="flex gap-1">
-                    <button
+                    <Button
                         type="button"
+                        variant="outline"
+                        size="sm"
                         onClick={() => setRemotesOpen(true)}
-                        className="hover:bg-accent flex h-[22px] items-center border px-2 text-[11px]"
+                        className="h-[22px] px-2 text-[11px]"
                     >
                         Remotes
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                         type="button"
+                        variant="outline"
+                        size="sm"
                         onClick={() => openCreate()}
-                        className="hover:bg-accent flex h-[22px] items-center border px-2 text-[11px]"
+                        className="h-[22px] px-2 text-[11px]"
                     >
                         + New
-                    </button>
+                    </Button>
                 </div>
             </div>
 
@@ -541,12 +548,10 @@ export function BranchesPanel({ repoId }: BranchesPanelProps) {
                             <span className="text-xs font-medium">
                                 Branch name
                             </span>
-                            <input
-                                type="text"
+                            <Input
                                 value={createName}
                                 onChange={e => setCreateName(e.target.value)}
                                 placeholder="feature/my-branch"
-                                className="h-8 w-full border px-2 text-sm"
                                 autoFocus
                             />
                         </label>
@@ -554,30 +559,28 @@ export function BranchesPanel({ repoId }: BranchesPanelProps) {
                             <span className="text-xs font-medium">
                                 Start point
                             </span>
-                            <input
-                                type="text"
+                            <Input
                                 value={createStart}
                                 onChange={e => setCreateStart(e.target.value)}
                                 placeholder="HEAD"
-                                className="h-8 w-full border px-2 text-sm"
                             />
                         </label>
                         <label className="flex items-center gap-2 text-sm">
-                            <input
-                                type="checkbox"
+                            <Checkbox
+                                aria-label="Switch to the new branch"
                                 checked={createSwitch}
-                                onChange={e =>
-                                    setCreateSwitch(e.target.checked)
+                                onCheckedChange={checked =>
+                                    setCreateSwitch(checked)
                                 }
                             />
                             Switch to this branch
                         </label>
                         <label className="flex items-center gap-2 text-sm">
-                            <input
-                                type="checkbox"
+                            <Checkbox
+                                aria-label="Set upstream tracking for the new branch"
                                 checked={createUpstream}
-                                onChange={e =>
-                                    setCreateUpstream(e.target.checked)
+                                onCheckedChange={checked =>
+                                    setCreateUpstream(checked)
                                 }
                             />
                             Set upstream tracking
@@ -619,11 +622,9 @@ export function BranchesPanel({ repoId }: BranchesPanelProps) {
                             <span className="text-xs font-medium">
                                 New name
                             </span>
-                            <input
-                                type="text"
+                            <Input
                                 value={renameNew}
                                 onChange={e => setRenameNew(e.target.value)}
-                                className="h-8 w-full border px-2 text-sm"
                                 autoFocus
                             />
                         </label>
@@ -664,12 +665,10 @@ export function BranchesPanel({ repoId }: BranchesPanelProps) {
                             <span className="text-xs font-medium">
                                 Upstream ref (e.g. origin/main)
                             </span>
-                            <input
-                                type="text"
+                            <Input
                                 value={upstreamRef}
                                 onChange={e => setUpstreamRef(e.target.value)}
                                 placeholder="origin/main"
-                                className="h-8 w-full border px-2 text-sm"
                                 autoFocus
                             />
                         </label>
@@ -765,11 +764,11 @@ export function BranchesPanel({ repoId }: BranchesPanelProps) {
                     </AlertDialogHeader>
                     <div className="py-2">
                         <label className="flex items-center gap-2 text-sm">
-                            <input
-                                type="checkbox"
+                            <Checkbox
+                                aria-label="Re-apply stashed changes after the switch"
                                 checked={stashReapply}
-                                onChange={e =>
-                                    setStashReapply(e.target.checked)
+                                onCheckedChange={checked =>
+                                    setStashReapply(checked)
                                 }
                             />
                             Re-apply stashed changes after switching

@@ -14,6 +14,7 @@ import { useRepoState } from '../rpc/hooks';
 import { useUiStore } from '../state/store';
 import { CommitPanel, type CommitPanelHandle } from './CommitPanel';
 import { StatusPanel } from './StatusPanel';
+import { Button } from './ui/button';
 import { Dialog, DialogContent, DialogTitle } from './ui/dialog';
 import { ResizableSplit } from './ui/resizable-split';
 import { WorkingDiffPanel } from './WorkingDiffPanel';
@@ -83,24 +84,28 @@ export function CommitDialog() {
                         <span className="font-mono">{branchLabel}</span>
                     </DialogTitle>
                     <div className="flex-1" />
-                    <button
+                    <Button
                         type="button"
+                        variant="outline"
+                        size="sm"
                         onClick={handleRefresh}
                         aria-label="Refresh status"
-                        className="hover:bg-accent flex h-6 items-center gap-1 rounded-none border px-1.5 text-[11px]"
+                        className="h-6 gap-1 px-1.5 text-[11px]"
                     >
                         <RefreshCw className="size-3.5" aria-hidden="true" />
                         Refresh
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                         type="button"
+                        variant="outline"
+                        size="icon"
                         onClick={requestClose}
                         disabled={mutating}
                         aria-label="Close"
-                        className="hover:bg-accent flex size-6 items-center justify-center rounded-none border disabled:opacity-40"
+                        className="size-6"
                     >
                         <X className="size-3.5" aria-hidden="true" />
-                    </button>
+                    </Button>
                 </div>
 
                 {/* Body: changes | diff, resizable (§3) */}

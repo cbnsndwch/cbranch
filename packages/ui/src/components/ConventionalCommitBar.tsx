@@ -1,3 +1,4 @@
+import { Input } from './ui/input';
 import {
     Select,
     SelectContent,
@@ -56,12 +57,11 @@ export function ConventionalCommitBar({
                 </SelectContent>
             </Select>
             <span className="text-muted-foreground">(</span>
-            <input
-                type="text"
+            <Input
                 value={scope}
                 onChange={e => onChange(type, e.target.value, breaking)}
                 placeholder="scope"
-                className="border-input h-6 w-20 rounded-none border bg-transparent px-1 text-xs focus:outline-none"
+                className="h-6 w-20 px-1 text-xs"
                 aria-label="Commit scope"
             />
             <span className="text-muted-foreground">)</span>

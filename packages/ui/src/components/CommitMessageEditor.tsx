@@ -1,5 +1,8 @@
 import { type Ref } from 'react';
 
+import { Input } from './ui/input';
+import { Textarea } from './ui/textarea';
+
 interface CommitMessageEditorProps {
     subject: string;
     body: string;
@@ -28,14 +31,13 @@ export function CommitMessageEditor({
     return (
         <div className="flex flex-col gap-1 px-2 pb-1">
             <div className="relative">
-                <input
+                <Input
                     ref={subjectRef}
-                    type="text"
                     value={subject}
                     onChange={e => onSubjectChange(e.target.value)}
                     placeholder="Summary (required)"
                     aria-label="Commit subject"
-                    className="border-input focus:ring-ring/50 h-7 w-full rounded-none border bg-transparent px-2 text-xs focus:ring-1 focus:outline-none"
+                    className="h-7 text-xs"
                 />
                 {overLimit && (
                     <span
@@ -46,13 +48,13 @@ export function CommitMessageEditor({
                     </span>
                 )}
             </div>
-            <textarea
+            <Textarea
                 value={body}
                 onChange={e => onBodyChange(e.target.value)}
                 placeholder="Extended description (optional)"
                 aria-label="Commit body"
                 rows={bodyRows}
-                className="border-input focus:ring-ring/50 w-full resize-none rounded-none border bg-transparent px-2 py-1 text-xs focus:ring-1 focus:outline-none"
+                className="min-h-0 resize-none text-xs"
             />
         </div>
     );

@@ -2,6 +2,7 @@ import { ChevronDown, ChevronUp, Columns2, Rows3 } from 'lucide-react';
 
 import { cn } from '../lib/cn';
 import { type DiffOptions, type DiffView } from '../lib/diff';
+import { Checkbox } from './ui/checkbox';
 import {
     Select,
     SelectContent,
@@ -94,15 +95,13 @@ export function DiffControls({
             </div>
 
             <label className="flex items-center gap-1">
-                <input
-                    type="checkbox"
+                <Checkbox
+                    aria-label="Ignore whitespace"
                     checked={ignoreWs}
-                    onChange={event =>
+                    onCheckedChange={checked =>
                         onOptionsChange({
                             ...options,
-                            whitespace: event.target.checked
-                                ? 'ignore-all'
-                                : 'show',
+                            whitespace: checked ? 'ignore-all' : 'show',
                         })
                     }
                 />

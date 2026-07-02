@@ -34,6 +34,7 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from './ui/dropdown-menu';
+import { Input } from './ui/input';
 import {
     Select,
     SelectContent,
@@ -251,13 +252,11 @@ export function ReflogPanel({
                             </span>
                             .
                         </DialogDescription>
-                        <input
-                            type="text"
+                        <Input
                             aria-label="Branch name"
                             value={branchName}
                             onChange={ev => setBranchName(ev.target.value)}
                             placeholder="new-branch-name"
-                            className="h-8 w-full border px-2 text-sm"
                         />
                         <div className="flex justify-end gap-2">
                             <Button

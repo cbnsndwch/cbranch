@@ -1,6 +1,8 @@
 import { ChevronDown, ChevronUp, X } from 'lucide-react';
 import { type KeyboardEvent, useEffect, useRef } from 'react';
 
+import { Input } from './ui/input';
+
 // The quick-find bar over loaded history (P1-UI-FILT-2): a focused input with a live match
 // counter and previous/next stepping. Enter / Shift+Enter step matches; Escape closes.
 export function FindBar({
@@ -41,15 +43,14 @@ export function FindBar({
 
     return (
         <div className="flex items-center gap-1 border-b px-2 py-1">
-            <input
+            <Input
                 ref={inputRef}
-                type="text"
                 value={query}
                 placeholder="Find in loaded history (message or hash)…"
                 onChange={event => onQueryChange(event.target.value)}
                 onKeyDown={onKeyDown}
                 aria-label="Find in loaded history"
-                className="bg-input/40 text-foreground focus:border-ring flex-1 border px-1 py-0.5 text-xs outline-none"
+                className="bg-input/40 text-foreground h-auto flex-1 px-1 py-0.5 text-xs"
             />
             <span
                 className="text-muted-foreground w-20 text-right text-[11px]"

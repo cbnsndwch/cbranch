@@ -19,12 +19,14 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from './ui/alert-dialog';
+import { Button } from './ui/button';
 import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from './ui/dropdown-menu';
+import { Input } from './ui/input';
 import {
     Select,
     SelectContent,
@@ -119,21 +121,25 @@ export function WorktreesPanel({ repoId }: WorktreesPanelProps) {
             <div className="flex items-center justify-between border-b px-3 py-1.5">
                 <h2 className="text-sm font-medium">Worktrees</h2>
                 <div className="flex gap-1">
-                    <button
+                    <Button
                         type="button"
+                        variant="outline"
+                        size="sm"
                         onClick={handlePrune}
                         disabled={pruneMut.isPending}
-                        className="hover:bg-accent flex h-[22px] items-center border px-2 text-[11px] disabled:opacity-40"
+                        className="h-[22px] px-2 text-[11px]"
                     >
                         Prune
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                         type="button"
+                        variant="outline"
+                        size="sm"
                         onClick={() => setAddOpen(true)}
-                        className="hover:bg-accent flex h-[22px] items-center border px-2 text-[11px]"
+                        className="h-[22px] px-2 text-[11px]"
                     >
                         + Add
-                    </button>
+                    </Button>
                 </div>
             </div>
 
@@ -168,12 +174,10 @@ export function WorktreesPanel({ repoId }: WorktreesPanelProps) {
                     <div className="flex flex-col gap-3 py-2">
                         <label className="flex flex-col gap-1">
                             <span className="text-xs font-medium">Path</span>
-                            <input
-                                type="text"
+                            <Input
                                 value={addPath}
                                 onChange={e => setAddPath(e.target.value)}
                                 placeholder="/path/to/new-worktree"
-                                className="h-8 w-full border px-2 text-sm"
                                 autoFocus
                             />
                         </label>
@@ -213,8 +217,7 @@ export function WorktreesPanel({ repoId }: WorktreesPanelProps) {
                                     ? 'New branch name'
                                     : 'Branch name'}
                             </span>
-                            <input
-                                type="text"
+                            <Input
                                 value={addBranch}
                                 onChange={e => setAddBranch(e.target.value)}
                                 placeholder={
@@ -222,7 +225,6 @@ export function WorktreesPanel({ repoId }: WorktreesPanelProps) {
                                         ? 'feat/my-feature'
                                         : 'main'
                                 }
-                                className="h-8 w-full border px-2 text-sm"
                             />
                         </label>
                         {addMode === 'new' && (
@@ -230,12 +232,10 @@ export function WorktreesPanel({ repoId }: WorktreesPanelProps) {
                                 <span className="text-xs font-medium">
                                     Start point (optional)
                                 </span>
-                                <input
-                                    type="text"
+                                <Input
                                     value={addStart}
                                     onChange={e => setAddStart(e.target.value)}
                                     placeholder="HEAD"
-                                    className="h-8 w-full border px-2 text-sm"
                                 />
                             </label>
                         )}
