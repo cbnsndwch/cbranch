@@ -35,6 +35,20 @@ import {
     RepoState,
 } from '../schemas/domain';
 import { GitError } from '../schemas/errors';
+import {
+    EngagementColor,
+    EngagementId,
+    EngagementWorkspace,
+} from '../schemas/engagements';
+import { FilesystemDirectoryListing } from '../schemas/filesystem';
+import {
+    ChangeSetId,
+    ChangeSetPullRequest,
+    GitHubPullRequestCreated,
+    GitHubPullRequestList,
+    GitHubPullRequestPreview,
+    PullRequestListState,
+} from '../schemas/forge';
 import { InvalidationEvent } from '../schemas/live';
 import {
     BlameResult,
@@ -108,6 +122,150 @@ export const CbranchRpcs = RpcGroup.make(
     Rpc.make('RepoRecentRemove', {
         payload: { repoId: RepoId },
         success: Schema.Void,
+        error: GitError,
+    }),
+    // fs.listDir — host-bounded directory discovery for repository/folder pickers.
+    Rpc.make('FilesystemListDir', {
+        payload: {
+            path: Schema.optional(Schema.String),
+            showHidden: Schema.optional(Schema.Boolean),
+        },
+        success: FilesystemDirectoryListing,
+        error: GitError,
+    }),
+    // engagement.list — complete, app-level consulting workspace snapshot.
+    Rpc.make('EngagementList', {
+        payload: {},
+        success: EngagementWorkspace,
+        error: GitError,
+    }),
+    // engagement.create — add a new isolated repository partition.
+    Rpc.make('EngagementCreate', {
+        payload: {
+            name: Schema.String,
+            color: EngagementColor,
+            avatarUrl: Schema.optional(Schema.String),
+        },
+        success: EngagementWorkspace,
+        error: GitError,
+    }),
+    // engagement.update — rename/recolor without touching repository membership.
+    Rpc.make('EngagementUpdate', {
+        payload: {
+            engagementId: EngagementId,
+            name: Schema.optional(Schema.String),
+            color: Schema.optional(EngagementColor),
+            avatarUrl: Schema.optional(Schema.NullOr(Schema.String)),
+        },
+        success: EngagementWorkspace,
+        error: GitError,
+    }),
+    // engagement.delete — remove the partition; repositories become unassigned.
+    Rpc.make('EngagementDelete', {
+        payload: { engagementId: EngagementId },
+        success: EngagementWorkspace,
+        error: GitError,
+    }),
+    // engagement.reorder — persists the presentation order used by the rail and manager.
+    Rpc.make('EngagementReorder', {
+        payload: { engagementIds: Schema.Array(EngagementId) },
+        success: EngagementWorkspace,
+        error: GitError,
+    }),
+    // engagement.repoAssign — ownership is exclusive; assignment removes the repo from
+    // any previous engagement and opens it in the destination session.
+    Rpc.make('EngagementRepoAssign', {
+        payload: { engagementId: EngagementId, repoId: RepoId },
+        success: EngagementWorkspace,
+        error: GitError,
+    }),
+    // engagement.repoRemove — remove membership and any corresponding open tab.
+    Rpc.make('EngagementRepoRemove', {
+        payload: { engagementId: EngagementId, repoId: RepoId },
+        success: EngagementWorkspace,
+        error: GitError,
+    }),
+    // engagement.sessionSet — persist ordered open tabs + the active repo.
+    Rpc.make('EngagementSessionSet', {
+        payload: {
+            engagementId: EngagementId,
+            openRepoIds: Schema.Array(RepoId),
+            activeRepoId: Schema.optional(RepoId),
+        },
+        success: EngagementWorkspace,
+        error: GitError,
+    }),
+    // engagement.activate — persist the engagement restored on the next launch.
+    Rpc.make('EngagementActivate', {
+        payload: { engagementId: EngagementId },
+        success: EngagementWorkspace,
+        error: GitError,
+    }),
+    // changeSet.* — engagement-scoped ordered PR coordination records.
+    Rpc.make('ChangeSetCreate', {
+        payload: {
+            engagementId: EngagementId,
+            name: Schema.String,
+            description: Schema.optional(Schema.String),
+        },
+        success: EngagementWorkspace,
+        error: GitError,
+    }),
+    Rpc.make('ChangeSetUpdate', {
+        payload: {
+            engagementId: EngagementId,
+            changeSetId: ChangeSetId,
+            name: Schema.optional(Schema.String),
+            description: Schema.optional(Schema.String),
+        },
+        success: EngagementWorkspace,
+        error: GitError,
+    }),
+    Rpc.make('ChangeSetDelete', {
+        payload: {
+            engagementId: EngagementId,
+            changeSetId: ChangeSetId,
+        },
+        success: EngagementWorkspace,
+        error: GitError,
+    }),
+    Rpc.make('ChangeSetItemsSet', {
+        payload: {
+            engagementId: EngagementId,
+            changeSetId: ChangeSetId,
+            items: Schema.Array(ChangeSetPullRequest),
+        },
+        success: EngagementWorkspace,
+        error: GitError,
+    }),
+    // github.pullsList — origin-derived, host-gh-backed PR metadata. Credentials remain
+    // entirely in the host gh credential store and never enter the payload/result.
+    Rpc.make('GitHubPullsList', {
+        payload: {
+            repoId: RepoId,
+            state: Schema.optional(PullRequestListState),
+        },
+        success: GitHubPullRequestList,
+        error: GitError,
+    }),
+    // github.pullPreview/create — preview exact merge-base..HEAD before host gh create.
+    Rpc.make('GitHubPullPreview', {
+        payload: {
+            repoId: RepoId,
+            baseRefName: Schema.optional(Schema.String),
+        },
+        success: GitHubPullRequestPreview,
+        error: GitError,
+    }),
+    Rpc.make('GitHubPullCreate', {
+        payload: {
+            repoId: RepoId,
+            title: Schema.String,
+            body: Schema.String,
+            baseRefName: Schema.String,
+            draft: Schema.Boolean,
+        },
+        success: GitHubPullRequestCreated,
         error: GitError,
     }),
     // repo.state — HEAD, current branch, detached, in-progress op (14 §8).

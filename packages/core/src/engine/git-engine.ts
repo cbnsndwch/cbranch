@@ -16,6 +16,8 @@ import {
     type BranchInfo,
     type BranchListing,
     type BranchSwitchStrategy,
+    type ChangeSetId,
+    type ChangeSetPullRequest,
     type CommitCreated,
     type CommitDetail,
     type CommitInput,
@@ -25,6 +27,9 @@ import {
     type ConflictSides,
     type ContentEncoding,
     type DiffFile,
+    type EngagementColor,
+    type EngagementId,
+    type EngagementWorkspace,
     type AppSettings,
     type ArchiveDescriptor,
     type ArchiveFormat,
@@ -38,9 +43,13 @@ import {
     type KeyBinding,
     type WritableScope,
     type FileContentResult,
+    type FilesystemDirectoryListing,
     type FileHistoryPage,
     type GcPrune,
     type GcResult,
+    type GitHubPullRequestList,
+    type GitHubPullRequestCreated,
+    type GitHubPullRequestPreview,
     type CommandLogEntry,
     type GitError,
     type MetaFile,
@@ -51,6 +60,7 @@ import {
     type PatchApplyReport,
     type PatchApplyResult,
     type PatchBundleDescriptor,
+    type PullRequestListState,
     type ReflogPage,
     type InvalidationEvent,
     type LogQuery,
@@ -104,6 +114,85 @@ export interface GitEngineApi {
     >;
     /** repo.recentRemove — drop an entry from the recent list. */
     readonly recentRemove: (repoId: RepoId) => Effect.Effect<void, GitError>;
+    /** Host-bounded directory listing for repository and folder pickers. */
+    readonly filesystemListDir: (input: {
+        readonly path?: string;
+        readonly showHidden?: boolean;
+    }) => Effect.Effect<FilesystemDirectoryListing, GitError>;
+    /** App-level consulting partitions and their ordered open-repository sessions. */
+    readonly engagementList: () => Effect.Effect<EngagementWorkspace, GitError>;
+    readonly engagementCreate: (
+        name: string,
+        color: EngagementColor,
+        avatarUrl?: string,
+    ) => Effect.Effect<EngagementWorkspace, GitError>;
+    readonly engagementUpdate: (
+        engagementId: EngagementId,
+        patch: {
+            readonly name?: string;
+            readonly color?: EngagementColor;
+            readonly avatarUrl?: string | null;
+        },
+    ) => Effect.Effect<EngagementWorkspace, GitError>;
+    readonly engagementDelete: (
+        engagementId: EngagementId,
+    ) => Effect.Effect<EngagementWorkspace, GitError>;
+    readonly engagementReorder: (
+        engagementIds: ReadonlyArray<EngagementId>,
+    ) => Effect.Effect<EngagementWorkspace, GitError>;
+    readonly engagementRepoAssign: (
+        engagementId: EngagementId,
+        repoId: RepoId,
+    ) => Effect.Effect<EngagementWorkspace, GitError>;
+    readonly engagementRepoRemove: (
+        engagementId: EngagementId,
+        repoId: RepoId,
+    ) => Effect.Effect<EngagementWorkspace, GitError>;
+    readonly engagementSessionSet: (
+        engagementId: EngagementId,
+        openRepoIds: ReadonlyArray<RepoId>,
+        activeRepoId?: RepoId,
+    ) => Effect.Effect<EngagementWorkspace, GitError>;
+    readonly engagementActivate: (
+        engagementId: EngagementId,
+    ) => Effect.Effect<EngagementWorkspace, GitError>;
+    readonly changeSetCreate: (
+        engagementId: EngagementId,
+        name: string,
+        description?: string,
+    ) => Effect.Effect<EngagementWorkspace, GitError>;
+    readonly changeSetUpdate: (
+        engagementId: EngagementId,
+        changeSetId: ChangeSetId,
+        patch: { readonly name?: string; readonly description?: string },
+    ) => Effect.Effect<EngagementWorkspace, GitError>;
+    readonly changeSetDelete: (
+        engagementId: EngagementId,
+        changeSetId: ChangeSetId,
+    ) => Effect.Effect<EngagementWorkspace, GitError>;
+    readonly changeSetItemsSet: (
+        engagementId: EngagementId,
+        changeSetId: ChangeSetId,
+        items: ReadonlyArray<ChangeSetPullRequest>,
+    ) => Effect.Effect<EngagementWorkspace, GitError>;
+    /** github.pullsList — origin-derived PR metadata through host gh credentials. */
+    readonly githubPullsList: (
+        repoId: RepoId,
+        state?: PullRequestListState,
+    ) => Effect.Effect<GitHubPullRequestList, GitError>;
+    readonly githubPullPreview: (
+        repoId: RepoId,
+        baseRefName?: string,
+    ) => Effect.Effect<GitHubPullRequestPreview, GitError>;
+    readonly githubPullCreate: (
+        repoId: RepoId,
+        input: {
+            readonly title: string;
+            readonly body: string;
+            readonly baseRefName: string;
+            readonly draft: boolean;
+        },
+    ) => Effect.Effect<GitHubPullRequestCreated, GitError>;
     /** repo.state — HEAD/branch/detached/in-progress/empty/bare snapshot. */
     readonly state: (repoId: RepoId) => Effect.Effect<RepoState, GitError>;
 

@@ -73,7 +73,8 @@ function parseLine(line: string, isRemote: boolean): BranchInfo | null {
     if (!fullRef || !objectname) return null;
 
     // Skip remote HEAD symlinks (refs/remotes/origin/HEAD)
-    if (isRemote && shortName.endsWith('/HEAD')) return null;
+    if (isRemote && (fullRef.endsWith('/HEAD') || shortName.endsWith('/HEAD')))
+        return null;
 
     let remoteName: string | undefined;
     if (isRemote) {

@@ -8,6 +8,7 @@
 // the composable building blocks (used by the integration tests and any embedder).
 
 export { buildServerLive, RPC_PATH } from './server';
+export { WORKSPACE_AVATAR_CHANNEL_PATH } from './workspace-avatar-channel';
 export {
     DEFAULT_HOST,
     DEFAULT_PORT,

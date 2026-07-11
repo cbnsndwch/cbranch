@@ -45,6 +45,11 @@ export {
     parseGitVersion,
 } from './git/version';
 export { computeRepoId, isRepoId, normalizeAbsolute } from './git/repo-id';
+export {
+    FILESYSTEM_LIST_LIMIT,
+    filesystemRootCandidates,
+    listFilesystemDirectory,
+} from './fs/list-directory';
 export { makeRepoLockRegistry, type RepoLockRegistry } from './git/locks';
 export {
     type CatFilePool,
@@ -100,13 +105,29 @@ export {
     defaultConfig,
     DEFAULT_BIND,
     DEFAULT_THRESHOLDS,
+    MAX_WORKSPACE_AVATAR_BYTES,
     makeConfigStore,
+    type EngagementEntry,
     type RecentRepoEntry,
     resolveConfigPath,
+    WORKSPACE_AVATAR_PATH_PREFIX,
 } from './config/config-store';
 
 // ── repository operations (parsers + resolvers reused by core-B) ────────────────
 export { repoCwd, type ResolvedRepo, resolveRepo } from './repo/resolve';
+
+// ── host forge integrations (credentials remain in host CLIs) ───────────────────
+export {
+    createGitHubPullRequest,
+    listGitHubPullRequests,
+    parseGitHubPullRequests,
+    parseGitHubRemote,
+    parsePreviewCommits,
+    parseRateLimit,
+    previewGitHubPullRequest,
+    runGh,
+    type GitHubRepository,
+} from './forge/github';
 export {
     detectInProgress,
     parseBranchHeader,

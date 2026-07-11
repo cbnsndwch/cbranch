@@ -13,6 +13,8 @@ import {
     type FixtureRepo,
     type FixtureWorkspace,
     gitEngineLayer,
+    makeConfigStore,
+    run,
     seedLinear,
 } from '@cbranch/core';
 import { CbranchRpcs, DiffSpec, LogQuery, Oid } from '@cbranch/rpc-contract';
@@ -27,6 +29,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 
 import { resolveServerConfig } from './config';
 import { buildServerLive } from './server';
+import { WORKSPACE_AVATAR_CHANNEL_PATH } from './workspace-avatar-channel';
 
 let workspace: FixtureWorkspace;
 let repo: FixtureRepo;
@@ -79,9 +82,15 @@ describe('web-server end-to-end (NF-TEST-8)', () => {
             env: { CBRANCH_BIND_ADDRESS: '127.0.0.1', CBRANCH_PORT: '0' },
             clientDir,
         });
+        const configStore = makeConfigStore({ configPath });
+        const avatarWorkspace = await run(
+            configStore.createEngagement('Avatar workspace', 'teal'),
+        );
+        const avatarEngagementId = avatarWorkspace.engagements[0]!.id;
         const serverLive = buildServerLive(
             config,
             gitEngineLayer({ env: process.env, configPath }),
+            configStore,
         );
 
         const program = Effect.gen(function* () {
@@ -159,6 +168,42 @@ describe('web-server end-to-end (NF-TEST-8)', () => {
                 },
             );
 
+            const avatarUpload = yield* fetchProbe(
+                `${base}${WORKSPACE_AVATAR_CHANNEL_PATH}?engagementId=${encodeURIComponent(avatarEngagementId)}`,
+                {
+                    method: 'POST',
+                    headers: { 'content-type': 'image/png' },
+                    body: new Uint8Array([
+                        0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+                    ]),
+                },
+            );
+            const avatarUrl = JSON.parse(avatarUpload.body) as {
+                avatarUrl: string;
+            };
+            const avatar = yield* fetchBytes(`${base}${avatarUrl.avatarUrl}`);
+            const invalidAvatar = yield* fetchProbe(
+                `${base}${WORKSPACE_AVATAR_CHANNEL_PATH}?engagementId=${encodeURIComponent(avatarEngagementId)}`,
+                { method: 'POST', body: 'not an image' },
+            );
+            const forbiddenAvatar = yield* fetchProbe(
+                `${base}${WORKSPACE_AVATAR_CHANNEL_PATH}?engagementId=${encodeURIComponent(avatarEngagementId)}`,
+                {
+                    method: 'POST',
+                    body: new Uint8Array([
+                        0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+                    ]),
+                    headers: { origin: 'http://evil.example.com' },
+                },
+            );
+            const avatarDelete = yield* fetchProbe(
+                `${base}${WORKSPACE_AVATAR_CHANNEL_PATH}?engagementId=${encodeURIComponent(avatarEngagementId)}`,
+                { method: 'DELETE' },
+            );
+            const removedAvatar = yield* fetchBytes(
+                `${base}${avatarUrl.avatarUrl}`,
+            );
+
             // --- archive side-channel (REQ-P5-AR-004/005) ---
             const archiveOk = yield* fetchBytes(
                 `${base}/sidechannel/archive?repoId=${repoId}&treeish=HEAD&format=zip`,
@@ -189,6 +234,12 @@ describe('web-server end-to-end (NF-TEST-8)', () => {
                 traversal,
                 forbidden,
                 forbiddenBlob,
+                avatarUpload,
+                avatar,
+                invalidAvatar,
+                forbiddenAvatar,
+                avatarDelete,
+                removedAvatar,
                 archiveOk,
                 archiveBadTree,
                 archiveBadPrefix,
@@ -243,6 +294,19 @@ describe('web-server end-to-end (NF-TEST-8)', () => {
         // NF-SEC-3: forged Origin rejected (HTTP route + side-channel) before any engine call.
         expect(r.forbidden.status).toBe(403);
         expect(r.forbiddenBlob.status).toBe(403);
+
+        // Workspace images are validated, persisted by the host, and served only through
+        // the guarded local side-channel. The cache-busting URL becomes unavailable after
+        // explicit removal.
+        expect(r.avatarUpload.status).toBe(200);
+        expect(r.avatar.contentType).toContain('image/png');
+        expect([...r.avatar.bytes]).toEqual([
+            0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+        ]);
+        expect(r.invalidAvatar.status).toBe(400);
+        expect(r.forbiddenAvatar.status).toBe(403);
+        expect(r.avatarDelete.status).toBe(204);
+        expect(r.removedAvatar.status).toBe(404);
 
         // REQ-P5-AR-004/005: archive streams a zip with attachment disposition; an invalid
         // tree-ish or traversal prefix is 400 with NO archive bytes (no partial download);

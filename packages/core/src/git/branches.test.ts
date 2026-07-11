@@ -151,6 +151,10 @@ describe('branchList', () => {
         expect(listing.remoteBranches.some(b => b.name.endsWith('/HEAD'))).toBe(
             false,
         );
+        expect(listing.remoteBranches.some(b => b.name === 'origin')).toBe(
+            false,
+        );
+        expect(listing.remoteBranches).toHaveLength(1);
         expect(listing.remoteBranches.some(b => b.name === 'origin/main')).toBe(
             true,
         );

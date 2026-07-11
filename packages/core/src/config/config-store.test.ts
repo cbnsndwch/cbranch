@@ -1,9 +1,15 @@
 import { createHash } from 'node:crypto';
 import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 
-import { RecentRepo, RepoId } from '@cbranch/rpc-contract';
+import {
+    ChangeSetPullRequest,
+    EngagementId,
+    Oid,
+    RecentRepo,
+    RepoId,
+} from '@cbranch/rpc-contract';
 import { afterAll, describe, expect, test } from 'vitest';
 
 import { run } from '../testing/effect-run';
@@ -30,6 +36,7 @@ describe('defaults (NF-CFG-5/7)', () => {
         const config = await run(store.load());
         expect(config.version).toBe(CONFIG_VERSION);
         expect(config.recentRepos).toEqual([]);
+        expect(config.engagements).toEqual([]);
         expect(config.theme).toBe('system');
         expect(config.bind).toEqual(DEFAULT_BIND);
         expect(config.thresholds.logPageSize).toBe(
@@ -73,7 +80,350 @@ describe('defaults (NF-CFG-5/7)', () => {
         expect(config.recentRepos).toHaveLength(1);
         expect('somethingUnknown' in config).toBe(false);
     });
+
+    test('normalizes malformed v2 change-set data without crossing membership', async () => {
+        const path = newPath();
+        const repoId = 'a'.repeat(64);
+        const validPull = {
+            repoId,
+            repository: 'acme/api',
+            number: 12,
+            title: 'API change',
+            url: 'https://github.com/acme/api/pull/12',
+            headRefName: 'feature/api',
+            baseRefName: 'main',
+        };
+        writeFileSync(
+            path,
+            JSON.stringify({
+                version: 2,
+                recentRepos: [
+                    {
+                        path: '/api',
+                        name: 'api',
+                        repoId,
+                        lastOpenedAt: 1,
+                    },
+                ],
+                engagements: [
+                    null,
+                    { id: '', name: 'bad', color: 'teal' },
+                    {
+                        id: 'client',
+                        name: ' Client ',
+                        color: 'blue',
+                        repoIds: [repoId],
+                        openRepoIds: [repoId, 'outside'],
+                        activeRepoId: 'outside',
+                        changeSets: [
+                            null,
+                            {
+                                id: 'release',
+                                name: ' Release ',
+                                pullRequests: [
+                                    null,
+                                    validPull,
+                                    validPull,
+                                    { ...validPull, repoId: 'outside' },
+                                    { ...validPull, number: '12' },
+                                ],
+                            },
+                            { id: 'release', name: 'duplicate' },
+                            { id: 'empty', name: ' ' },
+                        ],
+                    },
+                    {
+                        id: 'client',
+                        name: 'duplicate engagement',
+                        color: 'rose',
+                    },
+                ],
+            }),
+            'utf8',
+        );
+
+        const workspace = await run(
+            makeConfigStore({ configPath: path }).listEngagements(),
+        );
+        expect(workspace.engagements).toHaveLength(1);
+        expect(workspace.engagements[0]?.name).toBe('Client');
+        expect(workspace.engagements[0]?.openRepoIds).toEqual([repoId]);
+        expect(workspace.engagements[0]?.activeRepoId).toBeUndefined();
+        expect(workspace.engagements[0]?.changeSets).toHaveLength(1);
+        expect(workspace.engagements[0]?.changeSets[0]).toMatchObject({
+            name: 'Release',
+            description: '',
+            createdAt: 0,
+            updatedAt: 0,
+        });
+        expect(
+            workspace.engagements[0]?.changeSets[0]?.pullRequests,
+        ).toHaveLength(1);
+    });
 });
+
+describe('engagement workspaces', () => {
+    test('persists isolated membership and ordered open-repo sessions', async () => {
+        const path = newPath();
+        const store = makeConfigStore({ configPath: path });
+        const a = entry('/client-a/api');
+        const b = entry('/client-a/web');
+        await run(store.upsertRecent(a));
+        await run(store.upsertRecent(b));
+
+        const created = await run(store.createEngagement('Client A', 'teal'));
+        const engagementId = created.engagements[0]!.id;
+        await run(
+            store.assignEngagementRepo(engagementId, RepoId.make(a.repoId)),
+        );
+        await run(
+            store.assignEngagementRepo(engagementId, RepoId.make(b.repoId)),
+        );
+        await run(
+            store.setEngagementSession(
+                engagementId,
+                [RepoId.make(b.repoId), RepoId.make(a.repoId)],
+                RepoId.make(a.repoId),
+            ),
+        );
+
+        const reread = await run(
+            makeConfigStore({ configPath: path }).listEngagements(),
+        );
+        expect(reread.activeEngagementId).toBe(engagementId);
+        expect(
+            reread.engagements[0]?.repositories.map(repo => repo.path),
+        ).toEqual(['/client-a/api', '/client-a/web']);
+        expect(reread.engagements[0]?.openRepoIds).toEqual([
+            b.repoId,
+            a.repoId,
+        ]);
+        expect(reread.engagements[0]?.activeRepoId).toBe(a.repoId);
+        expect(reread.unassignedRepositories).toEqual([]);
+    });
+
+    test('persists, clears, and validates workspace avatar URLs', async () => {
+        const path = newPath();
+        const store = makeConfigStore({ configPath: path });
+        const created = await run(
+            store.createEngagement(
+                'Client A',
+                'teal',
+                'https://avatars.example.test/client-a.png',
+            ),
+        );
+        const id = created.engagements[0]!.id;
+        expect(created.engagements[0]?.avatarUrl).toBe(
+            'https://avatars.example.test/client-a.png',
+        );
+
+        await expect(
+            run(
+                store.updateEngagement(id, { avatarUrl: 'file:///secret.png' }),
+            ),
+        ).rejects.toMatchObject({ code: 'gitFailed' });
+
+        await run(store.updateEngagement(id, { avatarUrl: null }));
+        const reread = await run(
+            makeConfigStore({ configPath: path }).listEngagements(),
+        );
+        expect(reread.engagements[0]?.avatarUrl).toBeUndefined();
+    });
+
+    test('persists uploaded workspace avatars beside the config and removes them', async () => {
+        const path = newPath();
+        const store = makeConfigStore({ configPath: path });
+        const created = await run(store.createEngagement('Client A', 'teal'));
+        const id = created.engagements[0]!.id;
+        const png = new Uint8Array([
+            0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+        ]);
+
+        await expect(
+            run(store.uploadEngagementAvatar(id, new Uint8Array([0x00]))),
+        ).rejects.toMatchObject({ code: 'gitFailed' });
+
+        const uploaded = await run(store.uploadEngagementAvatar(id, png));
+        expect(uploaded.avatarUrl).toMatch(
+            /^\/sidechannel\/workspace-avatar\/[a-f0-9]{64}\.png\?v=/,
+        );
+        const filename = uploaded.avatarUrl
+            .replace('/sidechannel/workspace-avatar/', '')
+            .split('?')[0]!;
+        expect(
+            readFileSync(join(dirname(path), 'workspace-avatars', filename)),
+        ).toEqual(Buffer.from(png));
+
+        const loaded = await run(store.readEngagementAvatar(filename));
+        expect(loaded).toMatchObject({
+            bytes: png,
+            contentType: 'image/png',
+        });
+        const workspace = await run(store.listEngagements());
+        expect(workspace.engagements[0]?.avatarUrl).toBe(uploaded.avatarUrl);
+
+        await run(store.removeEngagementAvatar(id));
+        expect(await run(store.readEngagementAvatar(filename))).toBeUndefined();
+        expect(
+            (await run(store.listEngagements())).engagements[0]?.avatarUrl,
+        ).toBeUndefined();
+    });
+
+    test('moving a repo between engagements is exclusive and deleting unassigns it', async () => {
+        const store = makeConfigStore({ configPath: newPath() });
+        const repo = entry('/shared-looking-but-owned');
+        await run(store.upsertRecent(repo));
+        const first = await run(store.createEngagement('Client A', 'blue'));
+        const firstId = first.engagements[0]!.id;
+        const second = await run(store.createEngagement('Client B', 'rose'));
+        const secondId = second.engagements[1]!.id;
+        await run(
+            store.assignEngagementRepo(firstId, RepoId.make(repo.repoId)),
+        );
+        const moved = await run(
+            store.assignEngagementRepo(secondId, RepoId.make(repo.repoId)),
+        );
+        expect(moved.engagements[0]?.repositories).toEqual([]);
+        expect(moved.engagements[1]?.repositories[0]?.repoId).toBe(repo.repoId);
+
+        const deleted = await run(store.deleteEngagement(secondId));
+        expect(deleted.unassignedRepositories[0]?.repoId).toBe(repo.repoId);
+        expect(deleted.activeEngagementId).toBe(firstId);
+    });
+
+    test('persists workspace order and rejects incomplete or duplicate orders', async () => {
+        const path = newPath();
+        const store = makeConfigStore({ configPath: path });
+        const first = await run(store.createEngagement('First', 'teal'));
+        const second = await run(store.createEngagement('Second', 'blue'));
+        const third = await run(store.createEngagement('Third', 'rose'));
+        const ids = [
+            first.engagements[0]!.id,
+            second.engagements[1]!.id,
+            third.engagements[2]!.id,
+        ];
+
+        const reordered = await run(
+            store.reorderEngagements([ids[2]!, ids[0]!, ids[1]!]),
+        );
+        expect(
+            reordered.engagements.map(engagement => engagement.name),
+        ).toEqual(['Third', 'First', 'Second']);
+        expect(
+            (
+                await run(
+                    makeConfigStore({ configPath: path }).listEngagements(),
+                )
+            ).engagements.map(engagement => engagement.id),
+        ).toEqual([ids[2], ids[0], ids[1]]);
+
+        await expect(
+            run(store.reorderEngagements([ids[0]!, ids[0]!, ids[1]!])),
+        ).rejects.toMatchObject({ code: 'gitFailed' });
+    });
+
+    test('rejects session repos outside the engagement boundary', async () => {
+        const store = makeConfigStore({ configPath: newPath() });
+        const created = await run(store.createEngagement('Client', 'amber'));
+        const id = EngagementId.make(created.engagements[0]!.id);
+        await expect(
+            run(
+                store.setEngagementSession(
+                    id,
+                    [RepoId.make('unassigned')],
+                    RepoId.make('unassigned'),
+                ),
+            ),
+        ).rejects.toMatchObject({ code: 'repoUnavailable' });
+    });
+
+    test('persists ordered PR change sets and keeps them inside membership', async () => {
+        const path = newPath();
+        const store = makeConfigStore({ configPath: path });
+        const api = entry('/client/api');
+        const web = entry('/client/web');
+        const outside = entry('/other/repo');
+        await run(store.upsertRecent(api));
+        await run(store.upsertRecent(web));
+        await run(store.upsertRecent(outside));
+        const created = await run(store.createEngagement('Client', 'violet'));
+        const id = created.engagements[0]!.id;
+        await run(store.assignEngagementRepo(id, RepoId.make(api.repoId)));
+        await run(store.assignEngagementRepo(id, RepoId.make(web.repoId)));
+        const withSet = await run(
+            store.createChangeSet(id, 'Release train', 'API before web'),
+        );
+        const changeSetId = withSet.engagements[0]!.changeSets[0]!.id;
+        const items = [
+            changeSetItem(web.repoId, 'client/web', 22),
+            changeSetItem(api.repoId, 'client/api', 11),
+        ];
+        await run(store.setChangeSetItems(id, changeSetId, items));
+        await run(
+            store.updateChangeSet(id, changeSetId, {
+                description: 'Deploy API, then web',
+            }),
+        );
+
+        const reread = await run(
+            makeConfigStore({ configPath: path }).listEngagements(),
+        );
+        expect(
+            reread.engagements[0]?.changeSets[0]?.pullRequests.map(
+                item => item.number,
+            ),
+        ).toEqual([22, 11]);
+        expect(reread.engagements[0]?.changeSets[0]?.description).toBe(
+            'Deploy API, then web',
+        );
+
+        await expect(
+            run(
+                store.setChangeSetItems(id, changeSetId, [
+                    changeSetItem(outside.repoId, 'other/repo', 7),
+                ]),
+            ),
+        ).rejects.toMatchObject({ code: 'repoUnavailable' });
+    });
+
+    test('moving a repository scrubs its PRs from the old engagement change sets', async () => {
+        const store = makeConfigStore({ configPath: newPath() });
+        const repo = entry('/client/api');
+        await run(store.upsertRecent(repo));
+        const first = await run(store.createEngagement('First', 'teal'));
+        const firstId = first.engagements[0]!.id;
+        const second = await run(store.createEngagement('Second', 'blue'));
+        const secondId = second.engagements[1]!.id;
+        await run(
+            store.assignEngagementRepo(firstId, RepoId.make(repo.repoId)),
+        );
+        const withSet = await run(store.createChangeSet(firstId, 'Migration'));
+        const changeSetId = withSet.engagements[0]!.changeSets[0]!.id;
+        await run(
+            store.setChangeSetItems(firstId, changeSetId, [
+                changeSetItem(repo.repoId, 'client/api', 1),
+            ]),
+        );
+
+        const moved = await run(
+            store.assignEngagementRepo(secondId, RepoId.make(repo.repoId)),
+        );
+        expect(moved.engagements[0]?.changeSets[0]?.pullRequests).toEqual([]);
+    });
+});
+
+const changeSetItem = (repoId: string, repository: string, number: number) =>
+    new ChangeSetPullRequest({
+        repoId: RepoId.make(repoId),
+        repository,
+        number,
+        title: `PR ${number}`,
+        url: `https://github.com/${repository}/pull/${number}`,
+        headRefName: `feature/${number}`,
+        headRefOid: Oid.make(String(number).repeat(40).slice(0, 40)),
+        baseRefName: 'main',
+        dependencyNote: '',
+    });
 
 const entry = (p: string) => ({
     path: p,

@@ -23,6 +23,84 @@ export const handlersLayer = CbranchRpcs.toLayer({
         Effect.flatMap(GitEngine, engine => engine.recentList()),
     RepoRecentRemove: ({ repoId }) =>
         Effect.flatMap(GitEngine, engine => engine.recentRemove(repoId)),
+    FilesystemListDir: ({ path, showHidden }) =>
+        Effect.flatMap(GitEngine, engine =>
+            engine.filesystemListDir({ path, showHidden }),
+        ),
+    EngagementList: () =>
+        Effect.flatMap(GitEngine, engine => engine.engagementList()),
+    EngagementCreate: ({ name, color, avatarUrl }) =>
+        Effect.flatMap(GitEngine, engine =>
+            engine.engagementCreate(name, color, avatarUrl),
+        ),
+    EngagementUpdate: ({ engagementId, name, color, avatarUrl }) =>
+        Effect.flatMap(GitEngine, engine =>
+            engine.engagementUpdate(engagementId, { name, color, avatarUrl }),
+        ),
+    EngagementDelete: ({ engagementId }) =>
+        Effect.flatMap(GitEngine, engine =>
+            engine.engagementDelete(engagementId),
+        ),
+    EngagementReorder: ({ engagementIds }) =>
+        Effect.flatMap(GitEngine, engine =>
+            engine.engagementReorder(engagementIds),
+        ),
+    EngagementRepoAssign: ({ engagementId, repoId }) =>
+        Effect.flatMap(GitEngine, engine =>
+            engine.engagementRepoAssign(engagementId, repoId),
+        ),
+    EngagementRepoRemove: ({ engagementId, repoId }) =>
+        Effect.flatMap(GitEngine, engine =>
+            engine.engagementRepoRemove(engagementId, repoId),
+        ),
+    EngagementSessionSet: ({ engagementId, openRepoIds, activeRepoId }) =>
+        Effect.flatMap(GitEngine, engine =>
+            engine.engagementSessionSet(
+                engagementId,
+                openRepoIds,
+                activeRepoId,
+            ),
+        ),
+    EngagementActivate: ({ engagementId }) =>
+        Effect.flatMap(GitEngine, engine =>
+            engine.engagementActivate(engagementId),
+        ),
+    ChangeSetCreate: ({ engagementId, name, description }) =>
+        Effect.flatMap(GitEngine, engine =>
+            engine.changeSetCreate(engagementId, name, description),
+        ),
+    ChangeSetUpdate: ({ engagementId, changeSetId, name, description }) =>
+        Effect.flatMap(GitEngine, engine =>
+            engine.changeSetUpdate(engagementId, changeSetId, {
+                name,
+                description,
+            }),
+        ),
+    ChangeSetDelete: ({ engagementId, changeSetId }) =>
+        Effect.flatMap(GitEngine, engine =>
+            engine.changeSetDelete(engagementId, changeSetId),
+        ),
+    ChangeSetItemsSet: ({ engagementId, changeSetId, items }) =>
+        Effect.flatMap(GitEngine, engine =>
+            engine.changeSetItemsSet(engagementId, changeSetId, items),
+        ),
+    GitHubPullsList: ({ repoId, state }) =>
+        Effect.flatMap(GitEngine, engine =>
+            engine.githubPullsList(repoId, state),
+        ),
+    GitHubPullPreview: ({ repoId, baseRefName }) =>
+        Effect.flatMap(GitEngine, engine =>
+            engine.githubPullPreview(repoId, baseRefName),
+        ),
+    GitHubPullCreate: ({ repoId, title, body, baseRefName, draft }) =>
+        Effect.flatMap(GitEngine, engine =>
+            engine.githubPullCreate(repoId, {
+                title,
+                body,
+                baseRefName,
+                draft,
+            }),
+        ),
     RepoState: ({ repoId }) =>
         Effect.flatMap(GitEngine, engine => engine.state(repoId)),
     RepoSubscribe: ({ repoId }) =>

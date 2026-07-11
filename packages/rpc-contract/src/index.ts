@@ -45,6 +45,15 @@ export * from './schemas/phase5';
 // patch interchange (each slice appends).
 export * from './schemas/phase6';
 
+// Multi-repository consulting workspaces: engagement partitions + open-repo sessions.
+export * from './schemas/engagements';
+
+// Host-bounded filesystem exploration for repository/folder pickers.
+export * from './schemas/filesystem';
+
+// Host-credential forge metadata (GitHub PR list; no credential fields).
+export * from './schemas/forge';
+
 // The P1 method catalog.
 export * from './rpc/group';
 

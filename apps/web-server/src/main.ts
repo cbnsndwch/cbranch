@@ -15,7 +15,8 @@ import { ensureClientDir, resolveServerConfig } from './config';
 import { buildServerLive } from './server';
 
 const program = Effect.gen(function* () {
-    const persisted = yield* makeConfigStore({ env: process.env }).load();
+    const configStore = makeConfigStore({ env: process.env });
+    const persisted = yield* configStore.load();
     const config = resolveServerConfig({ env: process.env, config: persisted });
     ensureClientDir(config.clientDir);
 
@@ -30,7 +31,11 @@ const program = Effect.gen(function* () {
     }
 
     yield* Layer.launch(
-        buildServerLive(config, gitEngineLayer({ env: process.env })),
+        buildServerLive(
+            config,
+            gitEngineLayer({ env: process.env }),
+            configStore,
+        ),
     );
 });
 

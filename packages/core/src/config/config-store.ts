@@ -8,19 +8,40 @@
 // crashing (NF-CFG-5), and unknown fields are ignored (forward/backward compatible).
 // cbranch NEVER writes repository git config (NF-CFG-4) or secrets (NF-CFG-6).
 
-import { randomUUID } from 'node:crypto';
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
+import { createHash, randomUUID } from 'node:crypto';
+import { mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 
-import { type GitError, type RepoId } from '@cbranch/rpc-contract';
-import { RecentRepo, RepoId as RepoIdBrand } from '@cbranch/rpc-contract';
+import {
+    type ChangeSetId,
+    ChangeSetId as ChangeSetIdBrand,
+    type ChangeSetPullRequest,
+    ChangeSetPullRequest as ChangeSetPullRequestSchema,
+    Engagement,
+    type EngagementColor,
+    type EngagementId,
+    EngagementId as EngagementIdBrand,
+    EngagementWorkspace,
+    type GitError,
+    Oid as OidBrand,
+    PullRequestChangeSet,
+    RecentRepo,
+    type RepoId,
+    RepoId as RepoIdBrand,
+} from '@cbranch/rpc-contract';
 import { Effect, Semaphore } from 'effect';
 
-import { classifyNodeError } from '../git/errors';
+import { classifyNodeError, gitError } from '../git/errors';
 
 /** Current settings schema version (top-level integer for migration — NF-CFG-7). */
-export const CONFIG_VERSION = 1;
+export const CONFIG_VERSION = 3;
+
+/** Local host URL prefix for workspace images stored alongside cbranch's config. */
+export const WORKSPACE_AVATAR_PATH_PREFIX = '/sidechannel/workspace-avatar/';
+
+/** Uploaded workspace images are deliberately small enough for a local settings asset. */
+export const MAX_WORKSPACE_AVATAR_BYTES = 2 * 1024 * 1024;
 
 export const DEFAULT_BIND = { address: '127.0.0.1', port: 7420 } as const;
 
@@ -42,6 +63,41 @@ export interface RecentRepoEntry {
     readonly lastOpenedAt: number;
 }
 
+/** Host-persisted consulting partition and its ordered open-repository session. */
+export interface EngagementEntry {
+    readonly id: string;
+    readonly name: string;
+    readonly color: EngagementColor;
+    readonly avatarUrl?: string;
+    readonly repoIds: ReadonlyArray<string>;
+    readonly openRepoIds: ReadonlyArray<string>;
+    readonly activeRepoId?: string;
+    readonly changeSets: ReadonlyArray<PullRequestChangeSetEntry>;
+    readonly createdAt: number;
+    readonly updatedAt: number;
+}
+
+export interface ChangeSetPullRequestEntry {
+    readonly repoId: string;
+    readonly repository: string;
+    readonly number: number;
+    readonly title: string;
+    readonly url: string;
+    readonly headRefName: string;
+    readonly headRefOid?: string;
+    readonly baseRefName: string;
+    readonly dependencyNote: string;
+}
+
+export interface PullRequestChangeSetEntry {
+    readonly id: string;
+    readonly name: string;
+    readonly description: string;
+    readonly pullRequests: ReadonlyArray<ChangeSetPullRequestEntry>;
+    readonly createdAt: number;
+    readonly updatedAt: number;
+}
+
 /** History-grid column visibility (REQ-P6-COL-002); every column defaults to shown. */
 export interface HistoryColumns {
     readonly authorName: boolean;
@@ -60,6 +116,8 @@ export const DEFAULT_COLUMNS: HistoryColumns = {
 export interface Config {
     readonly version: number;
     readonly recentRepos: ReadonlyArray<RecentRepoEntry>;
+    readonly engagements: ReadonlyArray<EngagementEntry>;
+    readonly activeEngagementId?: string;
     readonly theme: 'light' | 'dark' | 'system';
     readonly locale: string;
     readonly logLevel: 'error' | 'warn' | 'info' | 'debug';
@@ -72,6 +130,8 @@ export interface Config {
 export const defaultConfig = (): Config => ({
     version: CONFIG_VERSION,
     recentRepos: [],
+    engagements: [],
+    activeEngagementId: undefined,
     theme: 'system',
     locale: 'en',
     logLevel: 'info',
@@ -127,6 +187,81 @@ export interface ConfigStore {
         repoId: RepoId,
         name: string,
     ) => Effect.Effect<void, GitError>;
+    /** Complete consulting workspace snapshot, including explicitly unassigned repos. */
+    readonly listEngagements: () => Effect.Effect<EngagementWorkspace>;
+    readonly createEngagement: (
+        name: string,
+        color: EngagementColor,
+        avatarUrl?: string,
+    ) => Effect.Effect<EngagementWorkspace, GitError>;
+    readonly updateEngagement: (
+        engagementId: EngagementId,
+        patch: {
+            readonly name?: string;
+            readonly color?: EngagementColor;
+            readonly avatarUrl?: string | null;
+        },
+    ) => Effect.Effect<EngagementWorkspace, GitError>;
+    /** Persist a validated raster image under cbranch's config directory for a workspace. */
+    readonly uploadEngagementAvatar: (
+        engagementId: EngagementId,
+        bytes: Uint8Array,
+    ) => Effect.Effect<{ readonly avatarUrl: string }, GitError>;
+    /** Read a previously persisted workspace image by its opaque local filename. */
+    readonly readEngagementAvatar: (filename: string) => Effect.Effect<
+        | {
+              readonly bytes: Uint8Array;
+              readonly contentType: string;
+          }
+        | undefined,
+        GitError
+    >;
+    /** Remove a workspace image and clear its persisted avatar URL. */
+    readonly removeEngagementAvatar: (
+        engagementId: EngagementId,
+    ) => Effect.Effect<EngagementWorkspace, GitError>;
+    readonly deleteEngagement: (
+        engagementId: EngagementId,
+    ) => Effect.Effect<EngagementWorkspace, GitError>;
+    /** Persist the workspace presentation order used by the sidebar and manager. */
+    readonly reorderEngagements: (
+        engagementIds: ReadonlyArray<EngagementId>,
+    ) => Effect.Effect<EngagementWorkspace, GitError>;
+    readonly assignEngagementRepo: (
+        engagementId: EngagementId,
+        repoId: RepoId,
+    ) => Effect.Effect<EngagementWorkspace, GitError>;
+    readonly removeEngagementRepo: (
+        engagementId: EngagementId,
+        repoId: RepoId,
+    ) => Effect.Effect<EngagementWorkspace, GitError>;
+    readonly setEngagementSession: (
+        engagementId: EngagementId,
+        openRepoIds: ReadonlyArray<RepoId>,
+        activeRepoId?: RepoId,
+    ) => Effect.Effect<EngagementWorkspace, GitError>;
+    readonly activateEngagement: (
+        engagementId: EngagementId,
+    ) => Effect.Effect<EngagementWorkspace, GitError>;
+    readonly createChangeSet: (
+        engagementId: EngagementId,
+        name: string,
+        description?: string,
+    ) => Effect.Effect<EngagementWorkspace, GitError>;
+    readonly updateChangeSet: (
+        engagementId: EngagementId,
+        changeSetId: ChangeSetId,
+        patch: { readonly name?: string; readonly description?: string },
+    ) => Effect.Effect<EngagementWorkspace, GitError>;
+    readonly deleteChangeSet: (
+        engagementId: EngagementId,
+        changeSetId: ChangeSetId,
+    ) => Effect.Effect<EngagementWorkspace, GitError>;
+    readonly setChangeSetItems: (
+        engagementId: EngagementId,
+        changeSetId: ChangeSetId,
+        items: ReadonlyArray<ChangeSetPullRequest>,
+    ) => Effect.Effect<EngagementWorkspace, GitError>;
     /** Read app settings (theme/locale/keybindings); infallible (defaults on any problem). */
     readonly getAppSettings: () => Effect.Effect<AppSettingsData>;
     /** Merge a partial patch into app settings and persist (REQ-P5-CFG-006). */
@@ -141,6 +276,111 @@ export interface ConfigStore {
  * upsertRecent can't lose an update. Reads stay lockless (load is infallible).
  */
 const writeLock = Semaphore.makeUnsafe(1);
+
+const missingEngagement = (engagementId: EngagementId): GitError =>
+    gitError('engagementNotFound', `engagement ${engagementId} does not exist`);
+
+const missingChangeSet = (changeSetId: ChangeSetId): GitError =>
+    gitError('changeSetNotFound', `change set ${changeSetId} does not exist`);
+
+type WorkspaceAvatarType = {
+    readonly extension: 'png' | 'jpg' | 'gif' | 'webp';
+    readonly contentType:
+        | 'image/png'
+        | 'image/jpeg'
+        | 'image/gif'
+        | 'image/webp';
+};
+
+const WORKSPACE_AVATAR_TYPES: ReadonlyArray<WorkspaceAvatarType> = [
+    { extension: 'png', contentType: 'image/png' },
+    { extension: 'jpg', contentType: 'image/jpeg' },
+    { extension: 'gif', contentType: 'image/gif' },
+    { extension: 'webp', contentType: 'image/webp' },
+];
+
+const avatarTypeFromBytes = (
+    bytes: Uint8Array,
+): WorkspaceAvatarType | undefined => {
+    if (
+        bytes.length >= 8 &&
+        bytes[0] === 0x89 &&
+        bytes[1] === 0x50 &&
+        bytes[2] === 0x4e &&
+        bytes[3] === 0x47 &&
+        bytes[4] === 0x0d &&
+        bytes[5] === 0x0a &&
+        bytes[6] === 0x1a &&
+        bytes[7] === 0x0a
+    )
+        return WORKSPACE_AVATAR_TYPES[0];
+    if (
+        bytes.length >= 3 &&
+        bytes[0] === 0xff &&
+        bytes[1] === 0xd8 &&
+        bytes[2] === 0xff
+    )
+        return WORKSPACE_AVATAR_TYPES[1];
+    if (
+        bytes.length >= 6 &&
+        bytes[0] === 0x47 &&
+        bytes[1] === 0x49 &&
+        bytes[2] === 0x46 &&
+        bytes[3] === 0x38 &&
+        (bytes[4] === 0x37 || bytes[4] === 0x39) &&
+        bytes[5] === 0x61
+    )
+        return WORKSPACE_AVATAR_TYPES[2];
+    if (
+        bytes.length >= 12 &&
+        bytes[0] === 0x52 &&
+        bytes[1] === 0x49 &&
+        bytes[2] === 0x46 &&
+        bytes[3] === 0x46 &&
+        bytes[8] === 0x57 &&
+        bytes[9] === 0x45 &&
+        bytes[10] === 0x42 &&
+        bytes[11] === 0x50
+    )
+        return WORKSPACE_AVATAR_TYPES[3];
+    return undefined;
+};
+
+const avatarFilename = (
+    engagementId: EngagementId,
+    extension: WorkspaceAvatarType['extension'],
+): string =>
+    `${createHash('sha256').update(engagementId).digest('hex')}.${extension}`;
+
+const avatarFilenamePattern = /^[a-f0-9]{64}\.(png|jpg|gif|webp)$/;
+
+const localAvatarUrlPattern = new RegExp(
+    `^${WORKSPACE_AVATAR_PATH_PREFIX.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[a-f0-9]{64}\\.(png|jpg|gif|webp)\\?v=[0-9a-f-]{36}$`,
+);
+
+const avatarDirectoryFor = (configPath: string): string =>
+    join(dirname(configPath), 'workspace-avatars');
+
+const removeAvatarFiles = async (
+    directory: string,
+    engagementId: EngagementId,
+    keepExtension?: WorkspaceAvatarType['extension'],
+): Promise<void> => {
+    await Promise.all(
+        WORKSPACE_AVATAR_TYPES.filter(
+            ({ extension }) => extension !== keepExtension,
+        ).map(async ({ extension }) => {
+            try {
+                await unlink(
+                    join(directory, avatarFilename(engagementId, extension)),
+                );
+            } catch (error) {
+                if ((error as NodeJS.ErrnoException).code !== 'ENOENT')
+                    throw error;
+            }
+        }),
+    );
+};
 
 export const makeConfigStore = (opts?: {
     readonly configPath?: string;
@@ -188,6 +428,18 @@ export const makeConfigStore = (opts?: {
             recentRepos: f([...config.recentRepos]),
         }));
 
+    const updateWorkspace = (
+        f: (config: Config) => Effect.Effect<Config, GitError>,
+    ): Effect.Effect<EngagementWorkspace, GitError> =>
+        writeLock.withPermits(1)(
+            Effect.gen(function* () {
+                const config = yield* load();
+                const next = yield* f(config);
+                yield* save(next);
+                return toEngagementWorkspace(next);
+            }),
+        );
+
     return {
         path,
         load,
@@ -210,11 +462,613 @@ export const makeConfigStore = (opts?: {
                 ...recents.filter(r => r.path !== entry.path),
             ]),
         removeRecent: repoId =>
-            mutate(recents => recents.filter(r => r.repoId !== repoId)),
+            update(config => ({
+                ...config,
+                recentRepos: config.recentRepos.filter(
+                    r => r.repoId !== repoId,
+                ),
+                engagements: config.engagements.map(engagement => {
+                    const repoIds = engagement.repoIds.filter(
+                        id => id !== repoId,
+                    );
+                    const openRepoIds = engagement.openRepoIds.filter(
+                        id => id !== repoId,
+                    );
+                    return {
+                        ...engagement,
+                        repoIds,
+                        openRepoIds,
+                        changeSets: scrubChangeSetRepo(
+                            engagement.changeSets,
+                            repoId,
+                        ),
+                        activeRepoId:
+                            engagement.activeRepoId === repoId
+                                ? openRepoIds[0]
+                                : engagement.activeRepoId,
+                    };
+                }),
+            })),
         renameRecent: (repoId, name) =>
             mutate(recents =>
                 recents.map(r => (r.repoId === repoId ? { ...r, name } : r)),
             ),
+        listEngagements: () =>
+            Effect.map(load(), config => toEngagementWorkspace(config)),
+        createEngagement: (rawName, color, rawAvatarUrl) =>
+            updateWorkspace(config => {
+                const name = rawName.trim();
+                if (name === '')
+                    return Effect.fail(
+                        gitError(
+                            'gitFailed',
+                            'engagement name cannot be empty',
+                        ),
+                    );
+                const avatarUrl =
+                    rawAvatarUrl === undefined
+                        ? undefined
+                        : normalizeAvatarUrl(rawAvatarUrl);
+                if (rawAvatarUrl !== undefined && avatarUrl === undefined)
+                    return Effect.fail(
+                        gitError(
+                            'gitFailed',
+                            'workspace avatar must be an http(s) image URL or a local upload',
+                        ),
+                    );
+                const now = Date.now();
+                const entry: EngagementEntry = {
+                    id: randomUUID(),
+                    name,
+                    color,
+                    avatarUrl,
+                    repoIds: [],
+                    openRepoIds: [],
+                    changeSets: [],
+                    createdAt: now,
+                    updatedAt: now,
+                };
+                return Effect.succeed({
+                    ...config,
+                    engagements: [...config.engagements, entry],
+                    activeEngagementId: entry.id,
+                });
+            }),
+        updateEngagement: (engagementId, patch) =>
+            updateWorkspace(config => {
+                const current = config.engagements.find(
+                    engagement => engagement.id === engagementId,
+                );
+                if (!current)
+                    return Effect.fail(missingEngagement(engagementId));
+                const name = patch.name?.trim();
+                if (name !== undefined && name === '')
+                    return Effect.fail(
+                        gitError(
+                            'gitFailed',
+                            'engagement name cannot be empty',
+                        ),
+                    );
+                const avatarUrl =
+                    patch.avatarUrl === undefined || patch.avatarUrl === null
+                        ? undefined
+                        : normalizeAvatarUrl(patch.avatarUrl);
+                if (
+                    patch.avatarUrl !== undefined &&
+                    patch.avatarUrl !== null &&
+                    avatarUrl === undefined
+                )
+                    return Effect.fail(
+                        gitError(
+                            'gitFailed',
+                            'workspace avatar must be an http(s) image URL or a local upload',
+                        ),
+                    );
+                return Effect.succeed({
+                    ...config,
+                    engagements: config.engagements.map(engagement =>
+                        engagement.id === engagementId
+                            ? {
+                                  ...engagement,
+                                  name: name ?? engagement.name,
+                                  color: patch.color ?? engagement.color,
+                                  avatarUrl:
+                                      patch.avatarUrl === undefined
+                                          ? engagement.avatarUrl
+                                          : avatarUrl,
+                                  updatedAt: Date.now(),
+                              }
+                            : engagement,
+                    ),
+                });
+            }),
+        uploadEngagementAvatar: (engagementId, bytes) => {
+            if (bytes.length === 0 || bytes.length > MAX_WORKSPACE_AVATAR_BYTES)
+                return Effect.fail(
+                    gitError(
+                        'gitFailed',
+                        `workspace avatar must be at most ${MAX_WORKSPACE_AVATAR_BYTES} bytes`,
+                    ),
+                );
+            const type = avatarTypeFromBytes(bytes);
+            if (!type)
+                return Effect.fail(
+                    gitError(
+                        'gitFailed',
+                        'workspace avatar must be a PNG, JPEG, GIF, or WebP image',
+                    ),
+                );
+            return writeLock.withPermits(1)(
+                Effect.gen(function* () {
+                    const config = yield* load();
+                    if (
+                        !config.engagements.some(
+                            engagement => engagement.id === engagementId,
+                        )
+                    )
+                        return yield* Effect.fail(
+                            missingEngagement(engagementId),
+                        );
+                    const directory = avatarDirectoryFor(path);
+                    const filename = avatarFilename(
+                        engagementId,
+                        type.extension,
+                    );
+                    const avatarPath = join(directory, filename);
+                    yield* Effect.tryPromise({
+                        try: async () => {
+                            await mkdir(directory, { recursive: true });
+                            const temporaryPath = `${avatarPath}.${randomUUID()}.tmp`;
+                            await writeFile(temporaryPath, bytes);
+                            await rename(temporaryPath, avatarPath);
+                            await removeAvatarFiles(
+                                directory,
+                                engagementId,
+                                type.extension,
+                            );
+                        },
+                        catch: classifyNodeError,
+                    });
+                    const avatarUrl = `${WORKSPACE_AVATAR_PATH_PREFIX}${filename}?v=${randomUUID()}`;
+                    yield* save({
+                        ...config,
+                        engagements: config.engagements.map(engagement =>
+                            engagement.id === engagementId
+                                ? Object.assign({}, engagement, {
+                                      avatarUrl,
+                                      updatedAt: Date.now(),
+                                  })
+                                : engagement,
+                        ),
+                    });
+                    return { avatarUrl };
+                }),
+            );
+        },
+        readEngagementAvatar: filename => {
+            const match = avatarFilenamePattern.exec(filename);
+            if (!match) return Effect.succeed(undefined);
+            const type = WORKSPACE_AVATAR_TYPES.find(
+                candidate => candidate.extension === match[1],
+            );
+            if (!type) return Effect.succeed(undefined);
+            return Effect.tryPromise({
+                try: async () => {
+                    try {
+                        return {
+                            bytes: new Uint8Array(
+                                await readFile(
+                                    join(avatarDirectoryFor(path), filename),
+                                ),
+                            ),
+                            contentType: type.contentType,
+                        };
+                    } catch (error) {
+                        if ((error as NodeJS.ErrnoException).code === 'ENOENT')
+                            return undefined;
+                        throw error;
+                    }
+                },
+                catch: classifyNodeError,
+            });
+        },
+        removeEngagementAvatar: engagementId =>
+            writeLock.withPermits(1)(
+                Effect.gen(function* () {
+                    const config = yield* load();
+                    if (
+                        !config.engagements.some(
+                            engagement => engagement.id === engagementId,
+                        )
+                    )
+                        return yield* Effect.fail(
+                            missingEngagement(engagementId),
+                        );
+                    const next = {
+                        ...config,
+                        engagements: config.engagements.map(engagement =>
+                            engagement.id === engagementId
+                                ? Object.assign({}, engagement, {
+                                      avatarUrl: undefined,
+                                      updatedAt: Date.now(),
+                                  })
+                                : engagement,
+                        ),
+                    };
+                    yield* save(next);
+                    yield* Effect.tryPromise({
+                        try: () =>
+                            removeAvatarFiles(
+                                avatarDirectoryFor(path),
+                                engagementId,
+                            ),
+                        catch: classifyNodeError,
+                    });
+                    return toEngagementWorkspace(next);
+                }),
+            ),
+        deleteEngagement: engagementId =>
+            updateWorkspace(config => {
+                if (
+                    !config.engagements.some(
+                        engagement => engagement.id === engagementId,
+                    )
+                )
+                    return Effect.fail(missingEngagement(engagementId));
+                const engagements = config.engagements.filter(
+                    engagement => engagement.id !== engagementId,
+                );
+                return Effect.succeed({
+                    ...config,
+                    engagements,
+                    activeEngagementId:
+                        config.activeEngagementId === engagementId
+                            ? engagements[0]?.id
+                            : config.activeEngagementId,
+                });
+            }),
+        reorderEngagements: engagementIds =>
+            updateWorkspace(config => {
+                const ids = [...engagementIds];
+                const byId = new Map(
+                    config.engagements.map(engagement => [
+                        engagement.id,
+                        engagement,
+                    ]),
+                );
+                if (
+                    ids.length !== config.engagements.length ||
+                    new Set(ids).size !== ids.length ||
+                    ids.some(id => !byId.has(id))
+                )
+                    return Effect.fail(
+                        gitError(
+                            'gitFailed',
+                            'workspace order must contain every workspace exactly once',
+                        ),
+                    );
+                return Effect.succeed({
+                    ...config,
+                    engagements: ids.map(id => byId.get(id)!),
+                });
+            }),
+        assignEngagementRepo: (engagementId, repoId) =>
+            updateWorkspace(config => {
+                if (
+                    !config.engagements.some(
+                        engagement => engagement.id === engagementId,
+                    )
+                )
+                    return Effect.fail(missingEngagement(engagementId));
+                if (!config.recentRepos.some(repo => repo.repoId === repoId))
+                    return Effect.fail(
+                        gitError(
+                            'repoUnavailable',
+                            'repository is not available in the recent list',
+                        ),
+                    );
+                const now = Date.now();
+                return Effect.succeed({
+                    ...config,
+                    activeEngagementId: engagementId,
+                    engagements: config.engagements.map(engagement => {
+                        const withoutRepo = engagement.repoIds.filter(
+                            id => id !== repoId,
+                        );
+                        const withoutOpen = engagement.openRepoIds.filter(
+                            id => id !== repoId,
+                        );
+                        if (engagement.id !== engagementId)
+                            return {
+                                ...engagement,
+                                repoIds: withoutRepo,
+                                openRepoIds: withoutOpen,
+                                changeSets: scrubChangeSetRepo(
+                                    engagement.changeSets,
+                                    repoId,
+                                ),
+                                activeRepoId:
+                                    engagement.activeRepoId === repoId
+                                        ? withoutOpen[0]
+                                        : engagement.activeRepoId,
+                                updatedAt:
+                                    withoutRepo.length ===
+                                    engagement.repoIds.length
+                                        ? engagement.updatedAt
+                                        : now,
+                            };
+                        return {
+                            ...engagement,
+                            repoIds: [...withoutRepo, repoId],
+                            openRepoIds: [...withoutOpen, repoId],
+                            activeRepoId: repoId,
+                            updatedAt: now,
+                        };
+                    }),
+                });
+            }),
+        removeEngagementRepo: (engagementId, repoId) =>
+            updateWorkspace(config => {
+                const current = config.engagements.find(
+                    engagement => engagement.id === engagementId,
+                );
+                if (!current)
+                    return Effect.fail(missingEngagement(engagementId));
+                const openRepoIds = current.openRepoIds.filter(
+                    id => id !== repoId,
+                );
+                return Effect.succeed({
+                    ...config,
+                    engagements: config.engagements.map(engagement =>
+                        engagement.id === engagementId
+                            ? {
+                                  ...engagement,
+                                  repoIds: engagement.repoIds.filter(
+                                      id => id !== repoId,
+                                  ),
+                                  openRepoIds,
+                                  changeSets: scrubChangeSetRepo(
+                                      engagement.changeSets,
+                                      repoId,
+                                  ),
+                                  activeRepoId:
+                                      engagement.activeRepoId === repoId
+                                          ? openRepoIds[0]
+                                          : engagement.activeRepoId,
+                                  updatedAt: Date.now(),
+                              }
+                            : engagement,
+                    ),
+                });
+            }),
+        setEngagementSession: (engagementId, requestedOpen, activeRepoId) =>
+            updateWorkspace(config => {
+                const current = config.engagements.find(
+                    engagement => engagement.id === engagementId,
+                );
+                if (!current)
+                    return Effect.fail(missingEngagement(engagementId));
+                const members = new Set(current.repoIds);
+                const openRepoIds = [...new Set(requestedOpen)];
+                if (openRepoIds.some(repoId => !members.has(repoId)))
+                    return Effect.fail(
+                        gitError(
+                            'repoUnavailable',
+                            'an open repository does not belong to this engagement',
+                        ),
+                    );
+                if (
+                    activeRepoId !== undefined &&
+                    !openRepoIds.includes(activeRepoId)
+                )
+                    return Effect.fail(
+                        gitError(
+                            'repoUnavailable',
+                            'the active repository must be one of the open repositories',
+                        ),
+                    );
+                return Effect.succeed({
+                    ...config,
+                    activeEngagementId: engagementId,
+                    engagements: config.engagements.map(engagement =>
+                        engagement.id === engagementId
+                            ? {
+                                  ...engagement,
+                                  openRepoIds,
+                                  activeRepoId,
+                                  updatedAt: Date.now(),
+                              }
+                            : engagement,
+                    ),
+                });
+            }),
+        activateEngagement: engagementId =>
+            updateWorkspace(config =>
+                config.engagements.some(
+                    engagement => engagement.id === engagementId,
+                )
+                    ? Effect.succeed({
+                          ...config,
+                          activeEngagementId: engagementId,
+                      })
+                    : Effect.fail(missingEngagement(engagementId)),
+            ),
+        createChangeSet: (engagementId, rawName, description) =>
+            updateWorkspace(config => {
+                const current = config.engagements.find(
+                    engagement => engagement.id === engagementId,
+                );
+                if (!current)
+                    return Effect.fail(missingEngagement(engagementId));
+                const name = rawName.trim();
+                if (name === '')
+                    return Effect.fail(
+                        gitError(
+                            'gitFailed',
+                            'change set name cannot be empty',
+                        ),
+                    );
+                const now = Date.now();
+                const changeSet: PullRequestChangeSetEntry = {
+                    id: randomUUID(),
+                    name,
+                    description: description?.trim() ?? '',
+                    pullRequests: [],
+                    createdAt: now,
+                    updatedAt: now,
+                };
+                return Effect.succeed({
+                    ...config,
+                    engagements: config.engagements.map(engagement =>
+                        engagement.id === engagementId
+                            ? {
+                                  ...engagement,
+                                  changeSets: [
+                                      ...engagement.changeSets,
+                                      changeSet,
+                                  ],
+                                  updatedAt: now,
+                              }
+                            : engagement,
+                    ),
+                });
+            }),
+        updateChangeSet: (engagementId, changeSetId, patch) =>
+            updateWorkspace(config => {
+                const current = config.engagements.find(
+                    engagement => engagement.id === engagementId,
+                );
+                if (!current)
+                    return Effect.fail(missingEngagement(engagementId));
+                if (
+                    !current.changeSets.some(
+                        changeSet => changeSet.id === changeSetId,
+                    )
+                )
+                    return Effect.fail(missingChangeSet(changeSetId));
+                const name = patch.name?.trim();
+                if (name !== undefined && name === '')
+                    return Effect.fail(
+                        gitError(
+                            'gitFailed',
+                            'change set name cannot be empty',
+                        ),
+                    );
+                const now = Date.now();
+                return Effect.succeed({
+                    ...config,
+                    engagements: config.engagements.map(engagement =>
+                        engagement.id === engagementId
+                            ? {
+                                  ...engagement,
+                                  changeSets: engagement.changeSets.map(
+                                      changeSet =>
+                                          changeSet.id === changeSetId
+                                              ? {
+                                                    ...changeSet,
+                                                    name:
+                                                        name ?? changeSet.name,
+                                                    description:
+                                                        patch.description !==
+                                                        undefined
+                                                            ? patch.description.trim()
+                                                            : changeSet.description,
+                                                    updatedAt: now,
+                                                }
+                                              : changeSet,
+                                  ),
+                                  updatedAt: now,
+                              }
+                            : engagement,
+                    ),
+                });
+            }),
+        deleteChangeSet: (engagementId, changeSetId) =>
+            updateWorkspace(config => {
+                const current = config.engagements.find(
+                    engagement => engagement.id === engagementId,
+                );
+                if (!current)
+                    return Effect.fail(missingEngagement(engagementId));
+                if (
+                    !current.changeSets.some(
+                        changeSet => changeSet.id === changeSetId,
+                    )
+                )
+                    return Effect.fail(missingChangeSet(changeSetId));
+                const now = Date.now();
+                return Effect.succeed({
+                    ...config,
+                    engagements: config.engagements.map(engagement =>
+                        engagement.id === engagementId
+                            ? {
+                                  ...engagement,
+                                  changeSets: engagement.changeSets.filter(
+                                      changeSet => changeSet.id !== changeSetId,
+                                  ),
+                                  updatedAt: now,
+                              }
+                            : engagement,
+                    ),
+                });
+            }),
+        setChangeSetItems: (engagementId, changeSetId, items) =>
+            updateWorkspace(config => {
+                const current = config.engagements.find(
+                    engagement => engagement.id === engagementId,
+                );
+                if (!current)
+                    return Effect.fail(missingEngagement(engagementId));
+                if (
+                    !current.changeSets.some(
+                        changeSet => changeSet.id === changeSetId,
+                    )
+                )
+                    return Effect.fail(missingChangeSet(changeSetId));
+                const members = new Set(current.repoIds);
+                const seen = new Set<string>();
+                for (const item of items) {
+                    if (!members.has(item.repoId))
+                        return Effect.fail(
+                            gitError(
+                                'repoUnavailable',
+                                'a change-set pull request does not belong to this engagement',
+                            ),
+                        );
+                    const key = `${item.repoId}\0${item.number}`;
+                    if (seen.has(key))
+                        return Effect.fail(
+                            gitError(
+                                'gitFailed',
+                                'a pull request may appear only once in a change set',
+                            ),
+                        );
+                    seen.add(key);
+                }
+                const nextItems = items.map(toChangeSetPullRequestEntry);
+                const now = Date.now();
+                return Effect.succeed({
+                    ...config,
+                    engagements: config.engagements.map(engagement =>
+                        engagement.id === engagementId
+                            ? {
+                                  ...engagement,
+                                  changeSets: engagement.changeSets.map(
+                                      changeSet =>
+                                          changeSet.id === changeSetId
+                                              ? {
+                                                    ...changeSet,
+                                                    pullRequests: nextItems,
+                                                    updatedAt: now,
+                                                }
+                                              : changeSet,
+                                  ),
+                                  updatedAt: now,
+                              }
+                            : engagement,
+                    ),
+                });
+            }),
         getAppSettings: () =>
             Effect.map(load(), config => ({
                 theme: config.theme,
@@ -251,6 +1105,11 @@ const normalizeConfig = (raw: string): Config => {
     return {
         version: typeof obj.version === 'number' ? obj.version : base.version,
         recentRepos: normalizeRecents(obj.recentRepos),
+        engagements: normalizeEngagements(obj.engagements),
+        activeEngagementId:
+            typeof obj.activeEngagementId === 'string'
+                ? obj.activeEngagementId
+                : undefined,
         theme:
             obj.theme === 'light' ||
             obj.theme === 'dark' ||
@@ -264,6 +1123,120 @@ const normalizeConfig = (raw: string): Config => {
         keybindings: pickStrings(obj.keybindings),
         columns: normalizeColumns(obj.columns),
     };
+};
+
+const toRecentRepo = (entry: RecentRepoEntry): RecentRepo =>
+    new RecentRepo({
+        path: entry.path,
+        name: entry.name,
+        repoId: RepoIdBrand.make(entry.repoId),
+        lastOpenedAt: entry.lastOpenedAt,
+    });
+
+const toChangeSetPullRequestEntry = (
+    item: ChangeSetPullRequest,
+): ChangeSetPullRequestEntry => ({
+    repoId: item.repoId,
+    repository: item.repository,
+    number: item.number,
+    title: item.title,
+    url: item.url,
+    headRefName: item.headRefName,
+    headRefOid: item.headRefOid,
+    baseRefName: item.baseRefName,
+    dependencyNote: item.dependencyNote,
+});
+
+const scrubChangeSetRepo = (
+    changeSets: ReadonlyArray<PullRequestChangeSetEntry>,
+    repoId: RepoId,
+): ReadonlyArray<PullRequestChangeSetEntry> =>
+    changeSets.map(changeSet => {
+        const pullRequests = changeSet.pullRequests.filter(
+            item => item.repoId !== repoId,
+        );
+        return pullRequests.length === changeSet.pullRequests.length
+            ? changeSet
+            : { ...changeSet, pullRequests, updatedAt: Date.now() };
+    });
+
+/** Materialize the wire snapshot while enforcing the no-cross-engagement ownership rule. */
+const toEngagementWorkspace = (config: Config): EngagementWorkspace => {
+    const reposById = new Map(
+        config.recentRepos.map(repo => [repo.repoId, repo] as const),
+    );
+    const assigned = new Set<string>();
+    const engagements = config.engagements.map(entry => {
+        const repositoryEntries = entry.repoIds
+            .filter(repoId => reposById.has(repoId) && !assigned.has(repoId))
+            .map(repoId => {
+                assigned.add(repoId);
+                return reposById.get(repoId)!;
+            });
+        const memberIds = new Set(repositoryEntries.map(repo => repo.repoId));
+        const openRepoIds = entry.openRepoIds
+            .filter(repoId => memberIds.has(repoId))
+            .map(repoId => RepoIdBrand.make(repoId));
+        const activeRepoId =
+            entry.activeRepoId !== undefined &&
+            openRepoIds.includes(RepoIdBrand.make(entry.activeRepoId))
+                ? RepoIdBrand.make(entry.activeRepoId)
+                : undefined;
+        return new Engagement({
+            id: EngagementIdBrand.make(entry.id),
+            name: entry.name,
+            color: entry.color,
+            avatarUrl: entry.avatarUrl,
+            repositories: repositoryEntries.map(toRecentRepo),
+            openRepoIds,
+            activeRepoId,
+            changeSets: entry.changeSets.map(
+                changeSet =>
+                    new PullRequestChangeSet({
+                        id: ChangeSetIdBrand.make(changeSet.id),
+                        name: changeSet.name,
+                        description: changeSet.description,
+                        pullRequests: changeSet.pullRequests
+                            .filter(item => memberIds.has(item.repoId))
+                            .map(
+                                item =>
+                                    new ChangeSetPullRequestSchema({
+                                        repoId: RepoIdBrand.make(item.repoId),
+                                        repository: item.repository,
+                                        number: item.number,
+                                        title: item.title,
+                                        url: item.url,
+                                        headRefName: item.headRefName,
+                                        headRefOid:
+                                            item.headRefOid === undefined
+                                                ? undefined
+                                                : OidBrand.make(
+                                                      item.headRefOid,
+                                                  ),
+                                        baseRefName: item.baseRefName,
+                                        dependencyNote: item.dependencyNote,
+                                    }),
+                            ),
+                        createdAt: changeSet.createdAt,
+                        updatedAt: changeSet.updatedAt,
+                    }),
+            ),
+            createdAt: entry.createdAt,
+            updatedAt: entry.updatedAt,
+        });
+    });
+    const engagementIds = new Set(engagements.map(engagement => engagement.id));
+    return new EngagementWorkspace({
+        engagements,
+        activeEngagementId:
+            config.activeEngagementId !== undefined &&
+            engagementIds.has(EngagementIdBrand.make(config.activeEngagementId))
+                ? EngagementIdBrand.make(config.activeEngagementId)
+                : undefined,
+        unassignedRepositories: config.recentRepos
+            .filter(repo => !assigned.has(repo.repoId))
+            .map(toRecentRepo),
+    });
 };
 
 /** Column visibility: each known flag is a boolean if present, else defaults to shown. */
@@ -306,6 +1279,172 @@ const normalizeRecents = (value: unknown): RecentRepoEntry[] => {
     }
     return out;
 };
+
+const ENGAGEMENT_COLORS = new Set<EngagementColor>([
+    'teal',
+    'blue',
+    'violet',
+    'amber',
+    'rose',
+    'slate',
+]);
+
+const normalizeAvatarUrl = (value: unknown): string | undefined => {
+    if (typeof value !== 'string') return undefined;
+    const avatarUrl = value.trim();
+    if (avatarUrl === '' || avatarUrl.length > 2048) return undefined;
+    if (localAvatarUrlPattern.test(avatarUrl)) return avatarUrl;
+    try {
+        const parsed = new URL(avatarUrl);
+        if (
+            (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') ||
+            parsed.username !== '' ||
+            parsed.password !== ''
+        )
+            return undefined;
+        return parsed.href;
+    } catch {
+        return undefined;
+    }
+};
+
+const normalizeEngagements = (value: unknown): EngagementEntry[] => {
+    if (!Array.isArray(value)) return [];
+    const result: EngagementEntry[] = [];
+    const seenIds = new Set<string>();
+    const assignedRepoIds = new Set<string>();
+    for (const item of value) {
+        if (typeof item !== 'object' || item === null) continue;
+        const entry = item as Record<string, unknown>;
+        if (
+            typeof entry.id !== 'string' ||
+            entry.id === '' ||
+            seenIds.has(entry.id) ||
+            typeof entry.name !== 'string' ||
+            entry.name.trim() === '' ||
+            !ENGAGEMENT_COLORS.has(entry.color as EngagementColor)
+        )
+            continue;
+        seenIds.add(entry.id);
+        const repoIds = stringArray(entry.repoIds).filter(repoId => {
+            if (assignedRepoIds.has(repoId)) return false;
+            assignedRepoIds.add(repoId);
+            return true;
+        });
+        const members = new Set(repoIds);
+        const openRepoIds = stringArray(entry.openRepoIds).filter(repoId =>
+            members.has(repoId),
+        );
+        const activeRepoId =
+            typeof entry.activeRepoId === 'string' &&
+            openRepoIds.includes(entry.activeRepoId)
+                ? entry.activeRepoId
+                : undefined;
+        result.push({
+            id: entry.id,
+            name: entry.name.trim(),
+            color: entry.color as EngagementColor,
+            avatarUrl: normalizeAvatarUrl(entry.avatarUrl),
+            repoIds,
+            openRepoIds,
+            activeRepoId,
+            changeSets: normalizeChangeSets(entry.changeSets, members),
+            createdAt:
+                typeof entry.createdAt === 'number' ? entry.createdAt : 0,
+            updatedAt:
+                typeof entry.updatedAt === 'number' ? entry.updatedAt : 0,
+        });
+    }
+    return result;
+};
+
+const normalizeChangeSets = (
+    value: unknown,
+    members: ReadonlySet<string>,
+): PullRequestChangeSetEntry[] => {
+    if (!Array.isArray(value)) return [];
+    const result: PullRequestChangeSetEntry[] = [];
+    const ids = new Set<string>();
+    for (const item of value) {
+        if (typeof item !== 'object' || item === null) continue;
+        const entry = item as Record<string, unknown>;
+        if (
+            typeof entry.id !== 'string' ||
+            entry.id === '' ||
+            ids.has(entry.id) ||
+            typeof entry.name !== 'string' ||
+            entry.name.trim() === ''
+        )
+            continue;
+        ids.add(entry.id);
+        result.push({
+            id: entry.id,
+            name: entry.name.trim(),
+            description:
+                typeof entry.description === 'string' ? entry.description : '',
+            pullRequests: normalizeChangeSetPullRequests(
+                entry.pullRequests,
+                members,
+            ),
+            createdAt:
+                typeof entry.createdAt === 'number' ? entry.createdAt : 0,
+            updatedAt:
+                typeof entry.updatedAt === 'number' ? entry.updatedAt : 0,
+        });
+    }
+    return result;
+};
+
+const normalizeChangeSetPullRequests = (
+    value: unknown,
+    members: ReadonlySet<string>,
+): ChangeSetPullRequestEntry[] => {
+    if (!Array.isArray(value)) return [];
+    const result: ChangeSetPullRequestEntry[] = [];
+    const seen = new Set<string>();
+    for (const item of value) {
+        if (typeof item !== 'object' || item === null) continue;
+        const entry = item as Record<string, unknown>;
+        if (
+            typeof entry.repoId !== 'string' ||
+            !members.has(entry.repoId) ||
+            typeof entry.repository !== 'string' ||
+            typeof entry.number !== 'number' ||
+            !Number.isFinite(entry.number) ||
+            typeof entry.title !== 'string' ||
+            typeof entry.url !== 'string' ||
+            typeof entry.headRefName !== 'string' ||
+            typeof entry.baseRefName !== 'string'
+        )
+            continue;
+        const key = `${entry.repoId}\0${entry.number}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        result.push({
+            repoId: entry.repoId,
+            repository: entry.repository,
+            number: entry.number,
+            title: entry.title,
+            url: entry.url,
+            headRefName: entry.headRefName,
+            headRefOid:
+                typeof entry.headRefOid === 'string'
+                    ? entry.headRefOid
+                    : undefined,
+            baseRefName: entry.baseRefName,
+            dependencyNote:
+                typeof entry.dependencyNote === 'string'
+                    ? entry.dependencyNote
+                    : '',
+        });
+    }
+    return result;
+};
+
+const stringArray = (value: unknown): string[] =>
+    Array.isArray(value)
+        ? [...new Set(value.filter(item => typeof item === 'string'))]
+        : [];
 
 const normalizeBind = (
     value: unknown,

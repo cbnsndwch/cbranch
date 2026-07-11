@@ -12,6 +12,10 @@
 import { basename, sep } from 'node:path';
 
 import {
+    filesystemRootCandidates,
+    listFilesystemDirectory,
+} from '../fs/list-directory';
+import {
     type GitError,
     type InvalidationEvent,
     type RepoId,
@@ -31,6 +35,11 @@ import {
     type ConfigStore,
     makeConfigStore,
 } from '../config/config-store';
+import {
+    createGitHubPullRequest,
+    listGitHubPullRequests,
+    previewGitHubPullRequest,
+} from '../forge/github';
 import { blame as blameGit } from '../git/blame';
 import {
     bisectMark as bisectMarkGit,
@@ -406,6 +415,59 @@ export const makeGitEngine = (
             init,
             recentList: () => configStore.listRecent(),
             recentRemove: repoId => configStore.removeRecent(repoId),
+            filesystemListDir: input =>
+                Effect.flatMap(configStore.listRecent(), recent =>
+                    listFilesystemDirectory(
+                        input,
+                        filesystemRootCandidates(recent, env),
+                    ),
+                ),
+            engagementList: () => configStore.listEngagements(),
+            engagementCreate: (name, color, avatarUrl) =>
+                configStore.createEngagement(name, color, avatarUrl),
+            engagementUpdate: (engagementId, patch) =>
+                configStore.updateEngagement(engagementId, patch),
+            engagementDelete: engagementId =>
+                configStore.deleteEngagement(engagementId),
+            engagementReorder: engagementIds =>
+                configStore.reorderEngagements(engagementIds),
+            engagementRepoAssign: (engagementId, repoId) =>
+                configStore.assignEngagementRepo(engagementId, repoId),
+            engagementRepoRemove: (engagementId, repoId) =>
+                configStore.removeEngagementRepo(engagementId, repoId),
+            engagementSessionSet: (engagementId, openRepoIds, activeRepoId) =>
+                configStore.setEngagementSession(
+                    engagementId,
+                    openRepoIds,
+                    activeRepoId,
+                ),
+            engagementActivate: engagementId =>
+                configStore.activateEngagement(engagementId),
+            changeSetCreate: (engagementId, name, description) =>
+                configStore.createChangeSet(engagementId, name, description),
+            changeSetUpdate: (engagementId, changeSetId, patch) =>
+                configStore.updateChangeSet(engagementId, changeSetId, patch),
+            changeSetDelete: (engagementId, changeSetId) =>
+                configStore.deleteChangeSet(engagementId, changeSetId),
+            changeSetItemsSet: (engagementId, changeSetId, items) =>
+                configStore.setChangeSetItems(engagementId, changeSetId, items),
+            githubPullsList: (repoId, state) =>
+                Effect.flatMap(resolveById(repoId), repo =>
+                    listGitHubPullRequests(repoCwd(repo), repoId, state, env),
+                ),
+            githubPullPreview: (repoId, baseRefName) =>
+                Effect.flatMap(resolveById(repoId), repo =>
+                    previewGitHubPullRequest(
+                        repoCwd(repo),
+                        repoId,
+                        baseRefName,
+                        env,
+                    ),
+                ),
+            githubPullCreate: (repoId, input) =>
+                Effect.flatMap(resolveById(repoId), repo =>
+                    createGitHubPullRequest(repoCwd(repo), repoId, input, env),
+                ),
             state: repoId => Effect.flatMap(resolveById(repoId), readRepoState),
 
             // ── history & diff & content (P1, core-B) ──────────────────────────────

@@ -45,6 +45,10 @@ export const GitErrorCode = Schema.Literals([
     // P6 additions (docs/spec/17 §"GitError codes")
     'repoExists',
     'patchDoesNotApply',
+    // app workspace / engagement configuration
+    'engagementNotFound',
+    'changeSetNotFound',
+    'forgeUnavailable',
 ]);
 export type GitErrorCode = typeof GitErrorCode.Type;
 

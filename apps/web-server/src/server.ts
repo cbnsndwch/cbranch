@@ -12,7 +12,7 @@
 
 import * as http from 'node:http';
 
-import { type GitEngine } from '@cbranch/core';
+import { type ConfigStore, type GitEngine } from '@cbranch/core';
 import { CbranchRpcs, type GitError } from '@cbranch/rpc-contract';
 import {
     Http,
@@ -28,6 +28,11 @@ import { makeOriginGuard } from './origin-guard';
 import { patchChannelRoute, patchUploadRoute } from './patch-channel';
 import { handlersLayer } from './rpc-handlers';
 import { sideChannelRoute } from './side-channel';
+import {
+    workspaceAvatarDeleteRoute,
+    workspaceAvatarRoute,
+    workspaceAvatarUploadRoute,
+} from './workspace-avatar-channel';
 
 /** Path of the multiplexed NDJSON WebSocket RPC bus (DECISIONS D3). */
 export const RPC_PATH = '/rpc';
@@ -45,6 +50,7 @@ export const RPC_PATH = '/rpc';
 export const buildServerLive = (
     config: ServerConfig,
     engineLive: Layer.Layer<GitEngine, GitError>,
+    configStore: ConfigStore,
 ) => {
     // `handlersLayer` requires `GitEngine` directly; `sideChannelRoute` requires it as a
     // route-scoped requirement that only surfaces (unwrapped) after `HttpRouter.serve`.
@@ -64,6 +70,9 @@ export const buildServerLive = (
         archiveChannelRoute,
         patchChannelRoute,
         patchUploadRoute,
+        workspaceAvatarUploadRoute(configStore),
+        workspaceAvatarRoute(configStore),
+        workspaceAvatarDeleteRoute(configStore),
     ).pipe(
         Layer.provide(handlersLayer),
         Layer.provide(RpcSerialization.layerNdjson),

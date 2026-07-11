@@ -35,6 +35,27 @@ import {
     Signature,
 } from '../schemas/domain';
 import { GitError } from '../schemas/errors';
+import {
+    Engagement,
+    EngagementId,
+    EngagementWorkspace,
+} from '../schemas/engagements';
+import {
+    FilesystemDirectoryListing,
+    FilesystemRoot,
+} from '../schemas/filesystem';
+import {
+    ChangeSetId,
+    ChangeSetPullRequest,
+    ForgeRateLimit,
+    GitHubPullRequest,
+    GitHubPullRequestCreated,
+    GitHubPullRequestList,
+    GitHubPullRequestPreview,
+    PullRequestChangeSet,
+    PullRequestCheckSummary,
+    PullRequestPreviewCommit,
+} from '../schemas/forge';
 import { InvalidationEvent } from '../schemas/live';
 import {
     BlameCommit,
@@ -132,6 +153,110 @@ const recentRepo = new RecentRepo({
     name: 'repo',
     repoId,
     lastOpenedAt: 1_700_000_000_000,
+});
+const filesystemDirectory = new FilesystemDirectoryListing({
+    path: '/srv',
+    parent: null,
+    breadcrumbs: [],
+    roots: [new FilesystemRoot({ label: 'Host', path: '/srv' })],
+    entries: [],
+    truncated: false,
+});
+
+const engagementId = EngagementId.make('client-acme');
+const changeSetId = ChangeSetId.make('release-set');
+const changeSetPullRequest = new ChangeSetPullRequest({
+    repoId,
+    repository: 'acme/repo',
+    number: 42,
+    title: 'Coordinate release',
+    url: 'https://github.com/acme/repo/pull/42',
+    headRefName: 'feature/release',
+    headRefOid: oid1,
+    baseRefName: 'main',
+    dependencyNote: 'Deploy after the API PR.',
+});
+const pullRequestChangeSet = new PullRequestChangeSet({
+    id: changeSetId,
+    name: 'July release',
+    description: 'Ordered rollout',
+    pullRequests: [changeSetPullRequest],
+    createdAt: 1_700_000_000_000,
+    updatedAt: 1_700_000_000_000,
+});
+const engagementWorkspace = new EngagementWorkspace({
+    engagements: [
+        new Engagement({
+            id: engagementId,
+            name: 'Acme Consulting',
+            color: 'teal',
+            repositories: [recentRepo],
+            openRepoIds: [repoId],
+            activeRepoId: repoId,
+            changeSets: [pullRequestChangeSet],
+            createdAt: 1_700_000_000_000,
+            updatedAt: 1_700_000_000_000,
+        }),
+    ],
+    activeEngagementId: engagementId,
+    unassignedRepositories: [],
+});
+const githubPullRequestList = new GitHubPullRequestList({
+    repoId,
+    repository: 'acme/repo',
+    repositoryUrl: 'https://github.com/acme/repo',
+    pullRequests: [
+        new GitHubPullRequest({
+            repoId,
+            repository: 'acme/repo',
+            number: 42,
+            title: 'Coordinate release',
+            url: 'https://github.com/acme/repo/pull/42',
+            state: 'open',
+            isDraft: false,
+            headRefName: 'feature/release',
+            headRefOid: oid1,
+            baseRefName: 'main',
+            authorLogin: 'ada',
+            authorName: 'Ada',
+            reviewerLogins: ['grace'],
+            reviewDecision: 'approved',
+            checks: new PullRequestCheckSummary({
+                total: 2,
+                passed: 2,
+                failed: 0,
+                pending: 0,
+            }),
+            updatedAt: '2026-07-10T12:00:00Z',
+        }),
+    ],
+    rateLimit: new ForgeRateLimit({ remaining: 100, resetAt: 1_783_700_419 }),
+});
+const githubPullRequestPreview = new GitHubPullRequestPreview({
+    repoId,
+    repository: 'acme/repo',
+    repositoryUrl: 'https://github.com/acme/repo',
+    headRefName: 'feature/release',
+    headOid: oid1,
+    baseRefName: 'main',
+    baseOid: oid2,
+    mergeBaseOid: oid2,
+    publishedHeadOid: oid1,
+    headPublished: true,
+    commits: [
+        new PullRequestPreviewCommit({
+            oid: oid1,
+            subject: 'Coordinate release',
+            authorName: 'Ada',
+            authoredAt: '2026-07-10T12:00:00Z',
+        }),
+    ],
+});
+const githubPullRequestCreated = new GitHubPullRequestCreated({
+    repoId,
+    repository: 'acme/repo',
+    number: 42,
+    url: 'https://github.com/acme/repo/pull/42',
 });
 
 const commitSummary = (subject: string) =>
@@ -482,6 +607,23 @@ const handlers = CbranchRpcs.toLayer({
             : Effect.succeed(repoHandle),
     RepoRecentList: () => Effect.succeed([recentRepo]),
     RepoRecentRemove: () => Effect.void,
+    FilesystemListDir: () => Effect.succeed(filesystemDirectory),
+    EngagementList: () => Effect.succeed(engagementWorkspace),
+    EngagementCreate: () => Effect.succeed(engagementWorkspace),
+    EngagementUpdate: () => Effect.succeed(engagementWorkspace),
+    EngagementDelete: () => Effect.succeed(engagementWorkspace),
+    EngagementReorder: () => Effect.succeed(engagementWorkspace),
+    EngagementRepoAssign: () => Effect.succeed(engagementWorkspace),
+    EngagementRepoRemove: () => Effect.succeed(engagementWorkspace),
+    EngagementSessionSet: () => Effect.succeed(engagementWorkspace),
+    EngagementActivate: () => Effect.succeed(engagementWorkspace),
+    ChangeSetCreate: () => Effect.succeed(engagementWorkspace),
+    ChangeSetUpdate: () => Effect.succeed(engagementWorkspace),
+    ChangeSetDelete: () => Effect.succeed(engagementWorkspace),
+    ChangeSetItemsSet: () => Effect.succeed(engagementWorkspace),
+    GitHubPullsList: () => Effect.succeed(githubPullRequestList),
+    GitHubPullPreview: () => Effect.succeed(githubPullRequestPreview),
+    GitHubPullCreate: () => Effect.succeed(githubPullRequestCreated),
     RepoState: () => Effect.succeed(repoState),
     RepoSubscribe: () =>
         Stream.make(
@@ -701,6 +843,95 @@ const handlers = CbranchRpcs.toLayer({
         Effect.succeed(
             new PatchApplyResult({ applied: true, message: 'Patch applied.' }),
         ),
+});
+
+describe('CbranchRpcs engagement workspace contract', () => {
+    test('all workspace mutations round-trip the partitioned snapshot', async () => {
+        const program = Effect.gen(function* () {
+            const client = yield* RpcTest.makeClient(CbranchRpcs);
+            const listed = yield* client.EngagementList({});
+            const filesystem = yield* client.FilesystemListDir({});
+            yield* client.EngagementCreate({
+                name: 'Acme Consulting',
+                color: 'teal',
+            });
+            yield* client.EngagementUpdate({
+                engagementId,
+                name: 'Acme',
+            });
+            yield* client.EngagementRepoAssign({ engagementId, repoId });
+            yield* client.EngagementSessionSet({
+                engagementId,
+                openRepoIds: [repoId],
+                activeRepoId: repoId,
+            });
+            yield* client.EngagementActivate({ engagementId });
+            yield* client.ChangeSetCreate({
+                engagementId,
+                name: 'July release',
+            });
+            yield* client.ChangeSetUpdate({
+                engagementId,
+                changeSetId,
+                description: 'Ordered rollout',
+            });
+            yield* client.ChangeSetItemsSet({
+                engagementId,
+                changeSetId,
+                items: [changeSetPullRequest],
+            });
+            yield* client.ChangeSetDelete({ engagementId, changeSetId });
+            yield* client.EngagementRepoRemove({ engagementId, repoId });
+            yield* client.EngagementDelete({ engagementId });
+            yield* client.EngagementReorder({ engagementIds: [engagementId] });
+            return { listed, filesystem };
+        }).pipe(Effect.provide(handlers), Effect.scoped);
+
+        const result = await Effect.runPromise(program);
+        expect(result.listed.activeEngagementId).toBe(engagementId);
+        expect(result.listed.engagements[0]?.repositories[0]?.repoId).toBe(
+            repoId,
+        );
+        expect(result.filesystem.path).toBe('/srv');
+    });
+
+    test('GitHub PR metadata round-trips without credential fields', async () => {
+        const program = Effect.gen(function* () {
+            const client = yield* RpcTest.makeClient(CbranchRpcs);
+            return yield* client.GitHubPullsList({
+                repoId,
+                state: 'open',
+            });
+        }).pipe(Effect.provide(handlers), Effect.scoped);
+
+        const result = await Effect.runPromise(program);
+        expect(result.pullRequests[0]?.number).toBe(42);
+        expect(result.rateLimit?.remaining).toBe(100);
+        expect(JSON.stringify(result)).not.toMatch(/token|credential/i);
+    });
+
+    test('GitHub PR preview and create results round-trip', async () => {
+        const program = Effect.gen(function* () {
+            const client = yield* RpcTest.makeClient(CbranchRpcs);
+            const preview = yield* client.GitHubPullPreview({
+                repoId,
+                baseRefName: 'main',
+            });
+            const created = yield* client.GitHubPullCreate({
+                repoId,
+                title: 'Coordinate release',
+                body: 'Release notes',
+                baseRefName: 'main',
+                draft: true,
+            });
+            return { preview, created };
+        }).pipe(Effect.provide(handlers), Effect.scoped);
+
+        const result = await Effect.runPromise(program);
+        expect(result.preview.commits[0]?.oid).toBe(oid1);
+        expect(result.preview.headPublished).toBe(true);
+        expect(result.created.number).toBe(42);
+    });
 });
 
 describe('CbranchRpcs P1 contract (in-memory RpcTest round-trip)', () => {
