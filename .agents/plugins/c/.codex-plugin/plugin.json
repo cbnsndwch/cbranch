@@ -1,0 +1,18 @@
+{
+  "name": "c",
+  "version": "0.1.0",
+  "description": "cBranch plugin",
+  "author": {
+    "name": "cbnsnswch LLC"
+  },
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "cBranch",
+    "shortDescription": "Use cBranch in Codex.",
+    "longDescription": "cBranch adds a local Codex plugin scaffold.",
+    "developerName": "cbnsnswch LLC",
+    "category": "Productivity",
+    "capabilities": [],
+    "defaultPrompt": "Help me use cBranch."
+  }
+}
