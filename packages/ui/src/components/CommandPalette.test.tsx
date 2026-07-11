@@ -22,6 +22,10 @@ const repoId = RepoId.make('palette-repo');
 const makeApi = (): CbranchApi =>
     ({
         recentList: vi.fn(async () => []),
+        engagementList: vi.fn(async () => ({
+            engagements: [],
+            unassignedRepositories: [],
+        })),
         repoOpen: vi.fn(async () => ({ repoId })),
     }) as unknown as CbranchApi;
 
@@ -51,7 +55,7 @@ beforeEach(() => {
         };
     useUiStore.setState({
         activeRepoId: null,
-        paletteOpen: false,
+        commandPaletteOpen: false,
         gcDialogOpen: false,
         settingsDialogOpen: false,
         activeView: 'history',
@@ -63,7 +67,10 @@ afterEach(() => cleanup());
 describe('CommandPalette P5 commands (spec §Entry points / NF-A11Y-6)', () => {
     test('with an active repo, the wired primary commands are listed', async () => {
         act(() => {
-            useUiStore.setState({ activeRepoId: repoId, paletteOpen: true });
+            useUiStore.setState({
+                activeRepoId: repoId,
+                commandPaletteOpen: true,
+            });
         });
         renderPalette();
         const labels = [
@@ -84,7 +91,10 @@ describe('CommandPalette P5 commands (spec §Entry points / NF-A11Y-6)', () => {
 
     test('Interactive rebase opens the rebase dialog with an empty base', async () => {
         act(() => {
-            useUiStore.setState({ activeRepoId: repoId, paletteOpen: true });
+            useUiStore.setState({
+                activeRepoId: repoId,
+                commandPaletteOpen: true,
+            });
         });
         renderPalette();
         fireEvent.click(await screen.findByText('Interactive rebase'));
@@ -93,24 +103,30 @@ describe('CommandPalette P5 commands (spec §Entry points / NF-A11Y-6)', () => {
                 upstream: null,
             });
         });
-        expect(useUiStore.getState().paletteOpen).toBe(false);
+        expect(useUiStore.getState().commandPaletteOpen).toBe(false);
     });
 
     test('a command dispatches its menu id and closes the palette', async () => {
         act(() => {
-            useUiStore.setState({ activeRepoId: repoId, paletteOpen: true });
+            useUiStore.setState({
+                activeRepoId: repoId,
+                commandPaletteOpen: true,
+            });
         });
         renderPalette();
         fireEvent.click(await screen.findByText('Run maintenance'));
         await waitFor(() => {
             expect(useUiStore.getState().gcDialogOpen).toBe(true);
         });
-        expect(useUiStore.getState().paletteOpen).toBe(false);
+        expect(useUiStore.getState().commandPaletteOpen).toBe(false);
     });
 
     test('Settings + Reflog route through the shared handler map', async () => {
         act(() => {
-            useUiStore.setState({ activeRepoId: repoId, paletteOpen: true });
+            useUiStore.setState({
+                activeRepoId: repoId,
+                commandPaletteOpen: true,
+            });
         });
         renderPalette();
         fireEvent.click(await screen.findByText('Reflog'));
@@ -121,7 +137,10 @@ describe('CommandPalette P5 commands (spec §Entry points / NF-A11Y-6)', () => {
 
     test('with no active repo, the commands are hidden (switcher only)', () => {
         act(() => {
-            useUiStore.setState({ activeRepoId: null, paletteOpen: true });
+            useUiStore.setState({
+                activeRepoId: null,
+                commandPaletteOpen: true,
+            });
         });
         renderPalette();
         expect(screen.queryByText('Run maintenance')).toBeNull();

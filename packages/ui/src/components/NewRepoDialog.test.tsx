@@ -1,5 +1,10 @@
 // @vitest-environment jsdom
-import { RepoId, RepoInitResult } from '@cbranch/rpc-contract';
+import {
+    FilesystemDirectoryListing,
+    FilesystemRoot,
+    RepoId,
+    RepoInitResult,
+} from '@cbranch/rpc-contract';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
     cleanup,
@@ -17,6 +22,14 @@ import { useUiStore } from '../state/store';
 import { NewRepoDialog } from './NewRepoDialog';
 
 const repoId = RepoId.make('r1');
+const listing = new FilesystemDirectoryListing({
+    path: '/tmp',
+    parent: null,
+    breadcrumbs: [],
+    roots: [new FilesystemRoot({ label: 'Temporary', path: '/tmp' })],
+    entries: [],
+    truncated: false,
+});
 
 const makeApi = (over: Partial<CbranchApi> = {}): CbranchApi =>
     ({
@@ -25,6 +38,7 @@ const makeApi = (over: Partial<CbranchApi> = {}): CbranchApi =>
             throw new Error('not used');
         }),
         recentList: vi.fn(async () => []),
+        filesystemListDir: vi.fn(async () => listing),
         ...over,
     }) as unknown as CbranchApi;
 
@@ -94,5 +108,24 @@ describe('NewRepoDialog', () => {
         await waitFor(() =>
             expect(openFn).toHaveBeenCalledWith('/tmp/existing'),
         );
+    });
+
+    test('the destination path can be selected from the host filesystem picker', async () => {
+        const listDir = vi.fn(async () => listing);
+        renderDialog(makeApi({ filesystemListDir: listDir }));
+
+        fireEvent.click(
+            screen.getByLabelText(
+                'Browse host folders for repository destination',
+            ),
+        );
+        await screen.findByRole('heading', { name: 'Choose host folder' });
+        await waitFor(() => expect(listDir).toHaveBeenCalled());
+        fireEvent.click(screen.getByRole('button', { name: 'Use folder' }));
+
+        expect(
+            (screen.getByLabelText('Destination path') as HTMLInputElement)
+                .value,
+        ).toBe('/tmp');
     });
 });

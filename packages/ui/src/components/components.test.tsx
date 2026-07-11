@@ -1,6 +1,9 @@
 // @vitest-environment jsdom
 import {
     CommitDetail,
+    Engagement,
+    EngagementId,
+    EngagementWorkspace,
     FileContent,
     InvalidationEvent,
     Oid,
@@ -27,8 +30,8 @@ import { type CbranchApi, type StreamHandlers } from '../rpc/api';
 import { ApiProvider } from '../rpc/ApiProvider';
 import { useInvalidationBus } from '../rpc/use-invalidation-bus';
 import { useUiStore } from '../state/store';
-import { CommandPalette } from './CommandPalette';
 import { DetailsPanel } from './DetailsPanel';
+import { RepoSwitcher } from './RepoSwitcher';
 import { StatusSummary } from './StatusSummary';
 
 const repoId = RepoId.make('repo-1');
@@ -71,6 +74,10 @@ const makeFakeApi = (overrides: Partial<CbranchApi> = {}): CbranchApi => ({
         }),
     ]),
     recentRemove: vi.fn(async () => undefined),
+    engagementList: vi.fn(async () => ({
+        engagements: [],
+        unassignedRepositories: [],
+    })),
     repoState: vi.fn(async () => repoState),
     commitDetail: vi.fn(
         async () =>
@@ -149,7 +156,7 @@ beforeEach(() => {
     useUiStore.setState({
         activeRepoId: null,
         selectedOid: null,
-        paletteOpen: false,
+        repoSwitcherOpen: false,
     });
 });
 afterEach(() => cleanup());
@@ -177,16 +184,96 @@ describe('DetailsPanel (NF-TEST-7)', () => {
     });
 });
 
-describe('CommandPalette (NF-TEST-7 / P1-UI-OPEN-1)', () => {
+describe('RepoSwitcher (NF-TEST-7 / P1-UI-OPEN-1)', () => {
     test('lists a recent repository and opens it on select', async () => {
         const api = makeFakeApi();
-        useUiStore.setState({ paletteOpen: true });
-        renderWithApi(<CommandPalette />, api);
+        useUiStore.setState({ repoSwitcherOpen: true });
+        renderWithApi(<RepoSwitcher />, api);
         const item = await screen.findByText('demo');
         fireEvent.click(item);
         await waitFor(() =>
             expect(api.repoOpen).toHaveBeenCalledWith('/repos/demo'),
         );
+    });
+
+    test('switches to the owning engagement instead of crossing its boundary', async () => {
+        const clientA = EngagementId.make('client-a');
+        const clientB = EngagementId.make('client-b');
+        const otherRepoId = RepoId.make('repo-2');
+        const demo = new RecentRepo({
+            path: '/repos/demo',
+            name: 'demo',
+            repoId,
+            lastOpenedAt: 2,
+        });
+        const other = new RecentRepo({
+            path: '/repos/other',
+            name: 'other',
+            repoId: otherRepoId,
+            lastOpenedAt: 1,
+        });
+        const engagementList = vi.fn(
+            async () =>
+                new EngagementWorkspace({
+                    engagements: [
+                        new Engagement({
+                            id: clientA,
+                            name: 'Client A',
+                            color: 'teal',
+                            repositories: [demo],
+                            openRepoIds: [repoId],
+                            activeRepoId: repoId,
+                            changeSets: [],
+                            createdAt: 1,
+                            updatedAt: 1,
+                        }),
+                        new Engagement({
+                            id: clientB,
+                            name: 'Client B',
+                            color: 'rose',
+                            repositories: [other],
+                            openRepoIds: [],
+                            changeSets: [],
+                            createdAt: 1,
+                            updatedAt: 1,
+                        }),
+                    ],
+                    activeEngagementId: clientA,
+                    unassignedRepositories: [],
+                }),
+        );
+        const sessionSet = vi.fn(async () => engagementList());
+        const assign = vi.fn(async () => engagementList());
+        const api = makeFakeApi({
+            recentList: vi.fn(async () => [demo, other]),
+            engagementList,
+            engagementSessionSet: sessionSet,
+            engagementRepoAssign: assign,
+            repoOpen: vi.fn(
+                async path =>
+                    new RepoHandle({
+                        repoId: path === '/repos/other' ? otherRepoId : repoId,
+                        root: path,
+                        gitDir: `${path}/.git`,
+                        commonDir: `${path}/.git`,
+                        state: repoState,
+                    }),
+            ),
+        });
+        useUiStore.setState({
+            repoSwitcherOpen: true,
+            activeEngagementId: clientA,
+        });
+        renderWithApi(<RepoSwitcher />, api);
+        fireEvent.click(await screen.findByText('other'));
+        await waitFor(() =>
+            expect(sessionSet).toHaveBeenCalledWith(
+                clientB,
+                [otherRepoId],
+                otherRepoId,
+            ),
+        );
+        expect(assign).not.toHaveBeenCalled();
     });
 });
 

@@ -7,7 +7,11 @@
 import { type FormEvent, useState } from 'react';
 import { toast } from 'sonner';
 
-import { useInitRepo, useOpenRepo } from '../rpc/hooks';
+import {
+    useAssignEngagementRepo,
+    useInitRepo,
+    useOpenRepo,
+} from '../rpc/hooks';
 import { useNavigation } from '../state/navigation';
 import { useUiStore } from '../state/store';
 import { Button } from './ui/button';
@@ -19,6 +23,7 @@ import {
     DialogTitle,
 } from './ui/dialog';
 import { Input } from './ui/input';
+import { FilesystemPickerButton } from './FilesystemPicker';
 
 const errorCode = (error: unknown): string | undefined =>
     error != null && typeof error === 'object' && 'code' in error
@@ -38,9 +43,11 @@ export function NewRepoDialog() {
 
 function NewRepoDialogBody() {
     const setOpen = useUiStore(s => s.setNewRepoDialogOpen);
+    const engagementId = useUiStore(s => s.activeEngagementId);
     const { openRepo } = useNavigation();
     const initRepo = useInitRepo();
     const openRepoMutation = useOpenRepo();
+    const assignRepo = useAssignEngagementRepo();
 
     const [path, setPath] = useState('');
     const [branch, setBranch] = useState('');
@@ -49,8 +56,29 @@ function NewRepoDialogBody() {
     // When init reports an existing repository, offer to open it instead.
     const [existing, setExisting] = useState(false);
 
-    const busy = initRepo.isPending || openRepoMutation.isPending;
+    const busy =
+        initRepo.isPending ||
+        openRepoMutation.isPending ||
+        assignRepo.isPending;
     const trimmedPath = path.trim();
+
+    const finishOpen = (repoId: Parameters<typeof openRepo>[0]) => {
+        if (!engagementId) {
+            openRepo(repoId);
+            setOpen(false);
+            return;
+        }
+        assignRepo.mutate(
+            { engagementId, repoId },
+            {
+                onSuccess: () => {
+                    openRepo(repoId, engagementId);
+                    setOpen(false);
+                },
+                onError: e => setError(errorMessage(e)),
+            },
+        );
+    };
 
     const close = () => {
         if (!busy) setOpen(false);
@@ -59,8 +87,7 @@ function NewRepoDialogBody() {
     const openExisting = () =>
         openRepoMutation.mutate(trimmedPath, {
             onSuccess: handle => {
-                openRepo(handle.repoId);
-                setOpen(false);
+                finishOpen(handle.repoId);
             },
             onError: e => setError(errorMessage(e)),
         });
@@ -79,8 +106,7 @@ function NewRepoDialogBody() {
             {
                 onSuccess: result => {
                     toast.success('Repository created.');
-                    openRepo(result.repoId);
-                    setOpen(false);
+                    finishOpen(result.repoId);
                 },
                 onError: err => {
                     if (errorCode(err) === 'repoExists') {
@@ -114,18 +140,31 @@ function NewRepoDialogBody() {
 
                     <label className="flex flex-col gap-1 text-sm">
                         <span className="font-medium">Destination path</span>
-                        <Input
-                            autoFocus
-                            aria-label="Destination path"
-                            value={path}
-                            onChange={e => {
-                                setPath(e.target.value);
-                                setError(null);
-                                setExisting(false);
-                            }}
-                            placeholder="/absolute/path/to/new-repo"
-                            disabled={busy}
-                        />
+                        <div className="flex gap-2">
+                            <Input
+                                autoFocus
+                                aria-label="Destination path"
+                                value={path}
+                                onChange={e => {
+                                    setPath(e.target.value);
+                                    setError(null);
+                                    setExisting(false);
+                                }}
+                                placeholder="/absolute/path/to/new-repo"
+                                disabled={busy}
+                            />
+                            <FilesystemPickerButton
+                                value={path}
+                                onSelect={selected => {
+                                    setPath(selected);
+                                    setError(null);
+                                    setExisting(false);
+                                }}
+                                allowNewLeaf
+                                disabled={busy}
+                                ariaLabel="Browse host folders for repository destination"
+                            />
+                        </div>
                     </label>
 
                     <label className="flex flex-col gap-1 text-sm">

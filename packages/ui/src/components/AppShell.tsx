@@ -8,6 +8,10 @@ import { type ActiveView, useUiStore } from '../state/store';
 import { BlamePanel } from './BlamePanel';
 import { BranchesPanel } from './BranchesPanel';
 import { CommandPalette } from './CommandPalette';
+import { RepoSwitcher } from './RepoSwitcher';
+import { EngagementManagerDialog } from './EngagementManagerDialog';
+import { EngagementOverview } from './EngagementOverview';
+import { EngagementRail } from './EngagementRail';
 import { CommitDetailsTabs } from './CommitDetailsTabs';
 import { ArchiveDialog } from './ArchiveDialog';
 import { BisectBanner } from './BisectBanner';
@@ -46,6 +50,7 @@ import { Button } from './ui/button';
 import { Placeholder } from './ui/placeholder';
 import { ResizableSplit } from './ui/resizable-split';
 import { WorktreesPanel } from './WorktreesPanel';
+import { WorkspaceBar } from './WorkspaceBar';
 
 const VIEWS: ReadonlyArray<readonly [ActiveView, string]> = [
     ['history', 'History'],
@@ -62,11 +67,12 @@ const VIEWS: ReadonlyArray<readonly [ActiveView, string]> = [
 // in-app title bar — <DocumentTitle> reflects the active branch in the browser window title.
 export function AppShell() {
     const repoId = useUiStore(s => s.activeRepoId);
+    const engagementId = useUiStore(s => s.activeEngagementId);
     const selectedOid = useUiStore(s => s.selectedOid);
     const detailTab = useUiStore(s => s.detailTab);
     const activeView = useUiStore(s => s.activeView);
     const setActiveView = useUiStore(s => s.setActiveView);
-    const openPalette = useUiStore(s => s.setPaletteOpen);
+    const openRepoSwitcher = useUiStore(s => s.setRepoSwitcherOpen);
     const blameTarget = useUiStore(s => s.blameTarget);
     const setBlameTarget = useUiStore(s => s.setBlameTarget);
     const historyTarget = useUiStore(s => s.historyTarget);
@@ -117,13 +123,14 @@ export function AppShell() {
     })();
 
     const mainContent = (() => {
+        if (!repoId && engagementId) return <EngagementOverview />;
         if (!repoId) {
             return (
                 <div className="flex h-full flex-col items-center justify-center gap-3">
                     <p className="text-muted-foreground text-sm">
                         Open a repository to start browsing.
                     </p>
-                    <Button onClick={() => openPalette(true)}>
+                    <Button onClick={() => openRepoSwitcher(true)}>
                         Open a repository
                     </Button>
                 </div>
@@ -186,6 +193,8 @@ export function AppShell() {
     return (
         <>
             <CommandPalette />
+            <RepoSwitcher />
+            <EngagementManagerDialog />
             <CommitDialog />
             <PickDialogs />
             <GcDialog />
@@ -234,63 +243,78 @@ export function AppShell() {
             {/* Headless: reflects the active branch in the browser window title (no in-app title bar). */}
             <DocumentTitle />
 
-            <div className="grid h-dvh grid-rows-[24px_auto_1fr] overflow-hidden">
-                {/* Row 1: Menu bar */}
-                <MenuBar />
+            <div className="grid h-dvh grid-cols-[3rem_minmax(0,1fr)] overflow-hidden">
+                {/* The workspace rail spans the viewport; shell chrome starts beside it. */}
+                <EngagementRail />
+                <div className="flex min-w-0 flex-col overflow-hidden">
+                    <div className="h-6 shrink-0 overflow-x-auto overflow-y-hidden border-b">
+                        <MenuBar />
+                    </div>
+                    <WorkspaceBar />
+                    {repoId ? <Toolbar /> : null}
 
-                {/* Row 2: Toolbar */}
-                <Toolbar />
-
-                {/* Row 3: Main split — sidebar beside (view nav tabs over content). The
-            tabs scope the right-hand graph only, so they live above it rather
-            than spanning the full width over the sidebar too. */}
-                <div className="flex min-h-0 flex-col">
-                    {/* Persistent bisect banner (REQ-P5-BS-002), above the sidebar + content. */}
-                    {repoId && (
-                        <BisectBanner repoId={repoId} onSelectOid={selectOid} />
-                    )}
-                    <div className="grid min-h-0 flex-1 grid-cols-[265px_1fr]">
-                        {/* Left: Repository sidebar (spans the full content height) */}
-                        <RepositorySidebar repoId={repoId} />
-                        {/* Right: view nav tabs over view content */}
-                        <div className="grid min-h-0 grid-rows-[28px_1fr]">
-                            {/* View nav tabs */}
-                            <div className="bg-muted flex items-end border-b">
-                                {VIEWS.map(([view, label]) => (
-                                    <button
-                                        key={view}
-                                        type="button"
-                                        onClick={() => setActiveView(view)}
-                                        className={cn(
-                                            'px-3 py-0.5 text-[11px]',
-                                            view === activeView
-                                                ? 'relative -mb-px border border-b-background bg-background font-medium'
-                                                : 'text-muted-foreground hover:bg-accent/50',
+                    {/* Main split — sidebar beside (view nav tabs over content). */}
+                    <div className="flex min-h-0 flex-1 flex-col">
+                        {/* Persistent bisect banner (REQ-P5-BS-002), above the sidebar + content. */}
+                        {repoId && (
+                            <BisectBanner
+                                repoId={repoId}
+                                onSelectOid={selectOid}
+                            />
+                        )}
+                        {repoId ? (
+                            <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[265px_1fr]">
+                                {/* Left: Repository sidebar (spans the full content height) */}
+                                <div className="hidden min-h-0 lg:block">
+                                    <RepositorySidebar repoId={repoId} />
+                                </div>
+                                {/* Right: view nav tabs over view content */}
+                                <div className="grid min-h-0 grid-rows-[28px_1fr]">
+                                    {/* View nav tabs */}
+                                    <div className="bg-muted flex items-end overflow-x-auto border-b">
+                                        {VIEWS.map(([view, label]) => (
+                                            <button
+                                                key={view}
+                                                type="button"
+                                                onClick={() =>
+                                                    setActiveView(view)
+                                                }
+                                                className={cn(
+                                                    'shrink-0 px-3 py-0.5 text-[11px]',
+                                                    view === activeView
+                                                        ? 'relative -mb-px border border-b-background bg-background font-medium'
+                                                        : 'text-muted-foreground hover:bg-accent/50',
+                                                )}
+                                            >
+                                                {label}
+                                            </button>
+                                        ))}
+                                        {showConflicts && (
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    setActiveView(
+                                                        'solveConflicts',
+                                                    )
+                                                }
+                                                className={cn(
+                                                    'shrink-0 px-3 py-0.5 text-[11px]',
+                                                    activeView ===
+                                                        'solveConflicts'
+                                                        ? 'relative -mb-px border border-b-background bg-background font-medium'
+                                                        : 'text-status-behind hover:bg-accent/50',
+                                                )}
+                                            >
+                                                Conflicts
+                                            </button>
                                         )}
-                                    >
-                                        {label}
-                                    </button>
-                                ))}
-                                {showConflicts && (
-                                    <button
-                                        type="button"
-                                        onClick={() =>
-                                            setActiveView('solveConflicts')
-                                        }
-                                        className={cn(
-                                            'px-3 py-0.5 text-[11px]',
-                                            activeView === 'solveConflicts'
-                                                ? 'relative -mb-px border border-b-background bg-background font-medium'
-                                                : 'text-status-behind hover:bg-accent/50',
-                                        )}
-                                    >
-                                        Conflicts
-                                    </button>
-                                )}
+                                    </div>
+                                    {mainContent}
+                                </div>
                             </div>
-                            {/* View content */}
-                            {mainContent}
-                        </div>
+                        ) : (
+                            <div className="min-h-0 flex-1">{mainContent}</div>
+                        )}
                     </div>
                 </div>
             </div>

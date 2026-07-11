@@ -2,7 +2,6 @@ import { useEffect } from 'react';
 import { Toaster } from 'sonner';
 
 import { AppShell } from './components/AppShell';
-import { CommandPalette } from './components/CommandPalette';
 import { useKeybindings } from './hooks/use-keybindings';
 import { useAppSettings } from './rpc/hooks';
 import { useUiStore } from './state/store';
@@ -11,15 +10,18 @@ import { useUiStore } from './state/store';
 // keep it stable; opening a repo-scoped dialog with no repo is a harmless no-op (the
 // dialog renders null). Defined at module scope so it never re-installs the listener.
 const KEYBINDING_ACTIONS: Readonly<Record<string, () => void>> = {
-    'view.commandPalette': () => useUiStore.getState().setPaletteOpen(true),
+    'view.commandPalette': () =>
+        useUiStore.getState().setCommandPaletteOpen(true),
+    'view.repoSwitcher': () => useUiStore.getState().setRepoSwitcherOpen(true),
     'commands.commit': () => useUiStore.getState().setCommitDialogOpen(true),
     'history.find': () => useUiStore.getState().setFindOpen(true),
     'navigate.goto': () => useUiStore.getState().setGoToDialogOpen(true),
 };
 
-// Root view: the browse shell plus the global command palette. Global shortcuts
-// (⌘/Ctrl-K palette, ⌘/Ctrl-Shift-Enter commit, ⌘/Ctrl-F find) are dispatched centrally
-// from user-remappable keybindings (REQ-P5-CFG-006 / NF-A11Y-6).
+// Root view: the browse shell (which mounts the command palette + repo switcher
+// overlays, AppShell.tsx). Global shortcuts (⌘/Ctrl-K commands, ⌘/Ctrl-O repo switcher,
+// ⌘/Ctrl-Shift-Enter commit, ⌘/Ctrl-F find) are dispatched centrally from
+// user-remappable keybindings (REQ-P5-CFG-006 / NF-A11Y-6).
 export function App() {
     useKeybindings(KEYBINDING_ACTIONS);
 
@@ -42,7 +44,6 @@ export function App() {
     return (
         <>
             <AppShell />
-            <CommandPalette />
             <Toaster
                 theme={theme}
                 position="bottom-right"

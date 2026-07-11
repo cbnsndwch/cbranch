@@ -114,7 +114,7 @@ export function Toolbar() {
     const repoId = useUiStore(s => s.activeRepoId);
     const filters = useUiStore(s => s.filters);
     const setFilters = useUiStore(s => s.setFilters);
-    const openPalette = useUiStore(s => s.setPaletteOpen);
+    const openRepoSwitcher = useUiStore(s => s.setRepoSwitcherOpen);
     const setActiveView = useUiStore(s => s.setActiveView);
     const openCommitDialog = useUiStore(s => s.setCommitDialogOpen);
     const syncRequest = useUiStore(s => s.syncRequest);
@@ -348,17 +348,21 @@ export function Toolbar() {
                     <SplitButton
                         icon={FolderGit2}
                         label="Working directory — click to switch repository"
-                        onPrimary={() => openPalette(true)}
+                        onPrimary={() => openRepoSwitcher(true)}
                         extra={
                             <span className="max-w-40 truncate">
                                 {repoRoot}
                             </span>
                         }
                     >
-                        <DropdownMenuItem onClick={() => openPalette(true)}>
+                        <DropdownMenuItem
+                            onClick={() => openRepoSwitcher(true)}
+                        >
                             Open another repository…
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => openPalette(true)}>
+                        <DropdownMenuItem
+                            onClick={() => openRepoSwitcher(true)}
+                        >
                             Recent repositories…
                         </DropdownMenuItem>
                     </SplitButton>

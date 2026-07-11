@@ -27,6 +27,7 @@ import {
     DropdownMenuTrigger,
 } from './ui/dropdown-menu';
 import { Input } from './ui/input';
+import { FilesystemPickerButton } from './FilesystemPicker';
 import {
     Select,
     SelectContent,
@@ -174,12 +175,21 @@ export function WorktreesPanel({ repoId }: WorktreesPanelProps) {
                     <div className="flex flex-col gap-3 py-2">
                         <label className="flex flex-col gap-1">
                             <span className="text-xs font-medium">Path</span>
-                            <Input
-                                value={addPath}
-                                onChange={e => setAddPath(e.target.value)}
-                                placeholder="/path/to/new-worktree"
-                                autoFocus
-                            />
+                            <div className="flex gap-2">
+                                <Input
+                                    value={addPath}
+                                    onChange={e => setAddPath(e.target.value)}
+                                    placeholder="/path/to/new-worktree"
+                                    autoFocus
+                                />
+                                <FilesystemPickerButton
+                                    value={addPath}
+                                    onSelect={setAddPath}
+                                    allowNewLeaf
+                                    disabled={addMut.isPending}
+                                    ariaLabel="Browse host folders for worktree path"
+                                />
+                            </div>
                         </label>
                         <label className="flex flex-col gap-1">
                             <span className="text-xs font-medium">Mode</span>

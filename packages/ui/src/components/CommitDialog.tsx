@@ -114,7 +114,7 @@ export function CommitDialog() {
                     fraction={split}
                     onFractionChange={setSplit}
                     left={
-                        <div className="h-full overflow-auto border-r">
+                        <div className="h-full overflow-hidden border-r">
                             <StatusPanel repoId={repoId} />
                         </div>
                     }

@@ -16,6 +16,8 @@ import {
     type BranchInfo,
     type BranchListing,
     type BranchSwitchStrategy,
+    type ChangeSetId,
+    type ChangeSetPullRequest,
     type CleanPreview,
     type CleanResult,
     type CommitCreated,
@@ -28,11 +30,18 @@ import {
     type ConflictSides,
     type DiffFile,
     type DiffSpec,
+    type EngagementColor,
+    type EngagementId,
+    type EngagementWorkspace,
     type FileContentResult,
     type FileHistoryPage,
+    type FilesystemDirectoryListing,
     type GcPrune,
     type GcResult,
     type GitConfigEntry,
+    type GitHubPullRequestList,
+    type GitHubPullRequestCreated,
+    type GitHubPullRequestPreview,
     type KeyBinding,
     type LogQuery,
     type MergeMode,
@@ -47,6 +56,7 @@ import {
     type PatchApplyResult,
     type PatchBundleDescriptor,
     type PatchSelection,
+    type PullRequestListState,
     type RebasePlan,
     type RebaseStatus,
     type RebaseStep,
@@ -86,6 +96,201 @@ export const useRecentList = (): UseQueryResult<ReadonlyArray<RecentRepo>> => {
     return useQuery({
         queryKey: queryKeys.recentList(),
         queryFn: () => api.recentList(),
+    });
+};
+
+/** Host-bounded directory listing for the reusable repository/folder picker. */
+export const useFilesystemDirectory = (
+    path: string | undefined,
+    showHidden: boolean,
+    enabled = true,
+): UseQueryResult<FilesystemDirectoryListing> => {
+    const api = useApi();
+    return useQuery({
+        queryKey: queryKeys.filesystemListDir(path, showHidden),
+        queryFn: () => api.filesystemListDir({ path, showHidden }),
+        enabled,
+        staleTime: 30_000,
+    });
+};
+
+/** Host-persisted consulting partitions and each partition's open-repo session. */
+export const useEngagementWorkspace =
+    (): UseQueryResult<EngagementWorkspace> => {
+        const api = useApi();
+        return useQuery({
+            queryKey: queryKeys.engagements(),
+            queryFn: () => api.engagementList(),
+        });
+    };
+
+const useWorkspaceMutation = <Variables>(
+    mutationFn: (
+        api: ReturnType<typeof useApi>,
+        variables: Variables,
+    ) => Promise<EngagementWorkspace>,
+) => {
+    const api = useApi();
+    const queryClient = useQueryClient();
+    return useMutation<EngagementWorkspace, unknown, Variables>({
+        mutationFn: variables => mutationFn(api, variables),
+        onSuccess: workspace => {
+            queryClient.setQueryData(queryKeys.engagements(), workspace);
+        },
+    });
+};
+
+export const useCreateEngagement = () =>
+    useWorkspaceMutation<{
+        readonly name: string;
+        readonly color: EngagementColor;
+        readonly avatarUrl?: string;
+    }>((api, { name, color, avatarUrl }) =>
+        api.engagementCreate(name, color, avatarUrl),
+    );
+
+export const useUpdateEngagement = () =>
+    useWorkspaceMutation<{
+        readonly engagementId: EngagementId;
+        readonly name?: string;
+        readonly color?: EngagementColor;
+        readonly avatarUrl?: string | null;
+    }>((api, { engagementId, ...patch }) =>
+        api.engagementUpdate(engagementId, patch),
+    );
+
+export const useDeleteEngagement = () =>
+    useWorkspaceMutation<EngagementId>((api, engagementId) =>
+        api.engagementDelete(engagementId),
+    );
+
+export const useReorderEngagements = () =>
+    useWorkspaceMutation<ReadonlyArray<EngagementId>>((api, engagementIds) =>
+        api.engagementReorder(engagementIds),
+    );
+
+export const useAssignEngagementRepo = () =>
+    useWorkspaceMutation<{
+        readonly engagementId: EngagementId;
+        readonly repoId: RepoId;
+    }>((api, { engagementId, repoId }) =>
+        api.engagementRepoAssign(engagementId, repoId),
+    );
+
+export const useRemoveEngagementRepo = () =>
+    useWorkspaceMutation<{
+        readonly engagementId: EngagementId;
+        readonly repoId: RepoId;
+    }>((api, { engagementId, repoId }) =>
+        api.engagementRepoRemove(engagementId, repoId),
+    );
+
+export const useSetEngagementSession = () =>
+    useWorkspaceMutation<{
+        readonly engagementId: EngagementId;
+        readonly openRepoIds: ReadonlyArray<RepoId>;
+        readonly activeRepoId?: RepoId;
+    }>((api, { engagementId, openRepoIds, activeRepoId }) =>
+        api.engagementSessionSet(engagementId, openRepoIds, activeRepoId),
+    );
+
+export const useActivateEngagement = () =>
+    useWorkspaceMutation<EngagementId>((api, engagementId) =>
+        api.engagementActivate(engagementId),
+    );
+
+export const useCreateChangeSet = () =>
+    useWorkspaceMutation<{
+        readonly engagementId: EngagementId;
+        readonly name: string;
+        readonly description?: string;
+    }>((api, { engagementId, name, description }) =>
+        api.changeSetCreate(engagementId, name, description),
+    );
+
+export const useUpdateChangeSet = () =>
+    useWorkspaceMutation<{
+        readonly engagementId: EngagementId;
+        readonly changeSetId: ChangeSetId;
+        readonly name?: string;
+        readonly description?: string;
+    }>((api, { engagementId, changeSetId, ...patch }) =>
+        api.changeSetUpdate(engagementId, changeSetId, patch),
+    );
+
+export const useDeleteChangeSet = () =>
+    useWorkspaceMutation<{
+        readonly engagementId: EngagementId;
+        readonly changeSetId: ChangeSetId;
+    }>((api, { engagementId, changeSetId }) =>
+        api.changeSetDelete(engagementId, changeSetId),
+    );
+
+export const useSetChangeSetItems = () =>
+    useWorkspaceMutation<{
+        readonly engagementId: EngagementId;
+        readonly changeSetId: ChangeSetId;
+        readonly items: ReadonlyArray<ChangeSetPullRequest>;
+    }>((api, { engagementId, changeSetId, items }) =>
+        api.changeSetItemsSet(engagementId, changeSetId, items),
+    );
+
+/** GitHub pull requests through the host gh login; manual/non-domain cache. */
+export const useGitHubPullRequests = (
+    repoId: RepoId | null,
+    state: PullRequestListState = 'open',
+): UseQueryResult<GitHubPullRequestList> => {
+    const api = useApi();
+    return useQuery({
+        queryKey: repoId
+            ? queryKeys.githubPulls(repoId, state)
+            : ['inactive', 'github', 'pulls'],
+        queryFn: () => api.githubPullsList(repoId as RepoId, state),
+        enabled: repoId !== null,
+        staleTime: 60_000,
+        refetchOnWindowFocus: false,
+    });
+};
+
+export const useGitHubPullPreview = (
+    repoId: RepoId | null,
+    baseRefName?: string,
+    enabled = true,
+): UseQueryResult<GitHubPullRequestPreview> => {
+    const api = useApi();
+    return useQuery({
+        queryKey: repoId
+            ? queryKeys.githubPullPreview(repoId, baseRefName)
+            : ['inactive', 'github', 'pullPreview'],
+        queryFn: () =>
+            api.githubPullPreview(repoId as RepoId, baseRefName || undefined),
+        enabled: enabled && repoId !== null,
+        staleTime: 0,
+        refetchOnWindowFocus: false,
+    });
+};
+
+export const useCreateGitHubPullRequest = () => {
+    const api = useApi();
+    const queryClient = useQueryClient();
+    return useMutation<
+        GitHubPullRequestCreated,
+        unknown,
+        {
+            readonly repoId: RepoId;
+            readonly title: string;
+            readonly body: string;
+            readonly baseRefName: string;
+            readonly draft: boolean;
+        }
+    >({
+        mutationFn: ({ repoId, ...input }) =>
+            api.githubPullCreate(repoId, input),
+        onSuccess: () => {
+            void queryClient.invalidateQueries({
+                queryKey: ['github', 'pulls'],
+            });
+        },
     });
 };
 

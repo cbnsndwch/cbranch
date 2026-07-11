@@ -17,6 +17,7 @@ const EMPTY: never[] = [];
 let inProgress = 'none';
 vi.mock('../../rpc/hooks', () => ({
     useRecentList: () => ({ data: EMPTY }),
+    useEngagementWorkspace: () => ({ data: { engagements: [] } }),
     useRepoState: () => ({ data: { inProgress } }),
 }));
 

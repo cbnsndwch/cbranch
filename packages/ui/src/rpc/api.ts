@@ -17,6 +17,8 @@ import {
     type BranchInfo,
     type BranchListing,
     type BranchSwitchStrategy,
+    type ChangeSetId,
+    type ChangeSetPullRequest,
     type CommandLogEntry,
     type CommitCreated,
     type CommitDetail,
@@ -32,12 +34,19 @@ import {
     type ContentEncoding,
     type DiffFile,
     type DiffSpec,
+    type EngagementColor,
+    type EngagementId,
+    type EngagementWorkspace,
     type FileContentResult,
     type FileHistoryPage,
+    type FilesystemDirectoryListing,
     type GcPrune,
     type GcResult,
     type GitConfigEntry,
     type GitConfigValue,
+    type GitHubPullRequestList,
+    type GitHubPullRequestCreated,
+    type GitHubPullRequestPreview,
     type HistoryColumnVisibility,
     type InvalidationEvent,
     type KeyBinding,
@@ -56,6 +65,7 @@ import {
     type MergeResult,
     type Oid,
     type PatchSelection,
+    type PullRequestListState,
     type RebasePlan,
     type RebaseStatus,
     type RebaseStep,
@@ -104,6 +114,80 @@ export interface CbranchApi {
     }): Promise<RepoInitResult>;
     recentList(): Promise<ReadonlyArray<RecentRepo>>;
     recentRemove(repoId: RepoId): Promise<void>;
+    filesystemListDir(input: {
+        readonly path?: string;
+        readonly showHidden?: boolean;
+    }): Promise<FilesystemDirectoryListing>;
+    engagementList(): Promise<EngagementWorkspace>;
+    engagementCreate(
+        name: string,
+        color: EngagementColor,
+        avatarUrl?: string,
+    ): Promise<EngagementWorkspace>;
+    engagementUpdate(
+        engagementId: EngagementId,
+        patch: {
+            readonly name?: string;
+            readonly color?: EngagementColor;
+            readonly avatarUrl?: string | null;
+        },
+    ): Promise<EngagementWorkspace>;
+    engagementDelete(engagementId: EngagementId): Promise<EngagementWorkspace>;
+    engagementReorder(
+        engagementIds: ReadonlyArray<EngagementId>,
+    ): Promise<EngagementWorkspace>;
+    engagementRepoAssign(
+        engagementId: EngagementId,
+        repoId: RepoId,
+    ): Promise<EngagementWorkspace>;
+    engagementRepoRemove(
+        engagementId: EngagementId,
+        repoId: RepoId,
+    ): Promise<EngagementWorkspace>;
+    engagementSessionSet(
+        engagementId: EngagementId,
+        openRepoIds: ReadonlyArray<RepoId>,
+        activeRepoId?: RepoId,
+    ): Promise<EngagementWorkspace>;
+    engagementActivate(
+        engagementId: EngagementId,
+    ): Promise<EngagementWorkspace>;
+    changeSetCreate(
+        engagementId: EngagementId,
+        name: string,
+        description?: string,
+    ): Promise<EngagementWorkspace>;
+    changeSetUpdate(
+        engagementId: EngagementId,
+        changeSetId: ChangeSetId,
+        patch: { readonly name?: string; readonly description?: string },
+    ): Promise<EngagementWorkspace>;
+    changeSetDelete(
+        engagementId: EngagementId,
+        changeSetId: ChangeSetId,
+    ): Promise<EngagementWorkspace>;
+    changeSetItemsSet(
+        engagementId: EngagementId,
+        changeSetId: ChangeSetId,
+        items: ReadonlyArray<ChangeSetPullRequest>,
+    ): Promise<EngagementWorkspace>;
+    githubPullsList(
+        repoId: RepoId,
+        state?: PullRequestListState,
+    ): Promise<GitHubPullRequestList>;
+    githubPullPreview(
+        repoId: RepoId,
+        baseRefName?: string,
+    ): Promise<GitHubPullRequestPreview>;
+    githubPullCreate(
+        repoId: RepoId,
+        input: {
+            readonly title: string;
+            readonly body: string;
+            readonly baseRefName: string;
+            readonly draft: boolean;
+        },
+    ): Promise<GitHubPullRequestCreated>;
     repoState(repoId: RepoId): Promise<RepoState>;
     commitDetail(repoId: RepoId, oid: Oid): Promise<CommitDetail>;
     commitDiff(spec: DiffSpec): Promise<ReadonlyArray<DiffFile>>;
@@ -540,6 +624,96 @@ export const makeApi = (runtime: AppRuntime): CbranchApi => {
             runtime.runPromise(withClient(c => c.RepoRecentList({}))),
         recentRemove: repoId =>
             runtime.runPromise(withClient(c => c.RepoRecentRemove({ repoId }))),
+        filesystemListDir: input =>
+            runtime.runPromise(withClient(c => c.FilesystemListDir(input))),
+        engagementList: () =>
+            runtime.runPromise(withClient(c => c.EngagementList({}))),
+        engagementCreate: (name, color, avatarUrl) =>
+            runtime.runPromise(
+                withClient(c => c.EngagementCreate({ name, color, avatarUrl })),
+            ),
+        engagementUpdate: (engagementId, patch) =>
+            runtime.runPromise(
+                withClient(c => c.EngagementUpdate({ engagementId, ...patch })),
+            ),
+        engagementDelete: engagementId =>
+            runtime.runPromise(
+                withClient(c => c.EngagementDelete({ engagementId })),
+            ),
+        engagementReorder: engagementIds =>
+            runtime.runPromise(
+                withClient(c => c.EngagementReorder({ engagementIds })),
+            ),
+        engagementRepoAssign: (engagementId, repoId) =>
+            runtime.runPromise(
+                withClient(c =>
+                    c.EngagementRepoAssign({ engagementId, repoId }),
+                ),
+            ),
+        engagementRepoRemove: (engagementId, repoId) =>
+            runtime.runPromise(
+                withClient(c =>
+                    c.EngagementRepoRemove({ engagementId, repoId }),
+                ),
+            ),
+        engagementSessionSet: (engagementId, openRepoIds, activeRepoId) =>
+            runtime.runPromise(
+                withClient(c =>
+                    c.EngagementSessionSet({
+                        engagementId,
+                        openRepoIds,
+                        activeRepoId,
+                    }),
+                ),
+            ),
+        engagementActivate: engagementId =>
+            runtime.runPromise(
+                withClient(c => c.EngagementActivate({ engagementId })),
+            ),
+        changeSetCreate: (engagementId, name, description) =>
+            runtime.runPromise(
+                withClient(c =>
+                    c.ChangeSetCreate({ engagementId, name, description }),
+                ),
+            ),
+        changeSetUpdate: (engagementId, changeSetId, patch) =>
+            runtime.runPromise(
+                withClient(c =>
+                    c.ChangeSetUpdate({
+                        engagementId,
+                        changeSetId,
+                        ...patch,
+                    }),
+                ),
+            ),
+        changeSetDelete: (engagementId, changeSetId) =>
+            runtime.runPromise(
+                withClient(c =>
+                    c.ChangeSetDelete({ engagementId, changeSetId }),
+                ),
+            ),
+        changeSetItemsSet: (engagementId, changeSetId, items) =>
+            runtime.runPromise(
+                withClient(c =>
+                    c.ChangeSetItemsSet({
+                        engagementId,
+                        changeSetId,
+                        items,
+                    }),
+                ),
+            ),
+        githubPullsList: (repoId, state) =>
+            runtime.runPromise(
+                withClient(c => c.GitHubPullsList({ repoId, state })),
+            ),
+        githubPullPreview: (repoId, baseRefName) =>
+            runtime.runPromise(
+                withClient(c => c.GitHubPullPreview({ repoId, baseRefName })),
+            ),
+        githubPullCreate: (repoId, input) =>
+            runtime.runPromise(
+                withClient(c => c.GitHubPullCreate({ repoId, ...input })),
+            ),
         repoState: repoId =>
             runtime.runPromise(withClient(c => c.RepoState({ repoId }))),
         commitDetail: (repoId, oid) =>

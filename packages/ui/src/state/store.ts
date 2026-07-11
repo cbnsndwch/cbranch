@@ -7,6 +7,7 @@
 
 import {
     type CommitSummary,
+    type EngagementId,
     type MetaFile,
     type Oid,
     type RepoId,
@@ -135,12 +136,18 @@ const DEFAULT_DRAFT: CommitDraft = {
 };
 
 export interface UiState {
-    /** The single active repository (cbranch is one-repo-at-a-time, P1-OPEN-4). */
+    /** URL-driven consulting partition; null for legacy/unassigned repository routes. */
+    readonly activeEngagementId: EngagementId | null;
+    /** The focused repository editor; an engagement may keep additional repos open. */
     readonly activeRepoId: RepoId | null;
     /** The selected commit, driving the details panel + diff (P1-HIST-5). */
     readonly selectedOid: Oid | null;
-    /** Whether the cmdk command palette / repo switcher is open (P1-UI-OPEN-1). */
-    readonly paletteOpen: boolean;
+    /** Whether the repo switcher (recent repos / open path / new repo) is open (P1-UI-OPEN-1). */
+    readonly repoSwitcherOpen: boolean;
+    /** Whether the cmdk run-a-command palette is open (NF-A11Y-6). */
+    readonly commandPaletteOpen: boolean;
+    /** Create/edit/delete engagement surface. */
+    readonly engagementManagerOpen: boolean;
     /** Light/dark/system preference (NF-THEME-2). */
     readonly theme: ThemePref;
     /** Active history filters (P1-FILT-*); reset when the repository changes. */
@@ -154,8 +161,11 @@ export interface UiState {
     readonly knownRefStrings: ReadonlyArray<string>;
     readonly setKnownRefStrings: (refs: ReadonlyArray<string>) => void;
     readonly setActiveRepoId: (id: RepoId | null) => void;
+    readonly setActiveEngagementId: (id: EngagementId | null) => void;
     readonly setSelectedOid: (oid: Oid | null) => void;
-    readonly setPaletteOpen: (open: boolean) => void;
+    readonly setRepoSwitcherOpen: (open: boolean) => void;
+    readonly setCommandPaletteOpen: (open: boolean) => void;
+    readonly setEngagementManagerOpen: (open: boolean) => void;
     readonly setTheme: (theme: ThemePref) => void;
     readonly setFilters: (filters: LogFilters) => void;
     readonly setDateMode: (mode: DateMode) => void;
@@ -332,9 +342,12 @@ export interface UiState {
 }
 
 export const useUiStore = create<UiState>(set => ({
+    activeEngagementId: null,
     activeRepoId: null,
     selectedOid: null,
-    paletteOpen: false,
+    repoSwitcherOpen: false,
+    commandPaletteOpen: false,
+    engagementManagerOpen: false,
     theme: readThemePref(),
     filters: emptyFilters,
     dateMode: readDateMode(),
@@ -411,7 +424,11 @@ export const useUiStore = create<UiState>(set => ({
             syncRequest: null,
         }),
     setSelectedOid: selectedOid => set({ selectedOid }),
-    setPaletteOpen: paletteOpen => set({ paletteOpen }),
+    setActiveEngagementId: activeEngagementId => set({ activeEngagementId }),
+    setRepoSwitcherOpen: repoSwitcherOpen => set({ repoSwitcherOpen }),
+    setCommandPaletteOpen: commandPaletteOpen => set({ commandPaletteOpen }),
+    setEngagementManagerOpen: engagementManagerOpen =>
+        set({ engagementManagerOpen }),
     setTheme: theme => {
         applyTheme(theme);
         set({ theme });

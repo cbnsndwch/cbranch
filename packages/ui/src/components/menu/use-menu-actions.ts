@@ -9,7 +9,11 @@ import { useNavigate } from 'react-router';
 import { toast } from 'sonner';
 
 import { useApi } from '../../rpc/ApiProvider';
-import { useRecentList, useRepoState } from '../../rpc/hooks';
+import {
+    useEngagementWorkspace,
+    useRecentList,
+    useRepoState,
+} from '../../rpc/hooks';
 import { repoScopeKey } from '../../rpc/query-keys';
 import { useNavigation } from '../../state/navigation';
 import { useUiStore } from '../../state/store';
@@ -43,9 +47,11 @@ export function useMenuActions(): MenuActions {
     const { openRepo } = useNavigation();
     const queryClient = useQueryClient();
     const repoId = useUiStore(s => s.activeRepoId);
+    const activeEngagementId = useUiStore(s => s.activeEngagementId);
     const selectedOid = useUiStore(s => s.selectedOid);
     const dateMode = useUiStore(s => s.dateMode);
     const recentQuery = useRecentList();
+    const workspaceQuery = useEngagementWorkspace();
     // The Conflicts view/tab only exists while a conflict-capable op is in progress
     // (mirrors AppShell), so "Solve merge conflicts…" is gated on the same signal.
     const inProgress = useRepoState(repoId).data?.inProgress ?? 'none';
@@ -59,7 +65,7 @@ export function useMenuActions(): MenuActions {
             useUiStore.getState().setSettingsDialogOpen(true);
         // Only wired commands appear here; everything else greys out automatically.
         const handlers: Record<string, () => void> = {
-            'start.open': () => useUiStore.getState().setPaletteOpen(true),
+            'start.open': () => useUiStore.getState().setRepoSwitcherOpen(true),
             'start.exit': () => navigate('/'),
             'repository.close': () => navigate('/'),
             // Browser-style history navigation is meaningful app-wide (no repo required).
@@ -289,10 +295,16 @@ export function useMenuActions(): MenuActions {
                 .getState()
                 .setShowNotes(!useUiStore.getState().showNotes);
 
-        const recent: DynamicItem[] = (recentQuery.data ?? []).map(r => ({
+        const activeEngagement = workspaceQuery.data?.engagements.find(
+            engagement => engagement.id === activeEngagementId,
+        );
+        const recentSource = activeEngagement
+            ? activeEngagement.repositories
+            : (recentQuery.data ?? []);
+        const recent: DynamicItem[] = recentSource.map(r => ({
             id: r.repoId,
             label: r.name,
-            onSelect: () => openRepo(r.repoId),
+            onSelect: () => openRepo(r.repoId, activeEngagement?.id),
         }));
 
         return {
@@ -311,6 +323,8 @@ export function useMenuActions(): MenuActions {
         dateMode,
         inProgress,
         recentQuery.data,
+        workspaceQuery.data,
+        activeEngagementId,
         api,
     ]);
 }

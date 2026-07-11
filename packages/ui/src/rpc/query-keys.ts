@@ -12,6 +12,7 @@ import {
     type Domain,
     type LogQuery,
     type Oid,
+    type PullRequestListState,
     type RepoId,
 } from '@cbranch/rpc-contract';
 
@@ -56,6 +57,17 @@ export const queryKeys = {
         [repoId, 'blob', rev, path] as const,
     /** `repo.recentList` — the persisted switcher list (not repo-scoped). */
     recentList: () => ['recent'] as const,
+    /** Host filesystem picker data is bounded by host-selected roots, never repo sync. */
+    filesystemListDir: (path: string | undefined, showHidden: boolean) =>
+        ['fs', 'listDir', path ?? 'default', showHidden] as const,
+    /** App-level consulting partitions + open-repository sessions. */
+    engagements: () => ['engagements'] as const,
+    /** Host-GitHub state is manually refreshed and never watcher-invalidated. */
+    githubPulls: (repoId: RepoId, state: PullRequestListState) =>
+        ['github', 'pulls', repoId, state] as const,
+    /** Exact local range used by the focused-repository PR creation preview. */
+    githubPullPreview: (repoId: RepoId, baseRefName?: string) =>
+        ['github', 'pullPreview', repoId, baseRefName ?? 'default'] as const,
     /** `status.get` — the working-tree status tree (domain: `status`). */
     status: (repoId: RepoId) => [repoId, 'status', 'tree'] as const,
     /**

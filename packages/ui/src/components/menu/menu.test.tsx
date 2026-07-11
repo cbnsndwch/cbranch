@@ -21,7 +21,13 @@ const TOP_MENUS = [
     'Help',
 ];
 
-const fakeApi = { recentList: vi.fn(async () => []) } as unknown as CbranchApi;
+const fakeApi = {
+    recentList: vi.fn(async () => []),
+    engagementList: vi.fn(async () => ({
+        engagements: [],
+        unassignedRepositories: [],
+    })),
+} as unknown as CbranchApi;
 
 const renderMenuBar = () => {
     const queryClient = new QueryClient({

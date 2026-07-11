@@ -9,6 +9,10 @@ import { startTransition, StrictMode } from 'react';
 import { hydrateRoot } from 'react-dom/client';
 import { HydratedRouter } from 'react-router/dom';
 
+// React Grab maps copied UI elements back to source files. Vite removes this dynamic
+// import from production builds, so the inspector is available only under `pnpm dev`.
+if (import.meta.env.DEV) void import('react-grab');
+
 startTransition(() => {
     hydrateRoot(
         document,

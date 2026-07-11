@@ -19,7 +19,8 @@ beforeEach(() => {
     useUiStore.setState({
         activeRepoId: null,
         selectedOid: null,
-        paletteOpen: false,
+        repoSwitcherOpen: false,
+        commandPaletteOpen: false,
         theme: 'system',
         commitDraft: { subject: '', body: '', amend: false, signoff: false },
         stagedSelection: new Set(),
@@ -37,11 +38,11 @@ describe('useUiStore', () => {
         expect(useUiStore.getState().selectedOid).toBeNull();
     });
 
-    test('setSelectedOid and setPaletteOpen update transient state', () => {
+    test('setSelectedOid and setCommandPaletteOpen update transient state', () => {
         useUiStore.getState().setSelectedOid(Oid.make('c0ffee'));
         expect(useUiStore.getState().selectedOid).toBe('c0ffee');
-        useUiStore.getState().setPaletteOpen(true);
-        expect(useUiStore.getState().paletteOpen).toBe(true);
+        useUiStore.getState().setCommandPaletteOpen(true);
+        expect(useUiStore.getState().commandPaletteOpen).toBe(true);
     });
 
     test('setTheme updates the preference', () => {

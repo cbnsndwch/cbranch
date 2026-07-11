@@ -16,6 +16,7 @@ export interface KeybindingCommand {
 /** The documented set of remappable actions (the existing global keyboard shortcuts). */
 export const KEYBINDING_COMMANDS: ReadonlyArray<KeybindingCommand> = [
     { id: 'view.commandPalette', label: 'Open command palette' },
+    { id: 'view.repoSwitcher', label: 'Open repository switcher' },
     { id: 'commands.commit', label: 'Open commit dialog' },
     { id: 'history.find', label: 'Find in history' },
     { id: 'navigate.goto', label: 'Go to commit' },
@@ -24,6 +25,7 @@ export const KEYBINDING_COMMANDS: ReadonlyArray<KeybindingCommand> = [
 /** Factory-default chord per command id (the shipped shortcuts). */
 export const DEFAULT_KEYBINDINGS: Readonly<Record<string, string>> = {
     'view.commandPalette': 'Mod+K',
+    'view.repoSwitcher': 'Mod+O',
     'commands.commit': 'Mod+Shift+Enter',
     'history.find': 'Mod+F',
     'navigate.goto': 'Mod+G',
