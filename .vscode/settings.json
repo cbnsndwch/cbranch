@@ -1,4 +1,10 @@
 {
+    "[jsonc]": {
+        "editor.defaultFormatter": "oxc.oxc-vscode"
+    },
+    "[typescript]": {
+        "editor.defaultFormatter": "oxc.oxc-vscode"
+    },
     "cSpell.words": [
         "autostash",
         "cbranch",
@@ -48,7 +54,8 @@
         "**/node_modules/*/**": true
     },
     "js/ts.tsdk.path": "node_modules/typescript/lib",
-    "oxc.fmt.configPath": "${workspaceFolder}/.oxfmtrc.json",
-    "oxc.path.oxfmt": "${workspaceFolder}/node_modules/oxfmt/bin/oxfmt",
-    "oxc.useExecPath": true
+    "oxc.fmt.configPath": ".oxfmtrc.json",
+    "[typescriptreact]": {
+        "editor.defaultFormatter": "oxc.oxc-vscode"
+    }
 }
