@@ -5,7 +5,6 @@ import {
     ArrowUpFromLine,
     ChevronDown,
     CloudDownload,
-    FolderGit2,
     FolderTree,
     GitBranch,
     GitCommitHorizontal,
@@ -114,7 +113,7 @@ export function Toolbar() {
     const repoId = useUiStore(s => s.activeRepoId);
     const filters = useUiStore(s => s.filters);
     const setFilters = useUiStore(s => s.setFilters);
-    const openRepoSwitcher = useUiStore(s => s.setRepoSwitcherOpen);
+    //   const openRepoSwitcher = useUiStore((s) => s.setRepoSwitcherOpen);
     const setActiveView = useUiStore(s => s.setActiveView);
     const openCommitDialog = useUiStore(s => s.setCommitDialogOpen);
     const syncRequest = useUiStore(s => s.syncRequest);
@@ -129,7 +128,7 @@ export function Toolbar() {
     // Pending-change count badge on the Commit button (docs/design/commit-surface.md §2).
     const changeCount = status?.entries.length ?? 0;
 
-    const repoRoot = state?.repoRoot ?? '—';
+    //   const repoRoot = state?.repoRoot ?? "—";
     const currentBranch = state?.isDetached
         ? 'HEAD'
         : (state?.currentBranch ?? '—');
@@ -137,9 +136,10 @@ export function Toolbar() {
 
     // Ahead/behind for the checked-out branch, sourced from the branch listing (D7) — the
     // same `upstream` divergence the BranchesPanel renders per row.
-    const upstream = branchListing?.localBranches.find(
+    const currentLocalBranch = branchListing?.localBranches.find(
         b => b.isCurrent,
-    )?.upstream;
+    );
+    const upstream = currentLocalBranch?.upstream;
 
     const syncUnsubRef = useRef<(() => void) | null>(null);
     // Mirror of `syncRunning` for the synchronous guard: a chained retry (pull → push)
@@ -236,10 +236,20 @@ export function Toolbar() {
     const handlePush = (opts: PushOpts) => {
         if (!repoId) return;
         const rid = repoId;
+        // A bare `git push origin` rejects a branch without an upstream. Publish the
+        // checked-out branch explicitly and establish its tracking ref on first push.
+        const pushOpts =
+            !opts.tags && currentLocalBranch && !currentLocalBranch.upstream
+                ? {
+                      ...opts,
+                      branch: currentLocalBranch.name,
+                      setUpstream: true,
+                  }
+                : opts;
         startSync(
             'push',
             'Pushing',
-            h => api.pushStream(rid, defaultRemote, opts, h),
+            h => api.pushStream(rid, defaultRemote, pushOpts, h),
             {
                 errorMessage: pushErrorMessage,
                 // A non-ff rejection opens the retry dialog (UI-007) instead of a dead-end
@@ -345,7 +355,7 @@ export function Toolbar() {
                     />
                     <Separator />
                     {/* Working directory — current repo path, click to switch repo */}
-                    <SplitButton
+                    {/* <SplitButton
                         icon={FolderGit2}
                         label="Working directory — click to switch repository"
                         onPrimary={() => openRepoSwitcher(true)}
@@ -365,7 +375,7 @@ export function Toolbar() {
                         >
                             Recent repositories…
                         </DropdownMenuItem>
-                    </SplitButton>
+                    </SplitButton> */}
                     {/* Branch — current branch + ahead/behind, click to manage branches */}
                     <SplitButton
                         icon={GitBranch}
@@ -749,9 +759,9 @@ function SplitButton({
                 <TooltipTrigger
                     render={
                         <Button
+                            size="sm"
                             type="button"
                             variant="outline"
-                            size="sm"
                             onClick={onPrimary}
                             disabled={disabled}
                             aria-label={label}

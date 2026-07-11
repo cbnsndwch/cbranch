@@ -58,6 +58,21 @@ const listing = new BranchListing({
     currentBranch: 'main',
 });
 
+const unpublishedListing = new BranchListing({
+    localBranches: [
+        new BranchInfo({
+            name: 'main',
+            fullRef: 'refs/heads/main',
+            tipOid: oid('a'),
+            tipSubject: 'tip',
+            isCurrent: true,
+            isRemote: false,
+        }),
+    ],
+    remoteBranches: [],
+    currentBranch: 'main',
+});
+
 const makeFakeApi = (overrides: Partial<CbranchApi> = {}): CbranchApi =>
     ({
         repoState: vi.fn(async () => repoState),
@@ -77,15 +92,18 @@ const renderToolbar = (api: CbranchApi) => {
     const qc = new QueryClient({
         defaultOptions: { queries: { retry: false } },
     });
-    return render(
-        <MemoryRouter>
-            <QueryClientProvider client={qc}>
-                <ApiProvider api={api}>
-                    <Toolbar />
-                </ApiProvider>
-            </QueryClientProvider>
-        </MemoryRouter>,
-    );
+    return {
+        queryClient: qc,
+        ...render(
+            <MemoryRouter>
+                <QueryClientProvider client={qc}>
+                    <ApiProvider api={api}>
+                        <Toolbar />
+                    </ApiProvider>
+                </QueryClientProvider>
+            </MemoryRouter>,
+        ),
+    };
 };
 
 beforeEach(() => {
@@ -131,6 +149,30 @@ describe('Toolbar (D7 / UI-005 / UI-006)', () => {
                 repoId,
                 'origin',
                 { setUpstream: true },
+                expect.anything(),
+            ),
+        );
+    });
+
+    test('Push publishes an untracked current branch and sets its upstream', async () => {
+        const pushStream = vi.fn(() => () => undefined);
+        const branchList = vi.fn(async () => unpublishedListing);
+        const { queryClient } = renderToolbar(
+            makeFakeApi({ pushStream, branchList }),
+        );
+        await waitFor(() =>
+            expect(queryClient.getQueryData([repoId, 'refs', 'branches'])).toBe(
+                unpublishedListing,
+            ),
+        );
+
+        act(() => fireEvent.click(screen.getByLabelText('Push')));
+
+        await waitFor(() =>
+            expect(pushStream).toHaveBeenCalledWith(
+                repoId,
+                'origin',
+                { branch: 'main', setUpstream: true },
                 expect.anything(),
             ),
         );
