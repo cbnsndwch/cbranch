@@ -17,7 +17,7 @@
 
 ## What cbranch is
 
-`cbranch` is a cross-platform, browser-based Git GUI, with a planned VSCode webview extension that shares the same core. It targets a developer working on a remote Linux/macOS host over SSH (including VSCode Remote-SSH) who opens cbranch in a browser through an SSH tunnel to visually manage Git repositories. It operates on **one repository at a time** with a fast repo switcher.
+`cbranch` is a cross-platform, browser-based Git GUI, with a planned VSCode webview extension that shares the same core. It targets a developer working on a remote Linux/macOS host over SSH (including VSCode Remote-SSH) who opens cbranch in a browser through an SSH tunnel to visually manage Git repositories. Repositories are partitioned into consulting **workspaces**; a workspace may keep multiple repositories open while one remains the focused Git editor context.
 
 The engine and service run **on the remote host** against the real on-disk repository via Node `fs`. The browser/webview is a pure view talking to the service over a typed RPC transport (WebSocket + HTTP for the web app; `webview.postMessage` for the extension).
 
@@ -47,6 +47,8 @@ Read the documents in the following order. Documents 01–04 are foundational an
 | 15 | [`15-sync-protocol.md`](15-sync-protocol.md) | **Live-Data Sync (authoritative)** — the WebSocket invalidation bus: host filesystem watcher → domain invalidation → React Query refetch; multi-tab, echo-suppression, and reconnect semantics. |
 | 16 | [`16-implementation-plan.md`](16-implementation-plan.md) | **Implementer entry point** — prerequisites, dependency discipline, the host-git-first build order, and the P1 read-only walking-skeleton definition of done. Adds no requirements. |
 | 17 | [`17-phase6-completion-and-utilities.md`](17-phase6-completion-and-utilities.md) | **Phase 6** — Completion & safety hardening (fulfils outstanding P1/P2 MUSTs: destructive-action confirmation, reset-to-commit, line-level staging, go-to-commit, persisted columns) plus repository utilities (undo last commit, init repo, Git command log, metadata-file editors, notes, patch interchange). References P0–P5 without modifying them; carries its own RPC contract delta. |
+| 18 | [`18-phase7-shell-navigation-and-integrations.md`](18-phase7-shell-navigation-and-integrations.md) | **Phase 7** — Menu completion (Navigate/View wiring quick-wins), a reusable filesystem explorer + directory-listing RPC (sequence first), repository create entry points, Help & onboarding, a scoped GitHub read/URL surface, and (isolated, off-by-default, security-gated) an embedded terminal. Clone/fork and plugins stay out of scope. References P0–P6 without modifying them; carries its own RPC contract delta. |
+| 19 | [`19-phase8-multi-repo-engagements.md`](19-phase8-multi-repo-engagements.md) | **Phase 8** — Host-persisted consulting workspaces, concurrent open-repo sessions, cross-repo status/branch/sync workflows, and pull-request coordination with host-provided forge credentials. Supersedes the original single-open-repo limitation while retaining one focused editor context. |
 
 > **Documents 14 and 15 are authoritative for the wire contract and live-data
 > design.** Read them alongside 02–04; all other documents reconcile to them.
@@ -77,5 +79,7 @@ Each phase is independently shippable. The VSCode extension is a **parallel trac
 4. **P4 — Cherry-pick, conflicts, blame.** Cherry-pick, the 3-way merge/conflict workflow, blame, and file history.
 5. **P5 — Power features.** Interactive rebase, reflog, bisect, archive, clean, gc/maintenance, submodules, and settings.
 6. **P6 — Completion & utilities.** Fulfils outstanding P1/P2 obligations (destructive-action confirmation, reset-to-commit, line-level staging, go-to-commit, persisted columns) and adds repository utilities (undo last commit, init repo, Git command log, metadata-file editors, notes, patch interchange). See `17-phase6-completion-and-utilities.md`.
+7. **P7 — Shell navigation, filesystem picker & host integrations.** Wires the greyed Navigate/View menus (quick-wins), adds a reusable filesystem explorer + `fs.listDir` RPC that the repo/folder pickers adopt, reconciles the repository create entry points, builds Help & onboarding, and lands a scoped GitHub surface plus an isolated, off-by-default, security-gated terminal. Clone/fork and plugins remain out of scope. See `18-phase7-shell-navigation-and-integrations.md`.
+8. **P8 — Multi-repository workspaces.** Partitions repositories by consulting workspace, restores multiple open repos per workspace, coordinates status/sync/branches across selected repos, and adds a workspace-scoped pull-request workflow. See `19-phase8-multi-repo-engagements.md`.
 
 > **VSCode extension (parallel track):** reuses `packages/core` and `packages/rpc-contract` over the `webview.postMessage` transport once the core is stable. See `13-vscode-extension.md`.

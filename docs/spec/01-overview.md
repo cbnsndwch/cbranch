@@ -38,8 +38,9 @@ semantics).
 
 ### What `cbranch` is
 
-- A **visual Git client** for one repository at a time, with a fast switcher to
-  jump between repositories the host can see.
+- A **visual Git client** with repositories partitioned into consulting
+  engagements, multiple open repositories per engagement, and one focused editor
+  context for history, staging, diffs, and destructive actions.
 - A **remote-first** tool: the engine and service execute on the host that owns
   the repository; the UI is delivered to a browser.
 - A **read-and-write** tool across its shipping phases: from read-only history
@@ -94,18 +95,20 @@ accounts, roles, or public network exposure. (Adding app-level auth later is a
 non-breaking additive change — see `14 §3.6`. Remote *Git* authentication is
 handled out-of-band at the host via ssh-agent / credential helpers.)
 
-## The single-repository + fast-switcher model
+## The engagement workspace + focused-repository model
 
-`cbranch` is, at any moment, focused on **exactly one repository**. The entire
-UI — history graph, branch list, staging area, diffs — reflects that one active
-repository. This keeps the mental model and the screen uncluttered.
+`cbranch` is, at any moment, focused on **exactly one repository** for detailed
+history, branch, staging, and diff work. Phase 8 adds host-persisted engagement
+partitions, multiple open repository tabs, and an engagement overview that reads
+summary state concurrently without merging repositories' Git data.
 
 Switching repositories is a first-class, low-friction action:
 
 - A **command-palette-style switcher** lists known repositories and lets the
   user filter by typing.
-- Selecting a repository **replaces** the active context; `cbranch` never shows
-  two repositories' data merged together.
+- Selecting a repository replaces the focused editor context while other
+  engagement repositories may remain open as tabs. Aggregate views are strictly
+  scoped to one engagement.
 - The switcher's list is populated from (a) repositories the user explicitly
   opens by path, and (b) a configurable, recently-used list. Filesystem-wide
   auto-discovery is not required for v1.
@@ -397,8 +400,9 @@ for later phases or separate tracks:
 - Interactive rebase, reflog browser, bisect, archive export, working-tree
   `clean`, garbage-collection/maintenance UI, and submodule management (P5).
 - The VSCode webview extension (parallel track; shares the same core).
-- Simultaneous multi-repository views, repository hosting/forge functionality,
-  multi-user accounts and permissions, code review, and CI/CD integration.
+- Repository hosting, multi-user accounts and permissions, an embedded code-review
+  system, and CI/CD execution. Phase 8 may read and coordinate host-forge pull
+  requests but cbranch does not host them.
 - Public/non-loopback network exposure and any app-level authentication model
   (v1 assumes a trusted perimeter with a default loopback bind plus an
   `Origin`/`Host` check; remote Git auth is handled out-of-band at the host).

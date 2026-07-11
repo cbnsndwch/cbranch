@@ -208,7 +208,10 @@ transport from pathological inputs.
 - **NF-A11Y-6 — Command palette.** The product MUST provide a command palette
   (cmdk) reachable by a documented keyboard shortcut from anywhere in the app. The
   palette MUST allow searching for and invoking any primary command by name, MUST
-  be fully keyboard-operable, and MUST be screen-reader accessible.
+  be fully keyboard-operable, and MUST be screen-reader accessible. The repository
+  switcher (P1-UI-OPEN-1) is a separate cmdk surface with its own documented
+  shortcut — it is not merged into this palette's result list, so opening a
+  recent repository never requires scrolling past unrelated commands.
 - **NF-A11Y-7 — Color independence.** No information (e.g., added/removed lines,
   branch status, conflict state) may be conveyed by color alone; a non-color cue
   (icon, text, or shape) MUST accompany it.
@@ -673,8 +676,9 @@ is invoked are:
 - The detailed RPC method catalog and payload schemas — defined in the RPC
   contract section; here they are only subject to contract-testing and versioning
   requirements.
-- Multi-repository simultaneous editing — cbranch operates on one repository at a
-  time with a fast switcher; concurrent multi-repo workspaces are not in scope.
+- Simultaneous detailed editing of multiple repositories in one viewport. Phase 8
+  permits concurrent engagement-scoped summary reads and independent batch
+  operations while retaining one focused repository editor.
 - App-level authentication of any kind (login, session/bearer token, multi-user
   accounts, SSO) — out of scope for v1; the model is a trusted perimeter with a
   default loopback bind plus the retained `Origin`/`Host` check (NF-SEC-2/3).

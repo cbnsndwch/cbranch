@@ -440,5 +440,6 @@ styling is out of scope.
   only require that errors and excerpts are scrubbed of credentials.
 - Persistence of UI state (selected commit, panel sizes) — that is Zustand UI
   state, not domain data.
-- Multi-repository aggregation — cbranch operates on one repository at a time;
-  `repoId` exists only to scope queries and the per-repo lock.
+- Cross-repository Git object aggregation inside the core domain. Phase 8 adds an
+  app-level engagement workspace that coordinates independently scoped `repoId`
+  queries and mutations without merging repositories' object models.

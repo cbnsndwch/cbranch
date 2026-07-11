@@ -497,7 +497,8 @@ behavior are not.
   rewriting workflows, foreach scripting) — deferred.
 - Background/scheduled maintenance and automatic gc policies — only an on-demand
   gc is in scope for this phase.
-- Cross-repository or multi-repo operations; cbranch operates on one repository
-  at a time.
+- Cross-repository implementations of these Phase 5 destructive/power features.
+  Phase 8 may coordinate safe fetch, branch, and forge operations while every
+  Phase 5 mutation remains focused-repository only.
 - Editing the system-wide git installation or OS credential stores beyond writing
   the documented config keys.

@@ -141,7 +141,29 @@ Per-feature vertical slices, easiest-first (D18). Each = a `core` commit then a 
   REQ-P5-SM-001..006.
 - ⬜ S7 settings/config · ⬜ S8 interactive rebase.
 
-## ▶ RESUME HERE — P6 COMPLETE ✅ (all 11 slices landed: GUARD, RESET, LINE, NAV, COL, UNDO, INIT, CLOG, META, NOTE, PATCH)
+## P8 multi-repo workspaces COMPLETE ✅
+
+- Done: host-persisted workspace CRUD, exclusive repo membership, unassigned migration,
+  per-workspace open-tab order/last-active restore, compatibility routes, switcher partitioning,
+  rail, tabs, manager, and live cross-repo status overview.
+- Done: selected-repo fetch with cancellation, per-repo outcomes, and failed-only retry;
+  coordinated branch create/switch with partial-failure reporting and no implicit rollback.
+- Done: common-branch matrix with local/remote/upstream/ahead-behind comparison, explicit
+  carry or stash-and-reapply strategy, and per-repo create/track/publish/fetch/switch repairs.
+- Done: GitHub PR aggregation via host `gh`, explicit repo/author/reviewer/state/branch filters,
+  direct repo/branch/commit/PR links, exact-range focused-repo preview/create, and actionable
+  auth/rate-limit states. Tokens never enter config, RPC payloads, or logs.
+- Done: config-v3 workspace change sets with ordered PRs and dependency notes. Membership is
+  validated host-side and stale PR items are scrubbed when a repository changes workspace.
+- Tests: 1,130 repository tests, 28 browser tests, and 681 coverage tests pass; focused
+  Phase 8 tests cover partitioning, restart persistence, cancellation, partial failure/retry,
+  dirty strategies, forge normalization/refusal paths, PR creation, ordering, and notes.
+- Gate: license audit, lint, formatting, type checks, production builds, unit/browser tests,
+  80.7% branch coverage, and dependency-direction checks pass. Desktop and 390px production
+  views were verified for the branch matrix, dirty-worktree strategy, PR preview/list, and
+  change-set editing with no browser errors or document overflow.
+
+## P6 COMPLETE ✅ (all 11 slices landed: GUARD, RESET, LINE, NAV, COL, UNDO, INIT, CLOG, META, NOTE, PATCH)
 
 **P6 (completion & utilities, `docs/spec/17`) is done.** Eleven gate-green slices on `main`.
 Completion & safety hardening (UI-only over existing methods): destructive-change

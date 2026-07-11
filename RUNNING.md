@@ -1,8 +1,8 @@
-# Running cbranch (P1 read-only browser)
+# Running cbranch
 
-The P1 walking skeleton is runnable end-to-end: the host service serves the built
-SPA and the RPC bus; the UI opens a repository and lets you browse its history,
-commit details, and diffs (read-only).
+The host service serves the built SPA and RPC bus. The UI can partition repositories
+by consulting workspace, keep several repos open per workspace, coordinate branch/
+fetch work, and use the full focused-repository Git surface.
 
 ## One-time
 
@@ -28,30 +28,55 @@ Useful env vars (NF-PKG-9): `CBRANCH_BIND_ADDRESS` (default `127.0.0.1`),
 prints a trust warning — cbranch has no app-level auth; keep it behind a trusted
 perimeter (SSH tunnel / VPN).
 
+## Development source references
+
+```bash
+pnpm dev
+```
+
+Open the Vite URL reported in the terminal (normally <http://localhost:5173>). In
+development only, React Grab is active: hover an element, press **Cmd/Ctrl-C**, then
+paste the copied source reference into the conversation. It is not loaded into the
+production bundle.
+
 ## How to drive it (what to click)
 
-1. **Open a repository.** The app starts on an empty state. Press **⌘/Ctrl-K** (or
-   click **Open / switch**) to open the command palette. Type an **absolute path**
-   to a git repo on this host (e.g. `/home/you/code/project` or `C:\code\project`)
-   and select **Open path**. Previously opened repos appear in the list and are
-   fuzzy-searchable.
-2. **Status.** The top bar shows the current branch (or a *detached* badge), and
-   *empty* / *in-progress* markers when applicable.
-3. **History.** The left pane streams the commit history (newest first), virtualized
+1. **Create a workspace.** Use the **+** at the bottom of the left rail, name the
+   client/workspace, choose an identifying swatch, and upload a PNG, JPEG, GIF, or WebP
+   image up to 2 MB. An optional `http(s)` avatar image URL remains available. Uploaded
+   images are stored beside cbranch's host config. When no image is set or it cannot load,
+   cbranch shows the color-backed workspace initials. Existing recent repos remain explicitly
+   unassigned until you add them.
+2. **Add repositories.** Click **Add repository** in the workspace overview or press
+   **⌘/Ctrl-O**. Type an absolute host path and select **Open path**. The repo is assigned
+   to the active workspace and kept in its tab strip. The folder button beside the input
+   opens a host-bounded filesystem picker. Repos owned by another workspace switch to that
+   workspace instead of silently crossing the boundary.
+3. **Coordinate repos.** The overview shows branch, dirty/conflict state, upstream, and
+   ahead/behind for every repo. Select a subset to **Fetch selected**, cancel/retry a
+   batch, create one **New branch**, or use **Branch matrix** to compare, repair, and
+   switch an existing common branch with an explicit carry/stash strategy.
+4. **Pull requests.** Open the **Pull requests** segment in the overview. cbranch derives
+   GitHub repositories from each real `origin` and delegates to the host `gh` login. Run
+   `gh auth login` on the host first; cbranch never stores the token. Filters cover repo,
+   author, reviewer, state, branch, title, and number. **New PR** previews the exact
+   merge-base-to-HEAD range before creation. Select related PRs and add them to an ordered
+   **Change set** with dependency notes.
+5. **Focused Git work.** Select a repo row or tab for history, status, staging, commit,
+   branches, sync, worktrees, stash, tags, conflicts, rebase, and other repo-scoped tools.
+6. **History.** The history pane streams commits (newest first), virtualized
    for large repos. Click a row, or focus the list and use **↑/↓**, to select a
    commit.
-4. **Details + diff.** Selecting a commit fills the right panes: commit identity,
+7. **Details + diff.** Selecting a commit fills the right panes: commit identity,
    author/committer, full message, and clickable **parents** (top); the changed-file
    list and a unified diff of the selected file (bottom).
 
-## Known P1 limits (by design / upcoming milestones)
+## Current multi-repo limits
 
-- The commit **graph** is a placeholder dot; lane/edge rendering, ref-label chips,
-  filters, and full keyboard nav arrive in the history-polish milestone.
-- The diff is a basic unified view; inline/side-by-side toggle, Shiki syntax
-  highlighting, the file tree, "view file at revision" (CodeMirror), and large-diff
-  deferral arrive in the diff-viewer milestone.
-- Working-tree status **counts** (staged/unstaged/untracked) depend on the P2
-  `status.get` method; P1 shows branch/detached/empty/in-progress from `repo.state`.
-- The live invalidation bus (auto-refresh on external changes) is wired after the UI.
-```
+- Forge integration currently targets GitHub through the host `gh` CLI. GitLab and other
+  forge adapters are not implemented.
+- PR creation currently treats the focused repository's GitHub `origin` as the target
+  repository. The base ref must be fetched locally and the head branch must already be
+  pushed at the exact previewed commit.
+- Change sets coordinate existing PRs; they do not impose merge queues or automatically
+  merge/deploy repositories.

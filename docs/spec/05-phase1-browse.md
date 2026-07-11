@@ -28,7 +28,7 @@ Requirements use stable identifiers of the form `P1-<area>-<n>`. Each is testabl
 - **P1-OPEN-1**: cbranch MUST accept an absolute filesystem path (on the remote host) identifying a repository and attempt to open it. Paths MAY point at the working-tree root, a subdirectory within the working tree, or a bare repository directory.
 - **P1-OPEN-2**: On an open request, cbranch MUST resolve the repository's top-level working-tree directory and the location of the Git directory, and MUST report whether the repository is bare, a worktree, or a normal working tree. If the path is not inside any Git repository, cbranch MUST return a typed "not a repository" error and MUST NOT add the path to the recent list.
 - **P1-OPEN-3**: cbranch MUST detect and report the following repository conditions at open time, each as an observable flag/value: empty repository (a valid repository with no commits), detached HEAD, repository currently mid-operation (e.g., an in-progress merge, rebase, cherry-pick, bisect, or revert — reported as a state label only; resolving them is out of Phase 1 scope).
-- **P1-OPEN-4**: cbranch MUST operate on exactly one repository at a time. Opening a new repository MUST replace the active repository in the view and MUST cancel or supersede any in-flight history/diff requests for the previously active repository.
+- **P1-OPEN-4**: cbranch MUST expose exactly one focused repository editor at a time. Opening a new repository MUST replace that focused history/diff context and MUST cancel or supersede its in-flight history/diff requests. Phase 8 supersedes the original open-session limit by allowing other repositories in the same engagement to remain open as tabs and summary queries.
 - **P1-OPEN-5**: Opening MUST be resilient to repositories that are large or slow to enumerate: the open operation MUST return as soon as identity (root, git dir, HEAD, bare/empty/detached state) is known, without waiting for full history to load.
 
 ### Recent-repository switcher
@@ -170,7 +170,7 @@ Expressed in terms of the locked UI stack (React 19, shadcn/ui `base-lyra` on Ba
 
 ### Repository open & switcher
 
-- **P1-UI-OPEN-1**: A command-palette-style switcher (cmdk) MUST be reachable via a global keyboard shortcut and a visible trigger. It lists recent repositories (P1-RECENT-*) with display name and path, supports fuzzy filtering as the user types, and offers an "Open path…" action that accepts an arbitrary absolute path.
+- **P1-UI-OPEN-1**: A command-palette-style switcher (cmdk) MUST be reachable via a global keyboard shortcut and a visible trigger. It lists recent repositories (P1-RECENT-*) with display name and path, supports fuzzy filtering as the user types, and offers an "Open path…" action that accepts an arbitrary absolute path. This switcher is a **surface distinct from the run-a-command palette** (NF-A11Y-6): it lists repositories only, never primary commands, so the two lists never compete for the top of the same result set.
 - **P1-UI-OPEN-2**: The active repository's display name and short path MUST be shown persistently (e.g., in the top app bar) and clicking it MUST open the switcher.
 - **P1-UI-OPEN-3**: Each recent entry MUST expose context actions (shadcn dropdown/context menu) for "Rename", "Remove from list", and "Copy path".
 - **P1-UI-OPEN-4**: Open failures MUST surface via an inline error (shadcn alert/toast) with the offending path and the typed reason; the switcher stays open so the user can correct the path.
@@ -260,5 +260,5 @@ Expressed in terms of the locked UI stack (React 19, shadcn/ui `base-lyra` on Ba
 - Automatic filesystem watching / live status auto-refresh (Phase 1 refreshes on demand and optionally on focus only).
 - Full GPG signature verification (presence indicator only, if shown at all).
 - Image/rich binary previews beyond a basic binary placeholder (optional, not required).
-- Multi-repository simultaneous views (cbranch operates on one repository at a time).
+- Cross-engagement aggregate views. Phase 8 allows concurrent repositories only inside one explicitly active engagement.
 - The VSCode webview extension surface (parallel track after the core stabilizes).
