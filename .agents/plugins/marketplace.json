@@ -1,20 +1,20 @@
 {
-  "name": "repo_local",
-  "interface": {
-    "displayName": "Repo-loca Marketplace"
-  },
-  "plugins": [
-    {
-      "name": "c",
-      "source": {
-        "source": "local",
-        "path": "./.agents/plugins/c"
-      },
-      "policy": {
-        "installation": "AVAILABLE",
-        "authentication": "ON_INSTALL"
-      },
-      "category": "Productivity"
-    }
-  ]
+    "name": "repo_local",
+    "interface": {
+        "displayName": "Repo-loca Marketplace"
+    },
+    "plugins": [
+        {
+            "name": "c",
+            "source": {
+                "source": "local",
+                "path": "./.agents/plugins/c"
+            },
+            "policy": {
+                "installation": "AVAILABLE",
+                "authentication": "ON_INSTALL"
+            },
+            "category": "Productivity"
+        }
+    ]
 }
