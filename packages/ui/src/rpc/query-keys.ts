@@ -93,13 +93,13 @@ export const queryKeys = {
      */
     bisect: (repoId: RepoId) => [repoId, 'inProgress', 'bisect'] as const,
     /**
-     * `rebase.plan` — the computed `<upstream>..HEAD` range for the todo editor (domain:
-     * `commits`; re-derived per chosen base). The range is independent of `--onto` (which
+     * `rebase.plan` — the computed `<upstream>..branch` range (or `HEAD`) for the todo
+     * editor (domain: `commits`; re-derived per chosen base/branch). The range is independent of `--onto` (which
      * only changes the replay target, not which commits replay), so `onto` is NOT keyed
      * here — changing it must not refetch or re-seed the todo. REQ-P5-IR-002.
      */
-    rebasePlan: (repoId: RepoId, upstream: string) =>
-        [repoId, 'commits', 'rebasePlan', upstream] as const,
+    rebasePlan: (repoId: RepoId, upstream: string, branch?: string) =>
+        [repoId, 'commits', 'rebasePlan', upstream, branch ?? 'HEAD'] as const,
     /**
      * `rebase.status` — machine-derived in-progress status (domain: `inProgress`). Stays
      * enabled so a pre-existing rebase shows on repo open (REQ-P5-IR-011).

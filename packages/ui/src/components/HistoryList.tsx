@@ -278,6 +278,10 @@ export function HistoryList({
     // replayed range (parent..HEAD) includes the selected commit (REQ-P5-IR-001).
     const rebaseSince = (parents: ReadonlyArray<Oid>) =>
         setRebaseDialog({ upstream: parents[0] ?? null });
+    // This mode keeps the selected commit as the fixed upstream and asks which existing
+    // local branch to replay; the dialog passes that branch to `git rebase -i <commit> <branch>`.
+    const rebaseBranchOnto = (target: Oid) =>
+        setRebaseDialog({ upstream: target, branch: null });
 
     if (status === 'error')
         return <Placeholder tone="danger">Could not load history.</Placeholder>;
@@ -478,6 +482,13 @@ export function HistoryList({
                                             </DropdownMenuItem>
                                             <DropdownMenuItem
                                                 onClick={() =>
+                                                    rebaseBranchOnto(row.oid)
+                                                }
+                                            >
+                                                Rebase branch onto this commit…
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem
+                                                onClick={() =>
                                                     resetToCommit(row.oid)
                                                 }
                                             >
@@ -525,6 +536,13 @@ export function HistoryList({
                                         onClick={() => rebaseSince(row.parents)}
                                     >
                                         Rebase commits since here…
+                                    </ContextMenuItem>
+                                    <ContextMenuItem
+                                        onClick={() =>
+                                            rebaseBranchOnto(row.oid)
+                                        }
+                                    >
+                                        Rebase branch onto this commit…
                                     </ContextMenuItem>
                                     <ContextMenuItem
                                         onClick={() => resetToCommit(row.oid)}

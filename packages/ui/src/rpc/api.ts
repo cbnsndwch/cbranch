@@ -582,13 +582,13 @@ export interface CbranchApi {
     rebasePlan(
         repoId: RepoId,
         upstream: string,
-        opts?: { onto?: string },
+        opts?: { onto?: string; branch?: string },
     ): Promise<RebasePlan>;
     rebaseStart(
         repoId: RepoId,
         upstream: string,
         steps: ReadonlyArray<RebaseStep>,
-        opts?: { onto?: string },
+        opts?: { onto?: string; branch?: string },
     ): Promise<RebaseStatus>;
     rebaseStatus(repoId: RepoId): Promise<RebaseStatus>;
 }

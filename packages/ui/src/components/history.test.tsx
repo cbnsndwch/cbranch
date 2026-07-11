@@ -216,6 +216,14 @@ describe('HistoryList (P1-HIST-1/2/3; spec 10)', () => {
         expect(notCancelled).toBe(false);
         expect(await screen.findByText('Cherry-pick…')).toBeTruthy();
         expect(screen.getByText('Revert…')).toBeTruthy();
+        expect(
+            screen.getByText('Rebase branch onto this commit…'),
+        ).toBeTruthy();
+        fireEvent.click(screen.getByText('Rebase branch onto this commit…'));
+        expect(useUiStore.getState().rebaseDialog).toEqual({
+            upstream: oid('a'),
+            branch: null,
+        });
     });
 
     // The Ctrl+F shortcut now rides the central keybinding dispatcher (covered in

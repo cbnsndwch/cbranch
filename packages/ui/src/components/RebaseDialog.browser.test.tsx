@@ -71,6 +71,14 @@ const branches = new BranchListing({
             isCurrent: true,
             isRemote: false,
         }),
+        new BranchInfo({
+            name: 'feature',
+            fullRef: 'refs/heads/feature',
+            tipOid: c3,
+            tipSubject: 'third',
+            isCurrent: false,
+            isRemote: false,
+        }),
     ],
     remoteBranches: [],
     currentBranch: 'main',
@@ -170,6 +178,46 @@ describe('RebaseDialog', () => {
                 }) as HTMLButtonElement
             ).disabled,
         ).toBe(false);
+    });
+
+    test('a commit-context rebase requires a local branch and targets its plan and start', async () => {
+        const rebasePlan = vi.fn(async () => plan);
+        const rebaseStart = vi.fn(async () => completed);
+        renderDialog(makeApi({ rebasePlan, rebaseStart }));
+        act(() => {
+            useUiStore.setState({
+                rebaseDialog: { upstream: base, branch: null },
+            });
+        });
+
+        expect(
+            (
+                screen.getByRole('button', {
+                    name: 'Start rebase',
+                }) as HTMLButtonElement
+            ).disabled,
+        ).toBe(true);
+        await chooseInSelect('Branch to rebase', /^feature$/);
+        expect(await screen.findByText('first')).toBeTruthy();
+        await waitFor(() =>
+            expect(rebasePlan).toHaveBeenCalledWith(repoId, base, {
+                branch: 'feature',
+            }),
+        );
+
+        await act(async () => {
+            fireEvent.click(
+                screen.getByRole('button', { name: 'Start rebase' }),
+            );
+        });
+        await waitFor(() =>
+            expect(rebaseStart).toHaveBeenCalledWith(
+                repoId,
+                base,
+                expect.any(Array),
+                { branch: 'feature' },
+            ),
+        );
     });
 
     test('reordering rows submits steps in the displayed order', async () => {

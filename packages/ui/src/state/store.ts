@@ -251,14 +251,20 @@ export interface UiState {
     /**
      * The interactive-rebase dialog, or `null` when closed. `upstream` pre-seeds the base
      * (the selected commit's parent from "Rebase commits since here…"); `null` opens the
-     * base picker empty so the user chooses an upstream/onto ref. REQ-P5-IR-001.
+     * base picker empty so the user chooses an upstream/onto ref. `branch: null` requires
+     * a local target-branch choice before starting. REQ-P5-IR-001.
      */
     readonly rebaseDialog: {
         readonly upstream: string | null;
         readonly onto?: string;
+        readonly branch?: string | null;
     } | null;
     readonly setRebaseDialog: (
-        state: { upstream: string | null; onto?: string } | null,
+        state: {
+            upstream: string | null;
+            onto?: string;
+            branch?: string | null;
+        } | null,
     ) => void;
     // ── P6: go-to-commit (REQ-P6-NAV-001..003) ──────────────────────────────────
     /** Whether the go-to-commit input dialog is open. */

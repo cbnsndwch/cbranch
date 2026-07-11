@@ -153,6 +153,7 @@ export function RebaseDialog({ repoId }: { repoId: RepoId }) {
             repoId={repoId}
             initialUpstream={state.upstream ?? ''}
             initialOnto={state.onto ?? ''}
+            initialBranch={state.branch}
         />
     );
 }
@@ -163,10 +164,12 @@ function RebaseBody({
     repoId,
     initialUpstream,
     initialOnto,
+    initialBranch,
 }: {
     repoId: RepoId;
     initialUpstream: string;
     initialOnto: string;
+    initialBranch?: string | null;
 }) {
     const branches = useBranchList(repoId);
     const start = useRebaseStart(repoId);
@@ -178,11 +181,17 @@ function RebaseBody({
     const [upstream, setUpstream] = useState(initialUpstream);
     const [showOnto, setShowOnto] = useState(initialOnto !== '');
     const [onto, setOnto] = useState(initialOnto);
+    // `undefined` means the existing rebase flow targets HEAD. `null` is the dedicated
+    // commit-context flow, which must wait for the user to choose an existing local branch.
+    const [branch, setBranch] = useState<string | null | undefined>(
+        initialBranch,
+    );
     const effectiveOnto = showOnto && onto !== '' ? onto : undefined;
 
-    // The range is `<upstream>..HEAD` and is independent of `--onto`, so the plan query is
-    // keyed on `upstream` only — changing the replay target never refetches/re-seeds.
-    const plan = useRebasePlan(repoId, upstream);
+    // The range is `<upstream>..branch` (or HEAD) and is independent of `--onto`, so the
+    // plan query is keyed on upstream + target branch — changing the replay target never
+    // refetches/re-seeds.
+    const plan = useRebasePlan(repoId, upstream, branch);
     const [rows, setRows] = useState<ReadonlyArray<TodoRow>>([]);
     const [editing, setEditing] = useState<number | null>(null);
     // Once the user touches the plan it is "dirty"; we then never auto-re-seed for the same
@@ -261,7 +270,7 @@ function RebaseBody({
     // Only the rows whose message the rebase applies get a message editor (an absorbed
     // reword / non-last squash folds without its own message).
     const messageRows = consumedMessageRows(rows);
-    const hasBase = upstream !== '';
+    const hasBase = upstream !== '' && branch !== null;
     const canStart =
         hasBase &&
         rows.length > 0 &&
@@ -279,7 +288,12 @@ function RebaseBody({
                 }),
         );
         start.mutate(
-            { upstream, steps, onto: effectiveOnto },
+            {
+                upstream,
+                steps,
+                onto: effectiveOnto,
+                branch: branch ?? undefined,
+            },
             {
                 onSuccess: status => {
                     close();
@@ -325,6 +339,8 @@ function RebaseBody({
         ...(branches.data?.remoteBranches ?? []),
     ];
     const isBranch = (value: string) => branchItems.some(b => b.name === value);
+    const targetBranchRequired = initialBranch === null;
+    const localBranches = branches.data?.localBranches ?? [];
 
     // A base picker: the branch/ref list, plus a synthetic option for a seeded commit oid
     // (from the commit context menu) that isn't itself a branch name.
@@ -375,34 +391,92 @@ function RebaseBody({
                 <div className="flex max-h-[82vh] flex-col gap-3 p-4">
                     <DialogTitle>Interactive rebase</DialogTitle>
                     <DialogDescription>
-                        Replay the commits since the chosen base onto it.
+                        {targetBranchRequired
+                            ? 'Choose a local branch to replay onto this commit.'
+                            : 'Replay the commits since the chosen base onto it.'}
                         Reorder rows and pick an action per commit; reword and
                         squash collect their message here.
                     </DialogDescription>
 
                     {/* Base picker */}
                     <div className="flex flex-col gap-2">
-                        <div className="flex items-center gap-2 text-sm">
-                            <span className="w-28 shrink-0">Rebase onto</span>
-                            {basePicker(upstream, setUpstream, 'Rebase onto')}
-                        </div>
-
-                        <label className="flex items-center gap-2 text-xs">
-                            <Checkbox
-                                aria-label="Rebase onto a different base"
-                                checked={showOnto}
-                                onCheckedChange={checked =>
-                                    setShowOnto(checked === true)
-                                }
-                                disabled={start.isPending}
-                            />
-                            Replay onto a different base (advanced --onto)
-                        </label>
-                        {showOnto && (
+                        {targetBranchRequired && (
                             <div className="flex items-center gap-2 text-sm">
-                                <span className="w-28 shrink-0">New base</span>
-                                {basePicker(onto, setOnto, 'New base')}
+                                <span className="w-28 shrink-0">
+                                    Branch to rebase
+                                </span>
+                                <Select
+                                    value={branch ?? ''}
+                                    onValueChange={next =>
+                                        setBranch(next ?? null)
+                                    }
+                                    disabled={start.isPending}
+                                >
+                                    <SelectTrigger
+                                        aria-label="Branch to rebase"
+                                        className="h-7 flex-1"
+                                    >
+                                        <SelectValue placeholder="Choose a local branch…" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {localBranches.map(b => (
+                                            <SelectItem
+                                                key={b.fullRef}
+                                                value={b.name}
+                                            >
+                                                {b.name}
+                                                {b.isCurrent
+                                                    ? ' (current)'
+                                                    : ''}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
                             </div>
+                        )}
+                        {targetBranchRequired ? (
+                            <div className="flex items-center gap-2 text-sm">
+                                <span className="w-28 shrink-0">
+                                    Rebase onto
+                                </span>
+                                <span className="font-mono text-xs">
+                                    commit {shortOid(upstream)}
+                                </span>
+                            </div>
+                        ) : (
+                            <>
+                                <div className="flex items-center gap-2 text-sm">
+                                    <span className="w-28 shrink-0">
+                                        Rebase onto
+                                    </span>
+                                    {basePicker(
+                                        upstream,
+                                        setUpstream,
+                                        'Rebase onto',
+                                    )}
+                                </div>
+
+                                <label className="flex items-center gap-2 text-xs">
+                                    <Checkbox
+                                        aria-label="Rebase onto a different base"
+                                        checked={showOnto}
+                                        onCheckedChange={checked =>
+                                            setShowOnto(checked === true)
+                                        }
+                                        disabled={start.isPending}
+                                    />
+                                    Replay onto a different base (advanced
+                                    --onto)
+                                </label>
+                                {showOnto && (
+                                    <div className="flex items-center gap-2 text-sm">
+                                        <span className="w-28 shrink-0">
+                                            New base
+                                        </span>
+                                        {basePicker(onto, setOnto, 'New base')}
+                                    </div>
+                                )}
+                            </>
                         )}
                     </div>
 

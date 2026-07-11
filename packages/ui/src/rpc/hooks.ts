@@ -1875,7 +1875,7 @@ export const useBisectReset = (repoId: RepoId) => {
 
 /**
  * The computed rebase range for the todo editor (REQ-P5-IR-002). Disabled until a base
- * is chosen (empty upstream); content-addressed under `commits` per base. The range does
+ * is chosen (empty upstream); content-addressed under `commits` per base/target branch. The range does
  * not depend on `--onto`, so the dialog passes only `upstream` (changing the replay
  * target must not refetch or re-seed the todo). `staleTime: Infinity` further prevents a
  * background `commits` invalidation from clobbering the user's in-progress edits while
@@ -1884,15 +1884,23 @@ export const useBisectReset = (repoId: RepoId) => {
 export const useRebasePlan = (
     repoId: RepoId | null,
     upstream: string,
+    branch?: string | null,
 ): UseQueryResult<RebasePlan> => {
     const api = useApi();
     return useQuery({
         queryKey:
-            repoId && upstream !== ''
-                ? queryKeys.rebasePlan(repoId, upstream)
+            repoId && upstream !== '' && branch !== null
+                ? queryKeys.rebasePlan(repoId, upstream, branch)
                 : ['inactive'],
-        queryFn: () => api.rebasePlan(repoId as RepoId, upstream),
-        enabled: repoId !== null && upstream !== '',
+        queryFn: () => {
+            if (branch === undefined)
+                return api.rebasePlan(repoId as RepoId, upstream);
+            // A null branch disables the query above; this guard keeps the API input
+            // total even if React Query were to invoke a just-disabled query function.
+            if (branch === null) throw new Error('Choose a branch to rebase');
+            return api.rebasePlan(repoId as RepoId, upstream, { branch });
+        },
+        enabled: repoId !== null && upstream !== '' && branch !== null,
         staleTime: Infinity,
     });
 };
@@ -1919,14 +1927,24 @@ export const useRebaseStart = (repoId: RepoId) => {
     return useMutation<
         RebaseStatus,
         unknown,
-        { upstream: string; steps: ReadonlyArray<RebaseStep>; onto?: string }
+        {
+            upstream: string;
+            steps: ReadonlyArray<RebaseStep>;
+            onto?: string;
+            branch?: string;
+        }
     >({
-        mutationFn: ({ upstream, steps, onto }) =>
+        mutationFn: ({ upstream, steps, onto, branch }) =>
             api.rebaseStart(
                 repoId,
                 upstream,
                 steps,
-                onto ? { onto } : undefined,
+                onto || branch
+                    ? {
+                          ...(onto === undefined ? {} : { onto }),
+                          ...(branch === undefined ? {} : { branch }),
+                      }
+                    : undefined,
             ),
         onSettled: () => invalidateOperation(qc, repoId),
     });
