@@ -1,6 +1,7 @@
 import { type StatusEntry } from '@cbranch/rpc-contract';
 
 import { statusLabel } from '../lib/status';
+
 import { Button } from './ui/button';
 import { Checkbox } from './ui/checkbox';
 
@@ -32,7 +33,7 @@ export function StatusChangeList({
     }
 
     return (
-        <ul className="overflow-y-auto">
+        <ul className="overflow-y-hidden">
             {entries.map(entry => {
                 const isSelected = selection.has(entry.path);
                 const label = statusLabel(entry);
@@ -54,7 +55,7 @@ export function StatusChangeList({
                             className="flex min-w-0 flex-1 items-center gap-1.5 text-left"
                             onClick={() => onSelect(entry.path, staged)}
                         >
-                            <span className="text-muted-foreground min-w-[60px] text-xs">
+                            <span className="text-muted-foreground min-w-15 text-xs">
                                 {label}
                             </span>
                             <span className="truncate text-xs">
