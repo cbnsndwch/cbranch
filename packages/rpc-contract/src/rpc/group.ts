@@ -1008,12 +1008,13 @@ export const CbranchRpcs = RpcGroup.make(
     }),
 
     // ── P5: interactive rebase ───────────────────────────────────────────────────
-    // rebase.plan — the `<upstream>..HEAD` range (optionally `--onto`), oldest-first. READ.
+    // rebase.plan — the `<upstream>..branch` range (or HEAD by default), oldest-first. READ.
     Rpc.make('RebasePlan', {
         payload: {
             repoId: RepoId,
             upstream: Schema.String,
             onto: Schema.optional(Schema.String),
+            branch: Schema.optional(Schema.String),
         },
         success: RebasePlan,
         error: GitError,
@@ -1025,6 +1026,7 @@ export const CbranchRpcs = RpcGroup.make(
             upstream: Schema.String,
             steps: Schema.Array(RebaseStep),
             onto: Schema.optional(Schema.String),
+            branch: Schema.optional(Schema.String),
         },
         success: RebaseStatus,
         error: GitError,

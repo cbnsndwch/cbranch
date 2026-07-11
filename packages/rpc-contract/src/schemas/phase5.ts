@@ -318,9 +318,10 @@ export class RebaseTodoCommit extends Schema.Class<RebaseTodoCommit>(
 }) {}
 
 /**
- * The computed rebase range (REQ-P5-IR-001/002): the commits in `<upstream>..HEAD`
- * (optionally replayed `--onto` a different base), oldest-first. `commits:[]` means an
- * empty range (nothing to rebase). DISPLAY input to the todo editor; not an operation.
+ * The computed rebase range (REQ-P5-IR-001/002): the commits in `<upstream>..branch`
+ * (or `HEAD` when no branch is supplied), optionally replayed `--onto` a different base,
+ * oldest-first. `commits:[]` means an empty range (nothing to rebase). DISPLAY input to
+ * the todo editor; not an operation.
  */
 export class RebasePlan extends Schema.Class<RebasePlan>('RebasePlan')({
     upstream: Schema.String,
