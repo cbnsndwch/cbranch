@@ -803,11 +803,12 @@ export interface GitEngineApi {
     }) => Effect.Effect<AppSettings, GitError>;
 
     // ── interactive rebase (P5, S8) ─────────────────────────────────────────────
-    /** rebase.plan — the `<upstream>..HEAD` range (optionally `--onto`), oldest-first. READ. REQ-P5-IR-001/002. */
+    /** rebase.plan — the `<upstream>..branch` range (or `HEAD` by default), oldest-first. READ. REQ-P5-IR-001/002. */
     readonly rebasePlan: (
         repoId: RepoId,
         upstream: string,
         onto?: string,
+        branch?: string,
     ) => Effect.Effect<RebasePlan, GitError>;
     /** rebase.start ✎ — scripted `git rebase -i` with an exec-amend todo. REQ-P5-IR-008. */
     readonly rebaseStart: (
@@ -815,6 +816,7 @@ export interface GitEngineApi {
         upstream: string,
         steps: ReadonlyArray<RebaseStep>,
         onto?: string,
+        branch?: string,
     ) => Effect.Effect<RebaseStatus, GitError>;
     /** rebase.status — machine-derived in-progress status (backend-aware). READ. REQ-P5-IR-009/011. */
     readonly rebaseStatus: (

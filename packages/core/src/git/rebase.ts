@@ -128,6 +128,7 @@ export const parseRebaseTodoCommits = (
  */
 export const buildRebasePlanArgs = (
     upstream: string,
+    branch?: string,
 ): ReadonlyArray<string> => [
     'log',
     '-z',
@@ -135,7 +136,7 @@ export const buildRebasePlanArgs = (
     '--reverse',
     '--no-merges',
     `--format=${REBASE_LOG_FORMAT}`,
-    `${upstream}..HEAD`,
+    `${upstream}..${branch ?? 'HEAD'}`,
 ];
 
 export const rebasePlan = (
@@ -143,13 +144,16 @@ export const rebasePlan = (
     upstream: string,
     onto?: string,
     env?: NodeJS.ProcessEnv,
+    branch?: string,
 ): Effect.Effect<RebasePlan, GitError> =>
     Effect.gen(function* () {
         yield* assertNoLeadingDash(upstream, 'rebase upstream');
         if (onto !== undefined) yield* assertNoLeadingDash(onto, 'rebase onto');
+        if (branch !== undefined)
+            yield* assertNoLeadingDash(branch, 'rebase branch');
         const log = yield* runGitOk({
             cwd,
-            args: buildRebasePlanArgs(upstream),
+            args: buildRebasePlanArgs(upstream, branch),
             env,
         });
         return new RebasePlan({
@@ -397,6 +401,7 @@ export const rebaseStart = (
     steps: ReadonlyArray<RebaseStep>,
     onto?: string,
     env?: NodeJS.ProcessEnv,
+    branch?: string,
 ): Effect.Effect<RebaseStatus, GitError> =>
     Effect.gen(function* () {
         if (detectInProgress(gitDir) !== 'none')
@@ -408,6 +413,8 @@ export const rebaseStart = (
             );
         yield* assertNoLeadingDash(upstream, 'rebase upstream');
         if (onto !== undefined) yield* assertNoLeadingDash(onto, 'rebase onto');
+        if (branch !== undefined)
+            yield* assertNoLeadingDash(branch, 'rebase branch');
         const invalid = validateRebasePlan(steps);
         if (invalid !== null)
             return yield* Effect.fail(gitError('gitFailed', invalid));
@@ -469,6 +476,7 @@ export const rebaseStart = (
         const args = ['rebase', '-i'];
         if (onto !== undefined) args.push('--onto', onto);
         args.push(upstream);
+        if (branch !== undefined) args.push(branch);
         const result = yield* runGit({
             cwd,
             args,

@@ -1380,11 +1380,11 @@ export const makeGitEngine = (
             // ── interactive rebase (P5) ───────────────────────────────────────────
             // Plan + status are lockless reads; start scripts `git rebase -i` under the
             // repo lock (it reads its own machine state to classify the outcome).
-            rebasePlan: (repoId, upstream, onto) =>
+            rebasePlan: (repoId, upstream, onto, branch) =>
                 Effect.flatMap(resolveById(repoId), repo =>
-                    rebasePlanGit(repoCwd(repo), upstream, onto, env),
+                    rebasePlanGit(repoCwd(repo), upstream, onto, env, branch),
                 ),
-            rebaseStart: (repoId, upstream, steps, onto) =>
+            rebaseStart: (repoId, upstream, steps, onto, branch) =>
                 Effect.flatMap(resolveById(repoId), repo =>
                     locks.withRepoLock(repoId)(
                         rebaseStartGit(
@@ -1394,6 +1394,7 @@ export const makeGitEngine = (
                             steps,
                             onto,
                             env,
+                            branch,
                         ),
                     ),
                 ),

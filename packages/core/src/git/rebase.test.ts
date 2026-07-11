@@ -60,6 +60,12 @@ describe('rebase pure helpers', () => {
         ]);
     });
 
+    test('buildRebasePlanArgs targets an explicit branch instead of HEAD', () => {
+        expect(buildRebasePlanArgs('abc123', 'feature')).toContain(
+            'abc123..feature',
+        );
+    });
+
     test('parseRebaseTodoCommits splits NUL records and rejoins a body with FS', () => {
         const a = 'a'.repeat(40);
         const b = 'b'.repeat(40);
@@ -361,6 +367,43 @@ describe('rebase git operations', () => {
             rebasePlan(repo.dir, oids[3], undefined, iso(repo)),
         );
         expect(plan.commits).toEqual([]);
+    });
+
+    test('plans and rebases an explicit branch onto the selected base', async () => {
+        const { repo, gitDir, oids } = await seedRange('target-branch');
+        await repo.branch('feature', { startPoint: oids[0] });
+        await repo.checkout('feature');
+        const featureOne = await repo.commit({
+            message: 'feature one',
+            files: { 'feature-1.txt': 'one\n' },
+        });
+        const featureTwo = await repo.commit({
+            message: 'feature two',
+            files: { 'feature-2.txt': 'two\n' },
+        });
+        await repo.checkout('main');
+
+        const plan = await run(
+            rebasePlan(repo.dir, oids[3], undefined, iso(repo), 'feature'),
+        );
+        expect(plan.commits.map(c => c.oid)).toEqual([featureOne, featureTwo]);
+
+        const status = await run(
+            rebaseStart(
+                repo.dir,
+                gitDir,
+                oids[3],
+                [rs('pick', featureOne), rs('pick', featureTwo)],
+                undefined,
+                iso(repo),
+                'feature',
+            ),
+        );
+        expect(status.inProgress).toBe(false);
+        expect(await subjects(repo, `${oids[3]}..feature`)).toEqual([
+            'feature two',
+            'feature one',
+        ]);
     });
 
     test('reword bakes the UI message via exec-amend (fully scripted, no editor)', async () => {
