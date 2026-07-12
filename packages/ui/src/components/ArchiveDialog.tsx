@@ -11,6 +11,8 @@ import { type ArchiveFormat, type RepoId } from '@cbranch/rpc-contract';
 import { useState } from 'react';
 
 import { useArchivePrepare } from '../rpc/hooks';
+import { useHostEndpoint } from '../rpc/connection-provider';
+import { resolveHostUrl } from '../rpc/client';
 import { useUiStore } from '../state/store';
 import { Button } from './ui/button';
 import {
@@ -74,6 +76,7 @@ function ArchiveDialogBody({
     const [downloading, setDownloading] = useState(false);
 
     const prepare = useArchivePrepare(repoId);
+    const endpoint = useHostEndpoint();
     const busy = prepare.isPending || downloading;
     const canExport = treeish.trim() !== '' && !busy;
 
@@ -88,7 +91,7 @@ function ArchiveDialogBody({
                 subPath: subPath.trim() === '' ? undefined : subPath.trim(),
             });
             setDownloading(true);
-            const res = await fetch(descriptor.url);
+            const res = await fetch(resolveHostUrl(endpoint, descriptor.url));
             if (!res.ok) {
                 setError('Export failed — the server rejected the request.');
                 return;

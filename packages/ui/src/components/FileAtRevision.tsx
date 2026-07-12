@@ -8,6 +8,8 @@ import { toast } from 'sonner';
 
 import { languageForPath, loadShikiLines } from '../lib/shiki-highlighter';
 import { useFileContentAtRev } from '../rpc/hooks';
+import { useHostEndpoint } from '../rpc/connection-provider';
+import { resolveHostUrl } from '../rpc/client';
 import { useUiStore } from '../state/store';
 import { Placeholder } from './ui/placeholder';
 
@@ -32,6 +34,7 @@ export function FileAtRevision({
     readonly path: string;
 }) {
     const { data, isLoading, isError } = useFileContentAtRev(repoId, rev, path);
+    const endpoint = useHostEndpoint();
     const theme = useUiStore(s => s.theme);
     const hostRef = useRef<HTMLDivElement>(null);
 
@@ -151,7 +154,7 @@ export function FileAtRevision({
                     {data.size} bytes.
                 </div>
                 <a
-                    href={data.url}
+                    href={resolveHostUrl(endpoint, data.url)}
                     className="text-primary mt-2 inline-block hover:underline"
                 >
                     Download file

@@ -68,11 +68,68 @@ export const streamWithClient = <A, E>(
 ): Stream.Stream<A, E, RpcClientService> =>
     Stream.unwrap(Effect.map(RpcClientService, f));
 
-/** Default RPC URL derived from the page origin (loopback dev or the served host). */
+/** A selected cbranch backend, including its HTTP side-channel base. */
+export interface HostEndpoint {
+    readonly rpcUrl: string;
+    readonly httpBaseUrl: string;
+}
+
+const asHttpProtocol = (protocol: string): string =>
+    protocol === 'wss:' ? 'https:' : 'http:';
+
+/** Validate and normalize an explicit backend endpoint. */
+export const makeHostEndpoint = (
+    rpcUrl: string,
+    httpBaseUrl?: string,
+): HostEndpoint => {
+    const rpc = new URL(rpcUrl);
+    if (rpc.protocol !== 'ws:' && rpc.protocol !== 'wss:')
+        throw new Error('The RPC endpoint must use ws:// or wss://.');
+    if (rpc.pathname !== '/rpc' || rpc.search !== '' || rpc.hash !== '')
+        throw new Error('The RPC endpoint must end with /rpc.');
+
+    const derivedHttp = new URL(rpc);
+    derivedHttp.protocol = asHttpProtocol(rpc.protocol);
+    derivedHttp.pathname = '';
+    const http = new URL(httpBaseUrl ?? derivedHttp.toString());
+    if (http.protocol !== 'http:' && http.protocol !== 'https:')
+        throw new Error('The HTTP endpoint must use http:// or https://.');
+    http.pathname = http.pathname.replace(/\/$/, '');
+    http.search = '';
+    http.hash = '';
+
+    return { rpcUrl: rpc.toString(), httpBaseUrl: http.toString() };
+};
+
+/** Default RPC endpoint derived from the page origin (loopback dev or served host). */
+export const defaultHostEndpoint = (location: {
+    protocol: string;
+    host: string;
+}): HostEndpoint => {
+    const scheme = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    return makeHostEndpoint(`${scheme}//${location.host}/rpc`);
+};
+
+/** Kept for callers that require only the WebSocket URL. */
 export const defaultRpcUrl = (location: {
     protocol: string;
     host: string;
-}): string => {
-    const scheme = location.protocol === 'https:' ? 'wss:' : 'ws:';
-    return `${scheme}//${location.host}/rpc`;
+}): string => defaultHostEndpoint(location).rpcUrl;
+
+/** Resolve a backend-relative side-channel URL against the selected connection. */
+export const resolveHostUrl = (
+    endpoint: HostEndpoint,
+    value: string,
+): string => {
+    try {
+        return new URL(value).toString();
+    } catch {
+        const resolved = new URL(value, `${endpoint.httpBaseUrl}/`);
+        if (
+            typeof window !== 'undefined' &&
+            resolved.origin === window.location.origin
+        )
+            return `${resolved.pathname}${resolved.search}${resolved.hash}`;
+        return resolved.toString();
+    }
 };

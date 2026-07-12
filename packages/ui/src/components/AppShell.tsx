@@ -18,6 +18,7 @@ import { BisectBanner } from './BisectBanner';
 import { BisectStartDialog } from './BisectStartDialog';
 import { CleanDialog } from './CleanDialog';
 import { CommandLogPanel } from './CommandLogPanel';
+import { ConnectionStatusIndicator } from './ConnectionStatusIndicator';
 import { ReflogPanel } from './ReflogPanel';
 import { CommitDialog } from './CommitDialog';
 import { GcDialog } from './GcDialog';
@@ -251,6 +252,7 @@ export function AppShell() {
                         <MenuBar />
                     </div>
                     <WorkspaceBar />
+                    <ConnectionStatusIndicator />
                     {repoId ? <Toolbar /> : null}
 
                     {/* Main split — sidebar beside (view nav tabs over content). */}

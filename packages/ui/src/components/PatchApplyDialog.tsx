@@ -14,6 +14,8 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 
 import { useApplyPatch, useInspectPatch } from '../rpc/hooks';
+import { useHostEndpoint } from '../rpc/connection-provider';
+import { resolveHostUrl, type HostEndpoint } from '../rpc/client';
 import { useUiStore } from '../state/store';
 import { Button } from './ui/button';
 import { Checkbox } from './ui/checkbox';
@@ -43,12 +45,16 @@ const errorMessage = (error: unknown): string =>
 /** Park an oversized patch on the side-channel; small patches travel inline (REQ-P6-PATCH-006). */
 async function resolvePatchInput(
     patch: string,
+    endpoint: HostEndpoint,
 ): Promise<{ patch: string; uploadId?: string }> {
     if (new Blob([patch]).size <= INLINE_CAP) return { patch };
-    const res = await fetch('/sidechannel/patch-upload', {
-        method: 'POST',
-        body: patch,
-    });
+    const res = await fetch(
+        resolveHostUrl(endpoint, '/sidechannel/patch-upload'),
+        {
+            method: 'POST',
+            body: patch,
+        },
+    );
     if (!res.ok) throw new Error('Could not upload the patch.');
     const body = (await res.json()) as { uploadId: string };
     return { patch: '', uploadId: body.uploadId };
@@ -81,6 +87,7 @@ export function PatchApplyDialog({ repoId }: { repoId: RepoId }) {
     const setOpen = useUiStore(s => s.setPatchApplyDialogOpen);
     const inspect = useInspectPatch(repoId);
     const apply = useApplyPatch(repoId);
+    const endpoint = useHostEndpoint();
 
     const [patch, setPatch] = useState('');
     const [mode, setMode] = useState<PatchApplyMode>('working');
@@ -107,7 +114,7 @@ export function PatchApplyDialog({ repoId }: { repoId: RepoId }) {
         setError(null);
         setReport(null);
         try {
-            const input = await resolvePatchInput(patch);
+            const input = await resolvePatchInput(patch, endpoint);
             const r = await inspect.mutateAsync({ ...input, mode, threeWay });
             setReport(r);
         } catch (e) {
@@ -118,7 +125,7 @@ export function PatchApplyDialog({ repoId }: { repoId: RepoId }) {
     const runApply = async () => {
         setError(null);
         try {
-            const input = await resolvePatchInput(patch);
+            const input = await resolvePatchInput(patch, endpoint);
             const result = await apply.mutateAsync({
                 ...input,
                 mode,

@@ -11,6 +11,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 
 import { useApi } from './ApiProvider';
+import { useOptionalConnection } from './connection-provider';
 import { domainKey, repoScopeKey } from './query-keys';
 
 const RECONNECT_DELAY_MS = 1500;
@@ -18,6 +19,7 @@ const RECONNECT_DELAY_MS = 1500;
 export const useInvalidationBus = (repoId: RepoId | null): void => {
     const api = useApi();
     const queryClient = useQueryClient();
+    const connection = useOptionalConnection();
     // Bumping `generation` re-runs the effect → re-subscribes after a drop (reconnect).
     const [generation, setGeneration] = useState(0);
 
@@ -40,6 +42,7 @@ export const useInvalidationBus = (repoId: RepoId | null): void => {
                 }
             },
             onError: () => {
+                connection?.markReconnecting();
                 // Reconnect resnapshot (NF-ERR-6): refetch everything mounted for the repo.
                 void queryClient.invalidateQueries({
                     queryKey: repoScopeKey(repoId),
@@ -47,13 +50,20 @@ export const useInvalidationBus = (repoId: RepoId | null): void => {
                 scheduleReconnect();
             },
             onComplete: () => {
+                connection?.markReconnecting();
+                void queryClient.invalidateQueries({
+                    queryKey: repoScopeKey(repoId),
+                });
                 scheduleReconnect();
             },
         });
+        // Subscribing opens a fresh RPC stream; any later transport error moves the
+        // shared state back to reconnecting and schedules another full resnapshot.
+        connection?.markReconnected();
 
         return () => {
             if (reconnectTimer !== undefined) clearTimeout(reconnectTimer);
             unsubscribe();
         };
-    }, [api, queryClient, repoId, generation]);
+    }, [api, connection, queryClient, repoId, generation]);
 };

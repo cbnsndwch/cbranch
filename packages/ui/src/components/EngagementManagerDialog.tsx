@@ -27,6 +27,8 @@ import {
     useReorderEngagements,
     useUpdateEngagement,
 } from '../rpc/hooks';
+import { useHostEndpoint } from '../rpc/connection-provider';
+import { resolveHostUrl } from '../rpc/client';
 import { useNavigation } from '../state/navigation';
 import { useUiStore } from '../state/store';
 import { DestructiveConfirmDialog } from './DestructiveConfirmDialog';
@@ -60,6 +62,7 @@ export function EngagementManagerDialog() {
     const activate = useActivateEngagement();
     const reorder = useReorderEngagements();
     const { openEngagement } = useNavigation();
+    const endpoint = useHostEndpoint();
     const [selectedId, setSelectedId] = useState<EngagementId | null>(null);
     const [name, setName] = useState('');
     const [color, setColor] = useState<EngagementColor>('teal');
@@ -126,7 +129,10 @@ export function EngagementManagerDialog() {
         setUploadingAvatar(true);
         try {
             const response = await fetch(
-                `/sidechannel/workspace-avatar?engagementId=${encodeURIComponent(selected.id)}`,
+                resolveHostUrl(
+                    endpoint,
+                    `/sidechannel/workspace-avatar?engagementId=${encodeURIComponent(selected.id)}`,
+                ),
                 { method: 'POST', body: file },
             );
             if (!response.ok)
@@ -161,7 +167,10 @@ export function EngagementManagerDialog() {
         setRemovingAvatar(true);
         try {
             const response = await fetch(
-                `/sidechannel/workspace-avatar?engagementId=${encodeURIComponent(selected.id)}`,
+                resolveHostUrl(
+                    endpoint,
+                    `/sidechannel/workspace-avatar?engagementId=${encodeURIComponent(selected.id)}`,
+                ),
                 { method: 'DELETE' },
             );
             if (!response.ok)

@@ -8,6 +8,8 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 
 import { usePatchFormatPrepare } from '../rpc/hooks';
+import { useHostEndpoint } from '../rpc/connection-provider';
+import { resolveHostUrl } from '../rpc/client';
 import { useUiStore } from '../state/store';
 import { Button } from './ui/button';
 import {
@@ -44,6 +46,7 @@ function PatchExportBody({
 }) {
     const setOpen = useUiStore(s => s.setPatchExportDialog);
     const prepare = usePatchFormatPrepare(repoId);
+    const endpoint = useHostEndpoint();
 
     const [range, setRange] = useState(initialRange);
     const [error, setError] = useState<string | null>(null);
@@ -64,7 +67,7 @@ function PatchExportBody({
             const url =
                 `/sidechannel/patch?repoId=${encodeURIComponent(repoId)}` +
                 `&range=${encodeURIComponent(trimmed)}`;
-            const res = await fetch(url);
+            const res = await fetch(resolveHostUrl(endpoint, url));
             if (!res.ok) {
                 setError('Export failed — the server rejected the request.');
                 return;

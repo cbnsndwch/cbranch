@@ -3,6 +3,8 @@ import { useState } from 'react';
 
 import { cn } from '../lib/cn';
 import { engagementColorClass, engagementInitials } from '../lib/engagements';
+import { useHostEndpoint } from '../rpc/connection-provider';
+import { resolveHostUrl } from '../rpc/client';
 
 /** Workspace image with a deterministic initials fallback for unavailable avatars. */
 export function WorkspaceAvatar({
@@ -17,9 +19,14 @@ export function WorkspaceAvatar({
     readonly className: string;
 }) {
     const [failedUrl, setFailedUrl] = useState<string | null>(null);
+    const endpoint = useHostEndpoint();
+    const resolvedAvatarUrl =
+        avatarUrl === undefined
+            ? undefined
+            : resolveHostUrl(endpoint, avatarUrl);
     const imageUrl =
-        avatarUrl !== undefined && avatarUrl !== failedUrl
-            ? avatarUrl
+        resolvedAvatarUrl !== undefined && resolvedAvatarUrl !== failedUrl
+            ? resolvedAvatarUrl
             : undefined;
 
     if (imageUrl)

@@ -5,18 +5,19 @@
 //   • the default export is the root component: it wires the app-wide providers (the RPC
 //     runtime + React Query) around the routed `<Outlet />`, and bridges URL → store.
 //
-// The single RPC runtime / React Query client are module-level singletons (one live host
-// connection for the app's lifetime). The runtime is built lazily and never connects until
-// an effect runs, so constructing it during the Node `index.html` render is harmless; the
-// only browser-only access (`window.location`) is guarded.
+// ConnectionProvider creates one runtime and React Query client for each selected
+// endpoint. It disposes both before replacing a profile, so server data never leaks
+// between browser or desktop connections.
 
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { useEffect, useState } from 'react';
 import { Links, Meta, Outlet, Scripts, ScrollRestoration } from 'react-router';
 
 import type { Route } from './+types/root';
-import { makeApi } from './rpc/api';
-import { ApiProvider } from './rpc/ApiProvider';
-import { defaultRpcUrl, makeAppRuntime } from './rpc/client';
+import { ConnectionFailureScreen } from './components/ConnectionFailureScreen';
+import { ConnectionProfilesScreen } from './desktop/ConnectionProfilesScreen';
+import { isDesktopSurface } from './desktop/bridge';
+import { ConnectionProvider, useConnection } from './rpc/connection-provider';
+import { defaultHostEndpoint } from './rpc/client';
 import { SyncRouteToStore } from './state/SyncRouteToStore';
 
 import appStyles from './styles.css?url';
@@ -44,27 +45,6 @@ export const links: Route.LinksFunction = () => [
     },
     { rel: 'manifest', href: '/site.webmanifest' },
 ];
-
-// The RPC URL is derived from the page origin; fall back to a placeholder during the
-// Node `index.html` render (no `window`). The placeholder is never dialled — the runtime
-// only connects in the browser, after hydration, when the first effect runs.
-const rpcUrl =
-    typeof window === 'undefined'
-        ? 'ws://localhost/rpc'
-        : defaultRpcUrl(window.location);
-
-// One app runtime owns the live RPC connection; one React Query client owns synced data.
-const runtime = makeAppRuntime(rpcUrl);
-const api = makeApi(runtime);
-const queryClient = new QueryClient({
-    defaultOptions: {
-        queries: {
-            staleTime: 30_000,
-            retry: false,
-            refetchOnWindowFocus: true,
-        },
-    },
-});
 
 // Blocking inline script that applies the persisted theme to <html> BEFORE first paint —
 // the real no-flash guarantee (NF-THEME-6). It runs when the browser parses the prerendered
@@ -107,12 +87,59 @@ export function Layout({ children }: { readonly children: React.ReactNode }) {
 }
 
 export default function Root() {
+    // A stable loading shell prevents server prerendering from guessing a browser or
+    // Tauri endpoint. The real connection starts only after browser hydration.
+    const [hydrated, setHydrated] = useState(false);
+    useEffect(() => setHydrated(true), []);
+    if (!hydrated)
+        return <div className="min-h-dvh bg-background" aria-busy="true" />;
+
+    const desktop = isDesktopSurface();
+    const initialEndpoint = desktop
+        ? undefined
+        : defaultHostEndpoint(window.location);
+
     return (
-        <QueryClientProvider client={queryClient}>
-            <ApiProvider api={api}>
-                <SyncRouteToStore />
-                <Outlet />
-            </ApiProvider>
-        </QueryClientProvider>
+        <ConnectionProvider initialEndpoint={initialEndpoint}>
+            <ConnectionGate desktop={desktop} />
+        </ConnectionProvider>
+    );
+}
+
+function ConnectionGate({ desktop }: { readonly desktop: boolean }) {
+    const { endpoint, status, error, connect, retry } = useConnection();
+
+    if (desktop && (endpoint === undefined || status === 'failed'))
+        return (
+            <ConnectionProfilesScreen
+                connectionError={error}
+                onConnect={connect}
+                onRetry={retry}
+            />
+        );
+
+    if (status === 'failed' && endpoint !== undefined)
+        return (
+            <ConnectionFailureScreen
+                endpoint={endpoint.rpcUrl}
+                error={error}
+                onRetry={retry}
+            />
+        );
+
+    if (status !== 'connected' && status !== 'reconnecting')
+        return (
+            <main className="grid min-h-dvh place-items-center bg-muted/20">
+                <p role="status" className="text-muted-foreground text-sm">
+                    Connecting to cbranch…
+                </p>
+            </main>
+        );
+
+    return (
+        <>
+            <SyncRouteToStore />
+            <Outlet />
+        </>
     );
 }
