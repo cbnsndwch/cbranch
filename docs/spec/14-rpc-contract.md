@@ -278,6 +278,7 @@ Conventions: ✎ = mutating (takes the per-repo lock); ⇉ = streaming RPC. All 
 ### Repository & live state — P1
 | Method | Payload | Success | Notes |
 |---|---|---|---|
+| `system.info` | `{}` | `SystemInfo` | Mandatory startup handshake: backend version, protocol version, additive capabilities. A newer client must stop before Git UI when the protocol is incompatible or this method is unavailable. |
 | `repo.open` | `{ path }` | `RepoHandle` | `OpenError = repoNotFound \| notARepository \| fsError`. Entry point (no clone). |
 | `repo.recentList` | `{}` | `RecentRepo[]` | keyed by resolved top-level path |
 | `repo.recentRemove` ✎ | `{ repoId }` | `void` | |
