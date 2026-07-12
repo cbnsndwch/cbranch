@@ -110,6 +110,7 @@ import {
 } from '../schemas/phase6';
 import { Oid, RepoId } from '../schemas/primitives';
 import { LogQuery } from '../schemas/queries';
+import { SystemInfo } from '../schemas/system';
 import {
     CommitCreated,
     CommitMessage,
@@ -593,9 +594,15 @@ const rebaseStatus = new RebaseStatus({
     onto: '1'.repeat(40),
     headName: 'refs/heads/feature',
 });
+const systemInfo = new SystemInfo({
+    version: '0.1.0',
+    protocolVersion: 1,
+    capabilities: ['system-info', 'loopback-rpc-v1', 'side-channel-v1'],
+});
 
 // --- stub handlers: schema-valid data, plus payload-driven error injection ---
 const handlers = CbranchRpcs.toLayer({
+    SystemInfo: () => Effect.succeed(systemInfo),
     RepoOpen: ({ path }) =>
         path === ''
             ? Effect.fail(

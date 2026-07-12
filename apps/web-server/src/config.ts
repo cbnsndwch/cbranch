@@ -35,10 +35,15 @@ export interface ServerConfig {
      * cross-site/DNS-rebinding `Origin` is rejected.
      */
     readonly allowedHostnames: ReadonlySet<string>;
+    /** Exact Windows WebView2 origins permitted for loopback SSH-forward clients. */
+    readonly allowedDesktopOrigins: ReadonlySet<string>;
 }
 
 export const DEFAULT_HOST = '127.0.0.1';
 export const DEFAULT_PORT = 7420;
+
+/** Tauri v2's WebView2 asset origin on Windows. Do not turn this into a wildcard. */
+export const TAURI_WINDOWS_ORIGIN = 'http://tauri.localhost';
 
 const LOOPBACK_HOSTNAMES = ['127.0.0.1', '::1', 'localhost'] as const;
 
@@ -117,5 +122,8 @@ export const resolveServerConfig = (opts?: {
         logLevel,
         isLoopback: isLoopbackHost(host),
         allowedHostnames,
+        allowedDesktopOrigins: isLoopbackHost(host)
+            ? new Set([TAURI_WINDOWS_ORIGIN])
+            : new Set(),
     };
 };

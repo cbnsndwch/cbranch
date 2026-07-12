@@ -15,6 +15,9 @@ export * from './schemas/primitives';
 // Canonical error model: GitErrorCode (closed union) + the single GitError class.
 export * from './schemas/errors';
 
+// Connection bootstrap: protocol/version/capability handshake.
+export * from './schemas/system';
+
 // Liveness: the Domain invalidation set + InvalidationEvent.
 export * from './schemas/live';
 

@@ -96,6 +96,7 @@ import {
 } from '../schemas/phase6';
 import { Oid, RepoId } from '../schemas/primitives';
 import { DiffSpec, LogQuery } from '../schemas/queries';
+import { SystemInfo } from '../schemas/system';
 import {
     CommitCreated,
     CommitInput,
@@ -105,6 +106,12 @@ import {
 } from '../schemas/working-tree';
 
 export const CbranchRpcs = RpcGroup.make(
+    // system.info — compatibility/capability handshake before the UI mounts.
+    Rpc.make('SystemInfo', {
+        payload: {},
+        success: SystemInfo,
+        error: GitError,
+    }),
     // repo.open — entry point (no clone). Logically only repoNotFound | notARepository
     // | fsError, but the error schema is the single canonical GitError (DECISIONS D7).
     Rpc.make('RepoOpen', {

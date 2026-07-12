@@ -79,7 +79,27 @@ export const buildServerLive = (
     );
 
     return Http.HttpRouter.serve(appLive, {
-        middleware: makeOriginGuard(config.allowedHostnames),
+        // CORS is needed only because the Windows WebView's asset origin differs
+        // from the loopback endpoint. The outer guard still rejects every foreign
+        // Origin/Host before a route or preflight handler can run.
+        middleware: effect =>
+            makeOriginGuard(
+                config.allowedHostnames,
+                config.allowedDesktopOrigins,
+            )(
+                Http.HttpMiddleware.cors({
+                    allowedOrigins: [...config.allowedDesktopOrigins],
+                    allowedMethods: [
+                        'GET',
+                        'HEAD',
+                        'POST',
+                        'DELETE',
+                        'OPTIONS',
+                    ],
+                    allowedHeaders: ['content-type'],
+                    exposedHeaders: ['content-disposition', 'content-type'],
+                })(effect),
+            ),
         disableListenLog: true,
     }).pipe(
         Layer.provideMerge(

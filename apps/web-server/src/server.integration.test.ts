@@ -62,6 +62,8 @@ const fetchProbe = (url: string, init?: RequestInit) =>
             status: res.status,
             body: await res.text(),
             contentType: res.headers.get('content-type'),
+            allowOrigin: res.headers.get('access-control-allow-origin'),
+            allowMethods: res.headers.get('access-control-allow-methods'),
         };
     });
 
@@ -110,6 +112,7 @@ describe('web-server end-to-end (NF-TEST-8)', () => {
 
             const rpc = yield* Effect.gen(function* () {
                 const client = yield* RpcClient.make(CbranchRpcs);
+                const systemInfo = yield* client.SystemInfo({});
                 const handle = yield* client.RepoOpen({ path: repo.dir });
                 const head = Oid.make(commits[commits.length - 1]!);
                 const state = yield* client.RepoState({
@@ -140,7 +143,15 @@ describe('web-server end-to-end (NF-TEST-8)', () => {
                     path: 'c.txt',
                     rev: commits[commits.length - 1]!,
                 });
-                return { handle, state, log, detail, diff, content };
+                return {
+                    systemInfo,
+                    handle,
+                    state,
+                    log,
+                    detail,
+                    diff,
+                    content,
+                };
             }).pipe(Effect.provide(clientLive), Effect.scoped);
 
             const repoId = encodeURIComponent(rpc.handle.repoId);
@@ -165,6 +176,21 @@ describe('web-server end-to-end (NF-TEST-8)', () => {
                 `${base}/sidechannel/blob?repoId=${repoId}&rev=${head}&path=c.txt`,
                 {
                     headers: { origin: 'http://evil.example.com' },
+                },
+            );
+            const desktopBlob = yield* fetchProbe(
+                `${base}/sidechannel/blob?repoId=${repoId}&rev=${head}&path=c.txt`,
+                { headers: { origin: 'http://tauri.localhost' } },
+            );
+            const desktopPreflight = yield* fetchProbe(
+                `${base}/sidechannel/workspace-avatar`,
+                {
+                    method: 'OPTIONS',
+                    headers: {
+                        origin: 'http://tauri.localhost',
+                        'access-control-request-method': 'POST',
+                        'access-control-request-headers': 'content-type',
+                    },
                 },
             );
 
@@ -234,6 +260,8 @@ describe('web-server end-to-end (NF-TEST-8)', () => {
                 traversal,
                 forbidden,
                 forbiddenBlob,
+                desktopBlob,
+                desktopPreflight,
                 avatarUpload,
                 avatar,
                 invalidAvatar,
@@ -252,6 +280,8 @@ describe('web-server end-to-end (NF-TEST-8)', () => {
         const r = await Effect.runPromise(program);
 
         // AC-1 / AC-5: open resolves identity + state without full history.
+        expect(r.rpc.systemInfo.protocolVersion).toBe(1);
+        expect(r.rpc.systemInfo.capabilities).toContain('system-info');
         expect(r.rpc.handle.repoId).toMatch(/^[0-9a-f]{64}$/);
         expect(r.rpc.handle.state.currentBranch).toBe('main');
         expect(r.rpc.handle.state.isEmpty).toBe(false);
@@ -294,6 +324,11 @@ describe('web-server end-to-end (NF-TEST-8)', () => {
         // NF-SEC-3: forged Origin rejected (HTTP route + side-channel) before any engine call.
         expect(r.forbidden.status).toBe(403);
         expect(r.forbiddenBlob.status).toBe(403);
+        expect(r.desktopBlob.status).toBe(200);
+        expect(r.desktopBlob.allowOrigin).toBe('http://tauri.localhost');
+        expect(r.desktopPreflight.status).toBe(204);
+        expect(r.desktopPreflight.allowOrigin).toBe('http://tauri.localhost');
+        expect(r.desktopPreflight.allowMethods).toContain('POST');
 
         // Workspace images are validated, persisted by the host, and served only through
         // the guarded local side-channel. The cache-busting URL becomes unavailable after

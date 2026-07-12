@@ -9,13 +9,32 @@
 // handler context the server runtime consumes.
 
 import { GitEngine } from '@cbranch/core';
-import { CbranchRpcs } from '@cbranch/rpc-contract';
+import {
+    CBRANCH_BACKEND_VERSION,
+    CBRANCH_PROTOCOL_VERSION,
+    CbranchRpcs,
+    SystemInfo,
+} from '@cbranch/rpc-contract';
 import { Effect, Stream } from 'effect';
 
 import { getUpload } from './patch-channel';
 
 /** Layer providing the P1 RPC handlers; requires `GitEngine` (supplied by `gitEngineLayer`). */
 export const handlersLayer = CbranchRpcs.toLayer({
+    // ── connection bootstrap ───────────────────────────────────────────────────
+    SystemInfo: () =>
+        Effect.succeed(
+            new SystemInfo({
+                version: CBRANCH_BACKEND_VERSION,
+                protocolVersion: CBRANCH_PROTOCOL_VERSION,
+                capabilities: [
+                    'system-info',
+                    'loopback-rpc-v1',
+                    'side-channel-v1',
+                ],
+            }),
+        ),
+
     // ── repository & live state ────────────────────────────────────────────────
     RepoOpen: ({ path }) =>
         Effect.flatMap(GitEngine, engine => engine.open(path)),

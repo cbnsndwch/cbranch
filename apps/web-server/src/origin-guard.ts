@@ -34,11 +34,19 @@ const hostnameOf = (value: string | undefined): string | undefined => {
 export const isAllowedRequest = (
     headers: Readonly<Record<string, string | undefined>>,
     allowedHostnames: ReadonlySet<string>,
+    allowedDesktopOrigins: ReadonlySet<string> = new Set(),
 ): boolean => {
     const host = hostnameOf(headers['host']);
     if (host === undefined || !allowedHostnames.has(host)) return false;
     const origin = headers['origin'];
     if (origin === undefined || origin === '') return true;
+    // Tauri's Windows WebView2 is a distinct asset origin. It is exact-match only;
+    // `Origin: null`, custom schemes, and near-match hostnames remain rejected.
+    try {
+        if (allowedDesktopOrigins.has(new URL(origin).origin)) return true;
+    } catch {
+        return false;
+    }
     const originHost = hostnameOf(origin);
     return originHost !== undefined && allowedHostnames.has(originHost);
 };
@@ -58,13 +66,22 @@ type HttpRequest = Http.HttpServerRequest.HttpServerRequest;
  * context instead of the `any` the broad `HttpMiddleware` interface would introduce.
  */
 export const makeOriginGuard =
-    (allowedHostnames: ReadonlySet<string>) =>
+    (
+        allowedHostnames: ReadonlySet<string>,
+        allowedDesktopOrigins: ReadonlySet<string> = new Set(),
+    ) =>
     <E, R>(
         httpEffect: Effect.Effect<HttpResponse, E, R>,
     ): Effect.Effect<HttpResponse, E, R | HttpRequest> =>
         Effect.gen(function* () {
             const request = yield* Http.HttpServerRequest.HttpServerRequest;
-            if (!isAllowedRequest(request.headers, allowedHostnames)) {
+            if (
+                !isAllowedRequest(
+                    request.headers,
+                    allowedHostnames,
+                    allowedDesktopOrigins,
+                )
+            ) {
                 return Http.HttpServerResponse.text(
                     'forbidden: origin/host not in allowlist',
                     { status: 403 },

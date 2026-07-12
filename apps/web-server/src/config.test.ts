@@ -6,6 +6,7 @@ import {
     DEFAULT_PORT,
     isLoopbackHost,
     resolveServerConfig,
+    TAURI_WINDOWS_ORIGIN,
 } from './config';
 
 describe('resolveServerConfig (NF-PKG-9 precedence)', () => {
@@ -17,6 +18,7 @@ describe('resolveServerConfig (NF-PKG-9 precedence)', () => {
         expect(c.isLoopback).toBe(true);
         expect(c.allowedHostnames.has('127.0.0.1')).toBe(true);
         expect(c.allowedHostnames.has('localhost')).toBe(true);
+        expect(c.allowedDesktopOrigins.has(TAURI_WINDOWS_ORIGIN)).toBe(true);
     });
 
     test('settings store overrides the built-in defaults', () => {
@@ -30,6 +32,7 @@ describe('resolveServerConfig (NF-PKG-9 precedence)', () => {
         expect(c.port).toBe(9000);
         expect(c.logLevel).toBe('debug');
         expect(c.isLoopback).toBe(false);
+        expect(c.allowedDesktopOrigins.size).toBe(0);
     });
 
     test('env overrides the settings store', () => {
