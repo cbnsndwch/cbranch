@@ -4,5 +4,5 @@
     "skills": {
         "paths": [".agents/skills"]
     },
-    "plugin": ["oh-my-goal"]
+    "plugin": ["../node_modules/oh-my-goal/dist/index.js"]
 }
