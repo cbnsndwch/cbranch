@@ -38,6 +38,7 @@ TypeScript is in any case a build-time-only dependency that is not shipped.
 | shiki (4.2.x) | MIT | Yes | Yes | Yes — retain copyright + MIT text | https://github.com/shikijs/shiki |
 | @tanstack/react-virtual (3.14.x) | MIT | Yes | Yes | Yes — retain copyright + MIT text | https://github.com/TanStack/virtual |
 | @tanstack/react-query (5.101.x) | MIT | Yes | Yes | Yes — retain copyright + MIT text | https://github.com/TanStack/query |
+| @tauri-apps/api (2.11.x) | Apache-2.0 OR MIT | Yes | Yes | Yes — retain copyright + license text | https://github.com/tauri-apps/tauri |
 | zustand (5.0.x) | MIT | Yes | Yes | Yes — retain copyright + MIT text | https://github.com/pmndrs/zustand |
 | tailwindcss (4.3.x) | MIT | Yes | Yes | Yes — retain copyright + MIT text | https://github.com/tailwindlabs/tailwindcss |
 | @tailwindcss/vite (4.3.x) | MIT | Yes | Yes | Yes — retain copyright + MIT text | https://github.com/tailwindlabs/tailwindcss |

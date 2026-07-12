@@ -1,0 +1,42 @@
+{
+    "$schema": "https://schema.tauri.app/config/2",
+    "productName": "cbranch",
+    "version": "0.1.0",
+    "identifier": "com.cbranch.desktop",
+    "build": {
+        "beforeDevCommand": "pnpm --filter @cbranch/ui dev",
+        "devUrl": "http://localhost:5173",
+        "beforeBuildCommand": "pnpm --filter @cbranch/ui build",
+        "frontendDist": "../../../packages/ui/build/client"
+    },
+    "app": {
+        "windows": [
+            {
+                "title": "cbranch",
+                "width": 1280,
+                "height": 800,
+                "minWidth": 960,
+                "minHeight": 640,
+                "resizable": true
+            }
+        ],
+        "security": {
+            "csp": "default-src 'self'; connect-src 'self' http://127.0.0.1:* ws://127.0.0.1:*; img-src 'self' data: blob: http://127.0.0.1:*; style-src 'self' 'unsafe-inline'; script-src 'self'"
+        }
+    },
+    "bundle": {
+        "active": true,
+        "targets": ["nsis"],
+        "publisher": "cbranch",
+        "windows": {
+            "nsis": {
+                "installMode": "currentUser",
+                "displayLanguageSelector": true
+            }
+        },
+        "icon": [
+            "../../../packages/ui/public/favicon.ico",
+            "../../../packages/ui/public/web-app-manifest-512x512.png"
+        ]
+    }
+}

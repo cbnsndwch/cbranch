@@ -1,0 +1,23 @@
+{
+    "name": "@cbranch/tauri",
+    "version": "0.1.0",
+    "private": true,
+    "description": "Windows Tauri desktop client for cbranch over SSH local forwarding.",
+    "license": "MIT",
+    "type": "module",
+    "scripts": {
+        "build": "pnpm --filter @cbranch/ui build",
+        "dev": "tauri dev",
+        "tauri": "tauri",
+        "tauri:build": "tauri build --bundles nsis",
+        "tauri:check": "cargo check --manifest-path src-tauri/Cargo.toml",
+        "tauri:test": "cargo test --manifest-path src-tauri/Cargo.toml",
+        "tauri:fmt:check": "cargo fmt --manifest-path src-tauri/Cargo.toml -- --check"
+    },
+    "dependencies": {
+        "@cbranch/ui": "workspace:*"
+    },
+    "devDependencies": {
+        "@tauri-apps/cli": "^2.11.4"
+    }
+}

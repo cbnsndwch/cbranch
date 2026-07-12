@@ -23,6 +23,10 @@ coverage/
 # vite cache
 .vite/
 
+# Tauri build-time schemas regenerated from tauri.conf.json and capabilities.
+apps/tauri/src-tauri/gen/
+apps/tauri/src-tauri/target/
+
 # vitest browser-mode artifacts (failure screenshots + attachments/traces)
 **/__screenshots__/
 .vitest-attachments/

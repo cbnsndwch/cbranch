@@ -19,7 +19,8 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 // Allowed internal edges, keyed by package name.
 // rpc-contract -> nothing; core -> rpc-contract (types only); ui -> rpc-contract;
-// web-server -> core + rpc-contract; vscode-ext -> ui + rpc-contract + core.
+// web-server -> core + rpc-contract; vscode-ext -> ui + rpc-contract + core;
+// tauri -> ui.
 const ALLOWED_INTERNAL = {
     '@cbranch/rpc-contract': new Set([]),
     '@cbranch/core': new Set(['@cbranch/rpc-contract']),
@@ -30,6 +31,7 @@ const ALLOWED_INTERNAL = {
         '@cbranch/rpc-contract',
         '@cbranch/core',
     ]),
+    '@cbranch/tauri': new Set(['@cbranch/ui']),
 };
 
 // Server / listening-socket libraries. Only @cbranch/web-server may declare these.
