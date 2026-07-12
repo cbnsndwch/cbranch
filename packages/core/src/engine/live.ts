@@ -1286,12 +1286,12 @@ export const makeGitEngine = (
                 Effect.flatMap(resolveById(repoId), repo =>
                     submoduleListGit(repoCwd(repo), env),
                 ),
-            submoduleUpdate: (repoId, paths, init, recursive, force) =>
+            submoduleUpdate: (repoId, paths, initialize, recursive, force) =>
                 Effect.flatMap(resolveById(repoId), repo =>
                     locks.withRepoLock(repoId)(
                         submoduleUpdateGit(
                             repoCwd(repo),
-                            { paths, init, recursive, force },
+                            { paths, init: initialize, recursive, force },
                             env,
                         ),
                     ),

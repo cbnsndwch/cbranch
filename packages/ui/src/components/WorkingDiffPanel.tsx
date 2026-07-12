@@ -293,7 +293,7 @@ function WorkingDiffBody({
                     oldLines: hunk.oldLines,
                     newStart: hunk.newStart,
                     newLines: hunk.newLines,
-                    selectedLines: [...lineIndices].sort((a, b) => a - b),
+                    selectedLines: lineIndices.toSorted((a, b) => a - b),
                 }),
             );
         }
