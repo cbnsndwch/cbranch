@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.1.1
+
+### Bug fixes
+
+- Load NVM-managed Node.js during non-interactive SSH managed-server setup,
+  allowing remote hosts with Node 20+ installed through NVM to provision
+  successfully by @cbnsndwch
+
+**Full commit history:** https://github.com/cbnsndwch/cbranch/compare/v0.1.0...v0.1.1
+
 ## v0.1.0
 
 ### Features
