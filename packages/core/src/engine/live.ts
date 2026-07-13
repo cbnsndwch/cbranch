@@ -12,24 +12,22 @@
 import { basename, sep } from 'node:path';
 
 import {
-    filesystemRootCandidates,
-    listFilesystemDirectory,
-} from '../fs/list-directory';
-import {
-    type GitError,
-    type InvalidationEvent,
-    type RepoId,
-} from '@cbranch/rpc-contract';
-import {
     AppSettings,
     CommandLogEntry,
+    type GitError,
     HistoryColumnVisibility,
+    type InvalidationEvent,
     KeyBinding,
     RepoHandle,
+    type RepoId,
     RepoInitResult,
 } from '@cbranch/rpc-contract';
 import { type Cause, Effect, Layer, Queue, Scope, Stream } from 'effect';
 
+import {
+    filesystemRootCandidates,
+    listFilesystemDirectory,
+} from '../fs/list-directory';
 import {
     type AppSettingsData,
     type ConfigStore,
@@ -40,13 +38,17 @@ import {
     listGitHubPullRequests,
     previewGitHubPullRequest,
 } from '../forge/github';
-import { blame as blameGit } from '../git/blame';
+import {
+    archivePrepare as archivePrepareGit,
+    archiveStreamGit,
+} from '../git/archive';
 import {
     bisectMark as bisectMarkGit,
     bisectReset as bisectResetGit,
     bisectStart as bisectStartGit,
     bisectStatus as bisectStatusGit,
 } from '../git/bisect';
+import { blame as blameGit } from '../git/blame';
 import {
     branchCheckoutDetached as branchCheckoutDetachedGit,
     branchCreate as branchCreateGit,
@@ -57,6 +59,15 @@ import {
 } from '../git/branch-ops';
 import { branchList } from '../git/branches';
 import { type CatFilePool, makeCatFilePool } from '../git/cat-file-pool';
+import {
+    clean as cleanGit,
+    cleanPreview as cleanPreviewGit,
+} from '../git/clean';
+import {
+    type CommandLogRecord,
+    listInvocations,
+    subscribeInvocations,
+} from '../git/command-log';
 import { commitDetail } from '../git/commit';
 import {
     commitCreate as commitCreateGit,
@@ -74,13 +85,22 @@ import {
 } from '../git/conflicts';
 import { fileContentAtRev } from '../git/content';
 import { commitDiff, diffWorkingFile } from '../git/diff';
-import {
-    type CommandLogRecord,
-    listInvocations,
-    subscribeInvocations,
-} from '../git/command-log';
 import { gitError } from '../git/errors';
+import { fileHistory as fileHistoryGit } from '../git/file-history';
+import {
+    configGet as configGetGit,
+    configList as configListGit,
+    configSet as configSetGit,
+    configUnset as configUnsetGit,
+} from '../git/git-config';
+import { makeLogStream } from '../git/history';
 import { initRepo } from '../git/init';
+import { makeRepoLockRegistry } from '../git/locks';
+import { gc as gcGit } from '../git/maintenance';
+import {
+    mergeAbort as mergeAbortGit,
+    mergeCreate as mergeCreateGit,
+} from '../git/merge';
 import { readMetaFile, writeMetaFile } from '../git/meta-files';
 import {
     notesGet as notesGetGit,
@@ -89,39 +109,23 @@ import {
     notesSet as notesSetGit,
 } from '../git/notes';
 import {
+    discardHunks as discardHunksGit,
+    stageHunks as stageHunksGit,
+    unstageHunks as unstageHunksGit,
+} from '../git/patch';
+import {
     patchApply as patchApplyGit,
     patchFormatPrepare as patchFormatPrepareGit,
     patchFormatStream as patchFormatStreamGit,
     patchInspect as patchInspectGit,
 } from '../git/patch-io';
-import { fileHistory as fileHistoryGit } from '../git/file-history';
 import {
-    configGet as configGetGit,
-    configList as configListGit,
-    configSet as configSetGit,
-    configUnset as configUnsetGit,
-} from '../git/git-config';
-import {
-    archivePrepare as archivePrepareGit,
-    archiveStreamGit,
-} from '../git/archive';
-import {
-    clean as cleanGit,
-    cleanPreview as cleanPreviewGit,
-} from '../git/clean';
-import { makeLogStream } from '../git/history';
-import { makeRepoLockRegistry } from '../git/locks';
-import { gc as gcGit } from '../git/maintenance';
-import {
-    mergeAbort as mergeAbortGit,
-    mergeCreate as mergeCreateGit,
-} from '../git/merge';
+    cleanupRebaseSidecar,
+    rebasePlan as rebasePlanGit,
+    rebaseStart as rebaseStartGit,
+    rebaseStatus as rebaseStatusGit,
+} from '../git/rebase';
 import { reflogList as reflogListGit } from '../git/reflog';
-import {
-    discardHunks as discardHunksGit,
-    stageHunks as stageHunksGit,
-    unstageHunks as unstageHunksGit,
-} from '../git/patch';
 import {
     remoteAdd as remoteAddGit,
     remoteList as remoteListGit,
@@ -136,12 +140,6 @@ import {
     opSkip as opSkipGit,
     revert as revertGit,
 } from '../git/sequencer';
-import {
-    cleanupRebaseSidecar,
-    rebasePlan as rebasePlanGit,
-    rebaseStart as rebaseStartGit,
-    rebaseStatus as rebaseStatusGit,
-} from '../git/rebase';
 import {
     deleteUntracked as deleteUntrackedGit,
     discardFiles as discardFilesGit,
@@ -198,7 +196,9 @@ import { GitEngine, type GitEngineApi } from './git-engine';
  */
 const reapRebaseSidecar = (gitDir: string): Effect.Effect<void> =>
     Effect.sync(() => {
-        if (detectInProgress(gitDir) !== 'rebase') cleanupRebaseSidecar(gitDir);
+        if (detectInProgress(gitDir) !== 'rebase') {
+            cleanupRebaseSidecar(gitDir);
+        }
     });
 
 export interface MakeGitEngineOptions {
@@ -1281,7 +1281,7 @@ export const makeGitEngine = (
             // ── submodules (P5) ───────────────────────────────────────────────────
             // List is a lockless read; mutations hold the repo lock. Remove needs the
             // common git dir to clear the cached `modules/<NAME>` (the .gitmodules
-            // subsection name, which only equals the path for a default add) after deinit + rm.
+            // subsection name, which only equals the path for a default add) after de-init + rm.
             submoduleList: repoId =>
                 Effect.flatMap(resolveById(repoId), repo =>
                     submoduleListGit(repoCwd(repo), env),
