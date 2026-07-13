@@ -8,11 +8,10 @@
 3. Create and push the matching `vMAJOR.MINOR.PATCH` tag.
 
 The release workflow reruns the quality gate, validates those version values, and
-builds native Windows x64, macOS Apple Silicon, macOS Intel, and Ubuntu x64 bundles.
-It publishes a GitHub Release only after every build succeeds, with a `SHA256SUMS.txt`
-asset for manual verification. A Linux x64 cbranch server archive is built once,
-embedded into every desktop artifact for managed SSH setup, and published as a
-separate release asset.
+builds a native Windows x64 installer. It publishes a GitHub Release only after the
+build succeeds, with a `SHA256SUMS.txt` asset for manual verification. A Linux x64
+cbranch server archive is built once, embedded into the installer for managed SSH
+setup, and published as a separate release asset.
 
 ## Current Delivery Policy
 

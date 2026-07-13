@@ -21,7 +21,7 @@
   managed remote-server provisioning by @cbnsndwch
 - Add real-time repository invalidation, serialized Git operations, hardened
   path handling, and conflict-safe workflows by @cbnsndwch
-- Add tag-driven Windows, macOS, and Ubuntu desktop release packaging with
-  validation, checksums, CI quality gates, and browser tests by @cbnsndwch
+- Add tag-driven Windows desktop release packaging with validation, checksums, CI
+  quality gates, and browser tests by @cbnsndwch
 
 **Full commit history:** https://github.com/cbnsndwch/cbranch/commits/v0.1.0
