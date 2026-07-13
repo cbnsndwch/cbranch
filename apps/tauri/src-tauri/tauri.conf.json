@@ -6,7 +6,7 @@
     "build": {
         "beforeDevCommand": "pnpm --filter @cbranch/ui dev",
         "devUrl": "http://localhost:5173",
-        "beforeBuildCommand": "pnpm --filter @cbranch/ui build",
+        "beforeBuildCommand": "pnpm -w build:libs && pnpm --filter @cbranch/ui build",
         "frontendDist": "../../../packages/ui/build/client"
     },
     "app": {

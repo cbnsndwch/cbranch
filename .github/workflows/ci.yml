@@ -63,6 +63,7 @@ jobs:
 
   tauri-windows:
     name: Tauri Windows installer
+    needs: gate
     runs-on: windows-latest
     steps:
       - name: Checkout

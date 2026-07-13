@@ -6,7 +6,7 @@
     "license": "MIT",
     "type": "module",
     "scripts": {
-        "build": "pnpm --filter @cbranch/ui build",
+        "build": "pnpm -w build:libs && pnpm --filter @cbranch/ui build",
         "dev": "tauri dev",
         "tauri": "tauri",
         "tauri:build": "tauri build --bundles nsis",
