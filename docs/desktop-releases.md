@@ -1,0 +1,20 @@
+# Desktop Releases
+
+## Stable Release Process
+
+1. Update the desktop, Cargo, Tauri config, and backend version to the intended
+   `MAJOR.MINOR.PATCH` release version.
+2. Run `RELEASE_TAG=vMAJOR.MINOR.PATCH pnpm release:check` and `pnpm gate`.
+3. Create and push the matching `vMAJOR.MINOR.PATCH` tag.
+
+The release workflow reruns the quality gate, validates those version values, and
+builds native Windows x64, macOS Apple Silicon, macOS Intel, and Ubuntu x64 bundles.
+It publishes a GitHub Release only after every build succeeds, with a `SHA256SUMS.txt`
+asset for manual verification.
+
+## Current Delivery Policy
+
+Artifacts are manual downloads. They are not configured for the Tauri updater and
+are not yet Authenticode-signed, macOS-notarized, or separately Linux-signed. Adding
+automatic updates or platform signing requires managed credentials, signing policy,
+and a key-rotation plan.

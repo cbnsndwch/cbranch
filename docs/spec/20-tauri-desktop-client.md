@@ -1,8 +1,8 @@
-# Tauri Windows Desktop Client
+# Tauri Desktop Client
 
 ## Purpose
 
-`apps/tauri` is the Windows desktop delivery surface for cbranch. It renders the
+`apps/tauri` is the desktop delivery surface for cbranch. It renders the
 existing `packages/ui` bundle and uses the unchanged `packages/rpc-contract`
 WebSocket protocol. It never opens a server socket, runs Git, stores a Git
 credential, or provides a direct network route to the backend.
@@ -12,7 +12,7 @@ credential, or provides a direct network route to the backend.
 The desktop app creates one owned system-OpenSSH process per selected profile:
 
 ```text
-Windows WebView -- ws/http://127.0.0.1:<local-port> -- ssh -L -->
+Tauri WebView -- ws/http://127.0.0.1:<local-port> -- ssh -L -->
 remote 127.0.0.1:<cbranch-port>
 ```
 
@@ -23,7 +23,7 @@ remote 127.0.0.1:<cbranch-port>
   `known_hosts`. The application stores none of them.
 - The local listener is always `127.0.0.1`; it is allocated from an ephemeral
   loopback port and checked before the UI receives an endpoint.
-- Connection failure distinguishes missing `ssh.exe`, host-key rejection,
+- Connection failure distinguishes missing `ssh`, host-key rejection,
   authentication rejection, unavailable remote host/port, local bind failure,
   and readiness timeout. Recent diagnostics redact URL and key/value secrets.
 - Disconnect, profile replacement/deletion, start failure, and application exit
@@ -58,21 +58,23 @@ not partially functioning Git UI.
 
 The remote server still binds `127.0.0.1` by default. The SSH forward reaches it
 with a loopback Host, so the existing private-perimeter model is preserved. The
-server accepts the exact Windows WebView2 Origin `http://tauri.localhost` only
-when loopback-bound; CORS is restricted to that origin for the HTTP side channel.
-`Origin: null`, look-alike hostnames, and arbitrary browser origins remain
-rejected before route/RPC dispatch.
+server accepts exact Tauri origins only when loopback-bound: Windows WebView2 uses
+`http://tauri.localhost`, while macOS and Linux use `tauri://localhost`. CORS is
+restricted to those origins for the HTTP side channel. `Origin: null`, look-alike
+hostnames, and arbitrary browser origins remain rejected before route/RPC dispatch.
 
 `packages/ui` receives an injected `{ rpcUrl, httpBaseUrl }` endpoint. Browser
 deployments still derive both values from `window.location`; desktop side-channel
 URLs resolve against the forwarded HTTP base.
 
-## Windows delivery
+## Desktop delivery
 
-The package is configured for a per-user NSIS installer with the existing
-cbranch icon. It requires Windows 10/11 WebView2 and the Windows OpenSSH Client.
-The app does not install OpenSSH, accept host keys, or use a custom key/password
-prompt. Users must resolve those outside the application with normal `ssh`.
+Stable `vMAJOR.MINOR.PATCH` tags produce a GitHub Release with a per-user Windows
+NSIS installer, macOS Apple Silicon and Intel DMGs, and Ubuntu DEB/AppImage bundles.
+The current artifacts are unsigned manual downloads. Windows requires WebView2 and
+an OpenSSH client; macOS and Linux require their normal system OpenSSH client. The
+app does not install OpenSSH, accept host keys, or use a custom key/password prompt.
+Users must resolve those outside the application with normal `ssh`.
 
 The Tauri capability set contains only `core:default` for the main window and
 custom profile/tunnel commands. No shell, filesystem, process, clipboard,
