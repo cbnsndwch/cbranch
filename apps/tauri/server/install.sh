@@ -121,11 +121,18 @@ const request = http.get({ host: "127.0.0.1", port, path: "/healthz", timeout: 5
   let body = "";
   response.setEncoding("utf8");
   response.on("data", chunk => { body += chunk; });
-  response.on("end", () => process.exit(response.statusCode === 200 && body.includes("\"service\":\"cbranch\"") ? 0 : 1));
+    response.on("end", () => {
+      try {
+        const health = JSON.parse(body);
+        process.exit(response.statusCode === 200 && health.service === "cbranch" && health.version === process.argv[2] ? 0 : 1);
+      } catch {
+        process.exit(1);
+      }
+    });
 });
 request.on("error", () => process.exit(1));
 request.on("timeout", () => request.destroy());
-' "$port"; do
+ ' "$port" "$version"; do
   attempt=$((attempt + 1))
   if [ "$attempt" -ge 20 ]; then
     printf '%s\n' 'The cbranch service did not become ready. Inspect it with systemctl --user status cbranch.service.' >&2

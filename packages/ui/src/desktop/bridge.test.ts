@@ -1,4 +1,7 @@
-import { CBRANCH_PROTOCOL_VERSION } from '@cbranch/rpc-contract';
+import {
+    CBRANCH_BACKEND_VERSION,
+    CBRANCH_PROTOCOL_VERSION,
+} from '@cbranch/rpc-contract';
 import { describe, expect, test, vi } from 'vitest';
 
 import { probeCbranchServer } from './bridge';
@@ -10,6 +13,7 @@ describe('probeCbranchServer', () => {
                 new Response(
                     JSON.stringify({
                         service: 'cbranch',
+                        version: CBRANCH_BACKEND_VERSION,
                         protocolVersion: CBRANCH_PROTOCOL_VERSION,
                     }),
                 ),
@@ -51,5 +55,41 @@ describe('probeCbranchServer', () => {
         await expect(
             probeCbranchServer('http://127.0.0.1:7420', incompatible),
         ).resolves.toEqual({ status: 'incompatible', protocolVersion: 2 });
+    });
+
+    test('requires a server release at least as new as the desktop client', async () => {
+        const old = vi.fn(
+            async () =>
+                new Response(
+                    JSON.stringify({
+                        service: 'cbranch',
+                        protocolVersion: CBRANCH_PROTOCOL_VERSION,
+                        version: '0.1.2',
+                    }),
+                ),
+        );
+        const missingVersion = vi.fn(
+            async () =>
+                new Response(
+                    JSON.stringify({
+                        service: 'cbranch',
+                        protocolVersion: CBRANCH_PROTOCOL_VERSION,
+                    }),
+                ),
+        );
+
+        await expect(
+            probeCbranchServer('http://127.0.0.1:7420', old),
+        ).resolves.toEqual({
+            status: 'incompatible',
+            protocolVersion: CBRANCH_PROTOCOL_VERSION,
+            version: '0.1.2',
+        });
+        await expect(
+            probeCbranchServer('http://127.0.0.1:7420', missingVersion),
+        ).resolves.toEqual({
+            status: 'incompatible',
+            protocolVersion: CBRANCH_PROTOCOL_VERSION,
+        });
     });
 });

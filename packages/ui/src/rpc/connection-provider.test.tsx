@@ -1,6 +1,9 @@
 // @vitest-environment jsdom
 
-import { CBRANCH_PROTOCOL_VERSION } from '@cbranch/rpc-contract';
+import {
+    CBRANCH_BACKEND_VERSION,
+    CBRANCH_PROTOCOL_VERSION,
+} from '@cbranch/rpc-contract';
 import { render, screen } from '@testing-library/react';
 import { StrictMode } from 'react';
 import { afterEach, describe, expect, test, vi } from 'vitest';
@@ -19,6 +22,7 @@ vi.mock('./client', async importOriginal => {
         makeAppRuntime: vi.fn(() => {
             const runtime = {
                 runPromise: vi.fn(async () => ({
+                    version: CBRANCH_BACKEND_VERSION,
                     protocolVersion: CBRANCH_PROTOCOL_VERSION,
                 })),
                 dispose: vi.fn(async () => undefined),

@@ -24,10 +24,12 @@ remote 127.0.0.1:<cbranch-port>
 - The local listener is always `127.0.0.1`; it is allocated from an ephemeral
   loopback port and checked before the UI receives an endpoint.
 - Before starting RPC, the desktop WebView requests the forwarded server's
-  `GET /healthz` identity endpoint. It distinguishes an unreachable cbranch
-  server from an unexpected or incompatible responder and keeps the normal Git
-  UI unmounted in either case. `system.info` remains the authoritative typed
-  RPC compatibility check after this preflight.
+  `GET /healthz` identity endpoint. It includes the server release and protocol
+  version, distinguishes an unreachable cbranch server from an unexpected or
+  incompatible responder, and keeps the normal Git UI unmounted in either
+  case. A server older than the desktop's required same-major release offers
+  **Update cbranch** rather than partially functioning UI. `system.info`
+  remains the authoritative typed RPC compatibility check after this preflight.
 - When the preflight finds no compatible server, the default action streams the
   version-matched server archive over the existing SSH transport and invokes a
   fixed remote bootstrap command. The desktop never sends a user-controlled
@@ -64,15 +66,17 @@ the bundled server under the selected remote user's XDG data directory and
 starts a `systemd --user` service. Managed setup supports Linux x86_64 hosts
 with Node 20+ and an active user service manager. It keeps the server bound to
 `127.0.0.1`; if the configured port is occupied, the installer selects another
-available loopback port and updates the local profile. A manual setup path is
-available for operators who need to retain full control.
+  available loopback port and updates the local profile. The installer accepts
+  readiness only after `/healthz` reports the deployed release version. A
+  manual setup path is available for operators who need to retain full control.
 
 ## Backend compatibility and trust
 
 Before mounting normal Git UI, every client calls the typed `system.info` RPC.
-The response includes the protocol version and additive capabilities. A protocol
-major mismatch or an older backend without this RPC produces an update message,
-not partially functioning Git UI.
+The response includes the release version, protocol version, and additive
+capabilities. A protocol mismatch, an older same-major backend, or an older
+backend without this RPC produces an update message, not partially functioning
+Git UI.
 
 The remote server still binds `127.0.0.1` by default. The SSH forward reaches it
 with a loopback Host, so the existing private-perimeter model is preserved. The

@@ -1,7 +1,13 @@
 // @vitest-environment jsdom
 
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, test, vi } from 'vitest';
+import {
+    cleanup,
+    fireEvent,
+    render,
+    screen,
+    waitFor,
+} from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
 import { ConnectionProfilesScreen } from './ConnectionProfilesScreen';
 import { loadDesktopBridge, probeCbranchServer } from './bridge';
@@ -40,6 +46,8 @@ const bridge = {
 };
 
 describe('ConnectionProfilesScreen', () => {
+    afterEach(cleanup);
+
     beforeEach(() => {
         vi.mocked(loadDesktopBridge).mockResolvedValue(bridge);
         vi.mocked(probeCbranchServer)
@@ -79,6 +87,41 @@ describe('ConnectionProfilesScreen', () => {
                 rpcUrl: 'ws://127.0.0.1:51321/rpc',
                 httpBaseUrl: 'http://127.0.0.1:51321/',
             });
+        });
+    });
+
+    test('offers an update for a healthy but older managed server', async () => {
+        vi.mocked(probeCbranchServer)
+            .mockReset()
+            .mockResolvedValueOnce({
+                status: 'incompatible',
+                protocolVersion: 1,
+                version: '0.1.2',
+            })
+            .mockResolvedValueOnce({ status: 'ready' });
+        const onConnect = vi.fn();
+        render(
+            <ConnectionProfilesScreen
+                onConnect={onConnect}
+                onRetry={vi.fn()}
+            />,
+        );
+
+        fireEvent.click(
+            await screen.findByRole('button', { name: /Clerk VM/ }),
+        );
+        fireEvent.click(screen.getByRole('button', { name: 'Connect' }));
+        expect(
+            await screen.findByRole('heading', {
+                name: 'cbranch server needs an update',
+            }),
+        ).toBeTruthy();
+        expect(screen.getByText(/Server v0.1.2 is older/)).toBeTruthy();
+        fireEvent.click(screen.getByRole('button', { name: 'Update cbranch' }));
+
+        await waitFor(() => {
+            expect(bridge.setupProfile).toHaveBeenCalledWith(profile.id);
+            expect(onConnect).toHaveBeenCalled();
         });
     });
 });

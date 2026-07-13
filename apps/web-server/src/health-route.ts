@@ -1,4 +1,7 @@
-import { CBRANCH_PROTOCOL_VERSION } from '@cbranch/rpc-contract';
+import {
+    CBRANCH_BACKEND_VERSION,
+    CBRANCH_PROTOCOL_VERSION,
+} from '@cbranch/rpc-contract';
 import { Http } from '@cbranch/rpc-contract/effect-rpc-adapter';
 import { Effect } from 'effect';
 
@@ -10,6 +13,7 @@ export const healthRoute = Http.HttpRouter.add('GET', HEALTH_PATH, () =>
         Http.HttpServerResponse.jsonUnsafe(
             {
                 service: 'cbranch',
+                version: CBRANCH_BACKEND_VERSION,
                 protocolVersion: CBRANCH_PROTOCOL_VERSION,
             },
             {

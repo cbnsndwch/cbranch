@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { CBRANCH_PROTOCOL_VERSION } from '@cbranch/rpc-contract';
 
 import { makeHostEndpoint, type HostEndpoint } from '../rpc/client';
 import { Button } from '../components/ui/button';
@@ -334,7 +335,12 @@ CBRANCH_BIND_ADDRESS=127.0.0.1 CBRANCH_PORT=${serverPort} pnpm --filter @cbranch
                                         : serverProbe.protocolVersion ===
                                             undefined
                                           ? 'The selected port responded, but it is not a compatible cbranch server.'
-                                          : `The server uses protocol v${serverProbe.protocolVersion}, which this desktop client cannot use.`}
+                                          : serverProbe.protocolVersion !==
+                                              CBRANCH_PROTOCOL_VERSION
+                                            ? `The server uses protocol v${serverProbe.protocolVersion}, which this desktop client cannot use.`
+                                            : serverProbe.version === undefined
+                                              ? 'The server does not report a release version. Update cbranch on the remote host.'
+                                              : `Server v${serverProbe.version} is older than this desktop client. Update cbranch on the remote host.`}
                                 </p>
                             </div>
                             {serverProbe.status === 'missing' && (

@@ -17,7 +17,13 @@ import {
     run,
     seedLinear,
 } from '@cbranch/core';
-import { CbranchRpcs, DiffSpec, LogQuery, Oid } from '@cbranch/rpc-contract';
+import {
+    CBRANCH_BACKEND_VERSION,
+    CbranchRpcs,
+    DiffSpec,
+    LogQuery,
+    Oid,
+} from '@cbranch/rpc-contract';
 import {
     Http,
     RpcClient,
@@ -319,6 +325,7 @@ describe('web-server end-to-end (NF-TEST-8)', () => {
         expect(r.health.status).toBe(200);
         expect(JSON.parse(r.health.body)).toEqual({
             service: 'cbranch',
+            version: CBRANCH_BACKEND_VERSION,
             protocolVersion: 1,
         });
         expect(r.health.contentType).toContain('application/json');

@@ -1,7 +1,12 @@
 // The shared UI never imports Tauri at module evaluation time. The desktop bundle
 // loads this narrow command adapter only when its WebView runtime is present.
 
-import { CBRANCH_PROTOCOL_VERSION } from '@cbranch/rpc-contract';
+import {
+    CBRANCH_BACKEND_VERSION,
+    CBRANCH_PROTOCOL_VERSION,
+} from '@cbranch/rpc-contract';
+
+import { isBackendVersionCompatible } from '../lib/backend-version';
 
 export interface ConnectionProfile {
     readonly id: string;
@@ -34,11 +39,19 @@ export interface ManagedServerSetup {
 export type CbranchServerProbe =
     | { readonly status: 'ready' }
     | { readonly status: 'missing' }
-    | { readonly status: 'incompatible'; readonly protocolVersion?: number };
+    | {
+          readonly status: 'incompatible';
+          readonly protocolVersion?: number;
+          readonly version?: string;
+      };
 
 const isHealthResponse = (
     value: unknown,
-): value is { readonly service: 'cbranch'; readonly protocolVersion: number } =>
+): value is {
+    readonly service: 'cbranch';
+    readonly protocolVersion: number;
+    readonly version?: string;
+} =>
     typeof value === 'object' &&
     value !== null &&
     'service' in value &&
@@ -72,6 +85,16 @@ export const probeCbranchServer = async (
         return {
             status: 'incompatible',
             protocolVersion: body.protocolVersion,
+            version: body.version,
+        };
+    if (
+        typeof body.version !== 'string' ||
+        !isBackendVersionCompatible(body.version, CBRANCH_BACKEND_VERSION)
+    )
+        return {
+            status: 'incompatible',
+            protocolVersion: body.protocolVersion,
+            version: body.version,
         };
     return { status: 'ready' };
 };

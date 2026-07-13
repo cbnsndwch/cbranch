@@ -1,7 +1,10 @@
 // Owns the connection-scoped RPC runtime and React Query cache. Replacing an
 // endpoint always unmounts consumers, clears the old cache, and disposes its socket.
 
-import { CBRANCH_PROTOCOL_VERSION } from '@cbranch/rpc-contract';
+import {
+    CBRANCH_BACKEND_VERSION,
+    CBRANCH_PROTOCOL_VERSION,
+} from '@cbranch/rpc-contract';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
     createContext,
@@ -14,6 +17,7 @@ import {
 
 import { useUiStore } from '../state/store';
 import { ConnectionErrorBoundary } from '../components/ConnectionErrorBoundary';
+import { isBackendVersionCompatible } from '../lib/backend-version';
 import { makeApi } from './api';
 import { ApiProvider } from './ApiProvider';
 import {
@@ -74,10 +78,18 @@ const errorMessage = (error: unknown): string => {
     return 'Could not connect to the cbranch backend.';
 };
 
-const compatibilityError = (info: { protocolVersion: number }): Error =>
-    new Error(
-        `The backend protocol is v${info.protocolVersion}, but this client requires v${CBRANCH_PROTOCOL_VERSION}. Update cbranch on the server or desktop client.`,
+const compatibilityError = (info: {
+    readonly protocolVersion: number;
+    readonly version: string;
+}): Error => {
+    if (info.protocolVersion !== CBRANCH_PROTOCOL_VERSION)
+        return new Error(
+            `The backend protocol is v${info.protocolVersion}, but this client requires v${CBRANCH_PROTOCOL_VERSION}. Update cbranch on the server or desktop client.`,
+        );
+    return new Error(
+        `The backend is v${info.version}, but this client requires v${CBRANCH_BACKEND_VERSION} or newer. Update cbranch on the server.`,
     );
+};
 
 /** Access the current connection lifecycle and selected host endpoint. */
 export const useConnection = (): ConnectionContextValue => {
@@ -140,7 +152,13 @@ export function ConnectionProvider({
         void next.runtime
             .runPromise(withClient(client => client.SystemInfo({})))
             .then(info => {
-                if (info.protocolVersion !== CBRANCH_PROTOCOL_VERSION)
+                if (
+                    info.protocolVersion !== CBRANCH_PROTOCOL_VERSION ||
+                    !isBackendVersionCompatible(
+                        info.version,
+                        CBRANCH_BACKEND_VERSION,
+                    )
+                )
                     throw compatibilityError(info);
                 if (active) {
                     setSession(next);
