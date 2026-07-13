@@ -7,9 +7,9 @@
     "type": "module",
     "scripts": {
         "build": "pnpm -w build:libs && pnpm --filter @cbranch/ui build",
-        "dev": "tauri dev",
+        "dev": "pnpm -w package:server-bundle && tauri dev",
         "tauri": "tauri",
-        "tauri:build": "tauri build --bundles nsis",
+        "tauri:build": "pnpm -w package:server-bundle && tauri build --bundles nsis",
         "tauri:check": "cargo check --manifest-path src-tauri/Cargo.toml",
         "tauri:test": "cargo test --manifest-path src-tauri/Cargo.toml",
         "tauri:fmt:check": "cargo fmt --manifest-path src-tauri/Cargo.toml -- --check"

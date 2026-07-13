@@ -19,6 +19,8 @@
         "license-audit": "node scripts/license-audit.mjs",
         "depcheck": "node scripts/check-deps.mjs",
         "check:primitives": "pnpm --filter @cbranch/ui check:primitives",
+        "package:server-bundle": "node scripts/package-server-bundle.mjs --force",
+        "ensure:server-bundle": "node scripts/package-server-bundle.mjs",
         "release:check": "node scripts/verify-desktop-release.mjs",
         "gate": "pnpm license-audit && pnpm lint && pnpm format:check && pnpm typecheck && pnpm build && pnpm test && pnpm test:browser && pnpm coverage && pnpm depcheck"
     },

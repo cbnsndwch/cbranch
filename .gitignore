@@ -26,6 +26,7 @@ coverage/
 # Tauri build-time schemas regenerated from tauri.conf.json and capabilities.
 apps/tauri/src-tauri/gen/
 apps/tauri/src-tauri/target/
+apps/tauri/src-tauri/resources/
 
 # vitest browser-mode artifacts (failure screenshots + attachments/traces)
 **/__screenshots__/

@@ -117,6 +117,35 @@ export function ConnectionProfilesScreen({
         }
     };
 
+    const setupServer = async () => {
+        if (!selectedId) return;
+        setBusy(true);
+        setNotice('Installing and starting cbranch on the remote host…');
+        try {
+            const bridge = await loadDesktopBridge();
+            const setup = await bridge.setupProfile(selectedId);
+            await reload();
+            select(setup.profile);
+            if (setup.warning) setNotice(setup.warning);
+
+            const tunnel = await bridge.connectProfile(setup.profile.id);
+            const probe = await probeCbranchServer(tunnel.httpBaseUrl);
+            if (probe.status !== 'ready') {
+                try {
+                    await bridge.disconnect();
+                } finally {
+                    setServerProbe(probe);
+                }
+                return;
+            }
+            onConnect(makeHostEndpoint(tunnel.rpcUrl, tunnel.httpBaseUrl));
+        } catch (error) {
+            setNotice(errorMessage(error));
+        } finally {
+            setBusy(false);
+        }
+    };
+
     const remove = async () => {
         if (!selectedId || !confirm('Delete this connection profile?')) return;
         setBusy(true);
@@ -311,19 +340,28 @@ CBRANCH_BIND_ADDRESS=127.0.0.1 CBRANCH_PORT=${serverPort} pnpm --filter @cbranch
                             {serverProbe.status === 'missing' && (
                                 <div className="grid gap-2">
                                     <p>
-                                        On the remote host, from a cbranch
-                                        checkout with Node 20+ and pnpm
-                                        installed, run:
+                                        cbranch can install its bundled server
+                                        and start a managed systemd user service
+                                        over this SSH connection. Node 20+ is
+                                        the only remote prerequisite.
                                     </p>
-                                    <pre className="overflow-x-auto border bg-background/80 p-3 font-mono text-xs">
-                                        {setupCommand}
-                                    </pre>
                                     <p className="text-muted-foreground text-xs">
-                                        If that port is already in use, choose
-                                        an unused loopback port in the command
-                                        and update this profile to match. The
-                                        server must remain bound to 127.0.0.1.
+                                        If port {serverPort} is occupied,
+                                        cbranch selects an unused loopback port
+                                        and updates this profile automatically.
                                     </p>
+                                    <details className="text-muted-foreground text-xs">
+                                        <summary className="cursor-pointer font-medium">
+                                            Set up manually instead
+                                        </summary>
+                                        <p className="mt-2">
+                                            From a cbranch checkout on the
+                                            remote host, run:
+                                        </p>
+                                        <pre className="mt-2 overflow-x-auto border bg-background/80 p-3 font-mono text-xs">
+                                            {setupCommand}
+                                        </pre>
+                                    </details>
                                 </div>
                             )}
                         </section>
@@ -346,6 +384,17 @@ CBRANCH_BIND_ADDRESS=127.0.0.1 CBRANCH_PORT=${serverPort} pnpm --filter @cbranch
                                 >
                                     Test tunnel
                                 </Button>
+                                {serverProbe && (
+                                    <Button
+                                        type="button"
+                                        disabled={busy}
+                                        onClick={() => void setupServer()}
+                                    >
+                                        {serverProbe.status === 'missing'
+                                            ? 'Set up cbranch'
+                                            : 'Update cbranch'}
+                                    </Button>
+                                )}
                                 <Button
                                     type="button"
                                     variant="outline"

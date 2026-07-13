@@ -4,9 +4,9 @@
     "version": "0.1.0",
     "identifier": "com.cbranch.desktop",
     "build": {
-        "beforeDevCommand": "pnpm --filter @cbranch/ui dev",
+        "beforeDevCommand": "pnpm -w ensure:server-bundle && pnpm --filter @cbranch/ui dev",
         "devUrl": "http://localhost:5173",
-        "beforeBuildCommand": "pnpm -w build:libs && pnpm --filter @cbranch/ui build",
+        "beforeBuildCommand": "pnpm -w ensure:server-bundle && pnpm -w build:libs && pnpm --filter @cbranch/ui build",
         "frontendDist": "../../../packages/ui/build/client"
     },
     "app": {
@@ -28,6 +28,9 @@
         "active": true,
         "targets": ["nsis"],
         "publisher": "cbranch",
+        "resources": {
+            "resources/cbranch-server.tar.gz": "cbranch-server.tar.gz"
+        },
         "windows": {
             "nsis": {
                 "installMode": "currentUser",

@@ -63,6 +63,13 @@ pub struct TunnelConnection {
 
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct ManagedServerSetup {
+    profile: ConnectionProfile,
+    warning: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct DesktopDiagnostics {
     desktop_version: String,
     profile: Option<ConnectionProfile>,
@@ -85,8 +92,8 @@ struct TunnelStop {
 
 impl TunnelProcess {
     fn stop(mut self) -> TunnelStop {
-        // `ssh` is the only child we spawn. Killing this handle never touches an
-        // existing user tunnel or another application process.
+        // This registry owns only its forwarding child. Killing it never touches
+        // an existing user tunnel or another application process.
         let _ = self.child.kill();
         #[cfg(test)]
         let reaped = self.child.wait().is_ok();
@@ -235,9 +242,8 @@ fn profile_id() -> String {
     format!("profile-{nanos:x}")
 }
 
-fn ssh_arguments(profile: &ConnectionProfile, local_port: u16) -> Vec<String> {
+fn ssh_connection_arguments(profile: &ConnectionProfile) -> Vec<String> {
     vec![
-        "-N".to_string(),
         "-T".to_string(),
         "-o".to_string(),
         "BatchMode=yes".to_string(),
@@ -247,10 +253,22 @@ fn ssh_arguments(profile: &ConnectionProfile, local_port: u16) -> Vec<String> {
         "ExitOnForwardFailure=yes".to_string(),
         "-p".to_string(),
         profile.ssh_port.to_string(),
-        "-L".to_string(),
-        format!("127.0.0.1:{local_port}:127.0.0.1:{}", profile.remote_port),
         format!("{}@{}", profile.user, profile.host),
     ]
+}
+
+fn ssh_arguments(profile: &ConnectionProfile, local_port: u16) -> Vec<String> {
+    let mut arguments = vec!["-N".to_string()];
+    let target = format!("{}@{}", profile.user, profile.host);
+    let mut connection = ssh_connection_arguments(profile);
+    connection.pop();
+    arguments.extend(connection);
+    arguments.extend([
+        "-L".to_string(),
+        format!("127.0.0.1:{local_port}:127.0.0.1:{}", profile.remote_port),
+        target,
+    ]);
+    arguments
 }
 
 fn ssh_diagnostic_command(profile: &ConnectionProfile, local_port: u16) -> String {
@@ -280,6 +298,99 @@ fn background_command(executable: &str) -> Command {
         command.creation_flags(CREATE_NO_WINDOW);
     }
     command
+}
+
+fn server_bundle_path(app: &AppHandle) -> Result<PathBuf, String> {
+    let path = app
+        .path()
+        .resource_dir()
+        .map_err(|error| format!("Could not resolve desktop resources: {error}"))?
+        .join("cbranch-server.tar.gz");
+    if path.is_file() {
+        Ok(path)
+    } else {
+        Err("The managed cbranch server bundle is unavailable. Reinstall cbranch desktop and retry.".to_string())
+    }
+}
+
+fn remote_setup_command(remote_port: u16) -> String {
+    format!(
+        "sh -c 'set -eu; stage=$(mktemp -d); cleanup() {{ rm -rf \"$stage\"; }}; trap cleanup EXIT HUP INT TERM; tar -xzf - -C \"$stage\"; exec sh \"$stage/cbranch-server/install.sh\" \"$@\"' cbranch-setup {} {}",
+        env!("CARGO_PKG_VERSION"),
+        remote_port,
+    )
+}
+
+fn parse_managed_setup_output(output: &str) -> Result<(u16, Option<String>), String> {
+    let port = output
+        .lines()
+        .find_map(|line| line.strip_prefix("CBRANCH_SETUP_PORT="))
+        .and_then(|value| value.parse::<u16>().ok())
+        .filter(|port| *port != 0)
+        .ok_or_else(|| "Managed setup did not report a usable cbranch port.".to_string())?;
+    let warning = match output
+        .lines()
+        .find_map(|line| line.strip_prefix("CBRANCH_SETUP_LINGER="))
+    {
+        Some("yes") | Some("true") => None,
+        _ => Some(
+            "cbranch is running now, but the remote system does not have user lingering enabled. It may stop after the last SSH session closes."
+                .to_string(),
+        ),
+    };
+    Ok((port, warning))
+}
+
+fn install_server(
+    app: &AppHandle,
+    profile: &ConnectionProfile,
+) -> Result<(u16, Option<String>), String> {
+    validate_profile(profile)?;
+    let bundle = server_bundle_path(app)?;
+    let mut child = background_command("ssh")
+        .args(ssh_connection_arguments(profile))
+        .arg(remote_setup_command(profile.remote_port))
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|error| {
+            if error.kind() == io::ErrorKind::NotFound {
+                "OpenSSH (ssh) was not found. Install an OpenSSH client and retry.".to_string()
+            } else {
+                format!("Could not start managed cbranch setup: {error}")
+            }
+        })?;
+    let copy_result = (|| {
+        let mut archive = fs::File::open(&bundle)
+            .map_err(|error| format!("Could not read the managed server bundle: {error}"))?;
+        let mut stdin = child
+            .stdin
+            .take()
+            .ok_or_else(|| "OpenSSH did not accept the server bundle.".to_string())?;
+        io::copy(&mut archive, &mut stdin)
+            .map_err(|error| format!("Could not transfer the server bundle: {error}"))?;
+        Ok::<(), String>(())
+    })();
+    if let Err(error) = copy_result {
+        let _ = child.kill();
+        let _ = child.wait();
+        return Err(error);
+    }
+    let output = child
+        .wait_with_output()
+        .map_err(|error| format!("Could not wait for managed cbranch setup: {error}"))?;
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    if !output.status.success() {
+        let stderr = redact(&String::from_utf8_lossy(&output.stderr));
+        let details = stderr.trim();
+        return Err(if details.is_empty() {
+            "Managed cbranch setup failed on the remote host.".to_string()
+        } else {
+            format!("Managed cbranch setup failed on the remote host. {details}")
+        });
+    }
+    parse_managed_setup_output(&stdout)
 }
 
 fn start_tunnel(profile: &ConnectionProfile) -> Result<TunnelProcess, String> {
@@ -426,6 +537,38 @@ fn profile_by_id(app: &AppHandle, id: &str) -> Result<ConnectionProfile, String>
 }
 
 #[tauri::command]
+fn setup_profile(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    id: String,
+) -> Result<ManagedServerSetup, String> {
+    let profile = profile_by_id(&app, &id)?;
+    lock_state(&state)?.disconnect();
+    let (remote_port, warning) = match install_server(&app, &profile) {
+        Ok(result) => result,
+        Err(error) => {
+            lock_state(&state)?.record_error(&error);
+            return Err(error);
+        }
+    };
+    let mut store = load_store(&app)?;
+    let profile = store
+        .profiles
+        .iter_mut()
+        .find(|profile| profile.id == id)
+        .ok_or_else(|| "The selected connection profile no longer exists.".to_string())?;
+    profile.remote_port = remote_port;
+    let profile = profile.clone();
+    save_store(&app, &store)?;
+    let mut state = lock_state(&state)?;
+    state.selected_profile = Some(profile.clone());
+    if let Some(warning) = &warning {
+        state.record_error(warning);
+    }
+    Ok(ManagedServerSetup { profile, warning })
+}
+
+#[tauri::command]
 fn list_profiles(app: AppHandle) -> Result<Vec<ConnectionProfile>, String> {
     Ok(load_store(&app)?.profiles)
 }
@@ -553,6 +696,7 @@ pub fn run() {
             save_profile,
             delete_profile,
             test_profile,
+            setup_profile,
             connect_profile,
             disconnect_tunnel,
             diagnostic_command,
@@ -615,6 +759,27 @@ mod tests {
             .map(String::from)
             .to_vec()
         );
+    }
+
+    #[test]
+    fn parses_managed_setup_port_and_linger_warning() {
+        assert_eq!(
+            parse_managed_setup_output("CBRANCH_SETUP_PORT=52341\nCBRANCH_SETUP_LINGER=yes\n"),
+            Ok((52341, None))
+        );
+        assert!(parse_managed_setup_output("CBRANCH_SETUP_PORT=7420\n")
+            .expect("setup output")
+            .1
+            .is_some());
+        assert!(parse_managed_setup_output("CBRANCH_SETUP_PORT=0\n").is_err());
+    }
+
+    #[test]
+    fn managed_setup_uses_a_fixed_remote_bootstrap() {
+        let command = remote_setup_command(7420);
+        assert!(command.contains("tar -xzf -"));
+        assert!(command.contains("cbranch-server/install.sh"));
+        assert!(command.ends_with(&format!("cbranch-setup {} 7420", env!("CARGO_PKG_VERSION"))));
     }
 
     #[test]

@@ -26,6 +26,11 @@ export interface DesktopDiagnostics {
     readonly recentErrors: ReadonlyArray<string>;
 }
 
+export interface ManagedServerSetup {
+    readonly profile: ConnectionProfile;
+    readonly warning: string | undefined;
+}
+
 export type CbranchServerProbe =
     | { readonly status: 'ready' }
     | { readonly status: 'missing' }
@@ -78,6 +83,7 @@ export interface DesktopBridge {
     ): Promise<ConnectionProfile>;
     deleteProfile(id: string): Promise<void>;
     testProfile(id: string): Promise<string>;
+    setupProfile(id: string): Promise<ManagedServerSetup>;
     connectProfile(id: string): Promise<TunnelConnection>;
     disconnect(): Promise<void>;
     diagnosticCommand(id: string): Promise<string>;
@@ -102,6 +108,7 @@ export const loadDesktopBridge = async (): Promise<DesktopBridge> => {
         saveProfile: profile => invoke('save_profile', { profile }),
         deleteProfile: id => invoke('delete_profile', { id }),
         testProfile: id => invoke('test_profile', { id }),
+        setupProfile: id => invoke('setup_profile', { id }),
         connectProfile: id => invoke('connect_profile', { id }),
         disconnect: () => invoke('disconnect_tunnel'),
         diagnosticCommand: id => invoke('diagnostic_command', { id }),

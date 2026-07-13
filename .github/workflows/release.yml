@@ -37,8 +37,36 @@ jobs:
       - name: Run quality gate
         run: pnpm gate
 
-  build:
+  server-bundle:
     needs: gate
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Package Linux server bundle
+        run: pnpm package:server-bundle
+
+      - name: Upload server bundle
+        uses: actions/upload-artifact@v7
+        with:
+          name: cbranch-server-linux-x64
+          path: apps/tauri/src-tauri/resources/cbranch-server.tar.gz
+          if-no-files-found: error
+
+  build:
+    needs: [gate, server-bundle]
     strategy:
       fail-fast: false
       matrix:
@@ -92,6 +120,12 @@ jobs:
 
       - name: Install
         run: pnpm install --frozen-lockfile
+
+      - name: Download server bundle
+        uses: actions/download-artifact@v8
+        with:
+          name: cbranch-server-linux-x64
+          path: apps/tauri/src-tauri/resources
 
       - name: Build native desktop bundles
         run: >-
