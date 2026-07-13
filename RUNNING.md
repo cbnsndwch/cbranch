@@ -42,7 +42,7 @@ production bundle.
 ## How to drive it (what to click)
 
 1. **Create a workspace.** Use the **+** at the bottom of the left rail, name the
-   client/workspace, choose an identifying swatch, and upload a PNG, JPEG, GIF, or WebP
+   client/workspace, choose an identifying swatch and URL slug, and upload a PNG, JPEG, GIF, or WebP
    image up to 2 MB. An optional `http(s)` avatar image URL remains available. Uploaded
    images are stored beside cbranch's host config. When no image is set or it cannot load,
    cbranch shows the color-backed workspace initials. Existing recent repos remain explicitly

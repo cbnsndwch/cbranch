@@ -17,7 +17,8 @@ repositories open and query their summary state concurrently.
 
 The product UI and operator documentation use **workspace**. The persisted
 `engagements` array, `Engagement*` type and RPC names, and `engagementId` remain
-compatibility identifiers; they do not change the user-facing vocabulary.
+compatibility identifiers; they do not change the user-facing vocabulary. Each workspace
+also has a unique, editable URL slug, generated from its name when created.
 
 ## Invariants
 
@@ -36,11 +37,11 @@ compatibility identifiers; they do not change the user-facing vocabulary.
 
 ### Workspaces and membership
 
-- **REQ-P8-ENG-001** The host config MUST persist named workspaces with stable
-  ids, identifying colors, an optional avatar image URL or host-stored raster upload,
+- **REQ-P8-ENG-001** The host config MUST persist named workspaces with stable internal
+  ids, unique editable URL slugs, identifying colors, an optional avatar image URL or host-stored raster upload,
   creation/update timestamps, repository membership,
   ordered open repo ids, and the last active repo id.
-- **REQ-P8-ENG-002** The UI MUST create, rename, recolor, upload or clear a PNG, JPEG,
+- **REQ-P8-ENG-002** The UI MUST create, rename, edit a URL slug, recolor, upload or clear a PNG, JPEG,
   GIF, or WebP avatar image up to 2 MB, reorder workspaces from the rail or manager, and
   delete workspaces. A missing or failed avatar MUST fall back to color-backed initials.
   Deleting a workspace MUST leave every repository on disk and move its members
@@ -61,8 +62,9 @@ compatibility identifiers; they do not change the user-facing vocabulary.
 - **REQ-P8-SESSION-002** The shell MUST expose workspace switching, a workspace
   overview, open-repository tabs, add/open, close, and tab switching without
   discarding another open repository's cached view state.
-- **REQ-P8-SESSION-003** Routes MUST encode the workspace boundary
-  (`/workspaces/:engagementId/...`) while retaining legacy `/repos/:repoId` deep
+- **REQ-P8-SESSION-003** Routes MUST encode the workspace boundary with its slug
+  (`/w/:workspaceSlug`, `/w/:workspaceSlug/r/:repoId`, and
+  `/w/:workspaceSlug/r/:repoId/commits/:oid`) while retaining `/repos/:repoId` deep
   links for unassigned repositories.
 - **REQ-P8-SESSION-004** A workspace-scoped repo deep link MUST add that repo to
   the workspace's open set. A repo id that is not a member MUST be rejected by the

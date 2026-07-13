@@ -285,6 +285,13 @@ Conventions: ✎ = mutating (takes the per-repo lock); ⇉ = streaming RPC. All 
 | `repo.state` | `{ repoId }` | `RepoState` | HEAD, current branch, detached, in-progress op, counts |
 | `repo.subscribe` ⇉ | `{ repoId }` | `InvalidationEvent` | WS invalidation bus → query refetch (see `15`) |
 
+### Workspaces — P8
+| Method | Payload | Success | Notes |
+|---|---|---|---|
+| `engagement.list` | `{}` | `EngagementWorkspace` | A workspace includes its opaque internal id and unique URL `slug`. |
+| `engagement.create` ✎ | `{ name, color, slug?, avatarUrl? }` | `EngagementWorkspace` | Omitted slug is generated from the name and made unique. |
+| `engagement.update` ✎ | `{ engagementId, name?, slug?, color?, avatarUrl? }` | `EngagementWorkspace` | Renaming does not change a slug; an explicit slug must be unique. |
+
 ### History & diff — P1
 | Method | Payload | Success | Notes |
 |---|---|---|---|
