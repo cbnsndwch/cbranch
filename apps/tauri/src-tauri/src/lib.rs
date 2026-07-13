@@ -283,7 +283,8 @@ fn start_tunnel(profile: &ConnectionProfile) -> Result<TunnelProcess, String> {
         .spawn()
         .map_err(|error| {
             if error.kind() == io::ErrorKind::NotFound {
-                "OpenSSH (ssh.exe) was not found. Install the Windows OpenSSH Client optional feature and retry.".to_string()
+                "OpenSSH (ssh) was not found. Install an OpenSSH client and retry."
+                    .to_string()
             } else {
                 format!("Could not start OpenSSH: {error}")
             }

@@ -2,7 +2,7 @@
     "name": "@cbranch/tauri",
     "version": "0.1.0",
     "private": true,
-    "description": "Windows Tauri desktop client for cbranch over SSH local forwarding.",
+    "description": "Tauri desktop client for cbranch over SSH local forwarding.",
     "license": "MIT",
     "type": "module",
     "scripts": {

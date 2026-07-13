@@ -40,10 +40,22 @@ export const isAllowedRequest = (
     if (host === undefined || !allowedHostnames.has(host)) return false;
     const origin = headers['origin'];
     if (origin === undefined || origin === '') return true;
-    // Tauri's Windows WebView2 is a distinct asset origin. It is exact-match only;
-    // `Origin: null`, custom schemes, and near-match hostnames remain rejected.
     try {
-        if (allowedDesktopOrigins.has(new URL(origin).origin)) return true;
+        const parsedOrigin = new URL(origin);
+        // Tauri WebViews use distinct asset origins. They are exact-match only;
+        // `tauri://` has an opaque URL origin, so compare the raw header first.
+        if (
+            allowedDesktopOrigins.has(origin) ||
+            allowedDesktopOrigins.has(parsedOrigin.origin)
+        )
+            return true;
+        // Browser origins can only use HTTP(S). Other custom schemes must be explicitly
+        // allowlisted above; never let their hostname pass through the same-origin path.
+        if (
+            parsedOrigin.protocol !== 'http:' &&
+            parsedOrigin.protocol !== 'https:'
+        )
+            return false;
     } catch {
         return false;
     }
