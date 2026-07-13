@@ -17,6 +17,11 @@ if [ "$(uname -s)" != "Linux" ] || [ "$(uname -m)" != "x86_64" ]; then
 fi
 
 node_bin=$(command -v node || true)
+if [ -z "$node_bin" ] && [ -s "${NVM_DIR:-$HOME/.nvm}/nvm.sh" ]; then
+  # SSH runs a non-interactive shell, which does not load the user's shell profile.
+  . "${NVM_DIR:-$HOME/.nvm}/nvm.sh"
+  node_bin=$(command -v node || true)
+fi
 if [ -z "$node_bin" ]; then
   printf '%s\n' 'Managed setup requires Node.js 20 or newer on the remote host.' >&2
   exit 1

@@ -7,6 +7,10 @@ per-user `systemd` service through SSH. It requires a Linux x86_64 remote host
 with Node 20+ and an active systemd user manager. It does not require a remote
 cbranch checkout, pnpm, or GitHub access.
 
+Node installed through NVM is supported: when `node` is absent from the
+non-interactive SSH `PATH`, setup loads `$NVM_DIR/nvm.sh`, defaulting to
+`$HOME/.nvm/nvm.sh`.
+
 The managed server remains loopback-only. Do not expose it on a LAN or the
 public internet; cbranch v1 has no application login or token.
 
