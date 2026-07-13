@@ -20,8 +20,8 @@ export default function Landing() {
             <Navigate
                 to={
                     activeRepoId
-                        ? `/workspaces/${activeEngagement.id}/repos/${activeRepoId}`
-                        : `/workspaces/${activeEngagement.id}`
+                        ? `/w/${activeEngagement.slug}/r/${activeRepoId}`
+                        : `/w/${activeEngagement.slug}`
                 }
                 replace
             />

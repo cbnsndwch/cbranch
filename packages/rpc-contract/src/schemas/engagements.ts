@@ -14,6 +14,12 @@ export const EngagementId = Schema.String.pipe(
 );
 export type EngagementId = typeof EngagementId.Type;
 
+/** URL-safe, user-editable workspace handle. Unique within one cbranch config. */
+export const EngagementSlug = Schema.String.pipe(
+    Schema.brand('cbranch/EngagementSlug'),
+);
+export type EngagementSlug = typeof EngagementSlug.Type;
+
 /** Small, closed swatch set used to distinguish engagements in the workspace rail. */
 export const EngagementColor = Schema.Literals([
     'teal',
@@ -33,6 +39,7 @@ export type EngagementColor = typeof EngagementColor.Type;
 export class Engagement extends Schema.Class<Engagement>('Engagement')({
     id: EngagementId,
     name: Schema.String,
+    slug: EngagementSlug,
     color: EngagementColor,
     avatarUrl: Schema.optional(Schema.String),
     repositories: Schema.Array(RecentRepo),

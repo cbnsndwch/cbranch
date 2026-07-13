@@ -2,6 +2,7 @@
 import {
     Engagement,
     EngagementId,
+    EngagementSlug,
     EngagementWorkspace,
     RecentRepo,
     RepoId,
@@ -23,6 +24,7 @@ const engagement = (id: typeof clientA, name: string) =>
     new Engagement({
         id,
         name,
+        slug: EngagementSlug.make(id),
         color: id === clientA ? 'teal' : 'rose',
         repositories: [],
         openRepoIds: [],
@@ -93,6 +95,7 @@ describe('WorkspaceBar', () => {
         const active = new Engagement({
             id: clientA,
             name: 'Client A',
+            slug: EngagementSlug.make('client-a'),
             color: 'teal',
             repositories: [repoA, repoB],
             openRepoIds: [repoA.repoId, repoB.repoId],

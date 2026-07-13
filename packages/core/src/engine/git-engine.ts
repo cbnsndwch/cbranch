@@ -29,6 +29,7 @@ import {
     type DiffFile,
     type EngagementColor,
     type EngagementId,
+    type EngagementSlug,
     type EngagementWorkspace,
     type AppSettings,
     type ArchiveDescriptor,
@@ -125,11 +126,13 @@ export interface GitEngineApi {
         name: string,
         color: EngagementColor,
         avatarUrl?: string,
+        slug?: EngagementSlug,
     ) => Effect.Effect<EngagementWorkspace, GitError>;
     readonly engagementUpdate: (
         engagementId: EngagementId,
         patch: {
             readonly name?: string;
+            readonly slug?: EngagementSlug;
             readonly color?: EngagementColor;
             readonly avatarUrl?: string | null;
         },

@@ -3,6 +3,7 @@ import {
     ChangeSetId,
     Engagement,
     EngagementId,
+    EngagementSlug,
     EngagementWorkspace,
     ForgeRateLimit,
     GitHubPullRequest,
@@ -38,6 +39,7 @@ const repo = (repoId: RepoId, name: string) =>
 const engagement = new Engagement({
     id: EngagementId.make('client-a'),
     name: 'Client A',
+    slug: EngagementSlug.make('client-a'),
     color: 'teal',
     repositories: [repo(apiRepoId, 'api'), repo(webRepoId, 'web')],
     openRepoIds: [],

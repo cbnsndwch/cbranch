@@ -56,7 +56,7 @@ export function RepoSwitcher() {
                 openRepoIds,
                 activeRepoId: repoId,
             });
-            openRepo(repoId, owner.id);
+            openRepo(repoId, owner.slug);
             finish();
             return;
         }
@@ -64,8 +64,11 @@ export function RepoSwitcher() {
             assignRepo.mutate(
                 { engagementId: activeEngagementId, repoId },
                 {
-                    onSuccess: () => {
-                        openRepo(repoId, activeEngagementId);
+                    onSuccess: next => {
+                        const assignedEngagement = next.engagements.find(
+                            engagement => engagement.id === activeEngagementId,
+                        );
+                        openRepo(repoId, assignedEngagement?.slug);
                         finish();
                     },
                 },

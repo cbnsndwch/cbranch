@@ -171,7 +171,7 @@ export function WorkspaceBar() {
             openRepoIds: engagement.openRepoIds,
             activeRepoId: repoId,
         });
-        openRepo(repoId, engagement.id);
+        openRepo(repoId, engagement.slug);
     };
 
     const closeRepo = (repoId: RepoId) => (event: MouseEvent) => {
@@ -187,8 +187,8 @@ export function WorkspaceBar() {
             activeRepoId: nextActive,
         });
         if (activeRepoId === repoId) {
-            if (nextActive) openRepo(nextActive, engagement.id);
-            else openEngagement(engagement.id);
+            if (nextActive) openRepo(nextActive, engagement.slug);
+            else openEngagement(engagement.slug);
         }
     };
 
@@ -197,7 +197,7 @@ export function WorkspaceBar() {
             <div className="bg-muted/60 flex h-8 min-w-0 shrink-0 items-stretch border-b">
                 <button
                     type="button"
-                    onClick={() => openEngagement(engagement.id)}
+                    onClick={() => openEngagement(engagement.slug)}
                     className={cn(
                         'flex w-44 shrink-0 items-center gap-2 border-r px-2 text-left text-xs font-medium outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-ring',
                         activeRepoId === null
@@ -217,7 +217,7 @@ export function WorkspaceBar() {
                         aria-hidden="true"
                     />
                 </button>
-                <div className="flex min-w-0 flex-1 overflow-x-auto">
+                <div className="flex min-w-0 flex-1 overflow-x-auto overflow-y-hidden">
                     {openRepos.map(repo => (
                         <RepoTab
                             key={repo.repoId}

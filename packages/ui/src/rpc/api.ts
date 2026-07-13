@@ -36,6 +36,7 @@ import {
     type DiffSpec,
     type EngagementColor,
     type EngagementId,
+    type EngagementSlug,
     type EngagementWorkspace,
     type FileContentResult,
     type FileHistoryPage,
@@ -123,11 +124,13 @@ export interface CbranchApi {
         name: string,
         color: EngagementColor,
         avatarUrl?: string,
+        slug?: EngagementSlug,
     ): Promise<EngagementWorkspace>;
     engagementUpdate(
         engagementId: EngagementId,
         patch: {
             readonly name?: string;
+            readonly slug?: EngagementSlug;
             readonly color?: EngagementColor;
             readonly avatarUrl?: string | null;
         },
@@ -628,9 +631,11 @@ export const makeApi = (runtime: AppRuntime): CbranchApi => {
             runtime.runPromise(withClient(c => c.FilesystemListDir(input))),
         engagementList: () =>
             runtime.runPromise(withClient(c => c.EngagementList({}))),
-        engagementCreate: (name, color, avatarUrl) =>
+        engagementCreate: (name, color, avatarUrl, slug) =>
             runtime.runPromise(
-                withClient(c => c.EngagementCreate({ name, color, avatarUrl })),
+                withClient(c =>
+                    c.EngagementCreate({ name, color, slug, avatarUrl }),
+                ),
             ),
         engagementUpdate: (engagementId, patch) =>
             runtime.runPromise(

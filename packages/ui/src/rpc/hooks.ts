@@ -32,6 +32,7 @@ import {
     type DiffSpec,
     type EngagementColor,
     type EngagementId,
+    type EngagementSlug,
     type EngagementWorkspace,
     type FileContentResult,
     type FileHistoryPage,
@@ -145,14 +146,16 @@ export const useCreateEngagement = () =>
         readonly name: string;
         readonly color: EngagementColor;
         readonly avatarUrl?: string;
-    }>((api, { name, color, avatarUrl }) =>
-        api.engagementCreate(name, color, avatarUrl),
+        readonly slug?: EngagementSlug;
+    }>((api, { name, color, avatarUrl, slug }) =>
+        api.engagementCreate(name, color, avatarUrl, slug),
     );
 
 export const useUpdateEngagement = () =>
     useWorkspaceMutation<{
         readonly engagementId: EngagementId;
         readonly name?: string;
+        readonly slug?: EngagementSlug;
         readonly color?: EngagementColor;
         readonly avatarUrl?: string | null;
     }>((api, { engagementId, ...patch }) =>

@@ -5,6 +5,7 @@ import {
     BranchUpstream,
     Engagement,
     EngagementId,
+    EngagementSlug,
     Oid,
     RecentRepo,
     RepoId,
@@ -44,6 +45,7 @@ const webRepo = repo(webId, 'web');
 const engagement = new Engagement({
     id: EngagementId.make('client'),
     name: 'Client',
+    slug: EngagementSlug.make('client'),
     color: 'teal',
     repositories: [apiRepo, webRepo],
     openRepoIds: [apiId, webId],

@@ -38,6 +38,7 @@ import { GitError } from '../schemas/errors';
 import {
     Engagement,
     EngagementId,
+    EngagementSlug,
     EngagementWorkspace,
 } from '../schemas/engagements';
 import {
@@ -190,6 +191,7 @@ const engagementWorkspace = new EngagementWorkspace({
         new Engagement({
             id: engagementId,
             name: 'Acme Consulting',
+            slug: EngagementSlug.make('acme-consulting'),
             color: 'teal',
             repositories: [recentRepo],
             openRepoIds: [repoId],

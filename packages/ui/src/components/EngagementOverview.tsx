@@ -104,7 +104,7 @@ function RepoSummaryRow({
             openRepoIds,
             activeRepoId: repo.repoId,
         });
-        openRepo(repo.repoId, engagement.id);
+        openRepo(repo.repoId, engagement.slug);
     };
 
     return (

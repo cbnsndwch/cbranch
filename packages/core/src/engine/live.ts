@@ -423,8 +423,8 @@ export const makeGitEngine = (
                     ),
                 ),
             engagementList: () => configStore.listEngagements(),
-            engagementCreate: (name, color, avatarUrl) =>
-                configStore.createEngagement(name, color, avatarUrl),
+            engagementCreate: (name, color, avatarUrl, slug) =>
+                configStore.createEngagement(name, color, avatarUrl, slug),
             engagementUpdate: (engagementId, patch) =>
                 configStore.updateEngagement(engagementId, patch),
             engagementDelete: engagementId =>

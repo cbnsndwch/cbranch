@@ -13,22 +13,35 @@ import {
 import { useLayoutEffect } from 'react';
 import { useParams } from 'react-router';
 
+import { useEngagementWorkspace } from '../rpc/hooks';
 import { useUiStore } from './store';
 
 export function SyncRouteToStore() {
-    const { engagementId, repoId, oid } = useParams<{
-        engagementId?: string;
+    const { workspaceSlug, repoId, oid } = useParams<{
+        workspaceSlug?: string;
         repoId?: string;
         oid?: string;
     }>();
     const activeRepoId = useUiStore(s => s.activeRepoId);
     const activeEngagementId = useUiStore(s => s.activeEngagementId);
+    const workspace = useEngagementWorkspace();
+    const matchedEngagementId = workspaceSlug
+        ? workspace.data?.engagements.find(
+              engagement => engagement.slug === workspaceSlug,
+          )?.id
+        : undefined;
 
     useLayoutEffect(() => {
-        const next = engagementId ? (engagementId as EngagementId) : null;
+        if (workspaceSlug && workspace.isLoading) return;
+        const next: EngagementId | null = matchedEngagementId ?? null;
         if (next !== activeEngagementId)
             useUiStore.getState().setActiveEngagementId(next);
-    }, [engagementId, activeEngagementId]);
+    }, [
+        activeEngagementId,
+        matchedEngagementId,
+        workspace.isLoading,
+        workspaceSlug,
+    ]);
 
     // Repo changes reset selection + filters (P1-OPEN-4), so only fire when it actually changes.
     useLayoutEffect(() => {

@@ -304,7 +304,7 @@ export function useMenuActions(): MenuActions {
         const recent: DynamicItem[] = recentSource.map(r => ({
             id: r.repoId,
             label: r.name,
-            onSelect: () => openRepo(r.repoId, activeEngagement?.id),
+            onSelect: () => openRepo(r.repoId, activeEngagement?.slug),
         }));
 
         return {

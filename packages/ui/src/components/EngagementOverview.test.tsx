@@ -2,6 +2,7 @@
 import {
     Engagement,
     EngagementId,
+    EngagementSlug,
     EngagementWorkspace,
     RecentRepo,
     RepoId,
@@ -46,6 +47,7 @@ const workspace = new EngagementWorkspace({
         new Engagement({
             id: engagementId,
             name: 'Client A',
+            slug: EngagementSlug.make('client-a'),
             color: 'teal',
             repositories: [apiRepo, webRepo],
             openRepoIds: [apiRepoId],
@@ -130,7 +132,7 @@ const renderOverview = (api: CbranchApi) => {
         defaultOptions: { queries: { retry: false } },
     });
     return render(
-        <MemoryRouter initialEntries={[`/workspaces/${engagementId}`]}>
+        <MemoryRouter initialEntries={[`/w/client-a`]}>
             <QueryClientProvider client={queryClient}>
                 <ApiProvider api={api}>
                     <EngagementOverview />

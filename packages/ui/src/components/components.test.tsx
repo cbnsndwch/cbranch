@@ -3,6 +3,7 @@ import {
     CommitDetail,
     Engagement,
     EngagementId,
+    EngagementSlug,
     EngagementWorkspace,
     FileContent,
     InvalidationEvent,
@@ -219,6 +220,7 @@ describe('RepoSwitcher (NF-TEST-7 / P1-UI-OPEN-1)', () => {
                         new Engagement({
                             id: clientA,
                             name: 'Client A',
+                            slug: EngagementSlug.make('client-a'),
                             color: 'teal',
                             repositories: [demo],
                             openRepoIds: [repoId],
@@ -230,6 +232,7 @@ describe('RepoSwitcher (NF-TEST-7 / P1-UI-OPEN-1)', () => {
                         new Engagement({
                             id: clientB,
                             name: 'Client B',
+                            slug: EngagementSlug.make('client-b'),
                             color: 'rose',
                             repositories: [other],
                             openRepoIds: [],

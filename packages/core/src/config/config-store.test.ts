@@ -6,6 +6,7 @@ import { dirname, join } from 'node:path';
 import {
     ChangeSetPullRequest,
     EngagementId,
+    EngagementSlug,
     Oid,
     RecentRepo,
     RepoId,
@@ -147,6 +148,7 @@ describe('defaults (NF-CFG-5/7)', () => {
         );
         expect(workspace.engagements).toHaveLength(1);
         expect(workspace.engagements[0]?.name).toBe('Client');
+        expect(workspace.engagements[0]?.slug).toBe('client');
         expect(workspace.engagements[0]?.openRepoIds).toEqual([repoId]);
         expect(workspace.engagements[0]?.activeRepoId).toBeUndefined();
         expect(workspace.engagements[0]?.changeSets).toHaveLength(1);
@@ -163,6 +165,53 @@ describe('defaults (NF-CFG-5/7)', () => {
 });
 
 describe('engagement workspaces', () => {
+    test('generates unique URL slugs, preserves them on rename, and persists edits', async () => {
+        const path = newPath();
+        const store = makeConfigStore({ configPath: path });
+        const first = await run(store.createEngagement('Client A', 'teal'));
+        const second = await run(store.createEngagement('Client A', 'blue'));
+        const firstId = first.engagements[0]!.id;
+        const secondId = second.engagements[1]!.id;
+
+        expect(first.engagements[0]?.slug).toBe('client-a');
+        expect(second.engagements[1]?.slug).toBe('client-a-2');
+        await run(store.updateEngagement(firstId, { name: 'Renamed client' }));
+        await run(
+            store.updateEngagement(firstId, {
+                slug: EngagementSlug.make('acme-platform'),
+            }),
+        );
+
+        await expect(
+            run(
+                store.updateEngagement(secondId, {
+                    slug: EngagementSlug.make('acme-platform'),
+                }),
+            ),
+        ).rejects.toMatchObject({ code: 'gitFailed' });
+        await expect(
+            run(
+                store.createEngagement(
+                    'Invalid slug',
+                    'rose',
+                    undefined,
+                    EngagementSlug.make('Not valid'),
+                ),
+            ),
+        ).rejects.toMatchObject({ code: 'gitFailed' });
+
+        const reread = await run(
+            makeConfigStore({ configPath: path }).listEngagements(),
+        );
+        expect(reread.engagements[0]).toMatchObject({
+            name: 'Renamed client',
+            slug: 'acme-platform',
+        });
+        expect(JSON.parse(readFileSync(path, 'utf8')).version).toBe(
+            CONFIG_VERSION,
+        );
+    });
+
     test('persists isolated membership and ordered open-repo sessions', async () => {
         const path = newPath();
         const store = makeConfigStore({ configPath: path });

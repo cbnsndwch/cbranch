@@ -38,6 +38,7 @@ import { GitError } from '../schemas/errors';
 import {
     EngagementColor,
     EngagementId,
+    EngagementSlug,
     EngagementWorkspace,
 } from '../schemas/engagements';
 import { FilesystemDirectoryListing } from '../schemas/filesystem';
@@ -151,6 +152,7 @@ export const CbranchRpcs = RpcGroup.make(
         payload: {
             name: Schema.String,
             color: EngagementColor,
+            slug: Schema.optional(EngagementSlug),
             avatarUrl: Schema.optional(Schema.String),
         },
         success: EngagementWorkspace,
@@ -161,6 +163,7 @@ export const CbranchRpcs = RpcGroup.make(
         payload: {
             engagementId: EngagementId,
             name: Schema.optional(Schema.String),
+            slug: Schema.optional(EngagementSlug),
             color: Schema.optional(EngagementColor),
             avatarUrl: Schema.optional(Schema.NullOr(Schema.String)),
         },

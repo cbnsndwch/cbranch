@@ -113,7 +113,7 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
                         </h1>
                         <p className="text-muted-foreground max-w-md text-sm leading-6">
                             {missingRoute
-                                ? 'Workspace URLs now begin with /workspaces. The link may be outdated or incomplete.'
+                                ? 'Workspace URLs now begin with /w. The link may be outdated or incomplete.'
                                 : 'Return to the workspace overview and try again.'}
                         </p>
                     </div>

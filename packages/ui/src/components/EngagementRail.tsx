@@ -37,8 +37,8 @@ export function EngagementRail() {
                     item => item.id === id,
                 );
                 if (engagement?.activeRepoId)
-                    openRepo(engagement.activeRepoId, id);
-                else openEngagement(id);
+                    openRepo(engagement.activeRepoId, engagement.slug);
+                else if (engagement) openEngagement(engagement.slug);
             },
         });
     };

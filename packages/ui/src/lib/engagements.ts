@@ -34,6 +34,19 @@ export const engagementInitials = (name: string): string => {
     return `${words[0]![0] ?? ''}${words.at(-1)![0] ?? ''}`.toUpperCase();
 };
 
+/** Match the host's default URL handle before it applies collision suffixes. */
+export const workspaceSlugFromName = (name: string): string => {
+    const slug = name
+        .normalize('NFKD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '')
+        .slice(0, 63)
+        .replace(/-+$/g, '');
+    return slug === '' ? 'workspace' : slug;
+};
+
 /** Move one persisted workspace id before another without mutating query-owned data. */
 export const moveWorkspaceId = <T>(
     items: ReadonlyArray<T>,

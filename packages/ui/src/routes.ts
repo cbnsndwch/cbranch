@@ -8,15 +8,13 @@ import { type RouteConfig, index, route } from '@react-router/dev/routes';
 
 export default [
     index('routes/landing.tsx'),
-    route('workspaces/:engagementId', 'routes/engagement.tsx'),
-    route('workspaces/:engagementId/repos/:repoId', 'routes/repo.tsx', {
+    route('w/:workspaceSlug', 'routes/engagement.tsx'),
+    route('w/:workspaceSlug/r/:repoId', 'routes/repo.tsx', {
         id: 'engagement-repo',
     }),
-    route(
-        'workspaces/:engagementId/repos/:repoId/commits/:oid',
-        'routes/repo.tsx',
-        { id: 'engagement-repo-commit' },
-    ),
+    route('w/:workspaceSlug/r/:repoId/commits/:oid', 'routes/repo.tsx', {
+        id: 'engagement-repo-commit',
+    }),
     route('repos/:repoId', 'routes/repo.tsx'),
     route('repos/:repoId/commits/:oid', 'routes/repo.tsx', {
         id: 'repo-commit',

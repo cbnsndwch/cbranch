@@ -4,6 +4,7 @@ import {
     ChangeSetPullRequest,
     Engagement,
     EngagementId,
+    EngagementSlug,
     EngagementWorkspace,
     PullRequestChangeSet,
     RecentRepo,
@@ -47,6 +48,7 @@ const changeSet = new PullRequestChangeSet({
 const engagement = new Engagement({
     id: EngagementId.make('client'),
     name: 'Client',
+    slug: EngagementSlug.make('client'),
     color: 'blue',
     repositories: [
         new RecentRepo({

@@ -4,7 +4,7 @@
 // subscribe to it keep working without a simultaneous refactor.
 
 import {
-    type EngagementId,
+    type EngagementSlug,
     type Oid,
     type RepoId,
 } from '@cbranch/rpc-contract';
@@ -13,45 +13,43 @@ import { useNavigate, useParams } from 'react-router';
 
 export interface Navigation {
     /** Open an engagement's cross-repository overview. */
-    readonly openEngagement: (id: EngagementId) => void;
+    readonly openEngagement: (slug: EngagementSlug) => void;
     /** Open/switch the active repository → `/repos/:repoId`. */
-    readonly openRepo: (id: RepoId, engagementId?: EngagementId) => void;
+    readonly openRepo: (id: RepoId, workspaceSlug?: EngagementSlug) => void;
     /** Select a commit in the active repository → `/repos/:repoId/commits/:oid`. */
     readonly selectOid: (oid: Oid) => void;
 }
 
 export function useNavigation(): Navigation {
     const navigate = useNavigate();
-    const { engagementId, repoId } = useParams<{
-        engagementId?: string;
+    const { workspaceSlug, repoId } = useParams<{
+        workspaceSlug?: string;
         repoId?: string;
     }>();
 
     const openEngagement = useCallback(
-        (id: EngagementId) => navigate(`/workspaces/${id}`),
+        (slug: EngagementSlug) => navigate(`/w/${slug}`),
         [navigate],
     );
 
     const openRepo = useCallback(
-        (id: RepoId, explicitEngagementId?: EngagementId) => {
-            const scope = explicitEngagementId ?? engagementId;
-            navigate(
-                scope ? `/workspaces/${scope}/repos/${id}` : `/repos/${id}`,
-            );
+        (id: RepoId, explicitWorkspaceSlug?: EngagementSlug) => {
+            const scope = explicitWorkspaceSlug ?? workspaceSlug;
+            navigate(scope ? `/w/${scope}/r/${id}` : `/repos/${id}`);
         },
-        [engagementId, navigate],
+        [navigate, workspaceSlug],
     );
     const selectOid = useCallback(
         (oid: Oid) => {
             // Commit selection is only meaningful within an open repository.
             if (!repoId) return;
             navigate(
-                engagementId
-                    ? `/workspaces/${engagementId}/repos/${repoId}/commits/${oid}`
+                workspaceSlug
+                    ? `/w/${workspaceSlug}/r/${repoId}/commits/${oid}`
                     : `/repos/${repoId}/commits/${oid}`,
             );
         },
-        [engagementId, navigate, repoId],
+        [navigate, repoId, workspaceSlug],
     );
 
     return { openEngagement, openRepo, selectOid };

@@ -71,8 +71,11 @@ function NewRepoDialogBody() {
         assignRepo.mutate(
             { engagementId, repoId },
             {
-                onSuccess: () => {
-                    openRepo(repoId, engagementId);
+                onSuccess: next => {
+                    const engagement = next.engagements.find(
+                        item => item.id === engagementId,
+                    );
+                    openRepo(repoId, engagement?.slug);
                     setOpen(false);
                 },
                 onError: e => setError(errorMessage(e)),

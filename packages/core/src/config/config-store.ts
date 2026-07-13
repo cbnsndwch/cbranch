@@ -22,6 +22,8 @@ import {
     type EngagementColor,
     type EngagementId,
     EngagementId as EngagementIdBrand,
+    type EngagementSlug,
+    EngagementSlug as EngagementSlugBrand,
     EngagementWorkspace,
     type GitError,
     Oid as OidBrand,
@@ -35,7 +37,7 @@ import { Effect, Semaphore } from 'effect';
 import { classifyNodeError, gitError } from '../git/errors';
 
 /** Current settings schema version (top-level integer for migration — NF-CFG-7). */
-export const CONFIG_VERSION = 3;
+export const CONFIG_VERSION = 4;
 
 /** Local host URL prefix for workspace images stored alongside cbranch's config. */
 export const WORKSPACE_AVATAR_PATH_PREFIX = '/sidechannel/workspace-avatar/';
@@ -67,6 +69,7 @@ export interface RecentRepoEntry {
 export interface EngagementEntry {
     readonly id: string;
     readonly name: string;
+    readonly slug: string;
     readonly color: EngagementColor;
     readonly avatarUrl?: string;
     readonly repoIds: ReadonlyArray<string>;
@@ -193,11 +196,13 @@ export interface ConfigStore {
         name: string,
         color: EngagementColor,
         avatarUrl?: string,
+        slug?: EngagementSlug,
     ) => Effect.Effect<EngagementWorkspace, GitError>;
     readonly updateEngagement: (
         engagementId: EngagementId,
         patch: {
             readonly name?: string;
+            readonly slug?: EngagementSlug;
             readonly color?: EngagementColor;
             readonly avatarUrl?: string | null;
         },
@@ -282,6 +287,43 @@ const missingEngagement = (engagementId: EngagementId): GitError =>
 
 const missingChangeSet = (changeSetId: ChangeSetId): GitError =>
     gitError('changeSetNotFound', `change set ${changeSetId} does not exist`);
+
+const ENGAGEMENT_SLUG_MAX_LENGTH = 63;
+const engagementSlugPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+const slugFromName = (name: string): string => {
+    const slug = name
+        .normalize('NFKD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '')
+        .slice(0, ENGAGEMENT_SLUG_MAX_LENGTH)
+        .replace(/-+$/g, '');
+    return slug === '' ? 'workspace' : slug;
+};
+
+const validEngagementSlug = (value: string): string | undefined => {
+    const slug = value.trim();
+    return slug.length <= ENGAGEMENT_SLUG_MAX_LENGTH &&
+        engagementSlugPattern.test(slug)
+        ? slug
+        : undefined;
+};
+
+const uniqueEngagementSlug = (
+    base: string,
+    used: ReadonlySet<string>,
+): string => {
+    if (!used.has(base)) return base;
+    for (let suffix = 2; ; suffix += 1) {
+        const ending = `-${suffix}`;
+        const candidate = `${base
+            .slice(0, ENGAGEMENT_SLUG_MAX_LENGTH - ending.length)
+            .replace(/-+$/g, '')}${ending}`;
+        if (!used.has(candidate)) return candidate;
+    }
+};
 
 type WorkspaceAvatarType = {
     readonly extension: 'png' | 'jpg' | 'gif' | 'webp';
@@ -495,7 +537,7 @@ export const makeConfigStore = (opts?: {
             ),
         listEngagements: () =>
             Effect.map(load(), config => toEngagementWorkspace(config)),
-        createEngagement: (rawName, color, rawAvatarUrl) =>
+        createEngagement: (rawName, color, rawAvatarUrl, rawSlug) =>
             updateWorkspace(config => {
                 const name = rawName.trim();
                 if (name === '')
@@ -516,10 +558,34 @@ export const makeConfigStore = (opts?: {
                             'workspace avatar must be an http(s) image URL or a local upload',
                         ),
                     );
+                const requestedSlug =
+                    rawSlug === undefined
+                        ? undefined
+                        : validEngagementSlug(rawSlug);
+                if (rawSlug !== undefined && requestedSlug === undefined)
+                    return Effect.fail(
+                        gitError(
+                            'gitFailed',
+                            'workspace slug must use lowercase letters, numbers, and hyphens',
+                        ),
+                    );
+                const usedSlugs = new Set(
+                    config.engagements.map(engagement => engagement.slug),
+                );
+                if (requestedSlug !== undefined && usedSlugs.has(requestedSlug))
+                    return Effect.fail(
+                        gitError(
+                            'gitFailed',
+                            `workspace slug "${requestedSlug}" is already in use`,
+                        ),
+                    );
                 const now = Date.now();
                 const entry: EngagementEntry = {
                     id: randomUUID(),
                     name,
+                    slug:
+                        requestedSlug ??
+                        uniqueEngagementSlug(slugFromName(name), usedSlugs),
                     color,
                     avatarUrl,
                     repoIds: [],
@@ -549,6 +615,31 @@ export const makeConfigStore = (opts?: {
                             'engagement name cannot be empty',
                         ),
                     );
+                const slug =
+                    patch.slug === undefined
+                        ? current.slug
+                        : validEngagementSlug(patch.slug);
+                if (slug === undefined)
+                    return Effect.fail(
+                        gitError(
+                            'gitFailed',
+                            'workspace slug must use lowercase letters, numbers, and hyphens',
+                        ),
+                    );
+                if (
+                    slug !== current.slug &&
+                    config.engagements.some(
+                        engagement =>
+                            engagement.id !== engagementId &&
+                            engagement.slug === slug,
+                    )
+                )
+                    return Effect.fail(
+                        gitError(
+                            'gitFailed',
+                            `workspace slug "${slug}" is already in use`,
+                        ),
+                    );
                 const avatarUrl =
                     patch.avatarUrl === undefined || patch.avatarUrl === null
                         ? undefined
@@ -571,6 +662,7 @@ export const makeConfigStore = (opts?: {
                             ? {
                                   ...engagement,
                                   name: name ?? engagement.name,
+                                  slug,
                                   color: patch.color ?? engagement.color,
                                   avatarUrl:
                                       patch.avatarUrl === undefined
@@ -1185,6 +1277,7 @@ const toEngagementWorkspace = (config: Config): EngagementWorkspace => {
         return new Engagement({
             id: EngagementIdBrand.make(entry.id),
             name: entry.name,
+            slug: EngagementSlugBrand.make(entry.slug),
             color: entry.color,
             avatarUrl: entry.avatarUrl,
             repositories: repositoryEntries.map(toRecentRepo),
@@ -1312,6 +1405,7 @@ const normalizeEngagements = (value: unknown): EngagementEntry[] => {
     if (!Array.isArray(value)) return [];
     const result: EngagementEntry[] = [];
     const seenIds = new Set<string>();
+    const seenSlugs = new Set<string>();
     const assignedRepoIds = new Set<string>();
     for (const item of value) {
         if (typeof item !== 'object' || item === null) continue;
@@ -1340,9 +1434,20 @@ const normalizeEngagements = (value: unknown): EngagementEntry[] => {
             openRepoIds.includes(entry.activeRepoId)
                 ? entry.activeRepoId
                 : undefined;
+        const name = entry.name.trim();
+        const configuredSlug =
+            typeof entry.slug === 'string'
+                ? validEngagementSlug(entry.slug)
+                : undefined;
+        const slug =
+            configuredSlug !== undefined && !seenSlugs.has(configuredSlug)
+                ? configuredSlug
+                : uniqueEngagementSlug(slugFromName(name), seenSlugs);
+        seenSlugs.add(slug);
         result.push({
             id: entry.id,
-            name: entry.name.trim(),
+            name,
+            slug,
             color: entry.color as EngagementColor,
             avatarUrl: normalizeAvatarUrl(entry.avatarUrl),
             repoIds,

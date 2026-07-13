@@ -1,9 +1,9 @@
-// Repository browse view, reused for both `/repos/:repoId` and
-// `/repos/:repoId/commits/:oid` (see routes.ts). `App` reads the matched params via the
-// store bridge (SyncRouteToStore), so the same component serves both paths.
+// Repository browse view, reused for bare and workspace-scoped paths (see routes.ts).
+// `App` reads the matched params via the store bridge (SyncRouteToStore), while the route
+// guard prevents a workspace URL from borrowing another workspace's repository state.
 
-import { App } from '../App';
+import { WorkspaceRouteApp } from './engagement';
 
 export default function Repo() {
-    return <App />;
+    return <WorkspaceRouteApp />;
 }

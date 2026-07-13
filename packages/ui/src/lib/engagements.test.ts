@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 
-import { moveWorkspaceId } from './engagements';
+import { moveWorkspaceId, workspaceSlugFromName } from './engagements';
 
 describe('moveWorkspaceId', () => {
     test('moves a workspace before the drop target without mutating the source order', () => {
@@ -11,5 +11,13 @@ describe('moveWorkspaceId', () => {
             'client-b',
         ]);
         expect(ids).toEqual(['client-a', 'client-b', 'internal']);
+    });
+});
+
+describe('workspaceSlugFromName', () => {
+    test('creates a URL-safe fallback for punctuation and non-ASCII-only names', () => {
+        expect(workspaceSlugFromName('Acme Platform!')).toBe('acme-platform');
+        expect(workspaceSlugFromName('Caf\u00e9')).toBe('cafe');
+        expect(workspaceSlugFromName('\u6771\u4eac')).toBe('workspace');
     });
 });

@@ -1,4 +1,8 @@
-import { type EngagementColor, type EngagementId } from '@cbranch/rpc-contract';
+import {
+    type EngagementColor,
+    type EngagementId,
+    EngagementSlug,
+} from '@cbranch/rpc-contract';
 import {
     ArrowDown,
     ArrowUp,
@@ -10,6 +14,7 @@ import {
     X,
 } from 'lucide-react';
 import { type ChangeEvent, useEffect, useRef, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router';
 import { toast } from 'sonner';
 
 import { cn } from '../lib/cn';
@@ -17,6 +22,7 @@ import {
     ENGAGEMENT_COLORS,
     engagementSwatchClass,
     moveWorkspaceId,
+    workspaceSlugFromName,
 } from '../lib/engagements';
 import {
     useActivateEngagement,
@@ -63,8 +69,12 @@ export function EngagementManagerDialog() {
     const reorder = useReorderEngagements();
     const { openEngagement } = useNavigation();
     const endpoint = useHostEndpoint();
+    const location = useLocation();
+    const navigate = useNavigate();
     const [selectedId, setSelectedId] = useState<EngagementId | null>(null);
     const [name, setName] = useState('');
+    const [slug, setSlug] = useState('');
+    const [slugEdited, setSlugEdited] = useState(false);
     const [color, setColor] = useState<EngagementColor>('teal');
     const [avatarUrl, setAvatarUrl] = useState('');
     const [deleteOpen, setDeleteOpen] = useState(false);
@@ -85,6 +95,8 @@ export function EngagementManagerDialog() {
             ) ?? workspace.data?.engagements[0];
         setSelectedId(initial?.id ?? null);
         setName(initial?.name ?? '');
+        setSlug(initial?.slug ?? '');
+        setSlugEdited(false);
         setColor(initial?.color ?? 'teal');
         setAvatarUrl(initial?.avatarUrl ?? '');
     }, [activeEngagementId, open, workspace.data]);
@@ -95,6 +107,8 @@ export function EngagementManagerDialog() {
         );
         setSelectedId(id);
         setName(engagement?.name ?? '');
+        setSlug(engagement?.slug ?? '');
+        setSlugEdited(false);
         setColor(engagement?.color ?? 'teal');
         setAvatarUrl(engagement?.avatarUrl ?? '');
     };
@@ -116,6 +130,8 @@ export function EngagementManagerDialog() {
     const startCreate = () => {
         setSelectedId(null);
         setName('');
+        setSlug('');
+        setSlugEdited(false);
         setColor('teal');
         setAvatarUrl('');
     };
@@ -188,15 +204,38 @@ export function EngagementManagerDialog() {
 
     const save = () => {
         if (name.trim() === '') return;
+        const requestedSlug = slugEdited
+            ? EngagementSlug.make(slug.trim())
+            : undefined;
         if (selected) {
             update.mutate(
                 {
                     engagementId: selected.id,
                     name: name.trim(),
+                    slug: requestedSlug,
                     color,
                     avatarUrl: avatarUrl.trim() === '' ? null : avatarUrl,
                 },
                 {
+                    onSuccess: next => {
+                        const updated = next.engagements.find(
+                            engagement => engagement.id === selected.id,
+                        );
+                        if (
+                            slugEdited &&
+                            updated &&
+                            selected.id === activeEngagementId &&
+                            location.pathname.startsWith(`/w/${selected.slug}`)
+                        )
+                            navigate(
+                                `${location.pathname.replace(
+                                    `/w/${selected.slug}`,
+                                    `/w/${updated.slug}`,
+                                )}${location.search}${location.hash}`,
+                                { replace: true },
+                            );
+                        setSlugEdited(false);
+                    },
                     onError: error => toast.error(errorMessage(error)),
                 },
             );
@@ -206,6 +245,7 @@ export function EngagementManagerDialog() {
             {
                 name: name.trim(),
                 color,
+                slug: requestedSlug,
                 avatarUrl:
                     avatarUrl.trim() === '' ? undefined : avatarUrl.trim(),
             },
@@ -214,7 +254,9 @@ export function EngagementManagerDialog() {
                     const created = next.engagements.at(-1);
                     if (!created) return;
                     setSelectedId(created.id);
-                    openEngagement(created.id);
+                    setSlug(created.slug);
+                    setSlugEdited(false);
+                    openEngagement(created.slug);
                 },
                 onError: error => toast.error(errorMessage(error)),
             },
@@ -225,7 +267,7 @@ export function EngagementManagerDialog() {
         if (!selected) return;
         activate.mutate(selected.id, {
             onSuccess: () => {
-                openEngagement(selected.id);
+                openEngagement(selected.slug);
                 setOpen(false);
                 openSwitcher(true);
             },
@@ -239,10 +281,11 @@ export function EngagementManagerDialog() {
                 const fallback = next.engagements[0];
                 if (fallback) {
                     setSelectedId(fallback.id);
-                    openEngagement(fallback.id);
+                    openEngagement(fallback.slug);
                 } else {
                     setSelectedId(null);
                     setName('');
+                    setSlug('');
                     setAvatarUrl('');
                 }
             },
@@ -414,11 +457,31 @@ export function EngagementManagerDialog() {
                                     <Input
                                         autoFocus={selectedId === null}
                                         value={name}
-                                        onChange={event =>
-                                            setName(event.target.value)
-                                        }
+                                        onChange={event => {
+                                            const next = event.target.value;
+                                            setName(next);
+                                            if (!slugEdited)
+                                                setSlug(
+                                                    workspaceSlugFromName(next),
+                                                );
+                                        }}
                                         placeholder="Client or workspace name"
                                     />
+                                </label>
+                                <label className="grid gap-1 text-xs">
+                                    URL slug
+                                    <Input
+                                        value={slug}
+                                        onChange={event => {
+                                            setSlug(event.target.value);
+                                            setSlugEdited(true);
+                                        }}
+                                        placeholder="client-workspace"
+                                        spellCheck={false}
+                                    />
+                                    <span className="text-muted-foreground text-[11px]">
+                                        Lowercase letters, numbers, and hyphens.
+                                    </span>
                                 </label>
                                 <label className="grid gap-1 text-xs">
                                     Avatar image URL (optional)

@@ -48,13 +48,18 @@ export const handlersLayer = CbranchRpcs.toLayer({
         ),
     EngagementList: () =>
         Effect.flatMap(GitEngine, engine => engine.engagementList()),
-    EngagementCreate: ({ name, color, avatarUrl }) =>
+    EngagementCreate: ({ name, color, slug, avatarUrl }) =>
         Effect.flatMap(GitEngine, engine =>
-            engine.engagementCreate(name, color, avatarUrl),
+            engine.engagementCreate(name, color, avatarUrl, slug),
         ),
-    EngagementUpdate: ({ engagementId, name, color, avatarUrl }) =>
+    EngagementUpdate: ({ engagementId, name, slug, color, avatarUrl }) =>
         Effect.flatMap(GitEngine, engine =>
-            engine.engagementUpdate(engagementId, { name, color, avatarUrl }),
+            engine.engagementUpdate(engagementId, {
+                name,
+                slug,
+                color,
+                avatarUrl,
+            }),
         ),
     EngagementDelete: ({ engagementId }) =>
         Effect.flatMap(GitEngine, engine =>
