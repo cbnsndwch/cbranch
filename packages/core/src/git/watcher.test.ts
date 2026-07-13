@@ -2,10 +2,70 @@ import { join } from 'node:path';
 
 import { describe, expect, test } from 'vitest';
 
-import { classifyChange } from './watcher';
+import {
+    classifyChange,
+    isIgnoredGitPath,
+    isIgnoredWorktreePath,
+} from './watcher';
 
+const ROOT = join('/repo');
 const COMMON = join('/repo', '.git');
 const under = (...segs: string[]): string => join(COMMON, ...segs);
+const inWorktree = (...segs: string[]): string => join(ROOT, ...segs);
+
+describe('watcher ignore policy', () => {
+    test('keeps Git administration paths while ignoring locks and objects', () => {
+        expect(isIgnoredGitPath(COMMON, under('HEAD'))).toBe(false);
+        expect(isIgnoredGitPath(COMMON, under('refs', 'heads', 'main'))).toBe(
+            false,
+        );
+        expect(
+            isIgnoredGitPath(COMMON, under('worktrees', 'wt1', 'HEAD')),
+        ).toBe(false);
+        expect(isIgnoredGitPath(COMMON, under('index.lock'))).toBe(true);
+        expect(
+            isIgnoredGitPath(COMMON, under('objects', 'pack', 'pack-1.pack')),
+        ).toBe(true);
+    });
+
+    test('ignores the common Git dir from the worktree watcher', () => {
+        expect(isIgnoredWorktreePath(COMMON, ROOT, COMMON)).toBe(true);
+        expect(
+            isIgnoredWorktreePath(COMMON, ROOT, under('refs', 'heads', 'main')),
+        ).toBe(true);
+    });
+
+    test('ignores generated and dependency trees at every worktree depth', () => {
+        for (const path of [
+            inWorktree('node_modules', 'react', 'index.js'),
+            inWorktree('packages', 'api', 'node_modules', 'zod', 'index.js'),
+            inWorktree('.next', 'cache', 'webpack', 'client.json'),
+            inWorktree('coverage', 'lcov.info'),
+        ]) {
+            expect(isIgnoredWorktreePath(COMMON, ROOT, path)).toBe(true);
+        }
+    });
+
+    test('keeps normal source changes visible to the worktree watcher', () => {
+        expect(
+            isIgnoredWorktreePath(COMMON, ROOT, inWorktree('src', 'app.ts')),
+        ).toBe(false);
+        expect(
+            isIgnoredWorktreePath(
+                COMMON,
+                ROOT,
+                inWorktree('packages', 'core', 'src', 'watcher.ts'),
+            ),
+        ).toBe(false);
+        expect(
+            isIgnoredWorktreePath(
+                COMMON,
+                ROOT,
+                inWorktree('packages', 'web', 'dist', 'index.js'),
+            ),
+        ).toBe(false);
+    });
+});
 
 describe('classifyChange (15 §3 mapping)', () => {
     test('HEAD / heads / remotes / packed-refs ⇒ refs+commits+inProgress', () => {

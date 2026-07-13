@@ -1,10 +1,10 @@
 // Host invalidation bus — `repo.subscribe` (docs/spec/15 §3; NF-WATCH-1/2/3;
 // NF-TEST-10).
 //
-// One SHARED chokidar watcher per `repoId` over the common git dir
+// One SHARED watcher set per `repoId` covers the common git dir
 // (`rev-parse --git-common-dir`) + worktree. Changed paths are mapped to the closed
-// `Domain` set EXACTLY per 15 §3, `*.lock` and `objects/**` churn is ignored
-// (NF-WATCH-1), and a burst within ~300 ms is coalesced into ONE `InvalidationEvent`
+// `Domain` set EXACTLY per 15 §3. Git objects/locks and high-volume generated worktree
+// trees are ignored; a burst within ~300 ms is coalesced into ONE `InvalidationEvent`
 // whose `domains` is the union. Subscribers are ref-counted; the watcher is torn down
 // when the last one leaves (NF-WATCH-2). No echo suppression: an external terminal
 // `git` change MUST still emit (NF-WATCH-3).
@@ -82,21 +82,52 @@ export const classifyChange = (
     return [];
 };
 
-/** True for high-volume churn the watcher must ignore: `*.lock` and `objects/**` (NF-WATCH-1). */
-const makeIgnored =
-    (commonDir: string) =>
-    (p: string): boolean => {
-        if (p.endsWith('.lock')) return true;
-        const rel = relativeUnder(commonDir, p);
-        return (
-            rel !== null && (rel === 'objects' || rel.startsWith('objects/'))
-        );
-    };
+const WORKTREE_IGNORED_DIRS = new Set([
+    '.cache',
+    '.next',
+    '.nuxt',
+    '.parcel-cache',
+    '.svelte-kit',
+    '.turbo',
+    '.vite',
+    'bower_components',
+    'coverage',
+    'node_modules',
+]);
+
+const isSameOrUnder = (base: string, p: string): boolean =>
+    relative(base, p).replace(/\\/g, '/') === '' ||
+    relativeUnder(base, p) !== null;
+
+/** True for high-volume Git churn: `*.lock` and `objects/**` (NF-WATCH-1). */
+export const isIgnoredGitPath = (commonDir: string, p: string): boolean => {
+    if (p.endsWith('.lock')) return true;
+    const rel = relativeUnder(commonDir, p);
+    return rel !== null && (rel === 'objects' || rel.startsWith('objects/'));
+};
+
+/**
+ * True for paths the worktree watcher should not recurse into. The common Git dir has
+ * its own watcher, which prevents duplicate administration watches in normal repos.
+ */
+export const isIgnoredWorktreePath = (
+    commonDir: string,
+    root: string,
+    p: string,
+): boolean => {
+    if (isIgnoredGitPath(commonDir, p) || isSameOrUnder(commonDir, p))
+        return true;
+    const rel = relativeUnder(root, p);
+    return (
+        rel !== null &&
+        rel.split('/').some(segment => WORKTREE_IGNORED_DIRS.has(segment))
+    );
+};
 
 type Listener = (event: InvalidationEvent) => void;
 
 interface Entry {
-    readonly watcher: FSWatcher;
+    readonly watchers: ReadonlyArray<FSWatcher>;
     readonly listeners: Set<Listener>;
     readonly pending: Set<Domain>;
     timer: ReturnType<typeof setTimeout> | null;
@@ -130,26 +161,40 @@ export class WatcherRegistry {
     }
 
     private createEntry(target: WatchTarget): Entry {
-        const paths = target.isBare
-            ? [target.commonDir]
-            : [target.commonDir, target.root];
-        const watcher = watch(paths, {
+        const gitWatcher = watch(target.commonDir, {
             ignoreInitial: true,
             persistent: true,
-            ignored: makeIgnored(target.commonDir),
+            ignored: p => isIgnoredGitPath(target.commonDir, p),
         });
+        const watchers = target.isBare
+            ? [gitWatcher]
+            : [
+                  gitWatcher,
+                  watch(target.root, {
+                      ignoreInitial: true,
+                      persistent: true,
+                      ignored: p =>
+                          isIgnoredWorktreePath(
+                              target.commonDir,
+                              target.root,
+                              p,
+                          ),
+                  }),
+              ];
         const entry: Entry = {
-            watcher,
+            watchers,
             listeners: new Set(),
             pending: new Set(),
             timer: null,
         };
-        watcher.on('all', (_event, changedPath) =>
-            this.onChange(target, entry, changedPath),
-        );
-        watcher.on('error', () => {
-            // A watcher error MUST NOT crash the service; subscribers simply stop receiving.
-        });
+        for (const watcher of watchers) {
+            watcher.on('all', (_event, changedPath) =>
+                this.onChange(target, entry, changedPath),
+            );
+            watcher.on('error', () => {
+                // A watcher error MUST NOT crash the service; subscribers simply stop receiving.
+            });
+        }
         this.entries.set(target.repoId, entry);
         return entry;
     }
@@ -191,7 +236,7 @@ export class WatcherRegistry {
             clearTimeout(entry.timer);
             entry.timer = null;
         }
-        void entry.watcher.close();
+        for (const watcher of entry.watchers) void watcher.close();
         this.entries.delete(repoId);
     }
 }
