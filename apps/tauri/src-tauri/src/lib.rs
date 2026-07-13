@@ -21,6 +21,9 @@ const PROFILE_STORE_FILE: &str = "profiles.json";
 const READY_TIMEOUT: Duration = Duration::from_secs(10);
 const STDERR_LIMIT: u64 = 16 * 1024;
 
+#[cfg(windows)]
+const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ConnectionProfile {
@@ -263,6 +266,22 @@ fn spawn_stderr_reader(stderr: impl Read + Send + 'static) -> thread::JoinHandle
     })
 }
 
+fn background_command(executable: &str) -> Command {
+    #[cfg(windows)]
+    let mut command = Command::new(executable);
+    #[cfg(not(windows))]
+    let command = Command::new(executable);
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+
+        // SSH is a console application, but the desktop shell surfaces its
+        // redacted diagnostics in-app instead of opening a terminal window.
+        command.creation_flags(CREATE_NO_WINDOW);
+    }
+    command
+}
+
 fn start_tunnel(profile: &ConnectionProfile) -> Result<TunnelProcess, String> {
     validate_profile(profile)?;
     // Reserve the loopback port while building the child process. SSH receives the
@@ -275,7 +294,7 @@ fn start_tunnel(profile: &ConnectionProfile) -> Result<TunnelProcess, String> {
         .map_err(|error| format!("Could not inspect the reserved loopback port: {error}"))?
         .port();
     let args = ssh_arguments(profile, local_port);
-    let mut child = Command::new("ssh")
+    let mut child = background_command("ssh")
         .args(&args)
         .stdin(Stdio::null())
         .stdout(Stdio::null())
@@ -283,8 +302,7 @@ fn start_tunnel(profile: &ConnectionProfile) -> Result<TunnelProcess, String> {
         .spawn()
         .map_err(|error| {
             if error.kind() == io::ErrorKind::NotFound {
-                "OpenSSH (ssh) was not found. Install an OpenSSH client and retry."
-                    .to_string()
+                "OpenSSH (ssh) was not found. Install an OpenSSH client and retry.".to_string()
             } else {
                 format!("Could not start OpenSSH: {error}")
             }
