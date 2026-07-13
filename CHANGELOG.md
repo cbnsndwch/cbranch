@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.1.3
+
+### Features
+
+- Import selected Git repositories from a host folder into a new or existing
+  workspace, with bounded shallow discovery, atomic membership updates, and
+  protection against cross-workspace moves by @cbnsndwch
+
+**Full commit history:** https://github.com/cbnsndwch/cbranch/compare/v0.1.2...v0.1.3
+
 ## v0.1.2
 
 ### Bug fixes
