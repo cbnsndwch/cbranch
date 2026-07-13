@@ -31,6 +31,8 @@ import {
     type DiffFile,
     type DiffSpec,
     type EngagementColor,
+    type EngagementDirectoryImportTarget,
+    type EngagementDirectoryPreview,
     type EngagementId,
     type EngagementSlug,
     type EngagementWorkspace,
@@ -115,6 +117,20 @@ export const useFilesystemDirectory = (
     });
 };
 
+/** Bounded, shallow host repository discovery for workspace directory imports. */
+export const useEngagementDirectoryPreview = (
+    path: string,
+    enabled = true,
+): UseQueryResult<EngagementDirectoryPreview> => {
+    const api = useApi();
+    return useQuery({
+        queryKey: queryKeys.engagementDirectoryPreview(path),
+        queryFn: () => api.engagementDirectoryPreview(path),
+        enabled: enabled && path.trim() !== '',
+        staleTime: 30_000,
+    });
+};
+
 /** Host-persisted consulting partitions and each partition's open-repo session. */
 export const useEngagementWorkspace =
     (): UseQueryResult<EngagementWorkspace> => {
@@ -150,6 +166,13 @@ export const useCreateEngagement = () =>
     }>((api, { name, color, avatarUrl, slug }) =>
         api.engagementCreate(name, color, avatarUrl, slug),
     );
+
+export const useImportEngagementDirectory = () =>
+    useWorkspaceMutation<{
+        readonly path: string;
+        readonly candidateRoots: ReadonlyArray<string>;
+        readonly target: EngagementDirectoryImportTarget;
+    }>((api, input) => api.engagementDirectoryImport(input));
 
 export const useUpdateEngagement = () =>
     useWorkspaceMutation<{

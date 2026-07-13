@@ -7,9 +7,11 @@ import { describe, expect, test } from 'vitest';
 
 import { run } from '../testing/effect-run';
 import {
+    ENGAGEMENT_DIRECTORY_SCAN_LIMIT,
     FILESYSTEM_LIST_LIMIT,
     filesystemRootCandidates,
     listFilesystemDirectory,
+    scanFilesystemDirectory,
 } from './list-directory';
 
 describe('listFilesystemDirectory', () => {
@@ -93,5 +95,28 @@ describe('listFilesystemDirectory', () => {
         );
         expect(listing.entries).toHaveLength(FILESYSTEM_LIST_LIMIT);
         expect(listing.truncated).toBe(true);
+    });
+
+    test('scans only sorted, immediate real directories for workspace imports', async () => {
+        const root = mkdtempSync(join(tmpdir(), 'cbranch-fs-import-'));
+        mkdirSync(join(root, 'zebra'));
+        mkdirSync(join(root, 'alpha'));
+        mkdirSync(join(root, '.hidden'));
+        symlinkSync(join(root, 'alpha'), join(root, 'linked-alpha'));
+        for (let index = 0; index <= ENGAGEMENT_DIRECTORY_SCAN_LIMIT; index++)
+            mkdirSync(join(root, `repo-${index}`));
+
+        const scan = await run(
+            scanFilesystemDirectory(root, [{ label: 'Fixture', path: root }]),
+        );
+        expect(scan.entries).toHaveLength(ENGAGEMENT_DIRECTORY_SCAN_LIMIT);
+        expect(scan.entries.map(entry => entry.name)).toEqual(
+            scan.entries.map(entry => entry.name).toSorted(),
+        );
+        expect(scan.entries.map(entry => entry.name)).not.toContain('.hidden');
+        expect(scan.entries.map(entry => entry.name)).not.toContain(
+            'linked-alpha',
+        );
+        expect(scan.truncated).toBe(true);
     });
 });

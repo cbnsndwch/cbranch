@@ -46,11 +46,19 @@ export const handlersLayer = CbranchRpcs.toLayer({
         Effect.flatMap(GitEngine, engine =>
             engine.filesystemListDir({ path, showHidden }),
         ),
+    EngagementDirectoryPreview: ({ path }) =>
+        Effect.flatMap(GitEngine, engine =>
+            engine.engagementDirectoryPreview(path),
+        ),
     EngagementList: () =>
         Effect.flatMap(GitEngine, engine => engine.engagementList()),
     EngagementCreate: ({ name, color, slug, avatarUrl }) =>
         Effect.flatMap(GitEngine, engine =>
             engine.engagementCreate(name, color, avatarUrl, slug),
+        ),
+    EngagementDirectoryImport: ({ path, candidateRoots, target }) =>
+        Effect.flatMap(GitEngine, engine =>
+            engine.engagementDirectoryImport({ path, candidateRoots, target }),
         ),
     EngagementUpdate: ({ engagementId, name, slug, color, avatarUrl }) =>
         Effect.flatMap(GitEngine, engine =>

@@ -36,10 +36,12 @@ import {
 } from '../schemas/domain';
 import { GitError } from '../schemas/errors';
 import {
+    EngagementDirectoryImportTarget,
     EngagementColor,
     EngagementId,
     EngagementSlug,
     EngagementWorkspace,
+    EngagementDirectoryPreview,
 } from '../schemas/engagements';
 import { FilesystemDirectoryListing } from '../schemas/filesystem';
 import {
@@ -141,6 +143,13 @@ export const CbranchRpcs = RpcGroup.make(
         success: FilesystemDirectoryListing,
         error: GitError,
     }),
+    // engagement.directoryPreview — shallow, bounded Git repository discovery below a
+    // host-bounded directory. The UI must use a returned candidate root for import.
+    Rpc.make('EngagementDirectoryPreview', {
+        payload: { path: Schema.String },
+        success: EngagementDirectoryPreview,
+        error: GitError,
+    }),
     // engagement.list — complete, app-level consulting workspace snapshot.
     Rpc.make('EngagementList', {
         payload: {},
@@ -154,6 +163,17 @@ export const CbranchRpcs = RpcGroup.make(
             color: EngagementColor,
             slug: Schema.optional(EngagementSlug),
             avatarUrl: Schema.optional(Schema.String),
+        },
+        success: EngagementWorkspace,
+        error: GitError,
+    }),
+    // engagement.directoryImport — re-validates selected candidate roots and atomically
+    // adds them to an existing workspace or a newly created one.
+    Rpc.make('EngagementDirectoryImport', {
+        payload: {
+            path: Schema.String,
+            candidateRoots: Schema.Array(Schema.String),
+            target: EngagementDirectoryImportTarget,
         },
         success: EngagementWorkspace,
         error: GitError,

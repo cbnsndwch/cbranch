@@ -1,3 +1,4 @@
+import { mkdirSync, symlinkSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { type GitError, type RepoId } from '@cbranch/rpc-contract';
@@ -10,6 +11,7 @@ import { type GitEngineApi, makeGitEngine } from '../index';
 import { runScoped } from '../testing/effect-run';
 import {
     createFixtureWorkspace,
+    FixtureRepo,
     type FixtureWorkspace,
 } from '../testing/fixtures';
 
@@ -21,6 +23,21 @@ const withEngine = <A, E>(
     configPath: string,
     f: (engine: GitEngineApi) => Effect.Effect<A, E>,
 ): Promise<A> => runScoped(Effect.flatMap(makeGitEngine({ configPath }), f));
+
+const withImportEngine = <A, E>(
+    configPath: string,
+    root: string,
+    f: (engine: GitEngineApi) => Effect.Effect<A, E>,
+): Promise<A> =>
+    runScoped(
+        Effect.flatMap(
+            makeGitEngine({
+                configPath,
+                env: { ...process.env, CBRANCH_FS_ROOTS: root },
+            }),
+            f,
+        ),
+    );
 
 // Collapse an op to a comparable label — "ok" on success, else the GitError.code —
 // so two concurrently-raced ops can be compared without digging into Exit causes.
@@ -157,6 +174,79 @@ describe('GitEngine repo.* (P1, core-A)', () => {
             }),
         );
         expect(blob?.data.toString('utf8')).toBe('hello\n');
+    });
+});
+
+describe('GitEngine engagement directory import', () => {
+    test('discovers only direct real Git directories and imports selected roots', async () => {
+        const root = await ws.createPlainDir('directory-import');
+        const alpha = new FixtureRepo(join(root, 'alpha'));
+        mkdirSync(alpha.dir);
+        await alpha.init();
+        await alpha.commit({ message: 'init', files: { 'a.txt': 'a\n' } });
+        const linked = await alpha.worktreeAdd('../linked', {
+            branch: 'linked-worktree',
+        });
+        const beta = new FixtureRepo(join(root, 'beta'));
+        mkdirSync(beta.dir);
+        await beta.init();
+        await beta.commit({ message: 'init', files: { 'b.txt': 'b\n' } });
+        const hidden = new FixtureRepo(join(root, '.hidden'));
+        mkdirSync(hidden.dir);
+        await hidden.init();
+        mkdirSync(join(root, 'plain'));
+        symlinkSync(alpha.dir, join(root, 'linked-alpha'));
+        const cfg = newCfg();
+
+        const result = await withImportEngine(cfg, root, e =>
+            Effect.gen(function* () {
+                const preview = yield* e.engagementDirectoryPreview(root);
+                const alphaCandidate = preview.candidates.find(
+                    candidate => candidate.name === 'alpha',
+                )!;
+                const betaCandidate = preview.candidates.find(
+                    candidate => candidate.name === 'beta',
+                )!;
+                const linkedCandidate = preview.candidates.find(
+                    candidate => candidate.name === 'linked',
+                )!;
+                const created = yield* e.engagementCreate('Client', 'teal');
+                const workspace = yield* e.engagementDirectoryImport({
+                    path: root,
+                    candidateRoots: [
+                        alphaCandidate.root,
+                        betaCandidate.root,
+                        alphaCandidate.root,
+                    ],
+                    target: {
+                        kind: 'existing',
+                        engagementId: created.engagements[0]!.id,
+                    },
+                });
+                return {
+                    preview,
+                    workspace,
+                    linkedRoot: linked.dir,
+                    alphaRepoId: alphaCandidate.repoId,
+                    linkedRepoId: linkedCandidate.repoId,
+                };
+            }),
+        );
+
+        expect(
+            result.preview.candidates.map(candidate => candidate.name),
+        ).toEqual(['alpha', 'beta', 'linked']);
+        expect(result.linkedRoot).toBe(
+            result.preview.candidates.find(
+                candidate => candidate.name === 'linked',
+            )?.root,
+        );
+        expect(result.linkedRepoId).toBe(result.alphaRepoId);
+        expect(result.workspace.activeEngagementId).toBe(
+            result.workspace.engagements[0]?.id,
+        );
+        expect(result.workspace.engagements[0]?.repositories).toHaveLength(2);
+        expect(result.workspace.engagements[0]?.openRepoIds).toHaveLength(2);
     });
 });
 

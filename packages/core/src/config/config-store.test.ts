@@ -251,6 +251,96 @@ describe('engagement workspaces', () => {
         expect(reread.unassignedRepositories).toEqual([]);
     });
 
+    test('imports resolved repositories into a new workspace in one workspace update', async () => {
+        const store = makeConfigStore({ configPath: newPath() });
+        const api = entry('/client/api');
+        const web = entry('/client/web');
+        const workspace = await run(
+            store.importEngagementDirectory(
+                {
+                    kind: 'new',
+                    name: 'Client',
+                    color: 'violet',
+                    slug: EngagementSlug.make('client'),
+                },
+                [
+                    {
+                        path: api.path,
+                        name: api.name,
+                        repoId: RepoId.make(api.repoId),
+                    },
+                    {
+                        path: web.path,
+                        name: web.name,
+                        repoId: RepoId.make(web.repoId),
+                    },
+                ],
+            ),
+        );
+
+        const imported = workspace.engagements[0]!;
+        expect(workspace.activeEngagementId).toBe(imported.id);
+        expect(
+            imported.repositories.map(repository => repository.path),
+        ).toEqual([api.path, web.path]);
+        expect(imported.openRepoIds).toEqual([api.repoId, web.repoId]);
+        expect(imported.activeRepoId).toBe(web.repoId);
+    });
+
+    test('rejects an import that would move a repository without a partial update', async () => {
+        const store = makeConfigStore({ configPath: newPath() });
+        const owned = entry('/client/owned');
+        const unassigned = entry('/client/unassigned');
+        const first = await run(store.createEngagement('First', 'teal'));
+        const firstId = first.engagements[0]!.id;
+        await run(
+            store.importEngagementDirectory(
+                { kind: 'existing', engagementId: firstId },
+                [
+                    {
+                        path: owned.path,
+                        name: owned.name,
+                        repoId: RepoId.make(owned.repoId),
+                    },
+                ],
+            ),
+        );
+        const second = await run(store.createEngagement('Second', 'blue'));
+        const secondId = second.engagements[1]!.id;
+
+        await expect(
+            run(
+                store.importEngagementDirectory(
+                    { kind: 'existing', engagementId: secondId },
+                    [
+                        {
+                            path: owned.path,
+                            name: owned.name,
+                            repoId: RepoId.make(owned.repoId),
+                        },
+                        {
+                            path: unassigned.path,
+                            name: unassigned.name,
+                            repoId: RepoId.make(unassigned.repoId),
+                        },
+                    ],
+                ),
+            ),
+        ).rejects.toMatchObject({ code: 'repoUnavailable' });
+
+        const workspace = await run(store.listEngagements());
+        expect(workspace.engagements[0]?.repositories[0]?.repoId).toBe(
+            owned.repoId,
+        );
+        expect(workspace.engagements[1]?.repositories).toEqual([]);
+        expect(workspace.unassignedRepositories).toEqual([]);
+        expect(
+            (await run(store.listRecent())).map(
+                repository => repository.repoId,
+            ),
+        ).toEqual([owned.repoId]);
+    });
+
     test('persists, clears, and validates workspace avatar URLs', async () => {
         const path = newPath();
         const store = makeConfigStore({ configPath: path });

@@ -46,9 +46,13 @@ export {
 } from './git/version';
 export { computeRepoId, isRepoId, normalizeAbsolute } from './git/repo-id';
 export {
+    ENGAGEMENT_DIRECTORY_SCAN_LIMIT,
     FILESYSTEM_LIST_LIMIT,
     filesystemRootCandidates,
     listFilesystemDirectory,
+    scanFilesystemDirectory,
+    type FilesystemDirectoryScan,
+    type FilesystemDirectoryScanEntry,
 } from './fs/list-directory';
 export { makeRepoLockRegistry, type RepoLockRegistry } from './git/locks';
 export {
@@ -107,6 +111,7 @@ export {
     DEFAULT_THRESHOLDS,
     MAX_WORKSPACE_AVATAR_BYTES,
     makeConfigStore,
+    type EngagementDirectoryImportRepository,
     type EngagementEntry,
     type RecentRepoEntry,
     resolveConfigPath,

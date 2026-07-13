@@ -35,6 +35,8 @@ import {
     type DiffFile,
     type DiffSpec,
     type EngagementColor,
+    type EngagementDirectoryImportTarget,
+    type EngagementDirectoryPreview,
     type EngagementId,
     type EngagementSlug,
     type EngagementWorkspace,
@@ -119,6 +121,9 @@ export interface CbranchApi {
         readonly path?: string;
         readonly showHidden?: boolean;
     }): Promise<FilesystemDirectoryListing>;
+    engagementDirectoryPreview(
+        path: string,
+    ): Promise<EngagementDirectoryPreview>;
     engagementList(): Promise<EngagementWorkspace>;
     engagementCreate(
         name: string,
@@ -126,6 +131,11 @@ export interface CbranchApi {
         avatarUrl?: string,
         slug?: EngagementSlug,
     ): Promise<EngagementWorkspace>;
+    engagementDirectoryImport(input: {
+        readonly path: string;
+        readonly candidateRoots: ReadonlyArray<string>;
+        readonly target: EngagementDirectoryImportTarget;
+    }): Promise<EngagementWorkspace>;
     engagementUpdate(
         engagementId: EngagementId,
         patch: {
@@ -629,6 +639,10 @@ export const makeApi = (runtime: AppRuntime): CbranchApi => {
             runtime.runPromise(withClient(c => c.RepoRecentRemove({ repoId }))),
         filesystemListDir: input =>
             runtime.runPromise(withClient(c => c.FilesystemListDir(input))),
+        engagementDirectoryPreview: path =>
+            runtime.runPromise(
+                withClient(c => c.EngagementDirectoryPreview({ path })),
+            ),
         engagementList: () =>
             runtime.runPromise(withClient(c => c.EngagementList({}))),
         engagementCreate: (name, color, avatarUrl, slug) =>
@@ -636,6 +650,10 @@ export const makeApi = (runtime: AppRuntime): CbranchApi => {
                 withClient(c =>
                     c.EngagementCreate({ name, color, slug, avatarUrl }),
                 ),
+            ),
+        engagementDirectoryImport: input =>
+            runtime.runPromise(
+                withClient(c => c.EngagementDirectoryImport(input)),
             ),
         engagementUpdate: (engagementId, patch) =>
             runtime.runPromise(

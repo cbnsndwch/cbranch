@@ -31,6 +31,49 @@ export const EngagementColor = Schema.Literals([
 ]);
 export type EngagementColor = typeof EngagementColor.Type;
 
+/** A repository found directly below a host-selected workspace import directory. */
+export class EngagementDirectoryCandidate extends Schema.Class<EngagementDirectoryCandidate>(
+    'EngagementDirectoryCandidate',
+)({
+    name: Schema.String,
+    root: Schema.String,
+    repoId: RepoId,
+}) {}
+
+/** Bounded, shallow repository discovery for a workspace directory import. */
+export class EngagementDirectoryPreview extends Schema.Class<EngagementDirectoryPreview>(
+    'EngagementDirectoryPreview',
+)({
+    path: Schema.String,
+    candidates: Schema.Array(EngagementDirectoryCandidate),
+    truncated: Schema.Boolean,
+}) {}
+
+/** Add discovered repositories to an existing workspace. */
+export const ExistingEngagementDirectoryImportTarget = Schema.Struct({
+    kind: Schema.Literal('existing'),
+    engagementId: EngagementId,
+});
+export type ExistingEngagementDirectoryImportTarget =
+    typeof ExistingEngagementDirectoryImportTarget.Type;
+
+/** Create a workspace and add the discovered repositories to it. */
+export const NewEngagementDirectoryImportTarget = Schema.Struct({
+    kind: Schema.Literal('new'),
+    name: Schema.String,
+    color: EngagementColor,
+    slug: Schema.optional(EngagementSlug),
+});
+export type NewEngagementDirectoryImportTarget =
+    typeof NewEngagementDirectoryImportTarget.Type;
+
+export const EngagementDirectoryImportTarget = Schema.Union([
+    ExistingEngagementDirectoryImportTarget,
+    NewEngagementDirectoryImportTarget,
+]);
+export type EngagementDirectoryImportTarget =
+    typeof EngagementDirectoryImportTarget.Type;
+
 /**
  * One engagement and its isolated repository session. `repositories` is authoritative
  * membership. `openRepoIds` is ordered like the tab strip and is always a subset of it;

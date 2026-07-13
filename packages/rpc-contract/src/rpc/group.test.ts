@@ -36,6 +36,9 @@ import {
 } from '../schemas/domain';
 import { GitError } from '../schemas/errors';
 import {
+    EngagementDirectoryCandidate,
+    EngagementDirectoryImportTarget,
+    EngagementDirectoryPreview,
     Engagement,
     EngagementId,
     EngagementSlug,
@@ -162,6 +165,16 @@ const filesystemDirectory = new FilesystemDirectoryListing({
     breadcrumbs: [],
     roots: [new FilesystemRoot({ label: 'Host', path: '/srv' })],
     entries: [],
+    truncated: false,
+});
+const engagementDirectoryCandidate = new EngagementDirectoryCandidate({
+    name: 'repo',
+    root: '/srv/repo',
+    repoId,
+});
+const engagementDirectoryPreview = new EngagementDirectoryPreview({
+    path: '/srv',
+    candidates: [engagementDirectoryCandidate],
     truncated: false,
 });
 
@@ -617,8 +630,11 @@ const handlers = CbranchRpcs.toLayer({
     RepoRecentList: () => Effect.succeed([recentRepo]),
     RepoRecentRemove: () => Effect.void,
     FilesystemListDir: () => Effect.succeed(filesystemDirectory),
+    EngagementDirectoryPreview: () =>
+        Effect.succeed(engagementDirectoryPreview),
     EngagementList: () => Effect.succeed(engagementWorkspace),
     EngagementCreate: () => Effect.succeed(engagementWorkspace),
+    EngagementDirectoryImport: () => Effect.succeed(engagementWorkspace),
     EngagementUpdate: () => Effect.succeed(engagementWorkspace),
     EngagementDelete: () => Effect.succeed(engagementWorkspace),
     EngagementReorder: () => Effect.succeed(engagementWorkspace),
@@ -860,9 +876,17 @@ describe('CbranchRpcs engagement workspace contract', () => {
             const client = yield* RpcTest.makeClient(CbranchRpcs);
             const listed = yield* client.EngagementList({});
             const filesystem = yield* client.FilesystemListDir({});
+            const preview = yield* client.EngagementDirectoryPreview({
+                path: '/srv',
+            });
             yield* client.EngagementCreate({
                 name: 'Acme Consulting',
                 color: 'teal',
+            });
+            yield* client.EngagementDirectoryImport({
+                path: '/srv',
+                candidateRoots: ['/srv/repo'],
+                target: { kind: 'existing', engagementId },
             });
             yield* client.EngagementUpdate({
                 engagementId,
@@ -893,7 +917,7 @@ describe('CbranchRpcs engagement workspace contract', () => {
             yield* client.EngagementRepoRemove({ engagementId, repoId });
             yield* client.EngagementDelete({ engagementId });
             yield* client.EngagementReorder({ engagementIds: [engagementId] });
-            return { listed, filesystem };
+            return { listed, filesystem, preview };
         }).pipe(Effect.provide(handlers), Effect.scoped);
 
         const result = await Effect.runPromise(program);
@@ -902,6 +926,37 @@ describe('CbranchRpcs engagement workspace contract', () => {
             repoId,
         );
         expect(result.filesystem.path).toBe('/srv');
+        expect(result.preview.candidates[0]?.root).toBe('/srv/repo');
+    });
+
+    test('directory import target accepts existing and new workspace forms', () => {
+        expect(
+            Exit.isSuccess(
+                Schema.decodeUnknownExit(EngagementDirectoryImportTarget)({
+                    kind: 'existing',
+                    engagementId,
+                }),
+            ),
+        ).toBe(true);
+        expect(
+            Exit.isSuccess(
+                Schema.decodeUnknownExit(EngagementDirectoryImportTarget)({
+                    kind: 'new',
+                    name: 'Acme Consulting',
+                    color: 'teal',
+                    slug: 'acme-consulting',
+                }),
+            ),
+        ).toBe(true);
+        expect(
+            Exit.isFailure(
+                Schema.decodeUnknownExit(EngagementDirectoryImportTarget)({
+                    kind: 'new',
+                    name: 'Acme Consulting',
+                    color: 'orange',
+                }),
+            ),
+        ).toBe(true);
     });
 
     test('GitHub PR metadata round-trips without credential fields', async () => {

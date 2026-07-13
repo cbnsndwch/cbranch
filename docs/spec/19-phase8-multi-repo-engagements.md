@@ -54,6 +54,13 @@ also has a unique, editable URL slug, generated from its name when created.
 - **REQ-P8-ENG-005** Repository switching MUST group entries by workspace. If a
   selected repo belongs to another workspace, cbranch MUST switch to that
   workspace; it MUST NOT silently move the repo across the partition.
+- **REQ-P8-ENG-006** The UI MUST support importing selected repositories from a
+  host folder into either the current workspace or a newly named workspace. The
+  host MUST scan only immediate, non-hidden, non-symlinked directory children,
+  resolve each candidate through Git, and bound the candidate count. Import MUST
+  revalidate the selected paths and persist recent entries, membership, open tabs,
+  and the active workspace in one config write. A repository owned by another
+  workspace MUST be shown as unavailable and MUST NOT be moved by import.
 
 ### Concurrent repository session
 
@@ -122,7 +129,9 @@ also has a unique, editable URL slug, generated from its name when created.
 Phase 8 adds these app-level methods to the existing RPC group:
 
 - `EngagementList`
+- `EngagementDirectoryPreview`
 - `EngagementCreate`
+- `EngagementDirectoryImport`
 - `EngagementUpdate`
 - `EngagementDelete`
 - `EngagementRepoAssign`

@@ -28,6 +28,7 @@ import {
     type ContentEncoding,
     type DiffFile,
     type EngagementColor,
+    type EngagementDirectoryImportTarget,
     type EngagementId,
     type EngagementSlug,
     type EngagementWorkspace,
@@ -45,6 +46,7 @@ import {
     type WritableScope,
     type FileContentResult,
     type FilesystemDirectoryListing,
+    type EngagementDirectoryPreview,
     type FileHistoryPage,
     type GcPrune,
     type GcResult,
@@ -120,6 +122,16 @@ export interface GitEngineApi {
         readonly path?: string;
         readonly showHidden?: boolean;
     }) => Effect.Effect<FilesystemDirectoryListing, GitError>;
+    /** Shallow, host-bounded Git repository discovery below one workspace directory. */
+    readonly engagementDirectoryPreview: (
+        path: string,
+    ) => Effect.Effect<EngagementDirectoryPreview, GitError>;
+    /** Re-validates selected roots, then atomically imports them into a workspace. */
+    readonly engagementDirectoryImport: (input: {
+        readonly path: string;
+        readonly candidateRoots: ReadonlyArray<string>;
+        readonly target: EngagementDirectoryImportTarget;
+    }) => Effect.Effect<EngagementWorkspace, GitError>;
     /** App-level consulting partitions and their ordered open-repository sessions. */
     readonly engagementList: () => Effect.Effect<EngagementWorkspace, GitError>;
     readonly engagementCreate: (

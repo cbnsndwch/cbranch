@@ -29,12 +29,26 @@ import { classifyNodeError, gitError } from '../git/errors';
 
 export const FILESYSTEM_LIST_LIMIT = 500;
 
+/** Git resolution is comparatively expensive, so directory import scans use a lower cap. */
+export const ENGAGEMENT_DIRECTORY_SCAN_LIMIT = 100;
+
 type RootCandidate = {
     readonly label: string;
     readonly path: string;
 };
 
 type ResolvedRoot = RootCandidate & { readonly path: string };
+
+export interface FilesystemDirectoryScanEntry {
+    readonly name: string;
+    readonly path: string;
+}
+
+export interface FilesystemDirectoryScan {
+    readonly path: string;
+    readonly entries: ReadonlyArray<FilesystemDirectoryScanEntry>;
+    readonly truncated: boolean;
+}
 
 const isContainedBy = (candidate: string, root: string): boolean => {
     const relation = relative(root, candidate);
@@ -118,28 +132,52 @@ export const filesystemRootCandidates = (
     })),
 ];
 
-const listDirectory = async (
-    input: { readonly path?: string; readonly showHidden?: boolean },
+const resolveFilesystemDirectory = async (
+    requested: string | undefined,
     candidates: ReadonlyArray<RootCandidate>,
-): Promise<FilesystemDirectoryListing> => {
+): Promise<{
+    readonly path: string;
+    readonly roots: ReadonlyArray<ResolvedRoot>;
+}> => {
     const roots = await resolveRoots(candidates);
     if (roots.length === 0)
         throw gitError(
             'fsError',
             'no usable filesystem picker roots are available',
         );
-    const requested = input.path ?? roots[0]!.path;
-    if (!isAbsolute(requested))
+    const requestedPath = requested ?? roots[0]!.path;
+    if (!isAbsolute(requestedPath))
         throw gitError('fsError', 'filesystem picker paths must be absolute');
-    const path = await realpath(requested);
+    const path = await realpath(requestedPath);
     const info = await stat(path);
     if (!info.isDirectory())
         throw gitError(
             'fsError',
             'filesystem picker paths must name a directory',
         );
+    if (!roots.some(candidate => isContainedBy(path, candidate.path)))
+        throw gitError(
+            'permissionDenied',
+            'directory is outside the allowed roots',
+        );
+    if (isDangerousRoot(path))
+        throw gitError(
+            'permissionDenied',
+            'directory is outside the allowed roots',
+        );
+    return { path, roots };
+};
+
+const listDirectory = async (
+    input: { readonly path?: string; readonly showHidden?: boolean },
+    candidates: ReadonlyArray<RootCandidate>,
+): Promise<FilesystemDirectoryListing> => {
+    const { path, roots } = await resolveFilesystemDirectory(
+        input.path,
+        candidates,
+    );
     const root = roots.find(candidate => isContainedBy(path, candidate.path));
-    if (!root || isDangerousRoot(path))
+    if (!root)
         throw gitError(
             'permissionDenied',
             'directory is outside the allowed roots',
@@ -234,6 +272,31 @@ const listDirectory = async (
     });
 };
 
+const scanDirectory = async (
+    path: string,
+    candidates: ReadonlyArray<RootCandidate>,
+): Promise<FilesystemDirectoryScan> => {
+    const resolved = await resolveFilesystemDirectory(path, candidates);
+    const entries = (await readdir(resolved.path, { withFileTypes: true }))
+        .filter(
+            entry =>
+                !entry.name.startsWith('.') &&
+                !entry.isSymbolicLink() &&
+                entry.isDirectory(),
+        )
+        .toSorted((left, right) => left.name.localeCompare(right.name));
+    return {
+        path: resolved.path,
+        entries: entries
+            .slice(0, ENGAGEMENT_DIRECTORY_SCAN_LIMIT)
+            .map(entry => ({
+                name: entry.name,
+                path: join(resolved.path, entry.name),
+            })),
+        truncated: entries.length > ENGAGEMENT_DIRECTORY_SCAN_LIMIT,
+    };
+};
+
 /** List one immediate, host-bounded directory for the reusable filesystem picker. */
 export const listFilesystemDirectory = (
     input: { readonly path?: string; readonly showHidden?: boolean },
@@ -241,5 +304,15 @@ export const listFilesystemDirectory = (
 ): Effect.Effect<FilesystemDirectoryListing, GitError> =>
     Effect.tryPromise({
         try: () => listDirectory(input, candidates),
+        catch: filesystemError,
+    });
+
+/** List immediate, non-hidden real directories for bounded workspace import discovery. */
+export const scanFilesystemDirectory = (
+    path: string,
+    candidates: ReadonlyArray<RootCandidate>,
+): Effect.Effect<FilesystemDirectoryScan, GitError> =>
+    Effect.tryPromise({
+        try: () => scanDirectory(path, candidates),
         catch: filesystemError,
     });

@@ -3,8 +3,14 @@ import {
     type RecentRepo,
     type RepoId,
 } from '@cbranch/rpc-contract';
-import { FolderPlus, GitBranch, LayoutDashboard, X } from 'lucide-react';
-import { type MouseEvent, useEffect } from 'react';
+import {
+    FolderInput,
+    FolderPlus,
+    GitBranch,
+    LayoutDashboard,
+    X,
+} from 'lucide-react';
+import { type MouseEvent, useEffect, useState } from 'react';
 
 import { cn } from '../lib/cn';
 import {
@@ -18,6 +24,7 @@ import { useNavigation } from '../state/navigation';
 import { useUiStore } from '../state/store';
 import { Button } from './ui/button';
 import { WorkspaceAvatar } from './WorkspaceAvatar';
+import { WorkspaceDirectoryImportDialog } from './WorkspaceDirectoryImportDialog';
 import {
     Tooltip,
     TooltipContent,
@@ -102,6 +109,7 @@ export function WorkspaceBar() {
     const activeRepoId = useUiStore(s => s.activeRepoId);
     const openSwitcher = useUiStore(s => s.setRepoSwitcherOpen);
     const openManager = useUiStore(s => s.setEngagementManagerOpen);
+    const [directoryImportOpen, setDirectoryImportOpen] = useState(false);
     const session = useSetEngagementSession();
     const activateEngagement = useActivateEngagement();
     const { openEngagement, openRepo } = useNavigation();
@@ -247,8 +255,35 @@ export function WorkspaceBar() {
                         />
                         <TooltipContent>Add repository</TooltipContent>
                     </Tooltip>
+                    <Tooltip>
+                        <TooltipTrigger
+                            render={
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="size-8 shrink-0"
+                                    aria-label="Import repositories from folder"
+                                    onClick={() => setDirectoryImportOpen(true)}
+                                >
+                                    <FolderInput
+                                        className="size-4"
+                                        aria-hidden="true"
+                                    />
+                                </Button>
+                            }
+                        />
+                        <TooltipContent>
+                            Import repositories from folder
+                        </TooltipContent>
+                    </Tooltip>
                 </div>
             </div>
+            <WorkspaceDirectoryImportDialog
+                open={directoryImportOpen}
+                onOpenChange={setDirectoryImportOpen}
+                target={{ kind: 'existing', engagementId: engagement.id }}
+            />
         </TooltipProvider>
     );
 }

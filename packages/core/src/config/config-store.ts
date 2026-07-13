@@ -20,6 +20,7 @@ import {
     ChangeSetPullRequest as ChangeSetPullRequestSchema,
     Engagement,
     type EngagementColor,
+    type EngagementDirectoryImportTarget,
     type EngagementId,
     EngagementId as EngagementIdBrand,
     type EngagementSlug,
@@ -63,6 +64,13 @@ export interface RecentRepoEntry {
     readonly name: string;
     readonly repoId: string;
     readonly lastOpenedAt: number;
+}
+
+/** A resolved repository ready to be added by one atomic workspace import. */
+export interface EngagementDirectoryImportRepository {
+    readonly path: string;
+    readonly name: string;
+    readonly repoId: RepoId;
 }
 
 /** Host-persisted consulting partition and its ordered open-repository session. */
@@ -198,6 +206,11 @@ export interface ConfigStore {
         avatarUrl?: string,
         slug?: EngagementSlug,
     ) => Effect.Effect<EngagementWorkspace, GitError>;
+    /** Atomically upsert resolved recents and open them in an existing or new workspace. */
+    readonly importEngagementDirectory: (
+        target: EngagementDirectoryImportTarget,
+        repositories: ReadonlyArray<EngagementDirectoryImportRepository>,
+    ) => Effect.Effect<EngagementWorkspace, GitError>;
     readonly updateEngagement: (
         engagementId: EngagementId,
         patch: {
@@ -323,6 +336,65 @@ const uniqueEngagementSlug = (
             .replace(/-+$/g, '')}${ending}`;
         if (!used.has(candidate)) return candidate;
     }
+};
+
+const createEngagementEntry = (
+    config: Config,
+    rawName: string,
+    color: EngagementColor,
+    rawAvatarUrl: string | undefined,
+    rawSlug: EngagementSlug | undefined,
+): Effect.Effect<EngagementEntry, GitError> => {
+    const name = rawName.trim();
+    if (name === '')
+        return Effect.fail(
+            gitError('gitFailed', 'engagement name cannot be empty'),
+        );
+    const avatarUrl =
+        rawAvatarUrl === undefined
+            ? undefined
+            : normalizeAvatarUrl(rawAvatarUrl);
+    if (rawAvatarUrl !== undefined && avatarUrl === undefined)
+        return Effect.fail(
+            gitError(
+                'gitFailed',
+                'workspace avatar must be an http(s) image URL or a local upload',
+            ),
+        );
+    const requestedSlug =
+        rawSlug === undefined ? undefined : validEngagementSlug(rawSlug);
+    if (rawSlug !== undefined && requestedSlug === undefined)
+        return Effect.fail(
+            gitError(
+                'gitFailed',
+                'workspace slug must use lowercase letters, numbers, and hyphens',
+            ),
+        );
+    const usedSlugs = new Set(
+        config.engagements.map(engagement => engagement.slug),
+    );
+    if (requestedSlug !== undefined && usedSlugs.has(requestedSlug))
+        return Effect.fail(
+            gitError(
+                'gitFailed',
+                `workspace slug "${requestedSlug}" is already in use`,
+            ),
+        );
+    const now = Date.now();
+    return Effect.succeed({
+        id: randomUUID(),
+        name,
+        slug:
+            requestedSlug ??
+            uniqueEngagementSlug(slugFromName(name), usedSlugs),
+        color,
+        avatarUrl,
+        repoIds: [],
+        openRepoIds: [],
+        changeSets: [],
+        createdAt: now,
+        updatedAt: now,
+    });
 };
 
 type WorkspaceAvatarType = {
@@ -538,68 +610,140 @@ export const makeConfigStore = (opts?: {
         listEngagements: () =>
             Effect.map(load(), config => toEngagementWorkspace(config)),
         createEngagement: (rawName, color, rawAvatarUrl, rawSlug) =>
-            updateWorkspace(config => {
-                const name = rawName.trim();
-                if (name === '')
-                    return Effect.fail(
-                        gitError(
-                            'gitFailed',
-                            'engagement name cannot be empty',
-                        ),
+            updateWorkspace(config =>
+                Effect.map(
+                    createEngagementEntry(
+                        config,
+                        rawName,
+                        color,
+                        rawAvatarUrl,
+                        rawSlug,
+                    ),
+                    entry => ({
+                        ...config,
+                        engagements: [...config.engagements, entry],
+                        activeEngagementId: entry.id,
+                    }),
+                ),
+            ),
+        importEngagementDirectory: (target, repositories) =>
+            updateWorkspace(config =>
+                Effect.gen(function* () {
+                    const imported: EngagementDirectoryImportRepository[] = [];
+                    const seenRepoIds = new Set<string>();
+                    for (const repository of repositories) {
+                        if (
+                            repository.path === '' ||
+                            repository.name === '' ||
+                            repository.repoId === '' ||
+                            seenRepoIds.has(repository.repoId)
+                        )
+                            continue;
+                        seenRepoIds.add(repository.repoId);
+                        imported.push(repository);
+                    }
+                    if (imported.length === 0)
+                        return yield* Effect.fail(
+                            gitError(
+                                'repoUnavailable',
+                                'no selected repository is available for import',
+                            ),
+                        );
+
+                    const existing =
+                        target.kind === 'existing'
+                            ? config.engagements.find(
+                                  engagement =>
+                                      engagement.id === target.engagementId,
+                              )
+                            : undefined;
+                    if (target.kind === 'existing' && !existing)
+                        return yield* Effect.fail(
+                            missingEngagement(target.engagementId),
+                        );
+                    const destination =
+                        target.kind === 'existing'
+                            ? existing!
+                            : yield* createEngagementEntry(
+                                  config,
+                                  target.name,
+                                  target.color,
+                                  undefined,
+                                  target.slug,
+                              );
+
+                    for (const repository of imported) {
+                        const owner = config.engagements.find(engagement =>
+                            engagement.repoIds.includes(repository.repoId),
+                        );
+                        if (owner && owner.id !== destination.id)
+                            return yield* Effect.fail(
+                                gitError(
+                                    'repoUnavailable',
+                                    'a selected repository belongs to another workspace',
+                                ),
+                            );
+                    }
+
+                    const now = Date.now();
+                    const importedRepoIds = imported.map(
+                        repository => repository.repoId,
                     );
-                const avatarUrl =
-                    rawAvatarUrl === undefined
-                        ? undefined
-                        : normalizeAvatarUrl(rawAvatarUrl);
-                if (rawAvatarUrl !== undefined && avatarUrl === undefined)
-                    return Effect.fail(
-                        gitError(
-                            'gitFailed',
-                            'workspace avatar must be an http(s) image URL or a local upload',
-                        ),
+                    const members = new Set(destination.repoIds);
+                    const open = new Set(destination.openRepoIds);
+                    const nextDestination: EngagementEntry = {
+                        ...destination,
+                        repoIds: [
+                            ...destination.repoIds,
+                            ...importedRepoIds.filter(repoId => {
+                                if (members.has(repoId)) return false;
+                                members.add(repoId);
+                                return true;
+                            }),
+                        ],
+                        openRepoIds: [
+                            ...destination.openRepoIds,
+                            ...importedRepoIds.filter(repoId => {
+                                if (open.has(repoId)) return false;
+                                open.add(repoId);
+                                return true;
+                            }),
+                        ],
+                        activeRepoId:
+                            importedRepoIds[importedRepoIds.length - 1],
+                        updatedAt: now,
+                    };
+                    const importedIds = new Set<string>(importedRepoIds);
+                    const importedPaths = new Set(
+                        imported.map(repository => repository.path),
                     );
-                const requestedSlug =
-                    rawSlug === undefined
-                        ? undefined
-                        : validEngagementSlug(rawSlug);
-                if (rawSlug !== undefined && requestedSlug === undefined)
-                    return Effect.fail(
-                        gitError(
-                            'gitFailed',
-                            'workspace slug must use lowercase letters, numbers, and hyphens',
-                        ),
-                    );
-                const usedSlugs = new Set(
-                    config.engagements.map(engagement => engagement.slug),
-                );
-                if (requestedSlug !== undefined && usedSlugs.has(requestedSlug))
-                    return Effect.fail(
-                        gitError(
-                            'gitFailed',
-                            `workspace slug "${requestedSlug}" is already in use`,
-                        ),
-                    );
-                const now = Date.now();
-                const entry: EngagementEntry = {
-                    id: randomUUID(),
-                    name,
-                    slug:
-                        requestedSlug ??
-                        uniqueEngagementSlug(slugFromName(name), usedSlugs),
-                    color,
-                    avatarUrl,
-                    repoIds: [],
-                    openRepoIds: [],
-                    changeSets: [],
-                    createdAt: now,
-                    updatedAt: now,
-                };
-                return Effect.succeed({
-                    ...config,
-                    engagements: [...config.engagements, entry],
-                    activeEngagementId: entry.id,
-                });
-            }),
+                    return {
+                        ...config,
+                        recentRepos: [
+                            ...imported.map(repository => ({
+                                path: repository.path,
+                                name: repository.name,
+                                repoId: repository.repoId,
+                                lastOpenedAt: now,
+                            })),
+                            ...config.recentRepos.filter(
+                                repository =>
+                                    !importedIds.has(repository.repoId) &&
+                                    !importedPaths.has(repository.path),
+                            ),
+                        ],
+                        engagements:
+                            target.kind === 'existing'
+                                ? config.engagements.map(engagement =>
+                                      engagement.id === destination.id
+                                          ? nextDestination
+                                          : engagement,
+                                  )
+                                : [...config.engagements, nextDestination],
+                        activeEngagementId: destination.id,
+                    };
+                }),
+            ),
         updateEngagement: (engagementId, patch) =>
             updateWorkspace(config => {
                 const current = config.engagements.find(

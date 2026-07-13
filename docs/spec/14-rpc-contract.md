@@ -289,7 +289,9 @@ Conventions: ✎ = mutating (takes the per-repo lock); ⇉ = streaming RPC. All 
 | Method | Payload | Success | Notes |
 |---|---|---|---|
 | `engagement.list` | `{}` | `EngagementWorkspace` | A workspace includes its opaque internal id and unique URL `slug`. |
+| `engagement.directoryPreview` | `{ path }` | `EngagementDirectoryPreview` | Bounded, shallow Git discovery below one host-bounded directory. Returns only immediate, non-hidden, non-symlinked directory candidates. |
 | `engagement.create` ✎ | `{ name, color, slug?, avatarUrl? }` | `EngagementWorkspace` | Omitted slug is generated from the name and made unique. |
+| `engagement.directoryImport` ✎ | `{ path, candidateRoots, target }` | `EngagementWorkspace` | Revalidates preview candidates then atomically imports them into an existing or newly created workspace. It rejects repositories owned by another workspace. |
 | `engagement.update` ✎ | `{ engagementId, name?, slug?, color?, avatarUrl? }` | `EngagementWorkspace` | Renaming does not change a slug; an explicit slug must be unique. |
 
 ### History & diff — P1

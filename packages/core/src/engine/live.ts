@@ -14,6 +14,10 @@ import { basename, sep } from 'node:path';
 import {
     AppSettings,
     CommandLogEntry,
+    EngagementDirectoryCandidate,
+    EngagementDirectoryPreview,
+    type EngagementDirectoryImportTarget,
+    type EngagementWorkspace,
     type GitError,
     HistoryColumnVisibility,
     type InvalidationEvent,
@@ -27,6 +31,7 @@ import { type Cause, Effect, Layer, Queue, Scope, Stream } from 'effect';
 import {
     filesystemRootCandidates,
     listFilesystemDirectory,
+    scanFilesystemDirectory,
 } from '../fs/list-directory';
 import {
     type AppSettingsData,
@@ -410,6 +415,78 @@ export const makeGitEngine = (
                 return new RepoInitResult({ repoId: repo.repoId });
             });
 
+        const engagementDirectoryPreview = (
+            path: string,
+        ): Effect.Effect<EngagementDirectoryPreview, GitError> =>
+            Effect.gen(function* () {
+                const recent = yield* configStore.listRecent();
+                const scan = yield* scanFilesystemDirectory(
+                    path,
+                    filesystemRootCandidates(recent, env),
+                );
+                const resolved = yield* Effect.forEach(
+                    scan.entries,
+                    entry =>
+                        Effect.match(resolveRepo(entry.path), {
+                            onSuccess: repo =>
+                                new EngagementDirectoryCandidate({
+                                    name: entry.name,
+                                    root: repo.root,
+                                    repoId: repo.repoId,
+                                }),
+                            // A plain directory or one that disappeared during the shallow
+                            // scan is simply not an import candidate.
+                            onFailure: () => undefined,
+                        }),
+                    { concurrency: 8 },
+                );
+                return new EngagementDirectoryPreview({
+                    path: scan.path,
+                    candidates: resolved.filter(
+                        (
+                            candidate,
+                        ): candidate is EngagementDirectoryCandidate =>
+                            candidate !== undefined,
+                    ),
+                    truncated: scan.truncated,
+                });
+            });
+
+        const engagementDirectoryImport = (input: {
+            readonly path: string;
+            readonly candidateRoots: ReadonlyArray<string>;
+            readonly target: EngagementDirectoryImportTarget;
+        }): Effect.Effect<EngagementWorkspace, GitError> =>
+            Effect.gen(function* () {
+                const preview = yield* engagementDirectoryPreview(input.path);
+                const requestedRoots = new Set(input.candidateRoots);
+                if (requestedRoots.size === 0)
+                    return yield* Effect.fail(
+                        gitError(
+                            'repoUnavailable',
+                            'select at least one repository to import',
+                        ),
+                    );
+                const selected = preview.candidates.filter(candidate =>
+                    requestedRoots.has(candidate.root),
+                );
+                if (selected.length !== requestedRoots.size)
+                    return yield* Effect.fail(
+                        gitError(
+                            'repoUnavailable',
+                            'a selected repository is no longer available',
+                        ),
+                    );
+                return yield* configStore.importEngagementDirectory(
+                    input.target,
+                    selected.map(candidate => ({
+                        path: candidate.root,
+                        name: candidate.name,
+                        repoId: candidate.repoId,
+                    })),
+                );
+            });
+
         const api: GitEngineApi = {
             open,
             init,
@@ -422,6 +499,8 @@ export const makeGitEngine = (
                         filesystemRootCandidates(recent, env),
                     ),
                 ),
+            engagementDirectoryPreview,
+            engagementDirectoryImport,
             engagementList: () => configStore.listEngagements(),
             engagementCreate: (name, color, avatarUrl, slug) =>
                 configStore.createEngagement(name, color, avatarUrl, slug),

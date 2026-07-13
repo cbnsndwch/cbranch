@@ -6,6 +6,7 @@ import {
 import {
     ArrowDown,
     ArrowUp,
+    FolderInput,
     FolderPlus,
     GripVertical,
     ImageUp,
@@ -49,6 +50,7 @@ import {
 } from './ui/dialog';
 import { Input } from './ui/input';
 import { WorkspaceAvatar } from './WorkspaceAvatar';
+import { WorkspaceDirectoryImportDialog } from './WorkspaceDirectoryImportDialog';
 
 const errorMessage = (error: unknown): string =>
     typeof error === 'object' && error !== null && 'message' in error
@@ -81,6 +83,9 @@ export function EngagementManagerDialog() {
     const [uploadingAvatar, setUploadingAvatar] = useState(false);
     const [removingAvatar, setRemovingAvatar] = useState(false);
     const [draggedId, setDraggedId] = useState<EngagementId | null>(null);
+    const [directoryImportTarget, setDirectoryImportTarget] = useState<
+        EngagementId | 'new' | null
+    >(null);
     const avatarFileInputRef = useRef<HTMLInputElement>(null);
 
     const selected = workspace.data?.engagements.find(
@@ -321,17 +326,31 @@ export function EngagementManagerDialog() {
                     <div className="grid min-h-0 flex-1 grid-cols-1 grid-rows-[150px_minmax(0,1fr)] sm:grid-cols-[210px_1fr] sm:grid-rows-1">
                         <div className="bg-muted/50 flex min-h-0 flex-col border-b sm:border-r sm:border-b-0">
                             <div className="flex h-9 shrink-0 items-center justify-between border-b px-2 text-xs font-medium">
-                                Workspaces
-                                <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon"
-                                    className="size-7"
-                                    aria-label="New workspace"
-                                    onClick={startCreate}
-                                >
-                                    <Plus className="size-4" />
-                                </Button>
+                                <span>Workspaces</span>
+                                <div className="flex items-center">
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        className="size-7"
+                                        aria-label="Import workspace from folder"
+                                        onClick={() =>
+                                            setDirectoryImportTarget('new')
+                                        }
+                                    >
+                                        <FolderInput className="size-4" />
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        className="size-7"
+                                        aria-label="New workspace"
+                                        onClick={startCreate}
+                                    >
+                                        <Plus className="size-4" />
+                                    </Button>
+                                </div>
                             </div>
                             <div className="min-h-0 flex-1 overflow-auto p-1">
                                 {(workspace.data?.engagements ?? []).map(
@@ -556,17 +575,35 @@ export function EngagementManagerDialog() {
                             <div className="flex min-h-0 flex-1 flex-col">
                                 <div className="flex h-9 shrink-0 items-center justify-between border-b px-3 text-xs font-medium">
                                     Repositories
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        size="sm"
-                                        className="h-7"
-                                        disabled={!selected}
-                                        onClick={addRepository}
-                                    >
-                                        <FolderPlus className="size-3.5" />
-                                        Add
-                                    </Button>
+                                    <div className="flex gap-1">
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            className="h-7"
+                                            disabled={!selected}
+                                            onClick={() =>
+                                                selected &&
+                                                setDirectoryImportTarget(
+                                                    selected.id,
+                                                )
+                                            }
+                                        >
+                                            <FolderInput className="size-3.5" />
+                                            Import
+                                        </Button>
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            className="h-7"
+                                            disabled={!selected}
+                                            onClick={addRepository}
+                                        >
+                                            <FolderPlus className="size-3.5" />
+                                            Add
+                                        </Button>
+                                    </div>
                                 </div>
                                 <div className="min-h-0 flex-1 overflow-auto">
                                     {selected?.repositories.map(repo => (
@@ -659,6 +696,22 @@ export function EngagementManagerDialog() {
                 onConfirm={confirmDelete}
                 paths={selected?.repositories.map(repo => repo.path)}
             />
+            {directoryImportTarget ? (
+                <WorkspaceDirectoryImportDialog
+                    open
+                    onOpenChange={next => {
+                        if (!next) setDirectoryImportTarget(null);
+                    }}
+                    target={
+                        directoryImportTarget === 'new'
+                            ? { kind: 'new' }
+                            : {
+                                  kind: 'existing',
+                                  engagementId: directoryImportTarget,
+                              }
+                    }
+                />
+            ) : null}
         </>
     );
 }
