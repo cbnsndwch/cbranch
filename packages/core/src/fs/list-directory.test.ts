@@ -97,6 +97,21 @@ describe('listFilesystemDirectory', () => {
         expect(listing.truncated).toBe(true);
     });
 
+    test('ignores hidden entries when determining a default listing truncation', async () => {
+        const root = mkdtempSync(
+            join(tmpdir(), 'cbranch-fs-picker-hidden-cap-'),
+        );
+        for (let index = 0; index < FILESYSTEM_LIST_LIMIT; index++)
+            writeFileSync(join(root, `file-${index}`), 'x');
+        writeFileSync(join(root, '.hidden'), 'hidden');
+
+        const listing = await run(
+            listFilesystemDirectory({}, [{ label: 'Fixture', path: root }]),
+        );
+        expect(listing.entries).toHaveLength(FILESYSTEM_LIST_LIMIT);
+        expect(listing.truncated).toBe(false);
+    });
+
     test('scans only sorted, immediate real directories for workspace imports', async () => {
         const root = mkdtempSync(join(tmpdir(), 'cbranch-fs-import-'));
         mkdirSync(join(root, 'zebra'));

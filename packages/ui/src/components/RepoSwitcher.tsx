@@ -1,7 +1,13 @@
 import { type RepoId } from '@cbranch/rpc-contract';
 import { Command } from 'cmdk';
-import { BriefcaseBusiness, FolderGit2, Plus } from 'lucide-react';
+import {
+    BriefcaseBusiness,
+    FolderGit2,
+    LoaderCircle,
+    Plus,
+} from 'lucide-react';
 import { type KeyboardEvent, useState } from 'react';
+import { toast } from 'sonner';
 
 import {
     useAssignEngagementRepo,
@@ -35,12 +41,22 @@ export function RepoSwitcher() {
     const setSession = useSetEngagementSession();
     const menuActions = useMenuActions();
     const [query, setQuery] = useState('');
+    const [pendingLabel, setPendingLabel] = useState<string>();
 
     if (!open) return null;
 
     const finish = () => {
+        setPendingLabel(undefined);
         setOpen(false);
         setQuery('');
+    };
+    const reportError = (error: unknown) => {
+        setPendingLabel(undefined);
+        toast.error(
+            typeof error === 'object' && error !== null && 'message' in error
+                ? String(error.message)
+                : 'Could not update the workspace.',
+        );
     };
 
     const routeRepo = (repoId: RepoId) => {
@@ -48,19 +64,28 @@ export function RepoSwitcher() {
             engagement.repositories.some(repo => repo.repoId === repoId),
         );
         if (owner) {
+            setPendingLabel(`Opening ${owner.name}…`);
             const openRepoIds = owner.openRepoIds.includes(repoId)
                 ? owner.openRepoIds
                 : [...owner.openRepoIds, repoId];
-            setSession.mutate({
-                engagementId: owner.id,
-                openRepoIds,
-                activeRepoId: repoId,
-            });
-            openRepo(repoId, owner.slug);
-            finish();
+            setSession.mutate(
+                {
+                    engagementId: owner.id,
+                    openRepoIds,
+                    activeRepoId: repoId,
+                },
+                {
+                    onSuccess: () => {
+                        openRepo(repoId, owner.slug);
+                        finish();
+                    },
+                    onError: reportError,
+                },
+            );
             return;
         }
         if (activeEngagementId) {
+            setPendingLabel('Adding to workspace…');
             assignRepo.mutate(
                 { engagementId: activeEngagementId, repoId },
                 {
@@ -71,6 +96,7 @@ export function RepoSwitcher() {
                         openRepo(repoId, assignedEngagement?.slug);
                         finish();
                     },
+                    onError: reportError,
                 },
             );
             return;
@@ -79,12 +105,25 @@ export function RepoSwitcher() {
         finish();
     };
 
-    const activate = (path: string) =>
+    const activate = (path: string) => {
+        if (pendingLabel) return;
+        setPendingLabel('Opening repository…');
         openRepoMutation.mutate(path, {
             onSuccess: handle => {
                 routeRepo(handle.repoId);
             },
+            onError: error => {
+                setPendingLabel(undefined);
+                toast.error(
+                    typeof error === 'object' &&
+                        error !== null &&
+                        'message' in error
+                        ? String(error.message)
+                        : 'Could not open this repository.',
+                );
+            },
         });
+    };
 
     const term = query.trim().toLowerCase();
     const matches = (recent.data ?? []).filter(
@@ -117,41 +156,59 @@ export function RepoSwitcher() {
         .filter(group => group.repos.length > 0);
 
     const runCommand = (id: string) => {
+        if (pendingLabel) return;
         menuActions.run(id);
         setOpen(false);
         setQuery('');
     };
 
     const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-        if (event.key === 'Escape') setOpen(false);
+        if (event.key === 'Escape' && !pendingLabel) setOpen(false);
     };
 
     return (
         <div
             className="fixed inset-0 z-50 bg-black/40"
-            onClick={() => setOpen(false)}
+            onClick={() => {
+                if (!pendingLabel) setOpen(false);
+            }}
         >
             <div
                 className="bg-popover text-popover-foreground mx-auto mt-[15vh] w-[min(640px,90vw)] overflow-hidden border shadow-lg"
                 onClick={event => event.stopPropagation()}
                 onKeyDown={onKeyDown}
             >
-                <Command shouldFilter={false} label="Open or switch repository">
+                <Command
+                    shouldFilter={false}
+                    label="Open or switch repository"
+                    aria-busy={pendingLabel !== undefined}
+                >
                     <div className="flex items-center border-b px-2">
                         <Command.Input
                             autoFocus
                             value={query}
                             onValueChange={setQuery}
+                            disabled={pendingLabel !== undefined}
                             placeholder="Search recent repositories or type an absolute path…"
                             className="placeholder:text-muted-foreground min-w-0 flex-1 bg-transparent px-1 py-2.5 text-sm outline-none"
                         />
                         <FilesystemPickerButton
                             value={query}
                             onSelect={setQuery}
+                            disabled={pendingLabel !== undefined}
                             ariaLabel="Browse host folders to open a repository"
                         />
                     </div>
                     <Command.List className="max-h-80 overflow-auto p-1">
+                        {pendingLabel ? (
+                            <div
+                                role="status"
+                                className="text-muted-foreground flex items-center gap-2 px-3 py-2 text-xs"
+                            >
+                                <LoaderCircle className="size-3.5 animate-spin" />
+                                {pendingLabel}
+                            </div>
+                        ) : null}
                         {openRepoMutation.isError ? (
                             <div className="text-destructive px-3 py-2 text-xs">
                                 Could not open that path.
@@ -163,6 +220,7 @@ export function RepoSwitcher() {
                         'init'.includes(term) ? (
                             <Command.Item
                                 value="command:repository.new"
+                                disabled={pendingLabel !== undefined}
                                 onSelect={() => runCommand('repository.new')}
                                 className="data-[selected=true]:bg-accent flex cursor-pointer items-center gap-2 px-3 py-2 text-sm"
                             >
@@ -173,6 +231,7 @@ export function RepoSwitcher() {
                         {looksLikePath(query) ? (
                             <Command.Item
                                 value="open-path"
+                                disabled={pendingLabel !== undefined}
                                 onSelect={() => activate(query.trim())}
                                 className="data-[selected=true]:bg-accent flex cursor-pointer items-center gap-2 px-3 py-2 text-sm"
                             >
@@ -197,6 +256,7 @@ export function RepoSwitcher() {
                                         key={repo.repoId}
                                         repo={repo}
                                         onSelect={() => activate(repo.path)}
+                                        disabled={pendingLabel !== undefined}
                                     />
                                 ))}
                             </Command.Group>
@@ -215,6 +275,7 @@ export function RepoSwitcher() {
                                         key={repo.repoId}
                                         repo={repo}
                                         onSelect={() => activate(repo.path)}
+                                        disabled={pendingLabel !== undefined}
                                     />
                                 ))}
                             </Command.Group>
@@ -231,6 +292,7 @@ export function RepoSwitcher() {
                                         repo={repo}
                                         onSelect={() => activate(repo.path)}
                                         engagement
+                                        disabled={pendingLabel !== undefined}
                                     />
                                 ))}
                             </Command.Group>
@@ -246,6 +308,7 @@ function RepoItem({
     repo,
     onSelect,
     engagement = false,
+    disabled = false,
 }: {
     readonly repo: {
         readonly repoId: string;
@@ -254,13 +317,15 @@ function RepoItem({
     };
     readonly onSelect: () => void;
     readonly engagement?: boolean;
+    readonly disabled?: boolean;
 }) {
     const Icon = engagement ? BriefcaseBusiness : FolderGit2;
     return (
         <Command.Item
             value={repo.repoId}
             onSelect={onSelect}
-            className="data-[selected=true]:bg-accent flex cursor-pointer items-center gap-2 px-3 py-2"
+            disabled={disabled}
+            className="data-[selected=true]:bg-accent data-[disabled=true]:cursor-wait data-[disabled=true]:opacity-60 flex cursor-pointer items-center gap-2 px-3 py-2"
         >
             <Icon
                 className="text-muted-foreground size-4 shrink-0"

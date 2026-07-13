@@ -2,7 +2,8 @@
 // deliberate pre-repository exception to per-repo containment: roots are chosen by
 // the host (home, recent-repository parents, and CBRANCH_FS_ROOTS), never by the UI.
 
-import { lstat, readdir, realpath, stat } from 'node:fs/promises';
+import type { Dirent } from 'node:fs';
+import { lstat, opendir, realpath, stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import {
     basename,
@@ -31,6 +32,8 @@ export const FILESYSTEM_LIST_LIMIT = 500;
 
 /** Git resolution is comparatively expensive, so directory import scans use a lower cap. */
 export const ENGAGEMENT_DIRECTORY_SCAN_LIMIT = 100;
+
+const DIRECTORY_ENTRY_ENRICHMENT_CONCURRENCY = 8;
 
 type RootCandidate = {
     readonly label: string;
@@ -70,6 +73,58 @@ const hasGitDirectory = async (path: string): Promise<boolean> => {
     } catch {
         return false;
     }
+};
+
+const readDirectoryEntries = async (
+    path: string,
+    include: (entry: Dirent) => boolean,
+    limit: number,
+): Promise<{
+    readonly entries: ReadonlyArray<Dirent>;
+    readonly truncated: boolean;
+}> => {
+    const directory = await opendir(path);
+    const entries: Dirent[] = [];
+    try {
+        while (true) {
+            // eslint-disable-next-line no-await-in-loop -- Dir.read advances one shared cursor.
+            const entry = await directory.read();
+            if (entry === null) return { entries, truncated: false };
+            if (!include(entry)) continue;
+            if (entries.length === limit) return { entries, truncated: true };
+            entries.push(entry);
+        }
+    } finally {
+        await directory.close();
+    }
+};
+
+const enrichDirectoryEntries = async <Result>(
+    entries: ReadonlyArray<Dirent>,
+    enrich: (entry: Dirent) => Promise<Result>,
+): Promise<ReadonlyArray<Result>> => {
+    const results: Result[] = [];
+    results.length = entries.length;
+    let nextIndex = 0;
+    const worker = async (): Promise<void> => {
+        while (nextIndex < entries.length) {
+            const index = nextIndex++;
+            // eslint-disable-next-line no-await-in-loop -- each worker processes one entry at a time.
+            results[index] = await enrich(entries[index]!);
+        }
+    };
+    await Promise.all(
+        Array.from(
+            {
+                length: Math.min(
+                    DIRECTORY_ENTRY_ENRICHMENT_CONCURRENCY,
+                    entries.length,
+                ),
+            },
+            worker,
+        ),
+    );
+    return results;
 };
 
 const isDangerousRoot = (path: string): boolean =>
@@ -183,51 +238,49 @@ const listDirectory = async (
             'directory is outside the allowed roots',
         );
 
-    const rawEntries = await readdir(path, { withFileTypes: true });
-    const visibleEntries = rawEntries
-        .filter(entry => input.showHidden || !entry.name.startsWith('.'))
-        .slice(0, FILESYSTEM_LIST_LIMIT);
-    const entries = await Promise.all(
-        visibleEntries.map(async raw => {
-            const entryPath = join(path, raw.name);
-            const hidden = raw.name.startsWith('.');
-            if (raw.isSymbolicLink()) {
-                let resolvedKind: FilesystemEntryKind | undefined;
-                let navigable = false;
-                let isRepository = false;
-                try {
-                    const resolved = await realpath(entryPath);
-                    if (isContainedBy(resolved, root.path)) {
-                        const target = await stat(resolved);
-                        resolvedKind = kindOf(target);
-                        navigable = resolvedKind === 'dir';
-                        isRepository =
-                            resolvedKind === 'dir' &&
-                            (await hasGitDirectory(resolved));
-                    }
-                } catch {
-                    // Broken or inaccessible symlinks remain visible but cannot be navigated.
+    const { entries: rawEntries, truncated } = await readDirectoryEntries(
+        path,
+        entry => input.showHidden || !entry.name.startsWith('.'),
+        FILESYSTEM_LIST_LIMIT,
+    );
+    const entries = await enrichDirectoryEntries(rawEntries, async raw => {
+        const entryPath = join(path, raw.name);
+        const hidden = raw.name.startsWith('.');
+        if (raw.isSymbolicLink()) {
+            let resolvedKind: FilesystemEntryKind | undefined;
+            let navigable = false;
+            let isRepository = false;
+            try {
+                const resolved = await realpath(entryPath);
+                if (isContainedBy(resolved, root.path)) {
+                    const target = await stat(resolved);
+                    resolvedKind = kindOf(target);
+                    navigable = resolvedKind === 'dir';
+                    isRepository =
+                        resolvedKind === 'dir' &&
+                        (await hasGitDirectory(resolved));
                 }
-                return new FilesystemEntry({
-                    name: raw.name,
-                    kind: 'symlink',
-                    hidden,
-                    isRepository,
-                    navigable,
-                    resolvedKind,
-                });
+            } catch {
+                // Broken or inaccessible symlinks remain visible but cannot be navigated.
             }
-            const kind = kindOf(raw);
             return new FilesystemEntry({
                 name: raw.name,
-                kind,
+                kind: 'symlink',
                 hidden,
-                isRepository:
-                    kind === 'dir' && (await hasGitDirectory(entryPath)),
-                navigable: kind === 'dir',
+                isRepository,
+                navigable,
+                resolvedKind,
             });
-        }),
-    );
+        }
+        const kind = kindOf(raw);
+        return new FilesystemEntry({
+            name: raw.name,
+            kind,
+            hidden,
+            isRepository: kind === 'dir' && (await hasGitDirectory(entryPath)),
+            navigable: kind === 'dir',
+        });
+    });
     const sortedEntries = entries.toSorted((left, right) => {
         const leftDirectory = left.navigable ? 0 : 1;
         const rightDirectory = right.navigable ? 0 : 1;
@@ -265,10 +318,7 @@ const listDirectory = async (
                 }),
         ),
         entries: sortedEntries,
-        truncated:
-            rawEntries.filter(
-                entry => input.showHidden || !entry.name.startsWith('.'),
-            ).length > sortedEntries.length,
+        truncated,
     });
 };
 
@@ -277,23 +327,24 @@ const scanDirectory = async (
     candidates: ReadonlyArray<RootCandidate>,
 ): Promise<FilesystemDirectoryScan> => {
     const resolved = await resolveFilesystemDirectory(path, candidates);
-    const entries = (await readdir(resolved.path, { withFileTypes: true }))
-        .filter(
-            entry =>
-                !entry.name.startsWith('.') &&
-                !entry.isSymbolicLink() &&
-                entry.isDirectory(),
-        )
-        .toSorted((left, right) => left.name.localeCompare(right.name));
+    const { entries, truncated } = await readDirectoryEntries(
+        resolved.path,
+        entry =>
+            !entry.name.startsWith('.') &&
+            !entry.isSymbolicLink() &&
+            entry.isDirectory(),
+        ENGAGEMENT_DIRECTORY_SCAN_LIMIT,
+    );
+    const sortedEntries = entries.toSorted((left, right) =>
+        left.name.localeCompare(right.name),
+    );
     return {
         path: resolved.path,
-        entries: entries
-            .slice(0, ENGAGEMENT_DIRECTORY_SCAN_LIMIT)
-            .map(entry => ({
-                name: entry.name,
-                path: join(resolved.path, entry.name),
-            })),
-        truncated: entries.length > ENGAGEMENT_DIRECTORY_SCAN_LIMIT,
+        entries: sortedEntries.map(entry => ({
+            name: entry.name,
+            path: join(resolved.path, entry.name),
+        })),
+        truncated,
     };
 };
 

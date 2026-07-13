@@ -55,80 +55,81 @@ const repoState = new RepoState({
     currentBranch: 'main',
 });
 
-const makeFakeApi = (overrides: Partial<CbranchApi> = {}): CbranchApi => ({
-    repoOpen: vi.fn(
-        async (path: string) =>
-            new RepoHandle({
+const makeFakeApi = (overrides: Partial<CbranchApi> = {}): CbranchApi =>
+    ({
+        repoOpen: vi.fn(
+            async (path: string) =>
+                new RepoHandle({
+                    repoId,
+                    root: path,
+                    gitDir: `${path}/.git`,
+                    commonDir: `${path}/.git`,
+                    state: repoState,
+                }),
+        ),
+        recentList: vi.fn(async () => [
+            new RecentRepo({
+                path: '/repos/demo',
+                name: 'demo',
                 repoId,
-                root: path,
-                gitDir: `${path}/.git`,
-                commonDir: `${path}/.git`,
-                state: repoState,
+                lastOpenedAt: 1,
             }),
-    ),
-    recentList: vi.fn(async () => [
-        new RecentRepo({
-            path: '/repos/demo',
-            name: 'demo',
-            repoId,
-            lastOpenedAt: 1,
+        ]),
+        recentRemove: vi.fn(async () => undefined),
+        engagementList: vi.fn(async () => ({
+            engagements: [],
+            unassignedRepositories: [],
+        })),
+        repoState: vi.fn(async () => repoState),
+        commitDetail: vi.fn(
+            async () =>
+                new CommitDetail({
+                    oid,
+                    parents: [],
+                    tree: oid,
+                    author: sig('Ada'),
+                    committer: sig('Ada'),
+                    subject: 'first commit',
+                    body: 'the body',
+                    messageRaw: 'first commit -- the body',
+                    stats: { filesChanged: 1, additions: 1, deletions: 0 },
+                }),
+        ),
+        commitDiff: vi.fn(async () => []),
+        workingFileDiff: vi.fn(async () => {
+            throw new Error('not implemented');
         }),
-    ]),
-    recentRemove: vi.fn(async () => undefined),
-    engagementList: vi.fn(async () => ({
-        engagements: [],
-        unassignedRepositories: [],
-    })),
-    repoState: vi.fn(async () => repoState),
-    commitDetail: vi.fn(
-        async () =>
-            new CommitDetail({
-                oid,
-                parents: [],
-                tree: oid,
-                author: sig('Ada'),
-                committer: sig('Ada'),
-                subject: 'first commit',
-                body: 'the body',
-                messageRaw: 'first commit -- the body',
-                stats: { filesChanged: 1, additions: 1, deletions: 0 },
-            }),
-    ),
-    commitDiff: vi.fn(async () => []),
-    workingFileDiff: vi.fn(async () => {
-        throw new Error('not implemented');
-    }),
-    fileContentAtRev: vi.fn(
-        async () =>
-            new FileContent({
-                path: 'a.txt',
-                size: 2,
-                isBinary: false,
-                encoding: 'utf8',
-                content: 'a',
-            }),
-    ),
-    statusGet: vi.fn(async () => {
-        throw new Error('not implemented');
-    }),
-    stageFiles: vi.fn(async () => undefined),
-    unstageFiles: vi.fn(async () => undefined),
-    discardFiles: vi.fn(async () => undefined),
-    deleteUntracked: vi.fn(async () => undefined),
-    resetTo: vi.fn(async () => undefined),
-    stageHunks: vi.fn(async () => undefined),
-    unstageHunks: vi.fn(async () => undefined),
-    discardHunks: vi.fn(async () => undefined),
-    commitCreate: vi.fn(async () => {
-        throw new Error('not implemented');
-    }),
-    commitLastMessage: vi.fn(async () => {
-        throw new Error('not implemented');
-    }),
-    logStream: vi.fn(() => () => undefined),
-    subscribe: vi.fn(() => () => undefined),
-    ...overrides,
-});
+        fileContentAtRev: vi.fn(
+            async () =>
+                new FileContent({
+                    path: 'a.txt',
+                    size: 2,
+                    isBinary: false,
+                    encoding: 'utf8',
+                    content: 'a',
+                }),
+        ),
+        statusGet: vi.fn(async () => {
+            throw new Error('not implemented');
+        }),
+        stageFiles: vi.fn(async () => undefined),
+        unstageFiles: vi.fn(async () => undefined),
+        discardFiles: vi.fn(async () => undefined),
+        deleteUntracked: vi.fn(async () => undefined),
+        resetTo: vi.fn(async () => undefined),
+        stageHunks: vi.fn(async () => undefined),
+        unstageHunks: vi.fn(async () => undefined),
+        discardHunks: vi.fn(async () => undefined),
+        commitCreate: vi.fn(async () => {
+            throw new Error('not implemented');
+        }),
+        commitLastMessage: vi.fn(async () => {
+            throw new Error('not implemented');
+        }),
+        logStream: vi.fn(() => () => undefined),
+        subscribe: vi.fn(() => () => undefined),
+        ...overrides,
+    }) as unknown as CbranchApi;
 
 const renderWithApi = (ui: ReactNode, api: CbranchApi) => {
     const queryClient = new QueryClient({
@@ -194,6 +195,40 @@ describe('RepoSwitcher (NF-TEST-7 / P1-UI-OPEN-1)', () => {
         fireEvent.click(item);
         await waitFor(() =>
             expect(api.repoOpen).toHaveBeenCalledWith('/repos/demo'),
+        );
+    });
+
+    test('shows progress and prevents duplicate repository opens', async () => {
+        let resolveOpen: ((handle: RepoHandle) => void) | undefined;
+        const api = makeFakeApi({
+            repoOpen: vi.fn(
+                () =>
+                    new Promise<RepoHandle>(resolve => {
+                        resolveOpen = resolve;
+                    }),
+            ),
+        });
+        useUiStore.setState({ repoSwitcherOpen: true });
+        renderWithApi(<RepoSwitcher />, api);
+
+        const item = await screen.findByText('demo');
+        fireEvent.click(item);
+        expect((await screen.findByRole('status')).textContent).toContain(
+            'Opening repository…',
+        );
+        fireEvent.click(item);
+        expect(api.repoOpen).toHaveBeenCalledOnce();
+
+        act(() =>
+            resolveOpen?.(
+                new RepoHandle({
+                    repoId,
+                    root: '/repos/demo',
+                    gitDir: '/repos/demo/.git',
+                    commonDir: '/repos/demo/.git',
+                    state: repoState,
+                }),
+            ),
         );
     });
 

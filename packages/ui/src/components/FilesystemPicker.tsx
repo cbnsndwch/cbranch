@@ -46,6 +46,11 @@ const splitNewLeaf = (value: string): { parent?: string; leaf: string } => {
 const appendLeaf = (parent: string, leaf: string): string =>
     `${parent}${parent.includes('\\') ? '\\' : '/'}${leaf}`;
 
+const errorMessage = (error: unknown): string =>
+    typeof error === 'object' && error !== null && 'message' in error
+        ? String(error.message)
+        : 'Could not list this host folder.';
+
 export function FilesystemPickerButton({
     value,
     onSelect,
@@ -84,6 +89,22 @@ export function FilesystemPickerButton({
         setLeaf('');
     }, [allowNewLeaf, open, value]);
 
+    const initializePath = () => {
+        if (!isAbsoluteHostPath(value)) {
+            setPath(undefined);
+            setLeaf('');
+            return;
+        }
+        if (allowNewLeaf) {
+            const next = splitNewLeaf(value);
+            setPath(next.parent);
+            setLeaf(next.leaf);
+            return;
+        }
+        setPath(value);
+        setLeaf('');
+    };
+
     const selectPath = (selected: string) => {
         onSelect(selected);
         setOpen(false);
@@ -104,7 +125,12 @@ export function FilesystemPickerButton({
                 aria-label={ariaLabel}
                 title={ariaLabel}
                 disabled={disabled}
-                onClick={() => setOpen(true)}
+                onClick={() => {
+                    // Set the requested path before mounting the query to avoid an
+                    // unnecessary default-Home listing for absolute input values.
+                    initializePath();
+                    setOpen(true);
+                }}
             >
                 <FolderOpen className="size-4" aria-hidden="true" />
             </Button>
@@ -186,7 +212,7 @@ export function FilesystemPickerButton({
                                     role="alert"
                                     className="text-destructive p-3 text-sm"
                                 >
-                                    Could not list this host folder.
+                                    {errorMessage(directory.error)}
                                 </p>
                             ) : null}
                             {listing?.parent ? (

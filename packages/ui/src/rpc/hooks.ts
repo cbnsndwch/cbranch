@@ -446,7 +446,13 @@ export const useOpenRepo = () => {
     const queryClient = useQueryClient();
     return useMutation<RepoHandle, unknown, string>({
         mutationFn: (path: string) => api.repoOpen(path),
-        onSuccess: () => {
+        onSuccess: handle => {
+            // RepoOpen already resolved this snapshot; avoid an immediate duplicate
+            // state probe when the routed repository view mounts.
+            queryClient.setQueryData(
+                queryKeys.repoState(handle.repoId),
+                handle.state,
+            );
             void queryClient.invalidateQueries({
                 queryKey: queryKeys.recentList(),
             });
