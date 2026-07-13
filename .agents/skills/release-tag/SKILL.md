@@ -48,10 +48,14 @@ Set the approved `MAJOR.MINOR.PATCH` value consistently in:
 - `apps/tauri/src-tauri/Cargo.lock` for the `cbranch-desktop` package
 - `packages/rpc-contract/src/schemas/system.ts` (`CBRANCH_BACKEND_VERSION`)
 
+Prepend the approved notes as a `## vMAJOR.MINOR.PATCH` section in
+`CHANGELOG.md`. The release workflow extracts that exact section for GitHub.
+
 Then verify from the repository root:
 
 ```sh
 RELEASE_TAG=vMAJOR.MINOR.PATCH pnpm release:check
+node scripts/extract-release-notes.mjs vMAJOR.MINOR.PATCH
 pnpm gate
 ```
 
