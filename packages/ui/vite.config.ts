@@ -39,17 +39,31 @@ export default defineConfig({
         // In dev the UI runs on Vite's port (:5173) while the backend occupies :7420.
         // Proxy /rpc (WebSocket) and /sidechannel (HTTP) to the backend so the client's
         // `defaultRpcUrl(window.location)` resolves correctly without any source change.
-        // The backend's Origin allowlist checks hostnames only (port-stripped), so
-        // `Origin: http://localhost:5173` passes as `localhost` — always in the allowlist.
+        // Vite runs the proxy on behalf of browsers that may reach it over a LAN IP.
+        // Rewrite the forwarded Origin so the loopback-only backend continues to see
+        // only its trusted local origin rather than exposing its allowlist to the LAN.
         proxy: {
             '/rpc': {
                 target: 'ws://localhost:7420',
                 ws: true,
                 changeOrigin: true,
+                rewriteWsOrigin: true,
+                configure: proxy => {
+                    proxy.on('proxyReq', request =>
+                        request.setHeader('origin', 'http://localhost:7420'),
+                    );
+                    proxy.on('proxyReqWs', request =>
+                        request.setHeader('origin', 'http://localhost:7420'),
+                    );
+                },
             },
             '/sidechannel': {
                 target: 'http://localhost:7420',
                 changeOrigin: true,
+                configure: proxy =>
+                    proxy.on('proxyReq', request =>
+                        request.setHeader('origin', 'http://localhost:7420'),
+                    ),
             },
         },
 
