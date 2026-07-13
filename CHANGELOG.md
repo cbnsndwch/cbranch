@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.1.4
+
+### Fixed
+
+- Detect older managed servers before mounting the UI and offer an explicit
+  **Update cbranch** action instead of failing on newer RPC methods by @cbnsndwch
+- Bound host directory enumeration and metadata probes to keep large home-folder
+  listings responsive by @cbnsndwch
+- Show repository-opening progress, prevent duplicate opens, reuse the initial
+  repository state, and surface filesystem-listing errors by @cbnsndwch
+
+**Full commit history:** https://github.com/cbnsndwch/cbranch/compare/v0.1.3...v0.1.4
+
 ## v0.1.3
 
 ### Features
