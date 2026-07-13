@@ -19,6 +19,7 @@ import { ApiProvider } from './ApiProvider';
 import {
     defaultHostEndpoint,
     makeAppRuntime,
+    type AppRuntime,
     type HostEndpoint,
     withClient,
 } from './client';
@@ -52,6 +53,14 @@ const newQueryClient = () =>
             },
         },
     });
+
+interface ConnectionSession {
+    readonly endpoint: HostEndpoint;
+    readonly runtime: AppRuntime;
+    readonly api: ReturnType<typeof makeApi>;
+    readonly queryClient: QueryClient;
+    readonly id: string;
+}
 
 const resetUiSelection = () => {
     const store = useUiStore.getState();
@@ -106,34 +115,39 @@ export function ConnectionProvider({
         initialEndpoint === undefined ? 'disconnected' : 'connecting',
     );
     const [error, setError] = useState<string>();
+    const [session, setSession] = useState<ConnectionSession>();
 
-    const session = useMemo(() => {
-        if (endpoint === undefined) return undefined;
+    useEffect(() => {
+        if (endpoint === undefined) {
+            setSession(undefined);
+            return;
+        }
+        // Effects mount, clean up, then mount again in development Strict Mode. Build
+        // the runtime here so the second pass never reuses the first pass's disposal.
         const runtime = makeAppRuntime(endpoint.rpcUrl);
-        return {
+        const next: ConnectionSession = {
             endpoint,
             runtime,
             api: makeApi(runtime),
             queryClient: newQueryClient(),
             id: `${endpoint.rpcUrl}:${attempt}`,
         };
-    }, [attempt, endpoint]);
-
-    useEffect(() => {
-        if (session === undefined) return;
+        setSession(undefined);
         let active = true;
         setStatus(current => transitionConnection(current, 'start'));
         setError(undefined);
 
-        void session.runtime
+        void next.runtime
             .runPromise(withClient(client => client.SystemInfo({})))
             .then(info => {
                 if (info.protocolVersion !== CBRANCH_PROTOCOL_VERSION)
                     throw compatibilityError(info);
-                if (active)
+                if (active) {
+                    setSession(next);
                     setStatus(current =>
                         transitionConnection(current, 'handshakeSucceeded'),
                     );
+                }
             })
             .catch(reason => {
                 if (active) {
@@ -146,11 +160,11 @@ export function ConnectionProvider({
 
         return () => {
             active = false;
-            void session.queryClient.cancelQueries();
-            session.queryClient.clear();
-            void session.runtime.dispose();
+            void next.queryClient.cancelQueries();
+            next.queryClient.clear();
+            void next.runtime.dispose();
         };
-    }, [session]);
+    }, [attempt, endpoint]);
 
     const value = useMemo<ConnectionContextValue>(
         () => ({
