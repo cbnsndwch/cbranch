@@ -10,7 +10,14 @@
 // between browser or desktop connections.
 
 import { useEffect, useState } from 'react';
-import { Links, Meta, Outlet, Scripts, ScrollRestoration } from 'react-router';
+import {
+    isRouteErrorResponse,
+    Links,
+    Meta,
+    Outlet,
+    Scripts,
+    ScrollRestoration,
+} from 'react-router';
 
 import type { Route } from './+types/root';
 import { ConnectionFailureScreen } from './components/ConnectionFailureScreen';
@@ -83,6 +90,44 @@ export function Layout({ children }: { readonly children: React.ReactNode }) {
                 <Scripts />
             </body>
         </html>
+    );
+}
+
+/** A route miss should be recoverable, not React Router's unstyled fallback page. */
+export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
+    const missingRoute = isRouteErrorResponse(error) && error.status === 404;
+
+    return (
+        <main className="grid min-h-dvh place-items-center bg-muted/20 p-5">
+            <section className="w-full max-w-lg border bg-background shadow-sm">
+                <div className="bg-primary h-1" />
+                <div className="grid gap-5 p-6 sm:p-8">
+                    <p className="text-muted-foreground font-mono text-xs tracking-widest uppercase">
+                        {missingRoute ? '404 / Route not found' : 'Route error'}
+                    </p>
+                    <div className="grid gap-2">
+                        <h1 className="text-2xl font-semibold tracking-tight">
+                            {missingRoute
+                                ? 'This workspace link no longer exists.'
+                                : 'cbranch could not open this page.'}
+                        </h1>
+                        <p className="text-muted-foreground max-w-md text-sm leading-6">
+                            {missingRoute
+                                ? 'Workspace URLs now begin with /workspaces. The link may be outdated or incomplete.'
+                                : 'Return to the workspace overview and try again.'}
+                        </p>
+                    </div>
+                    <div>
+                        <a
+                            href="/"
+                            className="bg-primary text-primary-foreground inline-flex h-9 items-center px-4 text-sm font-medium hover:bg-primary/90"
+                        >
+                            Return to cbranch
+                        </a>
+                    </div>
+                </div>
+            </section>
+        </main>
     );
 }
 
