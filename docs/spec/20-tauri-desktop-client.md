@@ -23,6 +23,11 @@ remote 127.0.0.1:<cbranch-port>
   `known_hosts`. The application stores none of them.
 - The local listener is always `127.0.0.1`; it is allocated from an ephemeral
   loopback port and checked before the UI receives an endpoint.
+- Before starting RPC, the desktop WebView requests the forwarded server's
+  `GET /healthz` identity endpoint. It distinguishes an unreachable cbranch
+  server from an unexpected or incompatible responder and keeps the normal Git
+  UI unmounted in either case. `system.info` remains the authoritative typed
+  RPC compatibility check after this preflight.
 - Connection failure distinguishes missing `ssh`, host-key rejection,
   authentication rejection, unavailable remote host/port, local bind failure,
   and readiness timeout. Recent diagnostics redact URL and key/value secrets.
@@ -48,6 +53,13 @@ The first-run screen lists, creates, edits, tests, connects, disconnects, and
 deletes profiles. Its diagnostics view shows the desktop version, selected
 profile, tunnel state, endpoint, and redacted errors. It also presents a
 copyable, non-secret OpenSSH diagnostic command.
+
+When a tunnel reaches an SSH host but no cbranch service responds at the
+configured remote loopback port, the screen provides manual remote-host setup
+instructions and a re-check action. It never installs remote software or runs
+remote commands automatically. If a loopback port is occupied, the operator
+chooses another available port while starting the server and updates the
+profile to match.
 
 ## Backend compatibility and trust
 
@@ -76,6 +88,11 @@ an OpenSSH client; macOS and Linux require their normal system OpenSSH client. T
 app does not install OpenSSH, accept host keys, or use a custom key/password prompt.
 Users must resolve those outside the application with normal `ssh`.
 
+Windows release binaries use the GUI subsystem, and the owned `ssh.exe` child
+is launched without a console window. SSH failures remain available as
+redacted in-application diagnostics; a terminal is not part of the user
+interface.
+
 The Tauri capability set contains only `core:default` for the main window and
 custom profile/tunnel commands. No shell, filesystem, process, clipboard,
 opener, or broad plugin permissions are granted. Downloads and file selection
@@ -86,3 +103,7 @@ continue through the WebView's normal user-initiated controls.
 Direct remote HTTP/HTTPS/WSS transport, public/LAN backend binding, TLS setup,
 application tokens/login, key/password storage, and VS Code remote-client work
 are out of scope. Adding any of those requires a new security/product decision.
+
+Automated remote-server installation, port allocation, and service lifecycle
+management are also deferred pending an ADR covering package provenance,
+supported hosts, required privileges, upgrades, and removal.

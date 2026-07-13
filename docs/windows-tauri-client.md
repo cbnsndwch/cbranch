@@ -28,9 +28,16 @@
 2. Create a profile with its display name, SSH host/config alias, SSH user and
    port, and the remote cbranch port (usually 7420).
 3. Select **Test tunnel**. This validates strict-host-key SSH forwarding without
-   retaining the process.
+    retaining the process.
 4. Select **Connect**. The application creates a temporary local
-   `127.0.0.1` port and connects the existing UI through it.
+    `127.0.0.1` port, verifies that cbranch responds through it, then connects
+    the existing UI.
+
+If the desktop app says that no cbranch server was found, install Node 20+ and
+pnpm on the remote host, obtain a cbranch checkout there, then run the shown
+commands from that checkout. The server must bind to `127.0.0.1`. If the chosen
+port is occupied, select an unused loopback port with `CBRANCH_PORT` and update
+the desktop profile's remote port to match.
 
 ## Common failures
 
@@ -42,7 +49,8 @@
   Password entry is intentionally unsupported.
 - **Tunnel cannot reach remote cbranch:** confirm the remote server is running,
   listening on `127.0.0.1:<remote-port>`, and that the profile targets the
-  correct SSH host/port.
+  correct SSH host/port. The desktop app does not install or manage the remote
+  service for you.
 - **Backend compatibility failed:** update the remote cbranch server or the
   desktop client so both support the same protocol version.
 
