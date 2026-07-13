@@ -28,6 +28,10 @@ remote 127.0.0.1:<cbranch-port>
   server from an unexpected or incompatible responder and keeps the normal Git
   UI unmounted in either case. `system.info` remains the authoritative typed
   RPC compatibility check after this preflight.
+- When the preflight finds no compatible server, the default action streams the
+  version-matched server archive over the existing SSH transport and invokes a
+  fixed remote bootstrap command. The desktop never sends a user-controlled
+  command string to the remote shell.
 - Connection failure distinguishes missing `ssh`, host-key rejection,
   authentication rejection, unavailable remote host/port, local bind failure,
   and readiness timeout. Recent diagnostics redact URL and key/value secrets.
@@ -55,11 +59,13 @@ profile, tunnel state, endpoint, and redacted errors. It also presents a
 copyable, non-secret OpenSSH diagnostic command.
 
 When a tunnel reaches an SSH host but no cbranch service responds at the
-configured remote loopback port, the screen provides manual remote-host setup
-instructions and a re-check action. It never installs remote software or runs
-remote commands automatically. If a loopback port is occupied, the operator
-chooses another available port while starting the server and updates the
-profile to match.
+configured remote loopback port, the default **Set up cbranch** action installs
+the bundled server under the selected remote user's XDG data directory and
+starts a `systemd --user` service. Managed setup supports Linux x86_64 hosts
+with Node 20+ and an active user service manager. It keeps the server bound to
+`127.0.0.1`; if the configured port is occupied, the installer selects another
+available loopback port and updates the local profile. A manual setup path is
+available for operators who need to retain full control.
 
 ## Backend compatibility and trust
 
@@ -83,6 +89,8 @@ URLs resolve against the forwarded HTTP base.
 
 Stable `vMAJOR.MINOR.PATCH` tags produce a GitHub Release with a per-user Windows
 NSIS installer, macOS Apple Silicon and Intel DMGs, and Ubuntu DEB/AppImage bundles.
+The release workflow builds a Linux x86_64 server archive once, embeds it in each
+desktop artifact, and publishes it with the release assets and checksums.
 The current artifacts are unsigned manual downloads. Windows requires WebView2 and
 an OpenSSH client; macOS and Linux require their normal system OpenSSH client. The
 app does not install OpenSSH, accept host keys, or use a custom key/password prompt.
@@ -104,6 +112,5 @@ Direct remote HTTP/HTTPS/WSS transport, public/LAN backend binding, TLS setup,
 application tokens/login, key/password storage, and VS Code remote-client work
 are out of scope. Adding any of those requires a new security/product decision.
 
-Automated remote-server installation, port allocation, and service lifecycle
-management are also deferred pending an ADR covering package provenance,
-supported hosts, required privileges, upgrades, and removal.
+Automated Node installation, non-Linux or non-x86_64 remote hosts, systemd user
+lingering, service removal, and multi-user service ownership remain deferred.
