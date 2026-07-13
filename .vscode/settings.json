@@ -5,9 +5,13 @@
     "[typescript]": {
         "editor.defaultFormatter": "oxc.oxc-vscode"
     },
+    "[typescriptreact]": {
+        "editor.defaultFormatter": "oxc.oxc-vscode"
+    },
     "cSpell.words": [
         "autostash",
         "cbranch",
+        "claude",
         "cmdk",
         "lyra",
         "msgpackr",
@@ -20,7 +24,9 @@
         "signoff",
         "tailwindcss",
         "treeish",
+        "typegen",
         "unsub",
+        "vitest",
         "worktree"
     ],
     "debug.inlineValues": "on",
@@ -29,7 +35,9 @@
     },
     "editor.defaultFormatter": "oxc.oxc-vscode",
     "editor.formatOnSave": true,
-    "editor.rulers": [80],
+    "editor.rulers": [
+        80
+    ],
     "explorer.fileNesting.enabled": true,
     "explorer.fileNesting.patterns": {
         ".dev.vars": ".dev.vars.*",
@@ -58,8 +66,5 @@
         "**/node_modules/*/**": true
     },
     "js/ts.tsdk.path": "node_modules/typescript/lib",
-    "oxc.fmt.configPath": ".oxfmtrc.json",
-    "[typescriptreact]": {
-        "editor.defaultFormatter": "oxc.oxc-vscode"
-    }
+    "oxc.fmt.configPath": ".oxfmtrc.json"
 }
