@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.1.2
+
+### Bug fixes
+
+- Generate a valid systemd user-service working directory during managed remote
+  setup by @cbnsndwch
+
+**Full commit history:** https://github.com/cbnsndwch/cbranch/compare/v0.1.1...v0.1.2
+
 ## v0.1.1
 
 ### Bug fixes
