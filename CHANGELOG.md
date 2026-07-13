@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.1.5
+
+### Fixed
+
+- Exclude generated dependency/cache trees and duplicate Git-directory coverage from
+  repository watchers, preventing large worktrees from saturating the cbranch server
+  by @cbnsndwch
+
+**Full commit history:** https://github.com/cbnsndwch/cbranch/compare/v0.1.4...v0.1.5
+
 ## v0.1.4
 
 ### Fixed
