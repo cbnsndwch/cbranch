@@ -24,6 +24,7 @@ import { Layer } from 'effect';
 
 import { archiveChannelRoute } from './archive-channel';
 import { type ServerConfig } from './config';
+import { healthRoute } from './health-route';
 import { makeOriginGuard } from './origin-guard';
 import { patchChannelRoute, patchUploadRoute } from './patch-channel';
 import { handlersLayer } from './rpc-handlers';
@@ -66,6 +67,7 @@ export const buildServerLive = (
             index: 'index.html',
             spa: true,
         }),
+        healthRoute,
         sideChannelRoute,
         archiveChannelRoute,
         patchChannelRoute,

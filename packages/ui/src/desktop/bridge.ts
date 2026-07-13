@@ -1,6 +1,8 @@
 // The shared UI never imports Tauri at module evaluation time. The desktop bundle
 // loads this narrow command adapter only when its WebView runtime is present.
 
+import { CBRANCH_PROTOCOL_VERSION } from '@cbranch/rpc-contract';
+
 export interface ConnectionProfile {
     readonly id: string;
     readonly name: string;
@@ -23,6 +25,51 @@ export interface DesktopDiagnostics {
     readonly endpoint: string | undefined;
     readonly recentErrors: ReadonlyArray<string>;
 }
+
+export type CbranchServerProbe =
+    | { readonly status: 'ready' }
+    | { readonly status: 'missing' }
+    | { readonly status: 'incompatible'; readonly protocolVersion?: number };
+
+const isHealthResponse = (
+    value: unknown,
+): value is { readonly service: 'cbranch'; readonly protocolVersion: number } =>
+    typeof value === 'object' &&
+    value !== null &&
+    'service' in value &&
+    value.service === 'cbranch' &&
+    'protocolVersion' in value &&
+    typeof value.protocolVersion === 'number';
+
+/** Probe the remote service through the active SSH forward before starting RPC. */
+export const probeCbranchServer = async (
+    httpBaseUrl: string,
+    request: typeof fetch = fetch,
+): Promise<CbranchServerProbe> => {
+    let response: Response;
+    try {
+        response = await request(new URL('/healthz', httpBaseUrl), {
+            cache: 'no-store',
+        });
+    } catch {
+        return { status: 'missing' };
+    }
+    if (!response.ok) return { status: 'incompatible' };
+
+    let body: unknown;
+    try {
+        body = await response.json();
+    } catch {
+        return { status: 'incompatible' };
+    }
+    if (!isHealthResponse(body)) return { status: 'incompatible' };
+    if (body.protocolVersion !== CBRANCH_PROTOCOL_VERSION)
+        return {
+            status: 'incompatible',
+            protocolVersion: body.protocolVersion,
+        };
+    return { status: 'ready' };
+};
 
 export interface DesktopBridge {
     listProfiles(): Promise<ReadonlyArray<ConnectionProfile>>;

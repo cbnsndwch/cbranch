@@ -3,7 +3,12 @@ import { useEffect, useState } from 'react';
 import { makeHostEndpoint, type HostEndpoint } from '../rpc/client';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
-import { type ConnectionProfile, loadDesktopBridge } from './bridge';
+import {
+    type CbranchServerProbe,
+    type ConnectionProfile,
+    loadDesktopBridge,
+    probeCbranchServer,
+} from './bridge';
 
 const emptyProfile = (): Omit<ConnectionProfile, 'id'> => ({
     name: '',
@@ -34,6 +39,8 @@ export function ConnectionProfilesScreen({
     const [selectedId, setSelectedId] = useState<string>();
     const [notice, setNotice] = useState<string>();
     const [diagnostics, setDiagnostics] = useState<string>();
+    const [serverProbe, setServerProbe] =
+        useState<Exclude<CbranchServerProbe, { readonly status: 'ready' }>>();
     const [busy, setBusy] = useState(false);
 
     const reload = async () => {
@@ -49,6 +56,7 @@ export function ConnectionProfilesScreen({
         setSelectedId(profile.id);
         setEditing(profile);
         setNotice(undefined);
+        setServerProbe(undefined);
     };
 
     const save = async () => {
@@ -88,10 +96,19 @@ export function ConnectionProfilesScreen({
         if (!selectedId) return;
         setBusy(true);
         setNotice(undefined);
+        setServerProbe(undefined);
         try {
-            const tunnel = await (
-                await loadDesktopBridge()
-            ).connectProfile(selectedId);
+            const bridge = await loadDesktopBridge();
+            const tunnel = await bridge.connectProfile(selectedId);
+            const probe = await probeCbranchServer(tunnel.httpBaseUrl);
+            if (probe.status !== 'ready') {
+                try {
+                    await bridge.disconnect();
+                } finally {
+                    setServerProbe(probe);
+                }
+                return;
+            }
             onConnect(makeHostEndpoint(tunnel.rpcUrl, tunnel.httpBaseUrl));
         } catch (error) {
             setNotice(errorMessage(error));
@@ -142,6 +159,12 @@ export function ConnectionProfilesScreen({
         value: Omit<ConnectionProfile, 'id'>[K],
     ) => setEditing(current => ({ ...current, [key]: value }));
 
+    const selectedProfile = profiles.find(profile => profile.id === selectedId);
+    const serverPort = selectedProfile?.remotePort ?? editing.remotePort;
+    const setupCommand = `pnpm install --frozen-lockfile
+pnpm build
+CBRANCH_BIND_ADDRESS=127.0.0.1 CBRANCH_PORT=${serverPort} pnpm --filter @cbranch/web-server start`;
+
     return (
         <main className="grid min-h-dvh place-items-center bg-muted/20 p-4">
             <section className="grid w-full max-w-4xl gap-0 border bg-background shadow-sm md:grid-cols-[220px_1fr]">
@@ -156,6 +179,7 @@ export function ConnectionProfilesScreen({
                                 setSelectedId(undefined);
                                 setEditing(emptyProfile());
                                 setNotice(undefined);
+                                setServerProbe(undefined);
                             }}
                         >
                             New
@@ -267,6 +291,43 @@ export function ConnectionProfilesScreen({
                             {connectionError ?? notice}
                         </p>
                     )}
+                    {serverProbe && (
+                        <section className="grid gap-3 border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
+                            <div>
+                                <h3 className="font-semibold">
+                                    {serverProbe.status === 'missing'
+                                        ? 'cbranch server not found'
+                                        : 'cbranch server needs an update'}
+                                </h3>
+                                <p className="text-muted-foreground mt-1">
+                                    {serverProbe.status === 'missing'
+                                        ? `No cbranch server responded on ${selectedProfile?.host ?? editing.host}:127.0.0.1:${serverPort} through this SSH connection.`
+                                        : serverProbe.protocolVersion ===
+                                            undefined
+                                          ? 'The selected port responded, but it is not a compatible cbranch server.'
+                                          : `The server uses protocol v${serverProbe.protocolVersion}, which this desktop client cannot use.`}
+                                </p>
+                            </div>
+                            {serverProbe.status === 'missing' && (
+                                <div className="grid gap-2">
+                                    <p>
+                                        On the remote host, from a cbranch
+                                        checkout with Node 20+ and pnpm
+                                        installed, run:
+                                    </p>
+                                    <pre className="overflow-x-auto border bg-background/80 p-3 font-mono text-xs">
+                                        {setupCommand}
+                                    </pre>
+                                    <p className="text-muted-foreground text-xs">
+                                        If that port is already in use, choose
+                                        an unused loopback port in the command
+                                        and update this profile to match. The
+                                        server must remain bound to 127.0.0.1.
+                                    </p>
+                                </div>
+                            )}
+                        </section>
+                    )}
                     <div className="flex flex-wrap gap-2">
                         <Button
                             type="button"
@@ -291,7 +352,9 @@ export function ConnectionProfilesScreen({
                                     disabled={busy}
                                     onClick={() => void connect()}
                                 >
-                                    Connect
+                                    {serverProbe
+                                        ? 'Re-check and connect'
+                                        : 'Connect'}
                                 </Button>
                                 <Button
                                     type="button"

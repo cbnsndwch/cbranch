@@ -28,6 +28,7 @@ import { Effect, Layer, Stream } from 'effect';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 
 import { resolveServerConfig } from './config';
+import { HEALTH_PATH } from './health-route';
 import { buildServerLive } from './server';
 import { WORKSPACE_AVATAR_CHANNEL_PATH } from './workspace-avatar-channel';
 
@@ -160,6 +161,7 @@ describe('web-server end-to-end (NF-TEST-8)', () => {
             // --- static bundle, SPA fallback, side-channel, Origin enforcement ---
             const root = yield* fetchProbe(`${base}/`);
             const appJs = yield* fetchProbe(`${base}/app.js`);
+            const health = yield* fetchProbe(`${base}${HEALTH_PATH}`);
             const spaFallback = yield* fetchProbe(`${base}/some/client/route`, {
                 headers: { accept: 'text/html' },
             });
@@ -255,6 +257,7 @@ describe('web-server end-to-end (NF-TEST-8)', () => {
                 rpc,
                 root,
                 appJs,
+                health,
                 spaFallback,
                 blob,
                 traversal,
@@ -313,6 +316,12 @@ describe('web-server end-to-end (NF-TEST-8)', () => {
         expect(r.root.status).toBe(200);
         expect(r.root.body).toContain('cbranch-test-marker');
         expect(r.appJs.status).toBe(200);
+        expect(r.health.status).toBe(200);
+        expect(JSON.parse(r.health.body)).toEqual({
+            service: 'cbranch',
+            protocolVersion: 1,
+        });
+        expect(r.health.contentType).toContain('application/json');
         expect(r.spaFallback.status).toBe(200);
         expect(r.spaFallback.body).toContain('cbranch-test-marker');
 
