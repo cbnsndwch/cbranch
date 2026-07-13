@@ -130,7 +130,7 @@ const renderOverview = (api: CbranchApi) => {
         defaultOptions: { queries: { retry: false } },
     });
     return render(
-        <MemoryRouter initialEntries={[`/engagements/${engagementId}`]}>
+        <MemoryRouter initialEntries={[`/workspaces/${engagementId}`]}>
             <QueryClientProvider client={queryClient}>
                 <ApiProvider api={api}>
                     <EngagementOverview />

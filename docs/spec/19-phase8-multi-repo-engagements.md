@@ -16,9 +16,8 @@ repositories open and query their summary state concurrently.
 ## Terminology
 
 The product UI and operator documentation use **workspace**. The persisted
-`engagements` array, `Engagement*` type and RPC names, `engagementId`, and
-`/engagements/:engagementId/...` routes remain compatibility identifiers; they do
-not change the user-facing vocabulary.
+`engagements` array, `Engagement*` type and RPC names, and `engagementId` remain
+compatibility identifiers; they do not change the user-facing vocabulary.
 
 ## Invariants
 
@@ -63,7 +62,7 @@ not change the user-facing vocabulary.
   overview, open-repository tabs, add/open, close, and tab switching without
   discarding another open repository's cached view state.
 - **REQ-P8-SESSION-003** Routes MUST encode the workspace boundary
-  (`/engagements/:engagementId/...`) while retaining legacy `/repos/:repoId` deep
+  (`/workspaces/:engagementId/...`) while retaining legacy `/repos/:repoId` deep
   links for unassigned repositories.
 - **REQ-P8-SESSION-004** A workspace-scoped repo deep link MUST add that repo to
   the workspace's open set. A repo id that is not a member MUST be rejected by the

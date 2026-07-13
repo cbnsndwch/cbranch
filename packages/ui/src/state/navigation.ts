@@ -28,7 +28,7 @@ export function useNavigation(): Navigation {
     }>();
 
     const openEngagement = useCallback(
-        (id: EngagementId) => navigate(`/engagements/${id}`),
+        (id: EngagementId) => navigate(`/workspaces/${id}`),
         [navigate],
     );
 
@@ -36,7 +36,7 @@ export function useNavigation(): Navigation {
         (id: RepoId, explicitEngagementId?: EngagementId) => {
             const scope = explicitEngagementId ?? engagementId;
             navigate(
-                scope ? `/engagements/${scope}/repos/${id}` : `/repos/${id}`,
+                scope ? `/workspaces/${scope}/repos/${id}` : `/repos/${id}`,
             );
         },
         [engagementId, navigate],
@@ -47,7 +47,7 @@ export function useNavigation(): Navigation {
             if (!repoId) return;
             navigate(
                 engagementId
-                    ? `/engagements/${engagementId}/repos/${repoId}/commits/${oid}`
+                    ? `/workspaces/${engagementId}/repos/${repoId}/commits/${oid}`
                     : `/repos/${repoId}/commits/${oid}`,
             );
         },
