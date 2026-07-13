@@ -1,8 +1,10 @@
 import { spawnSync } from 'node:child_process';
 import {
     chmodSync,
+    copyFileSync,
     mkdtempSync,
     mkdirSync,
+    readFileSync,
     rmSync,
     writeFileSync,
 } from 'node:fs';
@@ -63,6 +65,46 @@ describe('managed server installer', () => {
             expect(result.stderr).toContain(
                 'Managed setup requires an active systemd user service manager',
             );
+        },
+    );
+
+    it.skipIf(process.platform !== 'linux')(
+        'writes an unquoted systemd working directory',
+        () => {
+            const root = mkdtempSync(join(tmpdir(), 'cbranch-install-test-'));
+            temporaryDirectories.push(root);
+            const home = join(root, 'home');
+            const bin = join(root, 'bin');
+            const server = join(root, 'cbranch-server');
+            mkdirSync(bin);
+            mkdirSync(server);
+            copyFileSync(installScript, join(server, 'install.sh'));
+            writeFileSync(
+                join(server, 'cbranch-server.json'),
+                '{"version":"0.1.0"}\n',
+            );
+            writeExecutable(join(bin, 'node'), "#!/bin/sh\nprintf '%s' 7420\n");
+            writeExecutable(join(bin, 'systemctl'), '#!/bin/sh\nexit 0\n');
+            writeExecutable(join(bin, 'loginctl'), '#!/bin/sh\nprintf yes\n');
+
+            const result = spawnSync(
+                '/bin/sh',
+                [join(server, 'install.sh'), '0.1.0', '7420'],
+                {
+                    encoding: 'utf8',
+                    env: { HOME: home, PATH: `${bin}:/usr/bin:/bin` },
+                },
+            );
+
+            expect(result.status).toBe(0);
+            const unit = readFileSync(
+                join(home, '.config', 'systemd', 'user', 'cbranch.service'),
+                'utf8',
+            );
+            expect(unit).toContain(
+                `WorkingDirectory=${join(home, '.local', 'share', 'cbranch', 'current')}`,
+            );
+            expect(unit).not.toContain('WorkingDirectory="');
         },
     );
 });

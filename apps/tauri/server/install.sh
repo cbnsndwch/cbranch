@@ -94,7 +94,7 @@ Description=cbranch server
 
 [Service]
 Type=simple
-WorkingDirectory="$current_dir"
+WorkingDirectory=$current_dir
 Environment=CBRANCH_BIND_ADDRESS=127.0.0.1
 Environment=CBRANCH_PORT=$port
 Environment=CBRANCH_CONFIG=$config_root/config.json
