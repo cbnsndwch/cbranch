@@ -27,6 +27,8 @@ export interface GitResult {
     readonly signal: NodeJS.Signals | null;
     readonly stdout: Buffer;
     readonly stderr: Buffer;
+    /** True when `maxStdoutBytes` stopped the child before its output was fully read. */
+    readonly stdoutLimitExceeded: boolean;
 }
 
 export interface RunGitOptions {
@@ -40,6 +42,8 @@ export interface RunGitOptions {
     readonly read?: boolean;
     /** Optional data to write to the child's stdin before closing it (used by `git commit -F -`, `git apply -`). */
     readonly stdin?: Buffer;
+    /** Stop the child when stdout exceeds this byte count, retaining at most this many bytes. */
+    readonly maxStdoutBytes?: number;
 }
 
 /** Decode a captured buffer as UTF-8, replacing invalid sequences (ENC-002). */
@@ -123,6 +127,8 @@ export const runGit = (
 
         const stdout: Buffer[] = [];
         const stderr: Buffer[] = [];
+        let stdoutBytes = 0;
+        let stdoutLimitExceeded = false;
         let settled = false;
 
         const onAbort = () => {
@@ -130,7 +136,20 @@ export const runGit = (
         };
         signal.addEventListener('abort', onAbort, { once: true });
 
-        child.stdout.on('data', (chunk: Buffer) => stdout.push(chunk));
+        child.stdout.on('data', (chunk: Buffer) => {
+            if (stdoutLimitExceeded) return;
+            const max = opts.maxStdoutBytes;
+            if (max !== undefined && stdoutBytes + chunk.length > max) {
+                const remaining = Math.max(0, max - stdoutBytes);
+                if (remaining > 0)
+                    stdout.push(Buffer.from(chunk.subarray(0, remaining)));
+                stdoutLimitExceeded = true;
+                child.kill('SIGKILL');
+                return;
+            }
+            stdout.push(chunk);
+            stdoutBytes += chunk.length;
+        });
         child.stderr.on('data', (chunk: Buffer) => stderr.push(chunk));
 
         child.on('error', err => {
@@ -172,6 +191,7 @@ export const runGit = (
                     signal: sig,
                     stdout: Buffer.concat(stdout),
                     stderr: stderrBuf,
+                    stdoutLimitExceeded,
                 }),
             );
         });

@@ -27,6 +27,8 @@ export const GitErrorCode = Schema.Literals([
     'repoLocked',
     'lockTimeout',
     'cancelled',
+    // resource limits
+    'resultTooLarge',
     // domain
     'repoNotFound',
     'notARepository',

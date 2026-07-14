@@ -150,6 +150,8 @@ export const GitErrorCode = Schema.Literals([
   "hostGitMissing", "hostGitTooOld", "gitFailed", "fsError", "permissionDenied", "repoUnavailable",
   // concurrency / lifecycle
   "repoLocked", "lockTimeout", "cancelled",
+  // resource limits
+  "resultTooLarge",
   // domain
   "repoNotFound", "notARepository", "dirtyWorkingTree", "nonFastForward", "mergeConflict",
   "hookRejected", "authRequired", "authFailed", "networkError", "refExists", "invalidRefName",
@@ -299,6 +301,7 @@ Conventions: ✎ = mutating (takes the per-repo lock); ⇉ = streaming RPC. All 
 |---|---|---|---|
 | `log.stream` ⇉ | `LogQuery` | `CommitSummary` | the one history feed (§6) |
 | `commit.detail` | `{ repoId, oid }` | `CommitDetail` | full body, parents, stats |
+| `commit.tree` | `{ repoId, oid }` | `CommitTree` | complete display-only paths. `git ls-tree -r -z --name-only <oid>`; directories are derived client-side. At most 10,000 paths and 4 MiB raw output; either cap fails with `GitError{ code: "resultTooLarge" }`, never a partial tree. |
 | `commit.diff` | `DiffSpec` | `DiffFile[]` | diff of a commit/range |
 | `diff.workingFile` | `{ repoId, path, staged }` | `DiffFile` | working-tree / index diff |
 | `file.contentAtRev` | `{ repoId, path, rev }` | `FileContent` \| download descriptor | large → HTTP side-channel (§3.7) |

@@ -74,6 +74,7 @@ import {
     subscribeInvocations,
 } from '../git/command-log';
 import { commitDetail } from '../git/commit';
+import { commitTree } from '../git/commit-tree';
 import {
     commitCreate as commitCreateGit,
     commitLastMessage as commitLastMessageGit,
@@ -705,6 +706,10 @@ export const makeGitEngine = (
             commitDetail: (repoId, oid) =>
                 Effect.flatMap(resolveById(repoId), repo =>
                     commitDetail(repoCwd(repo), oid, env),
+                ),
+            commitTree: (repoId, oid) =>
+                Effect.flatMap(resolveById(repoId), repo =>
+                    commitTree(repoCwd(repo), oid, env),
                 ),
             commitDiff: spec =>
                 Effect.flatMap(resolveById(spec.repoId), repo =>

@@ -77,6 +77,12 @@ export {
 } from './git/history';
 export { commitDetail, parseTzOffsetMinutes } from './git/commit';
 export {
+    COMMIT_TREE_OUTPUT_CAP,
+    COMMIT_TREE_PATH_CAP,
+    commitTree,
+    parseCommitTreePaths,
+} from './git/commit-tree';
+export {
     buildDiffFiles,
     commitDiff,
     diffWorkingFile,

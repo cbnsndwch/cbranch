@@ -20,6 +20,7 @@ import {
     type ChangeSetPullRequest,
     type CommitCreated,
     type CommitDetail,
+    type CommitTree,
     type CommitInput,
     type CommitMessage,
     type ConflictListing,
@@ -305,6 +306,11 @@ export interface GitEngineApi {
         repoId: RepoId,
         oid: Oid,
     ) => Effect.Effect<CommitDetail, GitError>;
+    /** commit.tree — complete display-only paths in a commit's tree. */
+    readonly commitTree: (
+        repoId: RepoId,
+        oid: Oid,
+    ) => Effect.Effect<CommitTree, GitError>;
     /** commit.diff — changed files for a commit/range. core-B. */
     readonly commitDiff: (
         spec: DiffSpec,

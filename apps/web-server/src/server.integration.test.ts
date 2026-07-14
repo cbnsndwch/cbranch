@@ -134,6 +134,10 @@ describe('web-server end-to-end (NF-TEST-8)', () => {
                     repoId: handle.repoId,
                     oid: head,
                 });
+                const tree = yield* client.CommitTree({
+                    repoId: handle.repoId,
+                    oid: head,
+                });
                 const diff = yield* client.CommitDiff(
                     new DiffSpec({
                         repoId: handle.repoId,
@@ -156,6 +160,7 @@ describe('web-server end-to-end (NF-TEST-8)', () => {
                     state,
                     log,
                     detail,
+                    tree,
                     diff,
                     content,
                 };
@@ -304,6 +309,9 @@ describe('web-server end-to-end (NF-TEST-8)', () => {
         // AC-10: full commit detail with navigable parents.
         expect(r.rpc.detail.subject).toBe('c');
         expect(r.rpc.detail.parents).toContain(commits[commits.length - 2]);
+
+        // commit.tree reads the selected tree, including files unchanged by commit c.
+        expect(r.rpc.tree.paths).toEqual(['a.txt', 'b.txt', 'c.txt']);
 
         // AC-11: changed-file list for the commit vs its first parent.
         expect(r.rpc.diff).toHaveLength(1);

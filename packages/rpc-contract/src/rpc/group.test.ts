@@ -24,6 +24,7 @@ import {
 import {
     CommitDetail,
     CommitSummary,
+    CommitTree,
     DiffFile,
     DiffLine,
     DownloadDescriptor,
@@ -297,6 +298,10 @@ const commitDetail = new CommitDetail({
     body: 'the body',
     messageRaw: 'init\n\nthe body',
     stats: { filesChanged: 1, additions: 1, deletions: 0 },
+});
+
+const commitTree = new CommitTree({
+    paths: ['README.md', 'src/index.ts'],
 });
 
 const textDiffFile = new DiffFile({
@@ -670,6 +675,7 @@ const handlers = CbranchRpcs.toLayer({
                   commitSummary('second'),
               ]),
     CommitDetail: () => Effect.succeed(commitDetail),
+    CommitTree: () => Effect.succeed(commitTree),
     CommitDiff: () => Effect.succeed([textDiffFile, binaryDiffFile]),
     DiffWorkingFile: () => Effect.succeed(textDiffFile),
     FileContentAtRev: ({ path }) =>
@@ -1028,7 +1034,10 @@ describe('CbranchRpcs P1 contract (in-memory RpcTest round-trip)', () => {
             // 7. commit.detail (unary)
             const detail = yield* client.CommitDetail({ repoId, oid: oid1 });
 
-            // 8. commit.diff (unary, array; mixed text + binary)
+            // 8. commit.tree (unary, complete display-only path list)
+            const tree = yield* client.CommitTree({ repoId, oid: oid1 });
+
+            // 9. commit.diff (unary, array; mixed text + binary)
             const diffFiles = yield* client.CommitDiff({
                 repoId,
                 target: oid1,
@@ -1039,14 +1048,14 @@ describe('CbranchRpcs P1 contract (in-memory RpcTest round-trip)', () => {
                 combined: false,
             });
 
-            // 9. diff.workingFile (unary)
+            // 10. diff.workingFile (unary)
             const workingDiff = yield* client.DiffWorkingFile({
                 repoId,
                 path: 'a.txt',
                 staged: false,
             });
 
-            // 10. file.contentAtRev (unary union: inline FileContent vs DownloadDescriptor)
+            // 11. file.contentAtRev (unary union: inline FileContent vs DownloadDescriptor)
             const inline = yield* client.FileContentAtRev({
                 repoId,
                 path: 'a.txt',
@@ -1066,6 +1075,7 @@ describe('CbranchRpcs P1 contract (in-memory RpcTest round-trip)', () => {
                 events,
                 summaries,
                 detail,
+                tree,
                 diffFiles,
                 workingDiff,
                 inline,
@@ -1104,13 +1114,15 @@ describe('CbranchRpcs P1 contract (in-memory RpcTest round-trip)', () => {
         expect(result.detail.author.when.epochSeconds).toBe(1_700_000_000);
         expect(result.detail.stats.filesChanged).toBe(1);
         // 8.
+        expect(result.tree.paths).toEqual(['README.md', 'src/index.ts']);
+        // 9.
         expect(result.diffFiles).toHaveLength(2);
         expect(result.diffFiles[0]?.hunks[0]?.lines[0]?.kind).toBe('add');
         expect(result.diffFiles[1]?.isBinary).toBe(true);
         expect(result.diffFiles[1]?.additions).toBeNull();
-        // 9.
-        expect(result.workingDiff.newPath).toBe('a.txt');
         // 10.
+        expect(result.workingDiff.newPath).toBe('a.txt');
+        // 11.
         expect('content' in result.inline).toBe(true);
         if ('content' in result.inline) {
             expect(result.inline.content).toBe('hello');

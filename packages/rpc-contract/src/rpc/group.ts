@@ -28,6 +28,7 @@ import {
 import {
     CommitDetail,
     CommitSummary,
+    CommitTree,
     DiffFile,
     FileContentResult,
     RecentRepo,
@@ -322,6 +323,12 @@ export const CbranchRpcs = RpcGroup.make(
     Rpc.make('CommitDetail', {
         payload: { repoId: RepoId, oid: Oid },
         success: CommitDetail,
+        error: GitError,
+    }),
+    // commit.tree — complete, display-only file paths for one commit.
+    Rpc.make('CommitTree', {
+        payload: { repoId: RepoId, oid: Oid },
+        success: CommitTree,
         error: GitError,
     }),
     // commit.diff — diff of a commit/range.

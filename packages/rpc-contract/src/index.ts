@@ -25,7 +25,7 @@ export * from './schemas/live';
 export * from './schemas/queries';
 
 // Domain / authored P1 success Schemas (Signature, CommitSummary, CommitDetail,
-// RepoState, RepoHandle, RecentRepo, ChangeCode, DiffLine, Hunk, DiffFile,
+// CommitTree, RepoState, RepoHandle, RecentRepo, ChangeCode, DiffLine, Hunk, DiffFile,
 // FileContent, DownloadDescriptor, FileContentResult).
 export * from './schemas/domain';
 

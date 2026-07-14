@@ -81,6 +81,15 @@ export class CommitDetail extends Schema.Class<CommitDetail>('CommitDetail')({
 }) {}
 
 /**
+ * Complete, display-only file paths in a commit tree (`commit.tree`). Directories are
+ * reconstructed client-side from the slash-delimited paths; no working-tree path is
+ * opened by this read.
+ */
+export class CommitTree extends Schema.Class<CommitTree>('CommitTree')({
+    paths: Schema.Array(Schema.String),
+}) {}
+
+/**
  * Aggregate repository snapshot read on open and after invalidation
  * (`repo.state`, DM-070 + 14 §8; field is `inProgress` per 14 §8, keeping the
  * `"none"` member from DM-070). `inProgress` is derived from git-dir markers

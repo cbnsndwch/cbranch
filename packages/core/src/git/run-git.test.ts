@@ -65,6 +65,22 @@ describe('runGit', () => {
         );
         expect(result.exitCode).not.toBe(0);
     });
+
+    test('stops and flags stdout over an explicit byte limit', async () => {
+        const repo = await ws.createRepo('stdout-limit');
+        await repo.commit({ message: 'init', files: { 'a.txt': 'abcdef' } });
+
+        const result = await run(
+            runGit({
+                cwd: repo.dir,
+                args: ['show', 'HEAD:a.txt'],
+                maxStdoutBytes: 3,
+            }),
+        );
+
+        expect(result.stdoutLimitExceeded).toBe(true);
+        expect(result.stdout.toString('utf8')).toBe('abc');
+    });
 });
 
 describe('runGitOk', () => {

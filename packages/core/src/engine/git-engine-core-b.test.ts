@@ -289,6 +289,45 @@ describe('commit.detail', () => {
     });
 });
 
+describe('commit.tree', () => {
+    test('returns every file at the selected commit, not only that commit’s changes', async () => {
+        const repo = await ws.createRepo('commit-tree');
+        await repo.commit({
+            message: 'base',
+            files: {
+                'README.md': 'base\n',
+                'src/unchanged.ts': 'export const value = 1;\n',
+                'src/removed.ts': 'remove me\n',
+            },
+            date: fixtureDate(1),
+        });
+        await repo.commit({
+            message: 'next',
+            files: { 'src/current.ts': 'export const current = true;\n' },
+            date: fixtureDate(2),
+        });
+        await repo.git(['rm', '-q', 'src/removed.ts']);
+        const selected = await repo.commit({
+            message: 'remove obsolete file',
+            date: fixtureDate(3),
+        });
+        const cfg = newCfg();
+
+        const tree = await withEngine(cfg, e =>
+            Effect.flatMap(e.open(repo.dir), h =>
+                e.commitTree(h.repoId, OidBrand.make(selected)),
+            ),
+        );
+
+        expect(tree.paths).toEqual([
+            'README.md',
+            'src/current.ts',
+            'src/unchanged.ts',
+        ]);
+        expect(tree.paths).not.toContain('src/removed.ts');
+    });
+});
+
 describe('commit.diff', () => {
     test('classifies add / modify / delete / rename / binary against a base', async () => {
         const repo = await ws.createRepo('diff-mix');
