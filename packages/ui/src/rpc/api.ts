@@ -22,6 +22,7 @@ import {
     type CommandLogEntry,
     type CommitCreated,
     type CommitDetail,
+    type CommitTree,
     type CleanPreview,
     type CleanResult,
     type CommitInput,
@@ -203,6 +204,7 @@ export interface CbranchApi {
     ): Promise<GitHubPullRequestCreated>;
     repoState(repoId: RepoId): Promise<RepoState>;
     commitDetail(repoId: RepoId, oid: Oid): Promise<CommitDetail>;
+    commitTree(repoId: RepoId, oid: Oid): Promise<CommitTree>;
     commitDiff(spec: DiffSpec): Promise<ReadonlyArray<DiffFile>>;
     workingFileDiff(
         repoId: RepoId,
@@ -743,6 +745,8 @@ export const makeApi = (runtime: AppRuntime): CbranchApi => {
             runtime.runPromise(
                 withClient(c => c.CommitDetail({ repoId, oid })),
             ),
+        commitTree: (repoId, oid) =>
+            runtime.runPromise(withClient(c => c.CommitTree({ repoId, oid }))),
         commitDiff: spec =>
             runtime.runPromise(withClient(c => c.CommitDiff(spec))),
         workingFileDiff: (repoId, path, staged) =>

@@ -138,3 +138,10 @@ export const loadDesktopBridge = async (): Promise<DesktopBridge> => {
         diagnostics: () => invoke('desktop_diagnostics'),
     };
 };
+
+/** Set the native title only when the UI is running inside a Tauri WebView. */
+export const setDesktopWindowTitle = async (title: string): Promise<void> => {
+    if (!isDesktopSurface()) return;
+    const { getCurrentWindow } = await import('@tauri-apps/api/window');
+    await getCurrentWindow().setTitle(title);
+};

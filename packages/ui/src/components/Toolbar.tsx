@@ -1,3 +1,4 @@
+import { type SyncEvent } from '@cbranch/rpc-contract';
 import { useQueryClient } from '@tanstack/react-query';
 import {
     Archive,
@@ -95,6 +96,26 @@ const isNonFastForward = (err: unknown): boolean => {
     return s.includes('nonFastForward') || s.includes('non-fast-forward');
 };
 
+const syncEventText = (item: unknown): string | undefined => {
+    const event = item as Partial<SyncEvent>;
+    if (event._tag === 'progress') return event.text?.trim() || undefined;
+    if (event._tag === 'refUpdate') {
+        const update = event as Extract<SyncEvent, { _tag: 'refUpdate' }>;
+        return [
+            update.summary,
+            update.localRef,
+            update.remoteRef,
+            update.status,
+        ]
+            .filter(Boolean)
+            .join(' ');
+    }
+    return undefined;
+};
+
+const redactSyncText = (text: string): string =>
+    text.replace(/(https?:\/\/)[^\s/@]+@/g, '$1***@');
+
 // A single streaming sync handler shape (mirrors `StreamHandlers<SyncEvent>` but with
 // `unknown` items so the same core drives fetch / pull / push).
 interface SyncCallbacks {
@@ -118,6 +139,9 @@ export function Toolbar() {
     const openCommitDialog = useUiStore(s => s.setCommitDialogOpen);
     const syncRequest = useUiStore(s => s.syncRequest);
     const setSyncRequest = useUiStore(s => s.setSyncRequest);
+    const startSessionActivity = useUiStore(s => s.startSessionActivity);
+    const appendSessionActivity = useUiStore(s => s.appendSessionActivity);
+    const finishSessionActivity = useUiStore(s => s.finishSessionActivity);
     const { data: state } = useRepoState(repoId);
     const { data: remotes } = useRemoteList(repoId);
     const { data: branchListing } = useBranchList(repoId);
@@ -142,6 +166,7 @@ export function Toolbar() {
     const upstream = currentLocalBranch?.upstream;
 
     const syncUnsubRef = useRef<(() => void) | null>(null);
+    const syncActivityIdRef = useRef<string | null>(null);
     // Mirror of `syncRunning` for the synchronous guard: a chained retry (pull → push)
     // starts the next sync from inside the prior op's `onComplete`, where the captured
     // `syncRunning` state is stale. The ref always reflects the live value.
@@ -182,26 +207,40 @@ export function Toolbar() {
         syncUnsubRef.current?.();
         syncUnsubRef.current = null;
         setRunning(kind);
+        const activityId = startSessionActivity({ repoId, kind, label });
+        syncActivityIdRef.current = activityId;
         const toastId = 'sync-' + kind;
-        toast.loading(label + '…', { id: toastId });
         syncUnsubRef.current = start({
             onItem: item => {
-                const ev = item as { _tag: string; text?: string };
-                if (ev._tag === 'progress' && ev.text) {
-                    toast.loading(ev.text.trim() || label + '…', {
-                        id: toastId,
-                    });
-                }
+                const text = syncEventText(item);
+                if (text)
+                    appendSessionActivity(activityId, redactSyncText(text));
             },
             onComplete: () => {
                 setRunning(null);
                 syncUnsubRef.current = null;
+                if (syncActivityIdRef.current === activityId) {
+                    syncActivityIdRef.current = null;
+                    finishSessionActivity(
+                        activityId,
+                        'success',
+                        `${label} complete.`,
+                    );
+                }
                 toast.success(label + ' complete', { id: toastId });
                 opts?.onCompleted?.();
             },
             onError: err => {
                 setRunning(null);
                 syncUnsubRef.current = null;
+                if (syncActivityIdRef.current === activityId) {
+                    syncActivityIdRef.current = null;
+                    finishSessionActivity(
+                        activityId,
+                        'error',
+                        `${label} failed: ${String(err)}`,
+                    );
+                }
                 if (opts?.onErrorOverride?.(err)) {
                     toast.dismiss(toastId);
                     return;
@@ -312,6 +351,14 @@ export function Toolbar() {
         if (!syncRunning) return;
         syncUnsubRef.current?.();
         syncUnsubRef.current = null;
+        if (syncActivityIdRef.current) {
+            finishSessionActivity(
+                syncActivityIdRef.current,
+                'cancelled',
+                'Cancelled by user.',
+            );
+            syncActivityIdRef.current = null;
+        }
         toast.dismiss('sync-' + syncRunning);
         toast('Sync canceled');
         setSyncRunning(null);

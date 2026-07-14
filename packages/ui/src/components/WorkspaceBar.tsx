@@ -23,6 +23,7 @@ import { useInvalidationBus } from '../rpc/use-invalidation-bus';
 import { useNavigation } from '../state/navigation';
 import { useUiStore } from '../state/store';
 import { Button } from './ui/button';
+import { DesktopDisconnectAction } from './ConnectionStatusIndicator';
 import { WorkspaceAvatar } from './WorkspaceAvatar';
 import { WorkspaceDirectoryImportDialog } from './WorkspaceDirectoryImportDialog';
 import {
@@ -154,22 +155,25 @@ export function WorkspaceBar() {
 
     if (!engagement) {
         return (
-            <div className="bg-muted/60 flex h-8 shrink-0 items-center border-b px-2">
-                <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-7"
-                    onClick={() => openManager(true)}
-                >
-                    Create workspace
-                </Button>
-                {activeRepoId ? (
-                    <span className="text-muted-foreground ml-2 text-xs">
-                        Unassigned repository
-                    </span>
-                ) : null}
-            </div>
+            <TooltipProvider>
+                <div className="bg-muted/60 flex h-8 shrink-0 items-center border-b px-2">
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-7"
+                        onClick={() => openManager(true)}
+                    >
+                        Create workspace
+                    </Button>
+                    <DesktopDisconnectAction className="ml-1 size-7" />
+                    {activeRepoId ? (
+                        <span className="text-muted-foreground ml-2 text-xs">
+                            Unassigned repository
+                        </span>
+                    ) : null}
+                </div>
+            </TooltipProvider>
         );
     }
 
@@ -225,6 +229,7 @@ export function WorkspaceBar() {
                         aria-hidden="true"
                     />
                 </button>
+                <DesktopDisconnectAction className="size-8 border-r" />
                 <div className="flex min-w-0 flex-1 overflow-x-auto overflow-y-hidden">
                     {openRepos.map(repo => (
                         <RepoTab

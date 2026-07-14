@@ -13,6 +13,7 @@ import { EngagementManagerDialog } from './EngagementManagerDialog';
 import { EngagementOverview } from './EngagementOverview';
 import { EngagementRail } from './EngagementRail';
 import { CommitDetailsTabs } from './CommitDetailsTabs';
+import { CommitTreePanel } from './CommitTreePanel';
 import { ArchiveDialog } from './ArchiveDialog';
 import { BisectBanner } from './BisectBanner';
 import { BisectStartDialog } from './BisectStartDialog';
@@ -43,6 +44,7 @@ import { ResetDialog } from './ResetDialog';
 import { UndoLastCommitDialog } from './UndoLastCommitDialog';
 import { PickDialogs } from './SequencerDialogs';
 import { SettingsDialog } from './SettingsDialog';
+import { SessionActivityPanel } from './SessionActivityPanel';
 import { StashPanel } from './StashPanel';
 import { SubmodulesPanel } from './SubmodulesPanel';
 import { TagsPanel } from './TagsPanel';
@@ -113,6 +115,8 @@ export function AppShell() {
                 );
             case 'diff':
                 return <DiffPanel repoId={repoId} oid={selectedOid} />;
+            case 'filetree':
+                return <CommitTreePanel repoId={repoId} oid={selectedOid} />;
             default:
                 return (
                     <Placeholder>
@@ -194,6 +198,7 @@ export function AppShell() {
     return (
         <>
             <CommandPalette />
+            <SessionActivityPanel />
             <RepoSwitcher />
             <EngagementManagerDialog />
             <CommitDialog />

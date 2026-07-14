@@ -2,9 +2,13 @@ import {
     CBRANCH_BACKEND_VERSION,
     CBRANCH_PROTOCOL_VERSION,
 } from '@cbranch/rpc-contract';
-import { describe, expect, test, vi } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 
-import { probeCbranchServer } from './bridge';
+const tauriWindow = vi.hoisted(() => ({ getCurrentWindow: vi.fn() }));
+
+vi.mock('@tauri-apps/api/window', () => tauriWindow);
+
+import { probeCbranchServer, setDesktopWindowTitle } from './bridge';
 
 describe('probeCbranchServer', () => {
     test('accepts a compatible cbranch health response', async () => {
@@ -91,5 +95,23 @@ describe('probeCbranchServer', () => {
             status: 'incompatible',
             protocolVersion: CBRANCH_PROTOCOL_VERSION,
         });
+    });
+});
+
+describe('setDesktopWindowTitle', () => {
+    afterEach(() => {
+        tauriWindow.getCurrentWindow.mockReset();
+        vi.unstubAllGlobals();
+    });
+
+    test('defers the Tauri window import and updates the native title on desktop', async () => {
+        const setTitle = vi.fn(async () => undefined);
+        tauriWindow.getCurrentWindow.mockReturnValue({ setTitle });
+        vi.stubGlobal('window', { __TAURI_INTERNALS__: {} });
+
+        await setDesktopWindowTitle('Client A · api • cBranch');
+
+        expect(tauriWindow.getCurrentWindow).toHaveBeenCalledOnce();
+        expect(setTitle).toHaveBeenCalledWith('Client A · api • cBranch');
     });
 });

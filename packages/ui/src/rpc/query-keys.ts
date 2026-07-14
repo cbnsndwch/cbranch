@@ -32,6 +32,9 @@ export const queryKeys = {
     /** `commit.detail` — immutable, content-addressed by oid (never invalidated). */
     commitDetail: (repoId: RepoId, oid: Oid) =>
         [repoId, 'commit', oid, 'detail'] as const,
+    /** `commit.tree` — immutable, complete tree paths for a concrete commit. */
+    commitTree: (repoId: RepoId, oid: Oid) =>
+        [repoId, 'commit', oid, 'tree'] as const,
     /**
      * `commit.diff` — immutable, content-addressed by target plus the options that change the
      * computed patch (base/whitespace/context/combined/paths), so toggling a control caches

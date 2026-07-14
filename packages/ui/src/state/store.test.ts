@@ -27,6 +27,9 @@ beforeEach(() => {
         unstagedSelection: new Set(),
         selectedDiffFile: null,
         optimisticCommits: [],
+        sessionActivities: [],
+        sessionActivityOpen: false,
+        sessionActivityPinned: false,
     });
 });
 
@@ -48,6 +51,27 @@ describe('useUiStore', () => {
     test('setTheme updates the preference', () => {
         useUiStore.getState().setTheme('dark');
         expect(useUiStore.getState().theme).toBe('dark');
+    });
+
+    test('records a bounded session sync transcript and opens the activity panel', () => {
+        const id = useUiStore.getState().startSessionActivity({
+            repoId: RepoId.make('repo-1'),
+            kind: 'fetch',
+            label: 'Fetching',
+        });
+        useUiStore.getState().appendSessionActivity(id, 'Receiving objects');
+        useUiStore
+            .getState()
+            .finishSessionActivity(id, 'success', 'Fetch complete.');
+
+        const activity = useUiStore.getState().sessionActivities[0]!;
+        expect(useUiStore.getState().sessionActivityOpen).toBe(true);
+        expect(activity.status).toBe('success');
+        expect(activity.events).toEqual([
+            'Fetching started.',
+            'Receiving objects',
+            'Fetch complete.',
+        ]);
     });
 
     // ── P2: commit draft ────────────────────────────────────────────────────────

@@ -22,6 +22,7 @@ import {
     type CleanResult,
     type CommitCreated,
     type CommitDetail,
+    type CommitTree,
     type CommitInput,
     type CommitMessage,
     CommitSummary,
@@ -344,6 +345,19 @@ export const useCommitDetail = (
     });
 };
 
+export const useCommitTree = (
+    repoId: RepoId | null,
+    oid: Oid | null,
+): UseQueryResult<CommitTree> => {
+    const api = useApi();
+    return useQuery({
+        queryKey:
+            repoId && oid ? queryKeys.commitTree(repoId, oid) : ['inactive'],
+        queryFn: () => api.commitTree(repoId as RepoId, oid as Oid),
+        enabled: repoId !== null && oid !== null,
+    });
+};
+
 export const useCommitDiff = (
     spec: DiffSpec | null,
 ): UseQueryResult<ReadonlyArray<DiffFile>> => {
@@ -490,10 +504,20 @@ export const useCommandLog = (
     const api = useApi();
     const [entries, setEntries] = useState<ReadonlyArray<CommandLogEntry>>([]);
 
+    const mergeEntries = (next: ReadonlyArray<CommandLogEntry>) =>
+        setEntries(current => {
+            const bySequence = new Map<number, CommandLogEntry>();
+            for (const entry of [...current, ...next])
+                bySequence.set(entry.seq, entry);
+            return [...bySequence.values()]
+                .toSorted((left, right) => right.seq - left.seq)
+                .slice(0, 500);
+        });
+
     useEffect(() => {
         let active = true;
         void api.commandLogList(repoId, 500).then(rows => {
-            if (active) setEntries(rows);
+            if (active) mergeEntries(rows);
         });
         return () => {
             active = false;
@@ -503,7 +527,7 @@ export const useCommandLog = (
     useEffect(() => {
         if (!live) return;
         return api.commandLogSubscribe(repoId, {
-            onItem: entry => setEntries(prev => [entry, ...prev].slice(0, 500)),
+            onItem: entry => mergeEntries([entry]),
         });
     }, [api, repoId, live]);
 

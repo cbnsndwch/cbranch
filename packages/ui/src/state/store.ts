@@ -30,14 +30,7 @@ import { type DateMode, readDateMode, writeDateMode } from '../lib/format';
 import { readHistorySplit, writeHistorySplit } from '../lib/layout';
 import { applyTheme, readThemePref, type ThemePref } from '../theme/theme';
 
-export type DetailTab =
-    | 'changes'
-    | 'commit'
-    | 'diff'
-    | 'filetree'
-    | 'gpg'
-    | 'console'
-    | 'output';
+export type DetailTab = 'changes' | 'commit' | 'diff' | 'filetree' | 'gpg';
 
 export type ActiveView =
     | 'history'
@@ -49,6 +42,25 @@ export type ActiveView =
     | 'submodules'
     | 'commandLog'
     | 'solveConflicts';
+
+export type SessionActivityKind = 'fetch' | 'pull' | 'push';
+export type SessionActivityStatus =
+    | 'running'
+    | 'success'
+    | 'error'
+    | 'cancelled';
+
+/** A bounded, tab-local transcript for a streaming remote operation. */
+export interface SessionActivity {
+    readonly id: string;
+    readonly repoId: RepoId;
+    readonly kind: SessionActivityKind;
+    readonly label: string;
+    readonly startedAt: number;
+    readonly endedAt?: number;
+    readonly status: SessionActivityStatus;
+    readonly events: ReadonlyArray<string>;
+}
 
 /** A commit targeted by a cherry-pick / revert dialog (P4 UI-C, REQ-UX-001). */
 export interface PickCommit {
@@ -345,7 +357,26 @@ export interface UiState {
     /** One-shot sync request consumed by the always-mounted Toolbar (fetch/pull/push). */
     readonly syncRequest: 'fetch' | 'pull' | 'push' | null;
     readonly setSyncRequest: (req: 'fetch' | 'pull' | 'push' | null) => void;
+    /** Global, tab-local activity drawer for live Git operation transcripts. */
+    readonly sessionActivities: ReadonlyArray<SessionActivity>;
+    readonly sessionActivityOpen: boolean;
+    readonly sessionActivityPinned: boolean;
+    readonly startSessionActivity: (input: {
+        readonly repoId: RepoId;
+        readonly kind: SessionActivityKind;
+        readonly label: string;
+    }) => string;
+    readonly appendSessionActivity: (id: string, event: string) => void;
+    readonly finishSessionActivity: (
+        id: string,
+        status: Exclude<SessionActivityStatus, 'running'>,
+        event?: string,
+    ) => void;
+    readonly setSessionActivityOpen: (open: boolean) => void;
+    readonly setSessionActivityPinned: (pinned: boolean) => void;
 }
+
+let nextSessionActivityId = 0;
 
 export const useUiStore = create<UiState>(set => ({
     activeEngagementId: null,
@@ -395,6 +426,9 @@ export const useUiStore = create<UiState>(set => ({
     tagCreateOpen: false,
     remotesDialogOpen: false,
     syncRequest: null,
+    sessionActivities: [],
+    sessionActivityOpen: false,
+    sessionActivityPinned: false,
     // Switching repositories supersedes the old selection and filters (P1-OPEN-4 / P1-X-4).
     setActiveRepoId: activeRepoId =>
         set({
@@ -533,4 +567,54 @@ export const useUiStore = create<UiState>(set => ({
     setTagCreateOpen: tagCreateOpen => set({ tagCreateOpen }),
     setRemotesDialogOpen: remotesDialogOpen => set({ remotesDialogOpen }),
     setSyncRequest: syncRequest => set({ syncRequest }),
+    startSessionActivity: ({ repoId, kind, label }) => {
+        const id = `sync-${Date.now()}-${nextSessionActivityId++}`;
+        const startedAt = Date.now();
+        const activity: SessionActivity = {
+            id,
+            repoId,
+            kind,
+            label,
+            startedAt,
+            status: 'running',
+            events: [`${label} started.`],
+        };
+        set(state => ({
+            sessionActivityOpen: true,
+            sessionActivities: [activity, ...state.sessionActivities].slice(
+                0,
+                50,
+            ),
+        }));
+        return id;
+    },
+    appendSessionActivity: (id, event) =>
+        set(state => ({
+            sessionActivities: state.sessionActivities.map(activity =>
+                activity.id === id
+                    ? {
+                          ...activity,
+                          events: [...activity.events, event].slice(-100),
+                      }
+                    : activity,
+            ),
+        })),
+    finishSessionActivity: (id, status, event) =>
+        set(state => ({
+            sessionActivities: state.sessionActivities.map(activity =>
+                activity.id === id
+                    ? {
+                          ...activity,
+                          endedAt: Date.now(),
+                          status,
+                          events: event
+                              ? [...activity.events, event].slice(-100)
+                              : activity.events,
+                      }
+                    : activity,
+            ),
+        })),
+    setSessionActivityOpen: sessionActivityOpen => set({ sessionActivityOpen }),
+    setSessionActivityPinned: sessionActivityPinned =>
+        set({ sessionActivityPinned }),
 }));

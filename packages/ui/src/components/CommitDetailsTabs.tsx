@@ -9,8 +9,6 @@ const TABS: ReadonlyArray<readonly [DetailTab, string]> = [
     ['diff', 'Diff'],
     ['filetree', 'File tree'],
     ['gpg', 'GPG'],
-    ['console', 'Console'],
-    ['output', 'Output'],
 ];
 
 export function CommitDetailsTabs() {

@@ -80,7 +80,7 @@ export function Layout({ children }: { readonly children: React.ReactNode }) {
                 <meta name="theme-color" content="#2bc6ad" />
                 {/* Must run before <Links> so the right theme is active when the CSS applies. */}
                 <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
-                <title>cbranch</title>
+                <title>cBranch</title>
                 <Meta />
                 <Links />
             </head>

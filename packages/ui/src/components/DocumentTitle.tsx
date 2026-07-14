@@ -1,21 +1,48 @@
 import { useEffect } from 'react';
 
-import { useRepoState } from '../rpc/hooks';
+import { setDesktopWindowTitle } from '../desktop/bridge';
+import { useEngagementWorkspace } from '../rpc/hooks';
 import { useUiStore } from '../state/store';
 
-// On web there is no in-app title bar, the browser window title IS the title bar. This
-// headless component reflects the active repository's current branch in `document.title`
-// (e.g. "main • cBranch", or just "cBranch" with no repo open) and renders nothing.
+// On web there is no in-app title bar, so this headless component keeps both browser and
+// desktop window titles aligned with the active workspace and repository.
 export function DocumentTitle() {
     const repoId = useUiStore(s => s.activeRepoId);
-    const { data: state } = useRepoState(repoId);
-    const title = state?.currentBranch
-        ? `${state.currentBranch} • cBranch`
-        : 'cBranch';
+    const engagementId = useUiStore(s => s.activeEngagementId);
+    const workspace = useEngagementWorkspace();
+    const engagement = workspace.data?.engagements.find(
+        item => item.id === engagementId,
+    );
+    const repository = repoId
+        ? (engagement?.repositories.find(item => item.repoId === repoId) ??
+          workspace.data?.unassignedRepositories.find(
+              item => item.repoId === repoId,
+          ) ??
+          workspace.data?.engagements
+              .flatMap(item => item.repositories)
+              .find(item => item.repoId === repoId))
+        : undefined;
+    const title =
+        engagement && repository
+            ? `${engagement.name} · ${repository.name} • cBranch`
+            : engagement
+              ? `${engagement.name} • cBranch`
+              : repository
+                ? `${repository.name} • cBranch`
+                : 'cBranch';
 
     useEffect(() => {
         document.title = title;
+        void setDesktopWindowTitle(title).catch(() => undefined);
     }, [title]);
+
+    useEffect(
+        () => () => {
+            document.title = 'cBranch';
+            void setDesktopWindowTitle('cBranch').catch(() => undefined);
+        },
+        [],
+    );
 
     return null;
 }

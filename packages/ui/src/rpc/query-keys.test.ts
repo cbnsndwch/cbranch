@@ -34,6 +34,12 @@ describe('query keys (D9 / spec 15 §2)', () => {
             oid,
             'detail',
         ]);
+        expect(queryKeys.commitTree(repoId, oid)).toEqual([
+            repoId,
+            'commit',
+            oid,
+            'tree',
+        ]);
         const spec = new DiffSpec({
             repoId,
             target: 'abc123',
