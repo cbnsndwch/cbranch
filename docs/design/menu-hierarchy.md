@@ -207,9 +207,9 @@ Extension point. cbranch ships no plugin system in the MVP; the menu is a placeh
 
 ```txt
 Plugins
-  (no plugins loaded)        (later)  Populated dynamically when a plugin host exists.
+  (no plugins loaded)        (later)  Populated from enabled trusted extensions.
   ---
-  Plugin settings...         (later)  Configure installed plugins.
+  Plugin settings...         —        Show trusted-extension status and install warnings.
 ```
 
 ---

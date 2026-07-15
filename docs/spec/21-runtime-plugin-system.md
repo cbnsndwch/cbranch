@@ -7,8 +7,8 @@
 > plugin is equivalent to trusting its publisher with the host user account. Plugins
 > may use normal host APIs and are not OS-sandboxed. Signed artifacts, explicit
 > publisher trust, install/enable review, typed cbranch APIs, audit records, and
-> update review remain product requirements. The sandbox-worker requirements below
-> are deferred rather than emulated with a Node VM or a permission convention.
+> update review remain product requirements. Every former sandbox-worker requirement
+> below is deferred rather than emulated with a Node VM or a permission convention.
 
 ## Purpose
 
@@ -65,10 +65,10 @@ The following decisions are fixed for the first release of this phase:
   repositories reachable through HTTPS or SSH.
 - Make publisher identity, signature status, source repository, version,
   requested permissions, and update rationale visible before installation.
-- Run plugin logic outside the browser and without exposing a raw `GitEngine`,
-  raw RPC client, Node API, environment, credential, or host filesystem handle.
-- Permit useful workspace-scoped automation while enforcing a reviewable,
-  least-privilege capability grant at every host operation.
+- Run plugin logic outside the browser and expose only documented cbranch APIs;
+  plugins never receive a raw `GitEngine`, raw RPC client, or host credentials.
+- Make the host-user trust consequence explicit. Capability grants limit cbranch
+  APIs and UI behavior, not the ambient authority of trusted ESM code.
 - Make installation and update selection reproducible and recoverable.
 - Preserve existing package boundaries: only `apps/web-server` opens sockets or
   spawns non-Git host processes; `packages/core` remains transport-agnostic and
@@ -80,8 +80,9 @@ The following decisions are fixed for the first release of this phase:
   social discovery.
 - Installation from arbitrary URLs, local directories, npm, or a Git branch
   without signed repository metadata.
-- Arbitrary JavaScript/TypeScript execution in the web-server process, Node
-  module loading, native addons, shell scripts, or direct browser DOM access.
+- TypeScript runtime loading, npm package resolution, native addons, shell
+  scripts, direct browser DOM access, or runtime dependency installation. The
+  initial loader accepts reviewed `.mjs` and `.js` ESM modules only.
 - A security guarantee against a plugin granted the broad `hostAutomation`
   capability. Such a grant is equivalent to trusting that publisher's code to
   act as the host user within the approved scope.
@@ -96,9 +97,9 @@ The following decisions are fixed for the first release of this phase:
   without placing its token in a URL, browser store, config file, or log.
 - As a developer, I inspect a plugin's publisher, source, permissions, release
   notes, and artifact digest before installing it.
-- As a developer, I run a trusted release-management plugin against repositories
-  in the current engagement without handing the plugin an unrestricted Node
-  process or my Git credentials.
+- As a developer, I understand that enabling a trusted release-management plugin
+  grants its publisher host-user authority; cbranch still never hands it stored
+  repository credentials as a cbranch API.
 - As a security-conscious user, I can disable a plugin immediately, inspect its
   audit history, revoke its permissions, and return to the last known-good
   version after a bad release.
@@ -143,13 +144,9 @@ Browser / desktop UI
         ▼
 packages/ui ───────────────► apps/web-server
                                   │
-                                  ├─ Plugin repository client + TUF verifier
-                                  ├─ Plugin manager / permission broker
-                                  ├─ sandboxed plugin worker
-                                  │       │ capability requests only
-                                  │       ▼
-                                  ├─ packages/core GitEngine (Git capabilities)
-                                  └─ host-process broker (approved automation)
+                                   ├─ Verified artifact installer (deferred)
+                                   ├─ Plugin manager + audit store
+                                   └─ Trusted local ESM extension host
 ```
 
 ### Package boundaries
@@ -157,39 +154,35 @@ packages/ui ───────────────► apps/web-server
 - `packages/plugin-contract` defines versioned manifest, capability, declarative
   UI, repository metadata, broker request/result, and audit-event schemas. It
   has no UI, transport, Node process, filesystem, or Git implementation imports.
-- `packages/plugin-runtime` hosts the transport-agnostic plugin manager,
-  manifest validation, grant evaluation, TUF verification adapter, and worker
-  protocol. It MUST NOT open sockets, invoke Git, or spawn a host program.
-- `packages/core` remains the only direct Git orchestration layer. The web server
-  invokes `GitEngine` on behalf of an approved plugin through a narrow broker;
-  plugins never import or receive `GitEngine`.
-- `apps/web-server` owns repository fetching, OS-secret-store access, sandbox
-  worker lifecycle, host-process execution, and mapping plugin operations to
-  existing `GitEngine` methods. It is the only place a non-Git process may be
-  spawned for a plugin.
+- `packages/plugin-runtime` hosts transport-agnostic manifest, grant, archive,
+  and TUF policy. It MUST NOT open sockets, invoke Git, or spawn a host program.
+- `packages/core` remains the only direct Git orchestration layer. The initial
+  trusted extension API does not expose Git operations; later cbranch APIs must
+  broker through this boundary and never hand plugins a `GitEngine`.
+- `apps/web-server` owns trusted ESM loading, lifecycle, audit persistence,
+  repository fetching, and future OS-secret-store/artifact activation adapters.
 - `packages/ui` renders host-validated declarative contributions and calls only
   the existing cbranch RPC contract. It never downloads an artifact, evaluates
   plugin code, or receives a repository credential.
 
-### Sandboxed worker
+### Trusted extension host
 
-Plugins execute in a separately supervised, sandboxed worker runtime, not in
-the cbranch Node process. The runtime has no ambient network, filesystem,
-environment-variable, subprocess, or DOM access. It communicates with the host
-only through a versioned, schema-validated request/response protocol.
+Enabled plugins run as reviewed local ESM modules in the web-server process.
+They have normal host-user authority, so enabling one is an explicit publisher
+trust decision and is never described as sandboxing. The context exposed as the
+cbranch extension API is deliberately narrow: activation directory, structured
+log, declarative command handlers, and the `repoId`/input of a command invocation.
+It does not expose a `GitEngine`, RPC client, credential store, or server-private
+service as a cbranch API.
 
-The implementation MUST use an OS-supported sandbox plus a capability-oriented
-runtime (for example, a WASI/component worker). A JavaScript `vm`, an iframe,
-or a permission convention inside a Node process is not a security boundary and
-MUST NOT be used as one. If the required sandbox is unavailable on a supported
-host platform, plugin execution and installation MUST be unavailable with an
-actionable message; cbranch's non-plugin features continue to work.
+The manager loads only entrypoints rooted in an immutable, owner-only activation
+directory selected by the lock record. It loads enabled records at startup,
+validates hook shapes and command ownership, isolates hook exceptions, calls an
+optional `dispose` hook on disable, rejects further invocation, and records
+lifecycle, command, and hook outcomes. It bounds command output to 1 MiB.
 
-The host terminates a worker when it is disabled, removed, crashes, exceeds a
-resource limit, loses its engagement context, or cbranch shuts down. The host
-enforces per-invocation cancellation, time, memory, output-size, and concurrent
-worker limits. A plugin crash or timeout fails only that invocation and must not
-bring down the host service or leave a repository mutation lock held.
+The old separately supervised sandbox-worker design is deferred. It is not an
+alternative implementation of this initial trusted model.
 
 ### Declarative UI
 
@@ -201,6 +194,22 @@ HTML, CSS, React components, scripts, arbitrary URLs, or event handlers.
 This prevents a plugin from escaping the existing browser trust boundary and
 ensures menus, dialogs, keyboard navigation, and screen-reader semantics remain
 under cbranch's control.
+
+### Plugin authoring
+
+An artifact manifest sets `runtime` to `"trusted-esm"` and names a safe relative
+`.mjs` or `.js` entrypoint. The module must default-export a factory receiving
+`{ directory, log }`, and return a hooks object. `commands` maps every declared
+command id to `(input, { repoId }) => output`; command ids must begin with the
+plugin id and the implemented set must exactly match the reviewed declarations.
+`commandExecuted(commandId)`, `toolExecuteBefore`, `toolExecuteAfter`, and
+`dispose()` are optional hooks. Only `commandExecuted` currently has a host
+dispatch path. Hook errors are audited and do not fail a completed command.
+
+Plugins must be self-contained and may not rely on runtime package installation.
+TypeScript source and npm package resolution are deferred until a production
+bundling and pinning design exists. A factory/load/command error leaves the
+extension unavailable, records a redacted audit event, and does not stop cbranch.
 
 ## Distributed repository protocol
 
@@ -313,8 +322,9 @@ schema. At minimum it contains:
   "version": "1.4.2",
   "displayName": "Release Automation",
   "publisherFingerprint": "sha256:...",
-  "engines": { "cbranch": ">=0.3.0 <1.0.0", "pluginContract": 1 },
-  "entrypoint": "worker.wasm",
+   "engines": { "cbranch": ">=0.3.0 <1.0.0", "pluginContract": 1 },
+   "runtime": "trusted-esm",
+   "entrypoint": "plugin.mjs",
   "capabilities": ["git.read", "git.write", "automation.exec"],
   "automation": [
     {
@@ -330,9 +340,8 @@ schema. At minimum it contains:
 
 Plugin IDs are reverse-DNS ASCII identifiers and immutable once published.
 Versions use SemVer. The manifest publisher fingerprint and capability digest
-must match the signed target metadata. The artifact contains no executable
-format other than the supported sandbox worker format and no package-manager
-lockfile or dependency install script.
+must match the signed target metadata. The artifact contains a local ESM module,
+not a package-manager lockfile or dependency install script.
 
 ## Permission model
 
@@ -395,10 +404,10 @@ confirmation semantics.
 5. The user approves a grant. Cbranch atomically activates the artifact and
    writes the installed lock record. The plugin remains disabled; the user must
    explicitly enable it after the grant is recorded successfully.
-6. When enabled in an engagement, cbranch starts the sandboxed worker on demand
-   and renders its validated contributions.
-7. Disabling stops the worker and revokes all subsequent broker requests.
-8. Removal stops the worker, deletes its artifacts and grants, and retains only
+6. When enabled, cbranch loads the reviewed ESM module from its lock-selected
+   activation directory and renders its validated contributions.
+7. Disabling calls the optional dispose hook and rejects subsequent invocations.
+8. Removal unloads the module, deletes its artifacts and grants, and retains only
    redacted audit records according to the user-configured retention policy.
 
 Artifacts live under a host-private data directory (default
@@ -416,25 +425,30 @@ reinstall to select the same verified targets and makes rollback deterministic.
 
 ### Core runtime
 
-- **REQ-PLG-001.** The system SHALL execute plugin code only in a separately
-  supervised sandbox worker with no ambient filesystem, network, process,
-  environment, credential, DOM, or Node-module access.
-- **REQ-PLG-002.** The system SHALL expose plugin operations through a versioned,
-  schema-validated broker protocol and SHALL reject malformed, unknown, or
-  ungranted requests before they reach Git, filesystem, network, or process APIs.
-- **REQ-PLG-003.** Only `apps/web-server` MAY create plugin workers, access OS
-  secrets, fetch plugin repositories, or spawn brokered host processes.
+- **REQ-PLG-001.** The system SHALL execute enabled reviewed `.mjs`/`.js` ESM
+  modules in the host process and SHALL warn that this grants host-user authority.
+- **REQ-PLG-002.** The system SHALL load only an entrypoint under the private
+  lock-selected activation root; it SHALL validate the default factory, hooks,
+  and exact declared command ownership before invocation.
+- **REQ-PLG-003.** Only `apps/web-server` MAY load trusted modules, persist locks
+  and audits, access future OS secrets, fetch plugin repositories, or add host
+  process/Git broker APIs.
 - **REQ-PLG-004.** Plugin UI contributions SHALL be declarative, schema-validated
   data rendered by `packages/ui`; arbitrary markup, script, stylesheet, React
   component, and browser network contribution types are prohibited.
-- **REQ-PLG-005.** Disabling, uninstalling, crashing, timing out, cancelling, or
-  losing engagement context SHALL terminate the relevant worker and reject new
-  broker requests without affecting core cbranch availability.
-- **REQ-PLG-006.** Each brokered operation SHALL carry an operation id and be
-  cancellable. Plugin operations that mutate a repository SHALL use the existing
-  per-repository lock and invalidation rules.
+- **REQ-PLG-005.** Disabling SHALL call an optional dispose hook and reject new
+  invocations without affecting core cbranch availability. A load, hook, or
+  command failure SHALL be isolated to that plugin and recorded in the audit log.
+- **REQ-PLG-006.** Each command invocation SHALL carry a generated operation id
+  and cap returned output at 1 MiB. Cancellation, resource limits, and Git
+  mutation brokering are deferred with the sandbox-worker design.
 
-### Repositories and trust
+### Deferred distribution and broker requirements
+
+> The following repository, TUF, install/update, and capability-broker
+> requirements remain the target design but are **deferred**. The current RPCs
+> return an explicit repository-verification-not-yet-implemented error rather
+> than bypassing their checks or accepting an arbitrary local path.
 
 - **REQ-PLG-REP-001.** Cbranch SHALL support an HTTPS repository and a Git
   repository reachable over HTTPS or SSH, each carrying the TUF layout defined
@@ -475,8 +489,9 @@ reinstall to select the same verified targets and makes rollback deterministic.
 - **REQ-PLG-SEC-004.** SSH access to a Git repository SHALL use the host's normal
   SSH agent/configuration and non-interactive Git policy. Cbranch SHALL not read,
   persist, or expose SSH private-key or agent material.
-- **REQ-PLG-SEC-005.** Plugin code SHALL never receive repository credentials,
-  app secrets, host environment variables, or a raw network socket.
+- **REQ-PLG-SEC-005.** Deferred: a future broker SHALL never expose repository
+  credentials as a cbranch API. Trusted ESM modules nevertheless have ambient
+  host authority, so this is not a claim that Node/environment access is blocked.
 
 ### Installation and updates
 
@@ -550,12 +565,12 @@ reinstall to select the same verified targets and makes rollback deterministic.
   operable, focus-trapped where modal, accessible, localized, and specific about
   the action's authority. Approval and cancel controls shall be unambiguous.
 - **REQ-PLG-UX-003.** Plugin commands and panels SHALL visibly identify their
-  plugin and publisher and show a disabled/unavailable state if the worker,
-  grant, repository scope, or sandbox is unavailable.
+  plugin and publisher and show a disabled/unavailable state if the module,
+  grant, or repository scope is unavailable.
 - **REQ-PLG-AUD-001.** Cbranch SHALL write structured, redacted audit records for
-  repository trust changes, installs, removals, enables/disables, grant changes,
-  update decisions, brokered Git mutations, host-process invocations, denials,
-  and worker crashes/timeouts.
+  module loads, enables/disables, command invocations, hook failures, denials,
+  repository trust changes, installs, updates, brokered Git mutations, and host
+  process invocations when those deferred capabilities land.
 - **REQ-PLG-AUD-002.** Audit records SHALL include time, plugin id/version,
   publisher fingerprint, repository id, engagement/repo id where applicable,
   operation id, capability, outcome, and redacted error code. They SHALL never
@@ -578,11 +593,11 @@ the canonical `GitError` union extended only when no existing code applies.
 | `plugin.catalogList` | `{ repositoryId }` | `PluginCatalogEntry[]` | Only verified signed targets are returned. |
 | `plugin.install` | `{ repositoryId, pluginId, version, grant }` | `InstalledPlugin` | Mutating, atomic install. |
 | `plugin.list` | `{}` | `InstalledPlugin[]` | Grants are descriptive, never secrets. |
-| `plugin.enable` / `plugin.disable` | `{ pluginId }` | `InstalledPlugin` | Starts/stops workers as needed. |
+| `plugin.enable` / `plugin.disable` | `{ pluginId }` | `InstalledPlugin` | Loads/disposes a reviewed local ESM module. |
 | `plugin.update` | `{ pluginId, version, grant? }` | `InstalledPlugin` | Mutating, explicit ordinary update. |
 | `plugin.rollback` | `{ pluginId, version }` | `InstalledPlugin` | Retained verified target only. |
 | `plugin.auditList` | `{ pluginId?, cursor? }` | `PluginAuditPage` | Redacted, paged audit records. |
-| `plugin.invoke` | `{ pluginId, commandId, repoId, input }` | `PluginInvocation` | Routes a validated command to an enabled worker. |
+| `plugin.invoke` | `{ pluginId, commandId, repoId, input }` | `PluginInvocation` | Routes a declared command to an enabled trusted module. |
 
 `plugin.repositoryAdd` is a deliberately narrow exception to the usual advice
 that secrets not traverse RPC: its optional credential is accepted only over the
@@ -592,7 +607,7 @@ the configuration. A future native secret-store picker may remove even this
 one-time transfer without changing repository semantics.
 
 Plugin contribution data is part of `plugin.list` / `plugin.invoke` results and
-is schema-validated on both worker-to-host and host-to-UI boundaries. It is not a
+is schema-validated at the artifact/host and host-to-UI boundaries. It is not a
 new browser socket, does not weaken the `/rpc` Origin/Host guard, and must obey
 the normal RPC payload cap or use a bounded existing side channel.
 
@@ -608,7 +623,6 @@ existing `networkError`, `authRequired`, `authFailed`, `permissionDenied`,
 - `pluginArtifactInvalid`
 - `pluginIncompatible`
 - `pluginPermissionDenied`
-- `pluginSandboxUnavailable`
 - `pluginWorkerFailed`
 - `pluginPolicyDenied`
 
@@ -626,8 +640,10 @@ unredacted source URL secret, or plugin private data.
 - TUF tests MUST cover insufficient signature threshold, expired metadata,
   rollback/replay, delegated targets, root rotation, artifact substitution, and
   a valid private-repository refresh using fixture transport adapters.
-- Runtime tests MUST prove that a worker cannot access host files, network,
-  environment, Node modules, or processes except through granted broker calls.
+- Runtime tests MUST prove activation-root containment, invalid module/export
+  rejection, command ownership, hook ordering/failure isolation, reload/unload,
+  output caps, and audit logging. Ambient Node authority is a disclosed trusted
+  extension property, not a testable sandbox guarantee.
 - Broker tests MUST prove that an ungranted request, symlink escape, shell path,
   dynamic executable, broadened update, or missing destructive confirmation is
   rejected without changing the target repository.
@@ -635,10 +651,9 @@ unredacted source URL secret, or plugin private data.
   SSH fixture repositories, trust approval, install, disable, workspace-scoped
   invocation, ordinary update review, eligible security auto-update, ineligible
   permission-expanding update, rollback, and credential redaction.
-- Plugin activity MUST not block normal cbranch operation. The default worker
-  invocation time limit is 60 seconds; the default stdout/stderr cap is 1 MiB;
-  defaults are configurable under a dedicated plugin policy section in the host
-  config. Exceeding either fails the invocation and records an audit event.
+- Plugin activity MUST not block normal cbranch operation. The trusted module
+  command output cap is 1 MiB; process time/memory controls are deferred until
+  a separate execution boundary exists.
 - The UI MUST expose progress and cancellation for repository refresh, download,
   install, update, and long-running plugin invocations.
 - Telemetry remains opt-in under `NF-TELEM-1..4`; repository refreshes are
@@ -666,7 +681,7 @@ unredacted source URL secret, or plugin private data.
   when the user enabled that policy and receives a persistent advisory notice.
   A release with a broader grant, changed command declaration, major version,
   publisher change, or `hostAutomation` never updates automatically.
-- Disabling a running plugin terminates it; a subsequent command invocation is
+- Disabling a running plugin calls its dispose hook; a subsequent command invocation is
   rejected; cbranch's ordinary Git UI remains usable.
 - Rolling back restores the exact prior verified artifact and grant from the lock
   record and leaves an audit trail.
@@ -692,14 +707,14 @@ unredacted source URL secret, or plugin private data.
   cannot inject row-level client state.
 - **Interrupted install or update:** staging is deleted on recovery and the last
   atomically active lock record remains authoritative.
-- **Sandbox unavailable on a platform:** plugin controls explain that the platform
-  runtime is unavailable; cbranch never falls back to executing a plugin in Node.
+- **Repository verification unavailable:** plugin controls explain that remote
+  installation is unavailable until the TUF repository client exists; cbranch
+  never treats an arbitrary local path as an install.
 
 ## Open decisions before implementation
 
-- Select and validate the concrete cross-platform sandbox/runtime combinations
-  for Linux, macOS, and Windows. The selected solution must satisfy the no-ambient-
-  authority requirement; otherwise the platform is unavailable for plugins.
+- Implement the TUF repository client and bind its verified targets to the
+  completed archive extraction/materialization path for `.mjs`/`.js` modules.
 - Decide whether team-managed trust roots can be preprovisioned by a host policy
   file and how that policy interacts with an individual user's ability to remove
   trust.

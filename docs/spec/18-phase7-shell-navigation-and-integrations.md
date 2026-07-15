@@ -412,11 +412,10 @@ rule of `use-menu-actions.ts` is assumed throughout.
   terminal-specific item, and the terminal MUST be named in `NF-SEC-2`'s trust-
   model discussion, before this ships.
 
-### Plugins — out of scope (deferred)
+### Plugins — superseded by Phase 9
 
-- **REQ-P7-PLUGIN-001** The **Plugins** menu (`plugins.none`, `plugins.settings`)
-  is **explicitly out of scope** and remains deferred: cbranch has no plugin host
-  in v1 and P7 adds none.
+- **REQ-P7-PLUGIN-001 (superseded).** P7 did not add a plugin host. Phase 9 now
+  owns `plugins.none` and `plugins.settings`; see `21-runtime-plugin-system.md`.
 
 ## RPC contract additions
 
@@ -587,7 +586,7 @@ component choice and behavior are not.
 - **`git clone` / fork** and any remote-cloning flow (`start.clone`,
   `github.forkClone`) — unchanged v1 descope; repositories are opened or `init`-ed
   by host path only.
-- **Plugins** (`plugins.*`) — no plugin host in v1.
+- **Plugins** (`plugins.*`) — superseded by Phase 9's trusted-extension model.
 - **Artificial working-/index-row feature** and its dependents
   (`view.showArtificial`, `navigate.toggleArtificial`) — not built.
 - **Superproject-aware View items** (`view.showSuperprojectTags/Branches`) and
