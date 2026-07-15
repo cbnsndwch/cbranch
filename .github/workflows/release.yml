@@ -77,21 +77,6 @@ jobs:
             bundles: nsis
             artifact: windows-x64
             path: apps/tauri/src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe
-          - os: macos-latest
-            target: aarch64-apple-darwin
-            bundles: dmg
-            artifact: macos-arm64
-            path: apps/tauri/src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg
-          - os: macos-latest
-            target: x86_64-apple-darwin
-            bundles: dmg
-            artifact: macos-x64
-            path: apps/tauri/src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/*.dmg
-          - os: ubuntu-22.04
-            target: x86_64-unknown-linux-gnu
-            bundles: deb,appimage
-            artifact: linux-x64
-            path: apps/tauri/src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/**/*
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
@@ -118,13 +103,6 @@ jobs:
         with:
           name: cbranch-server-linux-x64
           path: apps/tauri/src-tauri/resources
-
-      - name: Install Linux bundle dependencies
-        if: matrix.os == 'ubuntu-22.04'
-        run: >-
-          sudo apt-get update && sudo apt-get install --yes
-          libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev
-          libssl-dev libayatana-appindicator3-dev librsvg2-dev
 
       - name: Build signed updater release draft
         uses: tauri-apps/tauri-action@v0.6.0

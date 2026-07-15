@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.1.8
+
+### Maintenance
+
+- Restore Windows-only desktop release builds and package the server resource before
+  Windows Tauri tests by @cbnsndwch
+
+**Full commit history:** https://github.com/cbnsndwch/cbranch/compare/v0.1.7...v0.1.8
+
 ## v0.1.7
 
 ### Maintenance
