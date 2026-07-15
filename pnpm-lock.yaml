@@ -72,6 +72,12 @@ importers:
       '@cbranch/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@cbranch/plugin-contract':
+        specifier: workspace:*
+        version: link:../../packages/plugin-contract
+      '@cbranch/plugin-runtime':
+        specifier: workspace:*
+        version: link:../../packages/plugin-runtime
       '@cbranch/rpc-contract':
         specifier: workspace:*
         version: link:../../packages/rpc-contract
@@ -105,8 +111,23 @@ importers:
         specifier: ^26.0.1
         version: 26.0.1
 
+  packages/plugin-contract:
+    dependencies:
+      effect:
+        specifier: 4.0.0-beta.92
+        version: 4.0.0-beta.92
+
+  packages/plugin-runtime:
+    dependencies:
+      '@cbranch/plugin-contract':
+        specifier: workspace:*
+        version: link:../plugin-contract
+
   packages/rpc-contract:
     dependencies:
+      '@cbranch/plugin-contract':
+        specifier: workspace:*
+        version: link:../plugin-contract
       effect:
         specifier: 4.0.0-beta.92
         version: 4.0.0-beta.92
