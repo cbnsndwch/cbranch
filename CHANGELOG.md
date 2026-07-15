@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.1.6
+
+### Features
+
+- Add signed, in-app desktop updates from GitHub Releases by @cbnsndwch
+- Support Tailscale SSH browser check-mode authentication without storing
+  credentials by @cbnsndwch
+- Add a selected-commit file tree and a pinable session activity panel for Git
+  synchronization output by @cbnsndwch
+
+**Full commit history:** https://github.com/cbnsndwch/cbranch/compare/v0.1.5...v0.1.6
+
 ## v0.1.5
 
 ### Fixed
