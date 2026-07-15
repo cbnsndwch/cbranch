@@ -65,6 +65,8 @@ jobs:
 
       - name: Build NSIS installer
         run: pnpm --filter @cbranch/tauri tauri:build
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
 
       - name: Upload NSIS installer
         uses: actions/upload-artifact@v6
