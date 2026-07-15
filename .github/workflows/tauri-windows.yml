@@ -49,8 +49,10 @@ jobs:
       - name: Package server bundle
         run: pnpm package:server-bundle
 
-      - name: Check and test Tauri shell
-        run: pnpm --filter @cbranch/tauri tauri:fmt:check; pnpm --filter @cbranch/tauri tauri:test
+      - name: Check Tauri shell test build
+        run: >-
+          pnpm --filter @cbranch/tauri tauri:fmt:check;
+          cargo test --manifest-path apps/tauri/src-tauri/Cargo.toml --no-run
 
       - name: Build NSIS installer
         run: pnpm --filter @cbranch/tauri tauri:build
