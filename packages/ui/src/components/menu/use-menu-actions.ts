@@ -8,6 +8,8 @@ import { useMemo } from 'react';
 import { useNavigate } from 'react-router';
 import { toast } from 'sonner';
 
+import { requestDesktopUpdateCheck } from '../../desktop/DesktopUpdater';
+import { isDesktopSurface } from '../../desktop/bridge';
 import { useApi } from '../../rpc/ApiProvider';
 import {
     useEngagementWorkspace,
@@ -71,15 +73,14 @@ export function useMenuActions(): MenuActions {
             // Browser-style history navigation is meaningful app-wide (no repo required).
             'navigate.back': () => navigate(-1),
             'navigate.forward': () => navigate(1),
-            'help.about': () =>
-                toast('cBranch', {
-                    description: 'A desktop-style git client. MIT licensed.',
-                }),
+            'help.about': () => useUiStore.getState().setAboutDialogOpen(true),
             'tools.settings': openSettings,
             // New repository is app-global (usable with no repo open). REQ-P6-INIT-001.
             'repository.new': () =>
                 useUiStore.getState().setNewRepoDialogOpen(true),
         };
+        if (isDesktopSurface())
+            handlers['help.checkUpdates'] = requestDesktopUpdateCheck;
         // Repo-scoped commands need an open repository.
         if (repoId) {
             handlers['repository.refresh'] = () =>

@@ -11,6 +11,12 @@ import { ApiProvider } from '../../rpc/ApiProvider';
 import { useUiStore } from '../../state/store';
 import { useMenuActions } from './use-menu-actions';
 
+const { requestDesktopUpdateCheck } = vi.hoisted(() => ({
+    requestDesktopUpdateCheck: vi.fn(),
+}));
+vi.mock('../../desktop/DesktopUpdater', () => ({ requestDesktopUpdateCheck }));
+vi.mock('../../desktop/bridge', () => ({ isDesktopSurface: () => true }));
+
 // The capability layer reads recent repos + in-progress state through these hooks; stub
 // them so the wiring (not the network) is under test. `inProgress` is mutable per test.
 const EMPTY: never[] = [];
@@ -152,5 +158,20 @@ describe('useMenuActions wiring (menu reconciliation)', () => {
         expect(result.current.isEnabled('commands.solveConflicts')).toBe(true);
         act(() => result.current.run('commands.solveConflicts'));
         expect(useUiStore.getState().activeView).toBe('solveConflicts');
+    });
+
+    test('checks for desktop updates from the Help menu', () => {
+        const { result } = renderHook(() => useMenuActions(), { wrapper });
+
+        expect(result.current.isEnabled('help.checkUpdates')).toBe(true);
+        act(() => result.current.run('help.checkUpdates'));
+        expect(requestDesktopUpdateCheck).toHaveBeenCalledOnce();
+    });
+
+    test('opens the About dialog from the Help menu', () => {
+        const { result } = renderHook(() => useMenuActions(), { wrapper });
+
+        act(() => result.current.run('help.about'));
+        expect(useUiStore.getState().aboutDialogOpen).toBe(true);
     });
 });

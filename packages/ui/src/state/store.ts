@@ -338,6 +338,12 @@ export interface UiState {
     /** Whether the settings modal (git config + app settings) is open (REQ-P5-CFG-001). App-global. */
     readonly settingsDialogOpen: boolean;
     readonly setSettingsDialogOpen: (open: boolean) => void;
+    /** Whether the Help → About modal is open. */
+    readonly aboutDialogOpen: boolean;
+    readonly setAboutDialogOpen: (open: boolean) => void;
+    /** Timestamp of the most recent successful desktop release check in this session. */
+    readonly lastUpdateCheckAt: number | null;
+    readonly setLastUpdateCheckAt: (timestamp: number) => void;
     // ── P5: history find bar (lifted from HistoryList so the keybinding dispatcher opens it) ──
     readonly findOpen: boolean;
     readonly setFindOpen: (open: boolean) => void;
@@ -421,6 +427,8 @@ export const useUiStore = create<UiState>(set => ({
     gotoRequest: null,
     logLimit: DEFAULT_LOG_LIMIT,
     settingsDialogOpen: false,
+    aboutDialogOpen: false,
+    lastUpdateCheckAt: null,
     findOpen: false,
     branchCreate: null,
     tagCreateOpen: false,
@@ -501,6 +509,8 @@ export const useUiStore = create<UiState>(set => ({
     setGotoRequest: gotoRequest => set({ gotoRequest }),
     setLogLimit: logLimit => set({ logLimit }),
     setSettingsDialogOpen: settingsDialogOpen => set({ settingsDialogOpen }),
+    setAboutDialogOpen: aboutDialogOpen => set({ aboutDialogOpen }),
+    setLastUpdateCheckAt: lastUpdateCheckAt => set({ lastUpdateCheckAt }),
     setFindOpen: findOpen => set({ findOpen }),
     setKeepOpenAfterCommit: keepOpenAfterCommit => {
         writeKeepOpen(keepOpenAfterCommit);

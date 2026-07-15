@@ -5,6 +5,7 @@ import { useRepoState } from '../rpc/hooks';
 import { useInvalidationBus } from '../rpc/use-invalidation-bus';
 import { useNavigation } from '../state/navigation';
 import { type ActiveView, useUiStore } from '../state/store';
+import { AboutDialog } from './AboutDialog';
 import { BlamePanel } from './BlamePanel';
 import { BranchesPanel } from './BranchesPanel';
 import { CommandPalette } from './CommandPalette';
@@ -199,6 +200,7 @@ export function AppShell() {
     return (
         <>
             <CommandPalette />
+            <AboutDialog />
             <DesktopUpdater />
             <SessionActivityPanel />
             <RepoSwitcher />

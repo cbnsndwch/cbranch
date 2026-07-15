@@ -810,7 +810,7 @@ export const MENUS: ReadonlyArray<TopMenu> = [
                 kind: 'command',
                 id: 'help.checkUpdates',
                 label: 'Check for updates',
-                phase: 'later',
+                phase: 'shell',
             },
             {
                 kind: 'command',
