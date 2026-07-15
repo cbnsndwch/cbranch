@@ -1,5 +1,19 @@
 # Changelog
 
+## v0.2.0
+
+### Bug fixes
+
+- Sign Windows updater artifacts in CI by @cbnsndwch
+- Compile Tauri tests and run server-bundle packaging correctly on Windows by
+  @cbnsndwch
+
+### Maintenance
+
+- Cache Rust build outputs in Windows CI by @cbnsndwch
+
+**Full commit history:** https://github.com/cbnsndwch/cbranch/compare/v0.1.9...v0.2.0
+
 ## v0.1.9
 
 ### Maintenance
