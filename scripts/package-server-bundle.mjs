@@ -30,12 +30,11 @@ const server = join(staging, 'cbranch-server');
 const archive = `${resource}.next`;
 
 const run = (command, args, env) => {
-    const executable =
-        process.platform === 'win32' ? `${command}.cmd` : command;
-    const result = spawnSync(executable, args, {
+    const result = spawnSync(command, args, {
         cwd: root,
         env: { ...process.env, ...env },
         stdio: 'inherit',
+        shell: process.platform === 'win32',
     });
     if (result.error) throw result.error;
     if (result.status !== 0)
