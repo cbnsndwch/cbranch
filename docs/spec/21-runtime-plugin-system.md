@@ -1,5 +1,15 @@
 # Phase 9 — Runtime Plugin System & Distributed Repositories
 
+> **Implementation decision (trusted extensions):** The initial cbranch release
+> uses OpenCode-style trusted host extensions. The first loader accepts reviewed
+> local ESM JavaScript modules; TypeScript and npm package resolution follow the same
+> model once the host package-loading path is added. Installing a
+> plugin is equivalent to trusting its publisher with the host user account. Plugins
+> may use normal host APIs and are not OS-sandboxed. Signed artifacts, explicit
+> publisher trust, install/enable review, typed cbranch APIs, audit records, and
+> update review remain product requirements. The sandbox-worker requirements below
+> are deferred rather than emulated with a Node VM or a permission convention.
+
 ## Purpose
 
 Phase 9 adds a runtime plugin system to cbranch. A plugin extends cbranch with
