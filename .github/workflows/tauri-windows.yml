@@ -43,6 +43,15 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/tauri/src-tauri
+          shared-key: tauri-x86_64-pc-windows-msvc
+          # Only write the cache from develop so PR builds restore but don't
+          # evict the base cache with PR-specific churn.
+          save-if: ${{ github.ref == 'refs/heads/develop' }}
+
       - name: Install (frozen lockfile)
         run: pnpm install --frozen-lockfile
 

@@ -97,6 +97,12 @@ jobs:
         with:
           targets: ${{ matrix.target }}
 
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/tauri/src-tauri
+          shared-key: tauri-${{ matrix.target }}
+
       - name: Install
         run: pnpm install --frozen-lockfile
 
