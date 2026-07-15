@@ -1,5 +1,19 @@
 # Changelog
 
+## v0.2.1
+
+### Features
+
+- Add manual desktop update checks and an About dialog with connection diagnostics
+  by @cbnsndwch
+
+### Maintenance
+
+- Specify the sandboxed runtime plugin system and trusted repository model by
+  @cbnsndwch
+
+**Full commit history:** https://github.com/cbnsndwch/cbranch/compare/v0.2.0...v0.2.1
+
 ## v0.2.0
 
 ### Bug fixes

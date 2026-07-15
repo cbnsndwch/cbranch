@@ -7,7 +7,7 @@ import { Schema } from 'effect';
 export const CBRANCH_PROTOCOL_VERSION = 1;
 
 /** Version reported by the backend until release packaging injects a build version. */
-export const CBRANCH_BACKEND_VERSION = '0.2.0';
+export const CBRANCH_BACKEND_VERSION = '0.2.1';
 
 /** Capabilities are additive so clients can explain a missing feature before use. */
 export const CbranchCapability = Schema.Literals([
