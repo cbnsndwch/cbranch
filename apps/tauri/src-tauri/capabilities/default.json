@@ -3,5 +3,10 @@
     "identifier": "main-capability",
     "description": "Only the cbranch desktop window may invoke its profile and tunnel commands.",
     "windows": ["main"],
-    "permissions": ["core:default", "core:window:allow-set-title"]
+    "permissions": [
+        "core:default",
+        "core:window:allow-set-title",
+        "updater:default",
+        "process:allow-restart"
+    ]
 }

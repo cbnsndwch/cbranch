@@ -4,22 +4,27 @@
 use std::{
     collections::VecDeque,
     fs,
-    io::{self, Read},
+    io::{self, BufRead, BufReader, Read},
     net::{TcpListener, TcpStream},
     path::PathBuf,
     process::{Child, Command, Stdio},
-    sync::{Mutex, MutexGuard},
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc, Mutex, MutexGuard,
+    },
     thread,
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Manager, RunEvent, State};
+use tauri::{AppHandle, Emitter, Manager, RunEvent, State};
 
 const PROFILE_STORE_VERSION: u32 = 1;
 const PROFILE_STORE_FILE: &str = "profiles.json";
 const READY_TIMEOUT: Duration = Duration::from_secs(10);
+const TAILSCALE_AUTH_TIMEOUT: Duration = Duration::from_secs(120);
 const STDERR_LIMIT: u64 = 16 * 1024;
+const SSH_AUTH_CHALLENGE_EVENT: &str = "cbranch://ssh-auth-challenge";
 
 #[cfg(windows)]
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
@@ -61,6 +66,14 @@ pub struct TunnelConnection {
     http_base_url: String,
 }
 
+/// A Tailscale SSH check-mode URL surfaced to the desktop without exposing credentials.
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SshAuthChallenge {
+    profile_id: String,
+    url: String,
+}
+
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ManagedServerSetup {
@@ -80,8 +93,19 @@ pub struct DesktopDiagnostics {
 
 struct TunnelProcess {
     child: Child,
-    stderr: thread::JoinHandle<String>,
+    stderr: StderrReader,
     connection: TunnelConnection,
+}
+
+struct StderrReader {
+    handle: thread::JoinHandle<String>,
+    auth_challenge_seen: Arc<AtomicBool>,
+}
+
+impl StderrReader {
+    fn join(self) -> String {
+        self.handle.join().unwrap_or_default()
+    }
 }
 
 struct TunnelStop {
@@ -100,7 +124,7 @@ impl TunnelProcess {
         #[cfg(not(test))]
         let _ = self.child.wait();
         TunnelStop {
-            stderr: self.stderr.join().unwrap_or_default(),
+            stderr: self.stderr.join(),
             #[cfg(test)]
             reaped,
         }
@@ -275,12 +299,75 @@ fn ssh_diagnostic_command(profile: &ConnectionProfile, local_port: u16) -> Strin
     format!("ssh {}", ssh_arguments(profile, local_port).join(" "))
 }
 
-fn spawn_stderr_reader(stderr: impl Read + Send + 'static) -> thread::JoinHandle<String> {
+fn tailscale_auth_url(text: &str) -> Option<String> {
+    text.split_whitespace().find_map(|word| {
+        let candidate = word.trim_matches(|character| {
+            matches!(character, '"' | '\'' | '(' | ')' | '[' | ']' | ',' | '.')
+        });
+        candidate
+            .starts_with("https://login.tailscale.com/")
+            .then(|| candidate.to_string())
+    })
+}
+
+fn append_limited(text: &mut String, bytes: &[u8]) {
+    if text.len() >= STDERR_LIMIT as usize {
+        return;
+    }
+    let remaining = STDERR_LIMIT as usize - text.len();
+    let bytes = &bytes[..bytes.len().min(remaining)];
+    text.push_str(&String::from_utf8_lossy(bytes));
+}
+
+fn spawn_stderr_reader(
+    stderr: impl Read + Send + 'static,
+    app: Option<AppHandle>,
+    profile_id: Option<String>,
+) -> StderrReader {
+    let auth_challenge_seen = Arc::new(AtomicBool::new(false));
+    let challenge_seen = Arc::clone(&auth_challenge_seen);
+    let handle = thread::spawn(move || {
+        let mut text = String::new();
+        let mut reader = BufReader::new(stderr);
+        let mut line = String::new();
+        while reader.read_line(&mut line).unwrap_or_default() > 0 {
+            if !challenge_seen.load(Ordering::Relaxed) {
+                if let (Some(url), Some(app), Some(profile_id)) =
+                    (tailscale_auth_url(&line), app.as_ref(), profile_id.as_ref())
+                {
+                    challenge_seen.store(true, Ordering::Relaxed);
+                    let _ = app.emit(
+                        SSH_AUTH_CHALLENGE_EVENT,
+                        SshAuthChallenge {
+                            profile_id: profile_id.clone(),
+                            url,
+                        },
+                    );
+                }
+            }
+            append_limited(&mut text, line.as_bytes());
+            line.clear();
+        }
+        redact(&text)
+    });
+    StderrReader {
+        handle,
+        auth_challenge_seen,
+    }
+}
+
+fn spawn_stdout_reader(stdout: impl Read + Send + 'static) -> thread::JoinHandle<String> {
     thread::spawn(move || {
         let mut text = String::new();
-        let mut reader = stderr.take(STDERR_LIMIT);
-        let _ = reader.read_to_string(&mut text);
-        redact(&text)
+        let mut reader = BufReader::new(stdout);
+        let mut buffer = [0; 4 * 1024];
+        loop {
+            match reader.read(&mut buffer) {
+                Ok(0) | Err(_) => break,
+                Ok(read) => append_limited(&mut text, &buffer[..read]),
+            }
+        }
+        text
     })
 }
 
@@ -361,6 +448,16 @@ fn install_server(
                 format!("Could not start managed cbranch setup: {error}")
             }
         })?;
+    let stdout = child
+        .stdout
+        .take()
+        .ok_or_else(|| "OpenSSH did not provide setup output.".to_string())?;
+    let stdout = spawn_stdout_reader(stdout);
+    let stderr = child
+        .stderr
+        .take()
+        .ok_or_else(|| "OpenSSH did not provide diagnostics.".to_string())?;
+    let stderr = spawn_stderr_reader(stderr, Some(app.clone()), Some(profile.id.clone()));
     let copy_result = (|| {
         let mut archive = fs::File::open(&bundle)
             .map_err(|error| format!("Could not read the managed server bundle: {error}"))?;
@@ -375,14 +472,16 @@ fn install_server(
     if let Err(error) = copy_result {
         let _ = child.kill();
         let _ = child.wait();
+        let _ = stdout.join();
+        let _ = stderr.join();
         return Err(error);
     }
-    let output = child
-        .wait_with_output()
+    let status = child
+        .wait()
         .map_err(|error| format!("Could not wait for managed cbranch setup: {error}"))?;
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    if !output.status.success() {
-        let stderr = redact(&String::from_utf8_lossy(&output.stderr));
+    let stdout = stdout.join().unwrap_or_default();
+    let stderr = stderr.join();
+    if !status.success() {
         let details = stderr.trim();
         return Err(if details.is_empty() {
             "Managed cbranch setup failed on the remote host.".to_string()
@@ -393,7 +492,7 @@ fn install_server(
     parse_managed_setup_output(&stdout)
 }
 
-fn start_tunnel(profile: &ConnectionProfile) -> Result<TunnelProcess, String> {
+fn start_tunnel(app: &AppHandle, profile: &ConnectionProfile) -> Result<TunnelProcess, String> {
     validate_profile(profile)?;
     // Reserve the loopback port while building the child process. SSH receives the
     // selected port as an argument and only ever binds 127.0.0.1; a retry is required
@@ -422,16 +521,17 @@ fn start_tunnel(profile: &ConnectionProfile) -> Result<TunnelProcess, String> {
         .stderr
         .take()
         .ok_or_else(|| "OpenSSH did not provide diagnostics.".to_string())?;
-    let stderr = spawn_stderr_reader(stderr);
+    let stderr = spawn_stderr_reader(stderr, Some(app.clone()), Some(profile.id.clone()));
     drop(reservation);
 
-    let deadline = Instant::now() + READY_TIMEOUT;
+    let ready_deadline = Instant::now() + READY_TIMEOUT;
+    let tailscale_auth_deadline = Instant::now() + TAILSCALE_AUTH_TIMEOUT;
     loop {
         if let Some(status) = child
             .try_wait()
             .map_err(|error| format!("Could not monitor OpenSSH: {error}"))?
         {
-            let stderr = stderr.join().unwrap_or_default();
+            let stderr = stderr.join();
             return Err(classify_ssh_failure(status.code(), &stderr));
         }
         if TcpStream::connect_timeout(
@@ -451,10 +551,15 @@ fn start_tunnel(profile: &ConnectionProfile) -> Result<TunnelProcess, String> {
                 },
             });
         }
+        let deadline = if stderr.auth_challenge_seen.load(Ordering::Relaxed) {
+            tailscale_auth_deadline
+        } else {
+            ready_deadline
+        };
         if Instant::now() >= deadline {
             let _ = child.kill();
             let _ = child.wait();
-            let stderr = stderr.join().unwrap_or_default();
+            let stderr = stderr.join();
             return Err(format!(
                 "The SSH tunnel did not become ready. Verify SSH access and that cbranch listens on 127.0.0.1:{} on the remote host. {}",
                 profile.remote_port,
@@ -618,7 +723,7 @@ fn delete_profile(app: AppHandle, state: State<'_, AppState>, id: String) -> Res
 #[tauri::command]
 fn test_profile(app: AppHandle, id: String) -> Result<String, String> {
     let profile = profile_by_id(&app, &id)?;
-    let tunnel = start_tunnel(&profile)?;
+    let tunnel = start_tunnel(&app, &profile)?;
     let endpoint = tunnel.connection.http_base_url.clone();
     let stderr = tunnel.stop().stderr;
     let suffix = if stderr.trim().is_empty() {
@@ -636,7 +741,7 @@ fn connect_profile(
     id: String,
 ) -> Result<TunnelConnection, String> {
     let profile = profile_by_id(&app, &id)?;
-    let tunnel = match start_tunnel(&profile) {
+    let tunnel = match start_tunnel(&app, &profile) {
         Ok(tunnel) => tunnel,
         Err(error) => {
             let mut state = lock_state(&state)?;
@@ -691,6 +796,8 @@ fn desktop_diagnostics(state: State<'_, AppState>) -> Result<DesktopDiagnostics,
 pub fn run() {
     let app = tauri::Builder::default()
         .manage(AppState::default())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .invoke_handler(tauri::generate_handler![
             list_profiles,
             save_profile,
@@ -803,6 +910,15 @@ mod tests {
         assert!(!value.contains("token=abc"));
     }
 
+    #[test]
+    fn extracts_only_the_tailscale_check_mode_url() {
+        assert_eq!(
+            tailscale_auth_url("Authenticate at https://login.tailscale.com/a/example."),
+            Some("https://login.tailscale.com/a/example".to_string())
+        );
+        assert_eq!(tailscale_auth_url("https://example.com/login"), None);
+    }
+
     fn test_tunnel(profile_id: &str) -> TunnelProcess {
         let executable = std::env::current_exe().expect("test executable path");
         let mut child = Command::new(executable)
@@ -812,7 +928,7 @@ mod tests {
             .stderr(Stdio::piped())
             .spawn()
             .expect("controlled child process");
-        let stderr = spawn_stderr_reader(child.stderr.take().expect("child stderr"));
+        let stderr = spawn_stderr_reader(child.stderr.take().expect("child stderr"), None, None);
         TunnelProcess {
             child,
             stderr,

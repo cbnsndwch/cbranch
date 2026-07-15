@@ -19,6 +19,11 @@ remote 127.0.0.1:<cbranch-port>
 - SSH arguments are passed as an argument vector, never through a shell.
 - The client uses `-N -T`, `BatchMode=yes`, `StrictHostKeyChecking=yes`, and
   `ExitOnForwardFailure=yes`. Password prompts are deliberately unavailable.
+- Tailscale SSH check-mode challenges are supported without relaxing those
+  restrictions: when OpenSSH emits an exact `https://login.tailscale.com/`
+  challenge URL, the desktop surfaces it for the selected profile and waits up
+  to two minutes for the user to complete browser authentication. No URL other
+  than that exact Tailscale origin is emitted to the UI.
 - OpenSSH reads the user's normal agent, keys, `~/.ssh/config`, and
   `known_hosts`. The application stores none of them.
 - The local listener is always `127.0.0.1`; it is allocated from an ephemeral

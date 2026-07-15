@@ -7,8 +7,10 @@ import { Input } from '../components/ui/input';
 import {
     type CbranchServerProbe,
     type ConnectionProfile,
+    listenForSshAuthChallenge,
     loadDesktopBridge,
     probeCbranchServer,
+    type SshAuthChallenge,
 } from './bridge';
 
 const emptyProfile = (): Omit<ConnectionProfile, 'id'> => ({
@@ -39,6 +41,7 @@ export function ConnectionProfilesScreen({
     >(emptyProfile());
     const [selectedId, setSelectedId] = useState<string>();
     const [notice, setNotice] = useState<string>();
+    const [authChallenge, setAuthChallenge] = useState<SshAuthChallenge>();
     const [diagnostics, setDiagnostics] = useState<string>();
     const [serverProbe, setServerProbe] =
         useState<Exclude<CbranchServerProbe, { readonly status: 'ready' }>>();
@@ -53,10 +56,27 @@ export function ConnectionProfilesScreen({
         void reload().catch(error => setNotice(errorMessage(error)));
     }, []);
 
+    useEffect(() => {
+        let disposed = false;
+        let unlisten: (() => void) | undefined;
+        void listenForSshAuthChallenge(challenge => {
+            if (!disposed && challenge.profileId === selectedId)
+                setAuthChallenge(challenge);
+        }).then(next => {
+            if (disposed) next();
+            else unlisten = next;
+        });
+        return () => {
+            disposed = true;
+            unlisten?.();
+        };
+    }, [selectedId]);
+
     const select = (profile: ConnectionProfile) => {
         setSelectedId(profile.id);
         setEditing(profile);
         setNotice(undefined);
+        setAuthChallenge(undefined);
         setServerProbe(undefined);
     };
 
@@ -97,6 +117,7 @@ export function ConnectionProfilesScreen({
         if (!selectedId) return;
         setBusy(true);
         setNotice(undefined);
+        setAuthChallenge(undefined);
         setServerProbe(undefined);
         try {
             const bridge = await loadDesktopBridge();
@@ -122,6 +143,7 @@ export function ConnectionProfilesScreen({
         if (!selectedId) return;
         setBusy(true);
         setNotice('Installing and starting cbranch on the remote host…');
+        setAuthChallenge(undefined);
         try {
             const bridge = await loadDesktopBridge();
             const setup = await bridge.setupProfile(selectedId);
@@ -313,6 +335,30 @@ CBRANCH_BIND_ADDRESS=127.0.0.1 CBRANCH_PORT=${serverPort} pnpm --filter @cbranch
                             />
                         </label>
                     </div>
+                    {authChallenge && (
+                        <section
+                            role="status"
+                            className="grid gap-2 border border-primary/40 bg-primary/10 p-3 text-sm"
+                        >
+                            <h3 className="font-semibold">
+                                Authenticate with Tailscale
+                            </h3>
+                            <p className="text-muted-foreground">
+                                Tailscale requires a browser check before this
+                                SSH connection can continue. Complete the
+                                sign-in below; cbranch will keep waiting for
+                                this tunnel.
+                            </p>
+                            <a
+                                href={authChallenge.url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-primary break-all font-mono text-xs underline"
+                            >
+                                {authChallenge.url}
+                            </a>
+                        </section>
+                    )}
                     {(notice || connectionError) && (
                         <p
                             role="alert"

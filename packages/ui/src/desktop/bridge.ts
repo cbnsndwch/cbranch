@@ -36,6 +36,12 @@ export interface ManagedServerSetup {
     readonly warning: string | undefined;
 }
 
+/** A Tailscale SSH check-mode sign-in URL emitted while a tunnel is connecting. */
+export interface SshAuthChallenge {
+    readonly profileId: string;
+    readonly url: string;
+}
+
 export type CbranchServerProbe =
     | { readonly status: 'ready' }
     | { readonly status: 'missing' }
@@ -137,6 +143,17 @@ export const loadDesktopBridge = async (): Promise<DesktopBridge> => {
         diagnosticCommand: id => invoke('diagnostic_command', { id }),
         diagnostics: () => invoke('desktop_diagnostics'),
     };
+};
+
+/** Listen for a Tailscale SSH browser challenge without exposing SSH credentials. */
+export const listenForSshAuthChallenge = async (
+    onChallenge: (challenge: SshAuthChallenge) => void,
+): Promise<() => void> => {
+    if (!isDesktopSurface()) return () => undefined;
+    const { listen } = await import('@tauri-apps/api/event');
+    return listen<SshAuthChallenge>('cbranch://ssh-auth-challenge', event =>
+        onChallenge(event.payload),
+    );
 };
 
 /** Set the native title only when the UI is running inside a Tauri WebView. */

@@ -22,7 +22,10 @@ ssh -o BatchMode=yes -o StrictHostKeyChecking=yes user@server exit
 
 If this reports a host-key prompt, run normal `ssh user@server` first and verify
 the fingerprint. If it reports `Permission denied`, load/configure the key in
-your normal SSH agent or `%USERPROFILE%\.ssh\config`.
+your normal SSH agent or `%USERPROFILE%\.ssh\config`. Tailscale SSH check mode
+is also supported: cbranch displays the `login.tailscale.com` browser challenge
+and waits for the completed sign-in without storing an SSH key or Tailscale
+credential.
 
 ## Desktop profile
 

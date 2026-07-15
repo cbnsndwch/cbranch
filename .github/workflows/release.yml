@@ -67,6 +67,8 @@ jobs:
 
   build:
     needs: [gate, server-bundle]
+    permissions:
+      contents: write
     strategy:
       matrix:
         include:
@@ -102,17 +104,21 @@ jobs:
           name: cbranch-server-linux-x64
           path: apps/tauri/src-tauri/resources
 
-      - name: Build native desktop bundles
-        run: >-
-          pnpm --filter @cbranch/tauri exec tauri build
-          --target ${{ matrix.target }} --bundles ${{ matrix.bundles }}
-
-      - name: Upload release bundles
-        uses: actions/upload-artifact@v7
+      - name: Build signed updater release draft
+        uses: tauri-apps/tauri-action@v0.6.0
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
         with:
-          name: cbranch-${{ matrix.artifact }}
-          path: ${{ matrix.path }}
-          if-no-files-found: error
+          tagName: ${{ env.RELEASE_TAG }}
+          releaseName: ${{ env.RELEASE_TAG }}
+          releaseBody: ''
+          releaseDraft: true
+          prerelease: false
+          includeUpdaterJson: true
+          tauriScript: pnpm exec tauri
+          projectPath: apps/tauri
+          args: --target ${{ matrix.target }} --bundles ${{ matrix.bundles }}
 
   publish:
     needs: build
@@ -125,12 +131,8 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: Download release bundles
-        uses: actions/download-artifact@v8
-        with:
-          pattern: cbranch-*
-          path: release-assets
-          merge-multiple: true
+      - name: Download draft release assets
+        run: gh release download "$RELEASE_TAG" --dir release-assets
 
       - name: Create checksums
         run: sha256sum release-assets/* > release-assets/SHA256SUMS.txt
@@ -142,5 +144,6 @@ jobs:
 
       - name: Publish GitHub Release
         run: >-
-          gh release create "$RELEASE_TAG" release-assets/*
-          --title "$RELEASE_TAG" --notes-file release-notes.md
+          gh release upload "$RELEASE_TAG" release-assets/SHA256SUMS.txt
+          --clobber && gh release edit "$RELEASE_TAG" --draft=false
+          --notes-file release-notes.md

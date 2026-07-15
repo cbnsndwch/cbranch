@@ -10,10 +10,15 @@ import {
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
 import { ConnectionProfilesScreen } from './ConnectionProfilesScreen';
-import { loadDesktopBridge, probeCbranchServer } from './bridge';
+import {
+    listenForSshAuthChallenge,
+    loadDesktopBridge,
+    probeCbranchServer,
+} from './bridge';
 
 vi.mock('./bridge', () => ({
     loadDesktopBridge: vi.fn(),
+    listenForSshAuthChallenge: vi.fn(),
     probeCbranchServer: vi.fn(),
 }));
 
@@ -50,6 +55,7 @@ describe('ConnectionProfilesScreen', () => {
 
     beforeEach(() => {
         vi.mocked(loadDesktopBridge).mockResolvedValue(bridge);
+        vi.mocked(listenForSshAuthChallenge).mockResolvedValue(() => undefined);
         vi.mocked(probeCbranchServer)
             .mockResolvedValueOnce({ status: 'missing' })
             .mockResolvedValueOnce({ status: 'ready' });
@@ -123,5 +129,38 @@ describe('ConnectionProfilesScreen', () => {
             expect(bridge.setupProfile).toHaveBeenCalledWith(profile.id);
             expect(onConnect).toHaveBeenCalled();
         });
+    });
+
+    test('shows a Tailscale browser challenge for the selected profile', async () => {
+        let onChallenge:
+            | ((challenge: {
+                  readonly profileId: string;
+                  readonly url: string;
+              }) => void)
+            | undefined;
+        vi.mocked(listenForSshAuthChallenge).mockImplementation(
+            async callback => {
+                onChallenge = callback;
+                return () => undefined;
+            },
+        );
+        render(
+            <ConnectionProfilesScreen onConnect={vi.fn()} onRetry={vi.fn()} />,
+        );
+
+        fireEvent.click(
+            await screen.findByRole('button', { name: /Clerk VM/ }),
+        );
+        await waitFor(() => expect(onChallenge).toBeDefined());
+        onChallenge?.({
+            profileId: profile.id,
+            url: 'https://login.tailscale.com/a/example',
+        });
+
+        expect(
+            await screen.findByRole('heading', {
+                name: 'Authenticate with Tailscale',
+            }),
+        ).toBeTruthy();
     });
 });
