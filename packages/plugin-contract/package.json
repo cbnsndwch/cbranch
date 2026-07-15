@@ -1,8 +1,8 @@
 {
-    "name": "@cbranch/rpc-contract",
+    "name": "@cbranch/plugin-contract",
     "version": "0.0.0",
     "private": true,
-    "description": "Typed RPC method catalog, payload/error Schemas, and transport binding. Depends on nothing internal.",
+    "description": "Versioned plugin manifest, grant, repository, and broker data schemas.",
     "license": "MIT",
     "files": [
         "dist"
@@ -14,20 +14,14 @@
         ".": {
             "types": "./dist/index.d.ts",
             "default": "./dist/index.js"
-        },
-        "./effect-rpc-adapter": {
-            "types": "./dist/effect-rpc-adapter.d.ts",
-            "default": "./dist/effect-rpc-adapter.js"
         }
     },
     "scripts": {
         "build": "tsc -b tsconfig.json",
         "typecheck": "tsc -b tsconfig.json",
-        "typecheck:test": "tsc -p tsconfig.test.json",
-        "test:coverage": "vitest run --coverage"
+        "typecheck:test": "tsc -p tsconfig.test.json"
     },
     "dependencies": {
-        "@cbranch/plugin-contract": "workspace:*",
         "effect": "4.0.0-beta.92"
     }
 }

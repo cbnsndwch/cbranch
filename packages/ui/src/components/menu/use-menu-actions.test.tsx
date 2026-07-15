@@ -27,7 +27,11 @@ vi.mock('../../rpc/hooks', () => ({
     useRepoState: () => ({ data: { inProgress } }),
 }));
 
-const fakeApi = {} as unknown as CbranchApi;
+const pluginRuntimeStatus = vi.fn(async () => ({
+    available: false,
+    reason: 'No supported OS sandbox runtime is installed for plugin workers.',
+}));
+const fakeApi = { pluginRuntimeStatus } as unknown as CbranchApi;
 const REPO = 'repo-1' as RepoId;
 
 const wrapper = ({ children }: { children: ReactNode }) => {
@@ -69,6 +73,7 @@ describe('useMenuActions wiring (menu reconciliation)', () => {
         expect(result.current.isEnabled('repository.worktrees')).toBe(false);
         expect(result.current.isEnabled('navigate.back')).toBe(true);
         expect(result.current.isEnabled('navigate.forward')).toBe(true);
+        expect(result.current.isEnabled('plugins.settings')).toBe(true);
 
         act(() => useUiStore.setState({ activeRepoId: REPO }));
         rerender();
@@ -103,6 +108,14 @@ describe('useMenuActions wiring (menu reconciliation)', () => {
         expect(useUiStore.getState().branchCreate).toEqual({
             startPoint: 'HEAD',
         });
+    });
+
+    test('plugin settings reads the host sandbox status before reporting availability', () => {
+        const { result } = renderHook(() => useMenuActions(), { wrapper });
+
+        act(() => result.current.run('plugins.settings'));
+
+        expect(pluginRuntimeStatus).toHaveBeenCalledOnce();
     });
 
     test('createTag shows the tags view and opens the lifted create dialog', () => {

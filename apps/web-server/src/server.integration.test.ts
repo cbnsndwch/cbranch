@@ -154,6 +154,8 @@ describe('web-server end-to-end (NF-TEST-8)', () => {
                     path: 'c.txt',
                     rev: commits[commits.length - 1]!,
                 });
+                const plugins = yield* client.PluginList({});
+                const pluginRuntime = yield* client.PluginRuntimeStatus({});
                 return {
                     systemInfo,
                     handle,
@@ -163,6 +165,8 @@ describe('web-server end-to-end (NF-TEST-8)', () => {
                     tree,
                     diff,
                     content,
+                    plugins,
+                    pluginRuntime,
                 };
             }).pipe(Effect.provide(clientLive), Effect.scoped);
 
@@ -301,6 +305,9 @@ describe('web-server end-to-end (NF-TEST-8)', () => {
         expect(r.rpc.handle.state.isEmpty).toBe(false);
         expect(r.rpc.handle.state.isBare).toBe(false);
         expect(r.rpc.state.headOid).toBe(commits[commits.length - 1]);
+        // The host exposes no runnable plugin until an OS sandbox supervisor exists.
+        expect(r.rpc.plugins).toEqual([]);
+        expect(r.rpc.pluginRuntime.available).toBe(false);
 
         // AC-6/AC-7 (transport): the streaming history feed yields every commit, newest first.
         expect(r.rpc.log).toHaveLength(3);

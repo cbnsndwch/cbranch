@@ -75,6 +75,29 @@ export function useMenuActions(): MenuActions {
             'navigate.forward': () => navigate(1),
             'help.about': () => useUiStore.getState().setAboutDialogOpen(true),
             'tools.settings': openSettings,
+            // Execution remains deliberately unavailable until a supported OS sandbox
+            // supervisor is installed; never offer an unsafe in-process fallback.
+            'plugins.settings': () =>
+                void api
+                    .pluginRuntimeStatus()
+                    .then(status =>
+                        toast.message(
+                            status.available
+                                ? 'Plugin settings are not available yet'
+                                : 'Plugin runtime unavailable',
+                            {
+                                description:
+                                    status.reason ??
+                                    'Installing and running plugins requires a supported sandbox runtime.',
+                            },
+                        ),
+                    )
+                    .catch(error =>
+                        toast.error(
+                            'Could not check plugin runtime: ' +
+                                errorMessage(error),
+                        ),
+                    ),
             // New repository is app-global (usable with no repo open). REQ-P6-INIT-001.
             'repository.new': () =>
                 useUiStore.getState().setNewRepoDialogOpen(true),

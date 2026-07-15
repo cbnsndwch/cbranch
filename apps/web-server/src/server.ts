@@ -27,6 +27,7 @@ import { type ServerConfig } from './config';
 import { healthRoute } from './health-route';
 import { makeOriginGuard } from './origin-guard';
 import { patchChannelRoute, patchUploadRoute } from './patch-channel';
+import { pluginManagerUnavailableLayer } from './plugin-manager';
 import { handlersLayer } from './rpc-handlers';
 import { sideChannelRoute } from './side-channel';
 import {
@@ -77,6 +78,7 @@ export const buildServerLive = (
         workspaceAvatarDeleteRoute(configStore),
     ).pipe(
         Layer.provide(handlersLayer),
+        Layer.provide(pluginManagerUnavailableLayer),
         Layer.provide(RpcSerialization.layerNdjson),
     );
 

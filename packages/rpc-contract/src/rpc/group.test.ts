@@ -623,6 +623,25 @@ const systemInfo = new SystemInfo({
 // --- stub handlers: schema-valid data, plus payload-driven error injection ---
 const handlers = CbranchRpcs.toLayer({
     SystemInfo: () => Effect.succeed(systemInfo),
+    PluginRepositoryList: () => Effect.succeed([]),
+    PluginRuntimeStatus: () =>
+        Effect.succeed({
+            available: false,
+            reason: 'Plugin sandbox is unavailable.',
+        }),
+    PluginRepositoryAdd: () => Effect.fail(pluginSandboxUnavailable()),
+    PluginRepositoryRefresh: () => Effect.fail(pluginSandboxUnavailable()),
+    PluginRepositoryRemove: () => Effect.fail(pluginSandboxUnavailable()),
+    PluginPublisherTrust: () => Effect.fail(pluginSandboxUnavailable()),
+    PluginCatalogList: () => Effect.succeed([]),
+    PluginInstall: () => Effect.fail(pluginSandboxUnavailable()),
+    PluginList: () => Effect.succeed([]),
+    PluginEnable: () => Effect.fail(pluginSandboxUnavailable()),
+    PluginDisable: () => Effect.fail(pluginSandboxUnavailable()),
+    PluginUpdate: () => Effect.fail(pluginSandboxUnavailable()),
+    PluginRollback: () => Effect.fail(pluginSandboxUnavailable()),
+    PluginAuditList: () => Effect.succeed({ events: [] }),
+    PluginInvoke: () => Effect.fail(pluginSandboxUnavailable()),
     RepoOpen: ({ path }) =>
         path === ''
             ? Effect.fail(
@@ -875,6 +894,12 @@ const handlers = CbranchRpcs.toLayer({
             new PatchApplyResult({ applied: true, message: 'Patch applied.' }),
         ),
 });
+
+const pluginSandboxUnavailable = (): GitError =>
+    new GitError({
+        code: 'pluginSandboxUnavailable',
+        message: 'Plugin sandbox is unavailable.',
+    });
 
 describe('CbranchRpcs engagement workspace contract', () => {
     test('all workspace mutations round-trip the partitioned snapshot', async () => {
@@ -1173,6 +1198,28 @@ describe('CbranchRpcs P1 contract (in-memory RpcTest round-trip)', () => {
         const exit = await Effect.runPromise(program);
 
         expect(Exit.isFailure(exit)).toBe(true);
+    });
+
+    test('plugin catalog reads are data-only and installation is sandbox-gated', async () => {
+        const program = Effect.gen(function* () {
+            const client = yield* RpcTest.makeClient(CbranchRpcs);
+            const repositories = yield* client.PluginRepositoryList({});
+            const runtimeStatus = yield* client.PluginRuntimeStatus({});
+            const installed = yield* client.PluginList({});
+            const install = yield* Effect.exit(
+                client.PluginRepositoryAdd({
+                    kind: 'https',
+                    url: 'https://plugins.example.test',
+                }),
+            );
+            return { repositories, runtimeStatus, installed, install };
+        }).pipe(Effect.provide(handlers), Effect.scoped);
+
+        const result = await Effect.runPromise(program);
+        expect(result.repositories).toEqual([]);
+        expect(result.runtimeStatus.available).toBe(false);
+        expect(result.installed).toEqual([]);
+        expect(Exit.isFailure(result.install)).toBe(true);
     });
 });
 

@@ -10,6 +10,24 @@
 // `effect/unstable/*` — DECISIONS D3/D10). `Schema` is stable and imported directly.
 
 import { Schema } from 'effect';
+import {
+    InstalledPlugin,
+    PluginAuditListInput,
+    PluginAuditPage,
+    PluginCatalogEntry,
+    PluginIdInput,
+    PluginInstallInput,
+    PluginInvocation,
+    PluginInvokeInput,
+    PluginPublisherTrustInput,
+    PluginRepository,
+    PluginRepositoryAddInput,
+    PluginRepositoryIdInput,
+    PluginRepositoryRefresh,
+    PluginRuntimeStatus,
+    PluginRollbackInput,
+    PluginUpdateInput,
+} from '@cbranch/plugin-contract';
 
 import { Rpc, RpcGroup } from '../effect-rpc-adapter';
 import {
@@ -114,6 +132,85 @@ export const CbranchRpcs = RpcGroup.make(
     Rpc.make('SystemInfo', {
         payload: {},
         success: SystemInfo,
+        error: GitError,
+    }),
+    // ── P9: runtime plugins ────────────────────────────────────────────────────
+    // Plugin records are data-only Schemas from @cbranch/plugin-contract. The one-time
+    // repository credential is intentionally accepted only by PluginRepositoryAdd and
+    // is never present in any success Schema.
+    Rpc.make('PluginRepositoryList', {
+        payload: {},
+        success: Schema.Array(PluginRepository),
+        error: GitError,
+    }),
+    Rpc.make('PluginRuntimeStatus', {
+        payload: {},
+        success: PluginRuntimeStatus,
+        error: GitError,
+    }),
+    Rpc.make('PluginRepositoryAdd', {
+        payload: PluginRepositoryAddInput,
+        success: PluginRepository,
+        error: GitError,
+    }),
+    Rpc.make('PluginRepositoryRefresh', {
+        payload: PluginRepositoryIdInput,
+        success: PluginRepositoryRefresh,
+        error: GitError,
+    }),
+    Rpc.make('PluginRepositoryRemove', {
+        payload: PluginRepositoryIdInput,
+        success: Schema.Void,
+        error: GitError,
+    }),
+    Rpc.make('PluginPublisherTrust', {
+        payload: PluginPublisherTrustInput,
+        success: PluginRepository,
+        error: GitError,
+    }),
+    Rpc.make('PluginCatalogList', {
+        payload: PluginRepositoryIdInput,
+        success: Schema.Array(PluginCatalogEntry),
+        error: GitError,
+    }),
+    Rpc.make('PluginInstall', {
+        payload: PluginInstallInput,
+        success: InstalledPlugin,
+        error: GitError,
+    }),
+    Rpc.make('PluginList', {
+        payload: {},
+        success: Schema.Array(InstalledPlugin),
+        error: GitError,
+    }),
+    Rpc.make('PluginEnable', {
+        payload: PluginIdInput,
+        success: InstalledPlugin,
+        error: GitError,
+    }),
+    Rpc.make('PluginDisable', {
+        payload: PluginIdInput,
+        success: InstalledPlugin,
+        error: GitError,
+    }),
+    Rpc.make('PluginUpdate', {
+        payload: PluginUpdateInput,
+        success: InstalledPlugin,
+        error: GitError,
+    }),
+    Rpc.make('PluginRollback', {
+        payload: PluginRollbackInput,
+        success: InstalledPlugin,
+        error: GitError,
+    }),
+    Rpc.make('PluginAuditList', {
+        payload: PluginAuditListInput,
+        success: PluginAuditPage,
+        error: GitError,
+    }),
+    Rpc.make('PluginInvoke', {
+        payload: PluginInvokeInput,
+        success: PluginInvocation,
         error: GitError,
     }),
     // repo.open — entry point (no clone). Logically only repoNotFound | notARepository

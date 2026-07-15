@@ -51,6 +51,16 @@ export const GitErrorCode = Schema.Literals([
     'engagementNotFound',
     'changeSetNotFound',
     'forgeUnavailable',
+    // runtime plugin system
+    'pluginRepositoryUntrusted',
+    'pluginMetadataInvalid',
+    'pluginMetadataExpired',
+    'pluginArtifactInvalid',
+    'pluginIncompatible',
+    'pluginPermissionDenied',
+    'pluginSandboxUnavailable',
+    'pluginWorkerFailed',
+    'pluginPolicyDenied',
 ]);
 export type GitErrorCode = typeof GitErrorCode.Type;
 

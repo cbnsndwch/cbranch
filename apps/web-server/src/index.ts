@@ -22,6 +22,28 @@ export {
 export { isAllowedRequest, makeOriginGuard } from './origin-guard';
 export { handlersLayer } from './rpc-handlers';
 export {
+    loadTrustedPlugin,
+    type TrustedPlugin,
+    type TrustedPluginContext,
+    type TrustedPluginHooks,
+} from './trusted-plugin-host';
+export {
+    makePluginArtifactStore,
+    type PluginArtifactStore,
+} from './plugin-artifact-store';
+export {
+    makeProcessCredentialStore,
+    type PluginCredentialReference,
+    type PluginCredentialStore,
+} from './plugin-credentials';
+export {
+    makePluginLockStore,
+    PLUGIN_LOCK_FILE_NAME,
+    PLUGIN_LOCK_VERSION,
+    resolvePluginDataDirectory,
+    type PluginLockStore,
+} from './plugin-lock-store';
+export {
     containBlobPath,
     guessContentType,
     safeRev,

@@ -70,6 +70,7 @@ import {
     type Oid,
     type PatchSelection,
     type PullRequestListState,
+    type PluginRuntimeStatus,
     type RebasePlan,
     type RebaseStatus,
     type RebaseStep,
@@ -110,6 +111,7 @@ export type Unsubscribe = () => void;
 
 /** The transport-agnostic host API the UI depends on (mockable for component tests). */
 export interface CbranchApi {
+    pluginRuntimeStatus(): Promise<PluginRuntimeStatus>;
     repoOpen(path: string): Promise<RepoHandle>;
     repoInit(input: {
         path: string;
@@ -631,6 +633,8 @@ export const makeApi = (runtime: AppRuntime): CbranchApi => {
     };
 
     return {
+        pluginRuntimeStatus: () =>
+            runtime.runPromise(withClient(c => c.PluginRuntimeStatus({}))),
         repoOpen: path =>
             runtime.runPromise(withClient(c => c.RepoOpen({ path }))),
         repoInit: input =>

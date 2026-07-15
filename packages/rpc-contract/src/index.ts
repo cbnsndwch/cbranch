@@ -57,6 +57,11 @@ export * from './schemas/filesystem';
 // Host-credential forge metadata (GitHub PR list; no credential fields).
 export * from './schemas/forge';
 
+// Plugin payload/result Schemas are authored in the transport-neutral plugin contract;
+// re-export the status Schema used by the existing RPC facade.
+export { PluginRuntimeStatus } from '@cbranch/plugin-contract';
+export type { PluginRuntimeStatus as PluginRuntimeStatusType } from '@cbranch/plugin-contract';
+
 // The P1 method catalog.
 export * from './rpc/group';
 

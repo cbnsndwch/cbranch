@@ -18,6 +18,7 @@ import {
 import { Effect, Stream } from 'effect';
 
 import { getUpload } from './patch-channel';
+import { PluginManager } from './plugin-manager';
 
 /** Layer providing the P1 RPC handlers; requires `GitEngine` (supplied by `gitEngineLayer`). */
 export const handlersLayer = CbranchRpcs.toLayer({
@@ -34,6 +35,41 @@ export const handlersLayer = CbranchRpcs.toLayer({
                 ],
             }),
         ),
+
+    // ── P9: runtime plugins ────────────────────────────────────────────────────
+    PluginRepositoryList: () =>
+        Effect.flatMap(PluginManager, manager => manager.repositoryList()),
+    PluginRuntimeStatus: () =>
+        Effect.flatMap(PluginManager, manager => manager.runtimeStatus()),
+    PluginRepositoryAdd: input =>
+        Effect.flatMap(PluginManager, manager => manager.repositoryAdd(input)),
+    PluginRepositoryRefresh: input =>
+        Effect.flatMap(PluginManager, manager =>
+            manager.repositoryRefresh(input),
+        ),
+    PluginRepositoryRemove: input =>
+        Effect.flatMap(PluginManager, manager =>
+            manager.repositoryRemove(input),
+        ),
+    PluginPublisherTrust: input =>
+        Effect.flatMap(PluginManager, manager => manager.publisherTrust(input)),
+    PluginCatalogList: input =>
+        Effect.flatMap(PluginManager, manager => manager.catalogList(input)),
+    PluginInstall: input =>
+        Effect.flatMap(PluginManager, manager => manager.install(input)),
+    PluginList: () => Effect.flatMap(PluginManager, manager => manager.list()),
+    PluginEnable: input =>
+        Effect.flatMap(PluginManager, manager => manager.enable(input)),
+    PluginDisable: input =>
+        Effect.flatMap(PluginManager, manager => manager.disable(input)),
+    PluginUpdate: input =>
+        Effect.flatMap(PluginManager, manager => manager.update(input)),
+    PluginRollback: input =>
+        Effect.flatMap(PluginManager, manager => manager.rollback(input)),
+    PluginAuditList: input =>
+        Effect.flatMap(PluginManager, manager => manager.auditList(input)),
+    PluginInvoke: input =>
+        Effect.flatMap(PluginManager, manager => manager.invoke(input)),
 
     // ── repository & live state ────────────────────────────────────────────────
     RepoOpen: ({ path }) =>
