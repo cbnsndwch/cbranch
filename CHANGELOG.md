@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.1.7
+
+### Maintenance
+
+- Install Tauri's Linux GTK and WebKit build dependencies in the release workflow
+  by @cbnsndwch
+
+**Full commit history:** https://github.com/cbnsndwch/cbranch/compare/v0.1.6...v0.1.7
+
 ## v0.1.6
 
 ### Features
