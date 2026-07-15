@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.1.9
+
+### Maintenance
+
+- Create the signed GitHub release from the Windows build job and support server
+  bundle packaging on Windows by @cbnsndwch
+
+**Full commit history:** https://github.com/cbnsndwch/cbranch/compare/v0.1.8...v0.1.9
+
 ## v0.1.8
 
 ### Maintenance

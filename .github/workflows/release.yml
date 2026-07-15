@@ -69,6 +69,8 @@ jobs:
     needs: [gate, server-bundle]
     permissions:
       contents: write
+    env:
+      RELEASE_TAG: ${{ github.ref_name }}
     strategy:
       matrix:
         include:
