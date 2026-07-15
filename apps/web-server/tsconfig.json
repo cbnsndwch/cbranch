@@ -6,6 +6,8 @@
         "types": ["node"]
     },
     "references": [
+        { "path": "../../packages/plugin-contract" },
+        { "path": "../../packages/plugin-runtime" },
         { "path": "../../packages/rpc-contract" },
         { "path": "../../packages/core" }
     ],

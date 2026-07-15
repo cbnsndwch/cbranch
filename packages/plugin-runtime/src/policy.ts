@@ -99,11 +99,17 @@ export const validateManifest = (manifest: PluginManifest): void => {
     }
     if (
         !isSafeRelativePath(manifest.entrypoint) ||
-        !manifest.entrypoint.endsWith('.wasm')
+        !isTrustedEsmEntrypoint(manifest.entrypoint)
     ) {
         throw new PluginPolicyError(
             'pluginArtifactInvalid',
-            'Plugin entrypoint must be a relative WASM file.',
+            'Plugin entrypoint must be a relative .mjs or .js file.',
+        );
+    }
+    if (manifest.runtime !== 'trusted-esm') {
+        throw new PluginPolicyError(
+            'pluginIncompatible',
+            'Plugin requires an unsupported runtime.',
         );
     }
     requireUnique(manifest.capabilities, 'capabilities');
@@ -115,6 +121,14 @@ export const validateManifest = (manifest: PluginManifest): void => {
         manifest.contributes.commands.map(command => command.id),
         'command contribution ids',
     );
+    for (const command of manifest.contributes.commands) {
+        if (!command.id.startsWith(`${manifest.id}.`)) {
+            throw new PluginPolicyError(
+                'pluginArtifactInvalid',
+                'Plugin command ids must be prefixed with the plugin id.',
+            );
+        }
+    }
     requireUnique(
         manifest.contributes.panels.map(panel => panel.id),
         'panel contribution ids',
@@ -429,6 +443,9 @@ export const isSafeRelativePath = (path: string): boolean =>
     !path
         .split('/')
         .some(segment => segment === '' || segment === '.' || segment === '..');
+
+const isTrustedEsmEntrypoint = (path: string): boolean =>
+    path.endsWith('.mjs') || path.endsWith('.js');
 
 /** Replaces known secrets before diagnostics or audit output leave a host adapter. */
 export const redactSecrets = (

@@ -17,7 +17,8 @@ describe('plugin contract schemas', () => {
             displayName: 'Release',
             publisherFingerprint: 'sha256:publisher',
             engines: { cbranch: '>=0.2.0 <1.0.0', pluginContract: 1 },
-            entrypoint: 'worker.wasm',
+            runtime: 'trusted-esm',
+            entrypoint: 'plugin.mjs',
             capabilities: ['ui.contribute', 'automation.exec'],
             automation: [
                 {
@@ -28,7 +29,13 @@ describe('plugin contract schemas', () => {
                 },
             ],
             contributes: {
-                commands: [{ id: 'check', title: 'Run check', menu: 'tools' }],
+                commands: [
+                    {
+                        id: 'com.example.release.check',
+                        title: 'Run check',
+                        menu: 'tools',
+                    },
+                ],
                 panels: [{ id: 'status', title: 'Status' }],
             },
         });
@@ -59,6 +66,16 @@ describe('plugin contract schemas', () => {
                 publisherFingerprint: 'sha256:publisher',
                 manifestCapabilityDigest: 'sha256:capabilities',
                 grantDigest: 'sha256:grant',
+                entrypoint: 'plugin.mjs',
+                enabled: false,
+                grant: {
+                    capabilities: [],
+                    repositoryIds: [],
+                    networkOrigins: [],
+                    automationActionIds: [],
+                    hostAutomationApproved: false,
+                },
+                contributions: { commands: [], panels: [] },
             },
             enabled: false,
             grant: {

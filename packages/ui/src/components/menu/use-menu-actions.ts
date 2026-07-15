@@ -75,20 +75,20 @@ export function useMenuActions(): MenuActions {
             'navigate.forward': () => navigate(1),
             'help.about': () => useUiStore.getState().setAboutDialogOpen(true),
             'tools.settings': openSettings,
-            // Execution remains deliberately unavailable until a supported OS sandbox
-            // supervisor is installed; never offer an unsafe in-process fallback.
+            // Trusted local extensions are available, but remote installation is held back
+            // until signed artifacts can be safely materialized into an activation root.
             'plugins.settings': () =>
                 void api
                     .pluginRuntimeStatus()
                     .then(status =>
                         toast.message(
                             status.available
-                                ? 'Plugin settings are not available yet'
+                                ? 'Trusted plugin settings are not available yet'
                                 : 'Plugin runtime unavailable',
                             {
                                 description:
                                     status.reason ??
-                                    'Installing and running plugins requires a supported sandbox runtime.',
+                                    'Trusted extensions require an activated reviewed module.',
                             },
                         ),
                     )

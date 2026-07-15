@@ -127,6 +127,9 @@ export class PluginManifest extends Schema.Class<PluginManifest>(
     displayName: Schema.String,
     publisherFingerprint: Schema.String,
     engines: PluginEngines,
+    // Trusted extensions are local ESM modules. This is a distribution/runtime format,
+    // not an isolation boundary: enabled code executes with the host user's authority.
+    runtime: Schema.Literal('trusted-esm'),
     entrypoint: Schema.String,
     capabilities: Schema.Array(PluginCapability),
     automation: Schema.Array(PluginAutomationAction),
@@ -169,6 +172,12 @@ export class PluginLockRecord extends Schema.Class<PluginLockRecord>(
     publisherFingerprint: Schema.String,
     manifestCapabilityDigest: Schema.String,
     grantDigest: Schema.String,
+    // The activated directory is derived from this immutable identity; the entrypoint
+    // is retained so startup can reload the exact reviewed module without a catalog.
+    entrypoint: Schema.String,
+    enabled: Schema.Boolean,
+    grant: PluginGrant,
+    contributions: PluginContributions,
 }) {}
 
 export class InstalledPlugin extends Schema.Class<InstalledPlugin>(
@@ -197,7 +206,10 @@ export class PluginAuditEvent extends Schema.Class<PluginAuditEvent>(
     publisherFingerprint: Schema.optional(Schema.String),
     repositoryId: Schema.optional(PluginRepositoryId),
     operationId: Schema.optional(PluginOperationId),
+    action: Schema.String,
     capability: Schema.optional(PluginCapability),
+    repoId: Schema.optional(Schema.String),
+    engagementId: Schema.optional(Schema.String),
     outcome: PluginAuditOutcome,
     errorCode: Schema.optional(Schema.String),
 }) {}

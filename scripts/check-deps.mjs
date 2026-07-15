@@ -18,14 +18,22 @@ import { fileURLToPath } from 'node:url';
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 // Allowed internal edges, keyed by package name.
-// rpc-contract -> nothing; core -> rpc-contract (types only); ui -> rpc-contract;
-// web-server -> core + rpc-contract; vscode-ext -> ui + rpc-contract + core;
+// plugin-contract -> nothing; plugin-runtime -> plugin-contract; rpc-contract ->
+// plugin-contract; core -> rpc-contract (types only); ui -> rpc-contract; web-server ->
+// core + rpc-contract + plugin contracts; vscode-ext -> ui + rpc-contract + core;
 // tauri -> ui.
 const ALLOWED_INTERNAL = {
-    '@cbranch/rpc-contract': new Set([]),
+    '@cbranch/plugin-contract': new Set([]),
+    '@cbranch/plugin-runtime': new Set(['@cbranch/plugin-contract']),
+    '@cbranch/rpc-contract': new Set(['@cbranch/plugin-contract']),
     '@cbranch/core': new Set(['@cbranch/rpc-contract']),
     '@cbranch/ui': new Set(['@cbranch/rpc-contract']),
-    '@cbranch/web-server': new Set(['@cbranch/core', '@cbranch/rpc-contract']),
+    '@cbranch/web-server': new Set([
+        '@cbranch/core',
+        '@cbranch/plugin-contract',
+        '@cbranch/plugin-runtime',
+        '@cbranch/rpc-contract',
+    ]),
     '@cbranch/vscode-ext': new Set([
         '@cbranch/ui',
         '@cbranch/rpc-contract',

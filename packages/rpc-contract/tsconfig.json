@@ -4,6 +4,7 @@
         "outDir": "dist",
         "rootDir": "src"
     },
+    "references": [{ "path": "../plugin-contract" }],
     "include": ["src/**/*"],
     "exclude": ["src/**/*.test.ts", "dist", "node_modules"]
 }

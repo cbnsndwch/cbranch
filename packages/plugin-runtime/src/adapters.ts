@@ -1,9 +1,4 @@
-import type {
-    PluginBrokerRequest,
-    PluginBrokerResponse,
-    PluginCatalogEntry,
-    PluginManifest,
-} from '@cbranch/plugin-contract';
+import type { PluginCatalogEntry } from '@cbranch/plugin-contract';
 
 /**
  * Host adapters implement these interfaces. Keeping them here lets policy code be
@@ -24,22 +19,7 @@ export interface TufVerifier {
 /** Storage activates only verified artifacts and retains previous verified versions. */
 export interface PluginArtifactStore {
     readonly stage: (
-        artifact: Uint8Array,
         target: PluginCatalogEntry,
-    ) => Promise<void>;
-    readonly activate: (pluginId: string, version: string) => Promise<void>;
-    readonly remove: (pluginId: string) => Promise<void>;
-}
-
-/** The only runtime execution boundary. A Node worker or VM must not implement this. */
-export interface PluginWorkerSupervisor {
-    readonly sandboxAvailable: () => Promise<{
-        readonly available: boolean;
-        readonly reason?: string;
-    }>;
-    readonly start: (manifest: PluginManifest) => Promise<void>;
-    readonly stop: (pluginId: string) => Promise<void>;
-    readonly request: (
-        request: PluginBrokerRequest,
-    ) => Promise<PluginBrokerResponse>;
+        artifact: Uint8Array,
+    ) => Promise<string>;
 }

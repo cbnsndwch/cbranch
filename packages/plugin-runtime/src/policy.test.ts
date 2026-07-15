@@ -31,7 +31,8 @@ const manifest: PluginManifest = {
     displayName: 'Release',
     publisherFingerprint: 'sha256:publisher',
     engines: { cbranch: '>=0.2.0 <1.0.0', pluginContract: 1 },
-    entrypoint: 'worker.wasm',
+    runtime: 'trusted-esm',
+    entrypoint: 'plugin.mjs',
     capabilities: ['automation.exec', 'network.connect'],
     automation: [
         {
@@ -93,9 +94,9 @@ describe('plugin runtime policy', () => {
     });
 
     test('rejects extraction escapes and redacts every token occurrence', () => {
-        expect(isSafeArchiveEntry('worker.wasm', 'file')).toBe(true);
-        expect(isSafeArchiveEntry('../worker.wasm', 'file')).toBe(false);
-        expect(isSafeArchiveEntry('/worker.wasm', 'file')).toBe(false);
+        expect(isSafeArchiveEntry('plugin.mjs', 'file')).toBe(true);
+        expect(isSafeArchiveEntry('../plugin.mjs', 'file')).toBe(false);
+        expect(isSafeArchiveEntry('/plugin.mjs', 'file')).toBe(false);
         expect(isSafeArchiveEntry('link', 'symlink')).toBe(false);
         expect(redactSecrets('token=abc abc', ['abc'])).toBe(
             'token=[REDACTED] [REDACTED]',
@@ -212,13 +213,13 @@ describe('plugin runtime policy', () => {
     test('rejects unsafe or oversized plugin archives before extraction', () => {
         const validEntries = [
             { path: 'plugin.json', kind: 'file' as const, size: 100 },
-            { path: 'worker.wasm', kind: 'file' as const, size: 200 },
+            { path: 'plugin.mjs', kind: 'file' as const, size: 200 },
         ];
         expect(() => validatePluginArchive(300, validEntries)).not.toThrow();
         expect(() =>
             validatePluginArchive(300, [
                 ...validEntries,
-                { path: 'worker.wasm', kind: 'file', size: 1 },
+                { path: 'plugin.mjs', kind: 'file', size: 1 },
             ]),
         ).toThrow('unsafe entry');
         expect(() =>
@@ -229,7 +230,7 @@ describe('plugin runtime policy', () => {
         ).toThrow('unsafe entry');
         expect(() =>
             validatePluginArchive(300, [
-                { path: 'worker.wasm', kind: 'file', size: 1 },
+                { path: 'plugin.mjs', kind: 'file', size: 1 },
             ]),
         ).toThrow('exactly one');
     });

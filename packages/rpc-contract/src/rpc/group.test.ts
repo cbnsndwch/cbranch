@@ -626,22 +626,22 @@ const handlers = CbranchRpcs.toLayer({
     PluginRepositoryList: () => Effect.succeed([]),
     PluginRuntimeStatus: () =>
         Effect.succeed({
-            available: false,
-            reason: 'Plugin sandbox is unavailable.',
+            available: true,
+            reason: 'Trusted local ESM extensions are available.',
         }),
-    PluginRepositoryAdd: () => Effect.fail(pluginSandboxUnavailable()),
-    PluginRepositoryRefresh: () => Effect.fail(pluginSandboxUnavailable()),
-    PluginRepositoryRemove: () => Effect.fail(pluginSandboxUnavailable()),
-    PluginPublisherTrust: () => Effect.fail(pluginSandboxUnavailable()),
+    PluginRepositoryAdd: () => Effect.fail(pluginActivationUnavailable()),
+    PluginRepositoryRefresh: () => Effect.fail(pluginActivationUnavailable()),
+    PluginRepositoryRemove: () => Effect.fail(pluginActivationUnavailable()),
+    PluginPublisherTrust: () => Effect.fail(pluginActivationUnavailable()),
     PluginCatalogList: () => Effect.succeed([]),
-    PluginInstall: () => Effect.fail(pluginSandboxUnavailable()),
+    PluginInstall: () => Effect.fail(pluginActivationUnavailable()),
     PluginList: () => Effect.succeed([]),
-    PluginEnable: () => Effect.fail(pluginSandboxUnavailable()),
-    PluginDisable: () => Effect.fail(pluginSandboxUnavailable()),
-    PluginUpdate: () => Effect.fail(pluginSandboxUnavailable()),
-    PluginRollback: () => Effect.fail(pluginSandboxUnavailable()),
+    PluginEnable: () => Effect.fail(pluginActivationUnavailable()),
+    PluginDisable: () => Effect.fail(pluginActivationUnavailable()),
+    PluginUpdate: () => Effect.fail(pluginActivationUnavailable()),
+    PluginRollback: () => Effect.fail(pluginActivationUnavailable()),
     PluginAuditList: () => Effect.succeed({ events: [] }),
-    PluginInvoke: () => Effect.fail(pluginSandboxUnavailable()),
+    PluginInvoke: () => Effect.fail(pluginActivationUnavailable()),
     RepoOpen: ({ path }) =>
         path === ''
             ? Effect.fail(
@@ -895,10 +895,10 @@ const handlers = CbranchRpcs.toLayer({
         ),
 });
 
-const pluginSandboxUnavailable = (): GitError =>
+const pluginActivationUnavailable = (): GitError =>
     new GitError({
-        code: 'pluginSandboxUnavailable',
-        message: 'Plugin sandbox is unavailable.',
+        code: 'pluginPolicyDenied',
+        message: 'Verified plugin activation is unavailable.',
     });
 
 describe('CbranchRpcs engagement workspace contract', () => {
@@ -1200,7 +1200,7 @@ describe('CbranchRpcs P1 contract (in-memory RpcTest round-trip)', () => {
         expect(Exit.isFailure(exit)).toBe(true);
     });
 
-    test('plugin catalog reads are data-only and installation is sandbox-gated', async () => {
+    test('plugin catalog reads are data-only and installation is activation-gated', async () => {
         const program = Effect.gen(function* () {
             const client = yield* RpcTest.makeClient(CbranchRpcs);
             const repositories = yield* client.PluginRepositoryList({});
@@ -1217,7 +1217,7 @@ describe('CbranchRpcs P1 contract (in-memory RpcTest round-trip)', () => {
 
         const result = await Effect.runPromise(program);
         expect(result.repositories).toEqual([]);
-        expect(result.runtimeStatus.available).toBe(false);
+        expect(result.runtimeStatus.available).toBe(true);
         expect(result.installed).toEqual([]);
         expect(Exit.isFailure(result.install)).toBe(true);
     });

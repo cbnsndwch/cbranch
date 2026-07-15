@@ -58,7 +58,6 @@ export const GitErrorCode = Schema.Literals([
     'pluginArtifactInvalid',
     'pluginIncompatible',
     'pluginPermissionDenied',
-    'pluginSandboxUnavailable',
     'pluginWorkerFailed',
     'pluginPolicyDenied',
 ]);

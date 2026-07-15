@@ -29,7 +29,7 @@ vi.mock('../../rpc/hooks', () => ({
 
 const pluginRuntimeStatus = vi.fn(async () => ({
     available: false,
-    reason: 'No supported OS sandbox runtime is installed for plugin workers.',
+    reason: 'Trusted extensions require an activated reviewed module.',
 }));
 const fakeApi = { pluginRuntimeStatus } as unknown as CbranchApi;
 const REPO = 'repo-1' as RepoId;
@@ -110,7 +110,7 @@ describe('useMenuActions wiring (menu reconciliation)', () => {
         });
     });
 
-    test('plugin settings reads the host sandbox status before reporting availability', () => {
+    test('plugin settings reads the host trusted-extension status before reporting availability', () => {
         const { result } = renderHook(() => useMenuActions(), { wrapper });
 
         act(() => result.current.run('plugins.settings'));

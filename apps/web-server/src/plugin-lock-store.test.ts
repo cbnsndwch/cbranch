@@ -21,6 +21,16 @@ const record = {
     publisherFingerprint: `sha256:${'b'.repeat(64)}`,
     manifestCapabilityDigest: `sha256:${'c'.repeat(64)}`,
     grantDigest: `sha256:${'d'.repeat(64)}`,
+    entrypoint: 'plugin.mjs',
+    enabled: false,
+    grant: {
+        capabilities: [],
+        repositoryIds: [],
+        networkOrigins: [],
+        automationActionIds: [],
+        hostAutomationApproved: false,
+    },
+    contributions: { commands: [], panels: [] },
 };
 
 describe('plugin lock store', () => {

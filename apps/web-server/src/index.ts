@@ -22,11 +22,32 @@ export {
 export { isAllowedRequest, makeOriginGuard } from './origin-guard';
 export { handlersLayer } from './rpc-handlers';
 export {
-    loadTrustedPlugin,
-    type TrustedPlugin,
-    type TrustedPluginContext,
-    type TrustedPluginHooks,
-} from './trusted-plugin-host';
+    activatedPluginDirectory,
+    makeTrustedPluginManager,
+    trustedPluginManagerLayer,
+    type PluginManagerApi,
+    type TrustedPluginManagerOptions,
+    type VerifiedPluginInstall,
+} from './plugin-manager';
+export {
+    makePluginAuditStore,
+    PLUGIN_AUDIT_FILE_NAME,
+    type PluginAuditStore,
+} from './plugin-audit-store';
+export {
+    makeHttpsPluginRepositoryTransport,
+    type PluginRepositoryTransportOptions,
+} from './plugin-repository-transport';
+export { verifyTufEd25519Signature } from './tuf-signature-verifier';
+export {
+    makeTufPluginRepository,
+    type TufPluginRepositoryOptions,
+} from './tuf-plugin-repository';
+export {
+    makePluginRepositoryStore,
+    PLUGIN_REPOSITORY_FILE_NAME,
+    type PluginRepositoryStore,
+} from './plugin-repository-store';
 export {
     makePluginArtifactStore,
     type PluginArtifactStore,

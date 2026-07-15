@@ -20,6 +20,7 @@
     "scripts": {
         "build": "tsc -b tsconfig.json && node build.mjs",
         "typecheck": "tsc -b tsconfig.json",
+        "typecheck:test": "tsc -p tsconfig.test.json",
         "start": "node dist/main.js",
         "dev": "node dev.mjs"
     },

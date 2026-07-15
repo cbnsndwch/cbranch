@@ -307,7 +307,8 @@ describe('web-server end-to-end (NF-TEST-8)', () => {
         expect(r.rpc.state.headOid).toBe(commits[commits.length - 1]);
         // The host exposes no runnable plugin until an OS sandbox supervisor exists.
         expect(r.rpc.plugins).toEqual([]);
-        expect(r.rpc.pluginRuntime.available).toBe(false);
+        expect(r.rpc.pluginRuntime.available).toBe(true);
+        expect(r.rpc.pluginRuntime.reason).toContain('Trusted local ESM');
 
         // AC-6/AC-7 (transport): the streaming history feed yields every commit, newest first.
         expect(r.rpc.log).toHaveLength(3);
