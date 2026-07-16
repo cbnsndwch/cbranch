@@ -1,6 +1,9 @@
 name: Publish test plugins
 
 on:
+  push:
+    tags:
+      - 'plugins-*'
   workflow_dispatch:
 
 permissions:
