@@ -124,6 +124,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          CBRANCH_SERVER_VARIANT: canary
+          VITE_CBRANCH_CANARY: '1'
         with:
           tagName: ${{ github.ref_name }}
           releaseName: cBranch Canary ${{ env.VERSION }}

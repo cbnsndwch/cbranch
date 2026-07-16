@@ -3,6 +3,13 @@ set -eu
 
 version=$1
 requested_port=$2
+variant=${3:-production}
+
+case "$variant" in
+  production) name=cbranch ;;
+  canary) name=cbranch-canary ;;
+  *) printf '%s\n' 'Invalid cbranch server variant.' >&2; exit 1 ;;
+esac
 
 case "$version" in
   '' | *[!0-9A-Za-z._-]*)
@@ -39,7 +46,7 @@ if ! systemctl --user show-environment >/dev/null 2>&1; then
   printf '%s\n' 'Managed setup requires an active systemd user service manager on the remote host.' >&2
   exit 1
 fi
-systemctl --user stop cbranch.service >/dev/null 2>&1 || true
+systemctl --user stop "$name.service" >/dev/null 2>&1 || true
 
 port=$("$node_bin" -e '
 const net = require("node:net");
@@ -65,8 +72,8 @@ const reserve = port =>
   exit 1
 }
 
-data_root="${XDG_DATA_HOME:-$HOME/.local/share}/cbranch"
-config_root="${XDG_CONFIG_HOME:-$HOME/.config}/cbranch"
+data_root="${XDG_DATA_HOME:-$HOME/.local/share}/$name"
+config_root="${XDG_CONFIG_HOME:-$HOME/.config}/$name"
 source_dir=$(CDPATH= cd "$(dirname "$0")" && pwd)
 release_dir="$data_root/releases/$version"
 next_dir="$release_dir.next"
@@ -87,10 +94,10 @@ rm -rf "$release_dir"
 mv "$next_dir" "$release_dir"
 ln -sfn "$release_dir" "$current_dir"
 
-unit="$HOME/.config/systemd/user/cbranch.service"
+unit="$HOME/.config/systemd/user/$name.service"
 cat > "$unit" <<EOF
 [Unit]
-Description=cbranch server
+Description=$name server
 
 [Service]
 Type=simple
@@ -98,6 +105,8 @@ WorkingDirectory=$current_dir
 Environment=CBRANCH_BIND_ADDRESS=127.0.0.1
 Environment=CBRANCH_PORT=$port
 Environment=CBRANCH_CONFIG=$config_root/config.json
+Environment=XDG_DATA_HOME=$data_root/data
+Environment=XDG_CONFIG_HOME=$config_root
 ExecStart="$node_bin" "$current_dir/dist/main.js"
 Restart=on-failure
 RestartSec=2
@@ -107,9 +116,9 @@ WantedBy=default.target
 EOF
 
 if ! systemctl --user daemon-reload || \
-  ! systemctl --user enable cbranch.service || \
-  ! systemctl --user restart cbranch.service; then
-  printf '%s\n' 'Could not start the cbranch systemd user service.' >&2
+  ! systemctl --user enable "$name.service" || \
+  ! systemctl --user restart "$name.service"; then
+  printf '%s\n' "Could not start the $name systemd user service." >&2
   exit 1
 fi
 
@@ -135,7 +144,7 @@ request.on("timeout", () => request.destroy());
  ' "$port" "$version"; do
   attempt=$((attempt + 1))
   if [ "$attempt" -ge 20 ]; then
-    printf '%s\n' 'The cbranch service did not become ready. Inspect it with systemctl --user status cbranch.service.' >&2
+    printf '%s\n' "The $name service did not become ready. Inspect it with systemctl --user status $name.service." >&2
     exit 1
   fi
   sleep 0.5

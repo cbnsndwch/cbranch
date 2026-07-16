@@ -61,6 +61,7 @@ export const links: Route.LinksFunction = () => [
 // (KEEP IN SYNC) since an inline script cannot import. React hydrates this <script> node as-is
 // and never re-runs it, so the theme is applied exactly once.
 const THEME_SCRIPT = `(function(){try{var k="cbranch.ui.theme";var p=localStorage.getItem(k);if(p!=="light"&&p!=="dark"&&p!=="system")p="system";var dark=p==="dark"||(p==="system"&&typeof matchMedia==="function"&&matchMedia("(prefers-color-scheme: dark)").matches);document.documentElement.classList.toggle("dark",dark);}catch(e){}})();`;
+const IS_CANARY = import.meta.env.VITE_CBRANCH_CANARY === '1';
 
 export function Layout({ children }: { readonly children: React.ReactNode }) {
     return (
@@ -69,18 +70,28 @@ export function Layout({ children }: { readonly children: React.ReactNode }) {
         // live <html> before first paint. That makes the live `<html class>` legitimately differ
         // from the shell, so suppress the (expected) hydration mismatch on this one element —
         // React adopts the live attribute rather than stripping it.
-        <html lang="en" suppressHydrationWarning>
+        <html
+            lang="en"
+            className={IS_CANARY ? 'canary' : undefined}
+            suppressHydrationWarning
+        >
             <head>
                 <meta charSet="UTF-8" />
                 <meta
                     name="viewport"
                     content="width=device-width, initial-scale=1.0"
                 />
-                <meta name="apple-mobile-web-app-title" content="cBranch" />
-                <meta name="theme-color" content="#2bc6ad" />
+                <meta
+                    name="apple-mobile-web-app-title"
+                    content={IS_CANARY ? 'cBranch Canary' : 'cBranch'}
+                />
+                <meta
+                    name="theme-color"
+                    content={IS_CANARY ? '#f97316' : '#2bc6ad'}
+                />
                 {/* Must run before <Links> so the right theme is active when the CSS applies. */}
                 <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
-                <title>cBranch</title>
+                <title>{IS_CANARY ? 'cBranch Canary' : 'cBranch'}</title>
                 <Meta />
                 <Links />
             </head>

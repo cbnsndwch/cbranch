@@ -13,12 +13,14 @@ import {
     type SshAuthChallenge,
 } from './bridge';
 
+const isCanary = import.meta.env.VITE_CBRANCH_CANARY === '1';
+
 const emptyProfile = (): Omit<ConnectionProfile, 'id'> => ({
     name: '',
     host: '',
     user: '',
     sshPort: 22,
-    remotePort: 7420,
+    remotePort: isCanary ? 7421 : 7420,
 });
 
 const errorMessage = (error: unknown): string =>

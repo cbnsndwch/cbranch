@@ -117,6 +117,19 @@
     --selection-fg: oklch(0.985 0 0);
 }
 
+.canary {
+    --primary: oklch(0.68 0.17 52);
+    --ring: oklch(0.68 0.17 52);
+    --status-ahead: oklch(0.68 0.17 52);
+    --status-staged: oklch(0.68 0.17 52);
+    --selection-bg: oklch(0.68 0.17 52);
+}
+
+.canary.dark {
+    --primary: oklch(0.76 0.16 52);
+    --ring: oklch(0.76 0.16 52);
+}
+
 /* Map the CSS variables onto Tailwind's token namespace so utilities like
    `bg-primary`, `text-muted-foreground`, `ring-ring`, `border-input` resolve. */
 @theme inline {

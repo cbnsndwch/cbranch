@@ -26,6 +26,14 @@ const TAILSCALE_AUTH_TIMEOUT: Duration = Duration::from_secs(120);
 const STDERR_LIMIT: u64 = 16 * 1024;
 const SSH_AUTH_CHALLENGE_EVENT: &str = "cbranch://ssh-auth-challenge";
 
+fn server_variant() -> &'static str {
+    if option_env!("CBRANCH_SERVER_VARIANT") == Some("canary") {
+        "canary"
+    } else {
+        "production"
+    }
+}
+
 #[cfg(windows)]
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
@@ -402,9 +410,10 @@ fn server_bundle_path(app: &AppHandle) -> Result<PathBuf, String> {
 
 fn remote_setup_command(remote_port: u16) -> String {
     format!(
-        "sh -c 'set -eu; stage=$(mktemp -d); cleanup() {{ rm -rf \"$stage\"; }}; trap cleanup EXIT HUP INT TERM; tar -xzf - -C \"$stage\"; exec sh \"$stage/cbranch-server/install.sh\" \"$@\"' cbranch-setup {} {}",
+        "sh -c 'set -eu; stage=$(mktemp -d); cleanup() {{ rm -rf \"$stage\"; }}; trap cleanup EXIT HUP INT TERM; tar -xzf - -C \"$stage\"; exec sh \"$stage/cbranch-server/install.sh\" \"$@\"' cbranch-setup {} {} {}",
         env!("CARGO_PKG_VERSION"),
         remote_port,
+        server_variant(),
     )
 }
 
