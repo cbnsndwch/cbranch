@@ -311,6 +311,29 @@ export const makeTrustedPluginManager = (
         availableVersions: [record.version],
     });
 
+    const trustedRepository = async (
+        repositoryId: PluginRepositoryIdInput['repositoryId'],
+    ): Promise<ReturnType<typeof makeTufPluginRepository>> => {
+        const existing = repositories.get(String(repositoryId));
+        if (existing) return existing;
+        const stored = await repositoryStore.get(repositoryId);
+        if (!stored?.root || stored.repository.trustState !== 'trusted')
+            throw new PluginManagerError(
+                'pluginRepositoryUntrusted',
+                'Approve the publisher before browsing its catalog.',
+            );
+        const repository = makeTufPluginRepository({
+            root: Buffer.from(stored.root, 'base64'),
+            transport: makeHttpsPluginRepositoryTransport({
+                url: stored.repository.url,
+            }),
+            artifactStore,
+            verifySignature: verifyTufEd25519Signature,
+        });
+        repositories.set(String(repositoryId), repository);
+        return repository;
+    };
+
     const manager = {
         runtimeStatus: async (): Promise<PluginRuntimeStatus> => {
             await ready;
@@ -393,21 +416,8 @@ export const makeTrustedPluginManager = (
                     catalogEntryCount: 0,
                 });
             }
-            if (!stored.root)
-                throw new PluginManagerError(
-                    'pluginRepositoryUntrusted',
-                    'Approve the fetched publisher root before refreshing this repository.',
-                );
-            const repository = makeTufPluginRepository({
-                root: Buffer.from(stored.root, 'base64'),
-                transport: makeHttpsPluginRepositoryTransport({
-                    url: stored.repository.url,
-                }),
-                artifactStore,
-                verifySignature: verifyTufEd25519Signature,
-            });
+            const repository = await trustedRepository(repositoryId);
             const catalog = await repository.refresh();
-            repositories.set(String(repositoryId), repository);
             return new PluginRepositoryRefresh({
                 repository: stored.repository,
                 catalogEntryCount: catalog.length,
@@ -416,12 +426,7 @@ export const makeTrustedPluginManager = (
         catalogList: async (
             repositoryId: PluginRepositoryIdInput['repositoryId'],
         ): Promise<readonly PluginCatalogEntry[]> => {
-            const repository = repositories.get(String(repositoryId));
-            if (!repository)
-                throw new PluginManagerError(
-                    'pluginMetadataInvalid',
-                    'Refresh the trusted plugin repository before browsing its catalog.',
-                );
+            const repository = await trustedRepository(repositoryId);
             return repository.refresh();
         },
         install: async (

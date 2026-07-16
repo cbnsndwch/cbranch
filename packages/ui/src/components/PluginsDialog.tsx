@@ -179,6 +179,19 @@ function PluginsDialogBody({ onClose }: { readonly onClose: () => void }) {
                     {selectedRepositoryId && (
                         <section className="grid gap-2">
                             <strong className="text-sm">Catalog</strong>
+                            {catalog.isError && (
+                                <p
+                                    role="alert"
+                                    className="text-destructive text-xs"
+                                >
+                                    {errorMessage(catalog.error)}
+                                </p>
+                            )}
+                            {catalog.isSuccess && catalog.data.length === 0 && (
+                                <p className="text-muted-foreground text-xs">
+                                    This verified catalog has no plugins.
+                                </p>
+                            )}
                             {catalog.data?.map(plugin => (
                                 <div
                                     key={`${plugin.pluginId}@${plugin.version}`}
