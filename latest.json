@@ -1,15 +1,15 @@
 {
-  "version": "0.2.2-rc.12",
+  "version": "0.2.2-rc.13",
   "notes": "Canary builds are for plugin-system testing only.",
-  "pub_date": "2026-07-16T20:10:22.483Z",
+  "pub_date": "2026-07-16T21:31:57.044Z",
   "platforms": {
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTWmJybWpFMDVVeldvOVBXSjlXcCtQaDdvSFY0QUErZ1Z2blg3ckRTY2loWDlEa1ZrQmRDdVZYeHVER1ZtM3UvOUxmbldNWHVveDdJczcwdm5teTZNZDRQVTFyTjBMZHdRPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg0MjMyNjE5CWZpbGU6Y0JyYW5jaCBDYW5hcnlfMC4yLjItcmMuMTJfeDY0LXNldHVwLmV4ZQpNRDJFbFdVNHEvbHRwWFV3KzBRK1l2UWZOVmNWZ0k5TmNJYmRNb3ZQcjBPdStNc2NYMjBFKys3REFKeFJDazBvUWt6RklZV1h0ZVlyY2Q4ZVYwVWVCUT09Cg==",
-      "url": "https://github.com/cbnsndwch/cbranch/releases/download/v0.2.2-rc.12/cBranch.Canary_0.2.2-rc.12_x64-setup.exe"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTWmJybWpFMDVVelk2QnBMOHMweVJUSndTL3U5UnpsYWMyc1VUNlBPaVlpM1FMZHd3TURPWWJacmYxTmkrbzZqTzI0Y0N3bWxQQmtBYUdicVNuZnM1MWFNVEpxOFo5cUEwPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg0MjM3NTEyCWZpbGU6Y0JyYW5jaCBDYW5hcnlfMC4yLjItcmMuMTNfeDY0LXNldHVwLmV4ZQpJd3JaVERoZkJIT21KZlBuNTJpSlpCcTVoYXBVZGhmU05TRmRSYWxkWjNnZXhTMFpGTEllZVVmR2RJblRzaEJBOTJLVG5LbnBzazBVTDZ6SU1lbWpDdz09Cg==",
+      "url": "https://github.com/cbnsndwch/cbranch/releases/download/v0.2.2-rc.13/cBranch.Canary_0.2.2-rc.13_x64-setup.exe"
     },
     "windows-x86_64-nsis": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTWmJybWpFMDVVeldvOVBXSjlXcCtQaDdvSFY0QUErZ1Z2blg3ckRTY2loWDlEa1ZrQmRDdVZYeHVER1ZtM3UvOUxmbldNWHVveDdJczcwdm5teTZNZDRQVTFyTjBMZHdRPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg0MjMyNjE5CWZpbGU6Y0JyYW5jaCBDYW5hcnlfMC4yLjItcmMuMTJfeDY0LXNldHVwLmV4ZQpNRDJFbFdVNHEvbHRwWFV3KzBRK1l2UWZOVmNWZ0k5TmNJYmRNb3ZQcjBPdStNc2NYMjBFKys3REFKeFJDazBvUWt6RklZV1h0ZVlyY2Q4ZVYwVWVCUT09Cg==",
-      "url": "https://github.com/cbnsndwch/cbranch/releases/download/v0.2.2-rc.12/cBranch.Canary_0.2.2-rc.12_x64-setup.exe"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTWmJybWpFMDVVelk2QnBMOHMweVJUSndTL3U5UnpsYWMyc1VUNlBPaVlpM1FMZHd3TURPWWJacmYxTmkrbzZqTzI0Y0N3bWxQQmtBYUdicVNuZnM1MWFNVEpxOFo5cUEwPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg0MjM3NTEyCWZpbGU6Y0JyYW5jaCBDYW5hcnlfMC4yLjItcmMuMTNfeDY0LXNldHVwLmV4ZQpJd3JaVERoZkJIT21KZlBuNTJpSlpCcTVoYXBVZGhmU05TRmRSYWxkWjNnZXhTMFpGTEllZVVmR2RJblRzaEJBOTJLVG5LbnBzazBVTDZ6SU1lbWpDdz09Cg==",
+      "url": "https://github.com/cbnsndwch/cbranch/releases/download/v0.2.2-rc.13/cBranch.Canary_0.2.2-rc.13_x64-setup.exe"
     }
   }
 }
