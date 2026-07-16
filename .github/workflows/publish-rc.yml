@@ -3,7 +3,7 @@ name: Publish Canary
 on:
   push:
     tags:
-      - 'rc-*'
+      - 'v*-rc.*'
   workflow_dispatch:
     inputs:
       rc_version:
@@ -51,8 +51,8 @@ jobs:
             VERSION='${{ inputs.rc_version }}'
           else
             TAG="${GITHUB_REF_NAME}"
-            [[ "$TAG" =~ ^rc-([0-9]+\.[0-9]+\.[0-9]+)(-([0-9]+))?$ ]]
-            VERSION="${BASH_REMATCH[1]}-rc.${BASH_REMATCH[3]:-0}"
+            [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-rc\.[0-9]+$ ]]
+            VERSION="${TAG#v}"
           fi
           [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+-rc\.[0-9]+$ ]]
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
