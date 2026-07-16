@@ -10,7 +10,13 @@
             "icons/canary/128x128@2x.png",
             "icons/canary/icon.icns",
             "icons/canary/icon.ico"
-        ]
+        ],
+        "windows": {
+            "nsis": {
+                "installerIcon": "icons/canary/icon.ico",
+                "uninstallerIcon": "icons/canary/icon.ico"
+            }
+        }
     },
     "plugins": {
         "updater": {
