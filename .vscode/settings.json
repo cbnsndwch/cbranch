@@ -2,6 +2,9 @@
     "[jsonc]": {
         "editor.defaultFormatter": "oxc.oxc-vscode"
     },
+    "[markdown]": {
+        "editor.defaultFormatter": "oxc.oxc-vscode"
+    },
     "[typescript]": {
         "editor.defaultFormatter": "oxc.oxc-vscode"
     },
@@ -65,8 +68,5 @@
     },
     "js/ts.tsdk.path": "node_modules/typescript/lib",
     "oxc.fmt.configPath": ".oxfmtrc.json",
-    "[markdown]": {
-        "editor.defaultFormatter": "oxc.oxc-vscode"
-    },
     "workbench.experimental.modernUI": true
 }
