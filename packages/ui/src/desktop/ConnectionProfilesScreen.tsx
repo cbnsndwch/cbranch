@@ -1,9 +1,16 @@
 import { useEffect, useState } from 'react';
 import { CBRANCH_PROTOCOL_VERSION } from '@cbranch/rpc-contract';
+import { Copy, Info, Save, Trash2 } from 'lucide-react';
 
 import { makeHostEndpoint, type HostEndpoint } from '../rpc/client';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from '../components/ui/tooltip';
 import {
     type CbranchServerProbe,
     type ConnectionProfile,
@@ -14,13 +21,14 @@ import {
 } from './bridge';
 
 const isCanary = import.meta.env.VITE_CBRANCH_CANARY === '1';
+const CANARY_SERVER_PORT = 7421;
 
 const emptyProfile = (): Omit<ConnectionProfile, 'id'> => ({
     name: '',
     host: '',
     user: '',
     sshPort: 22,
-    remotePort: isCanary ? 7421 : 7420,
+    remotePort: isCanary ? CANARY_SERVER_PORT : 7420,
 });
 
 const errorMessage = (error: unknown): string =>
@@ -77,6 +85,21 @@ export function ConnectionProfilesScreen({
     const select = (profile: ConnectionProfile) => {
         setSelectedId(profile.id);
         setEditing(profile);
+        setNotice(undefined);
+        setAuthChallenge(undefined);
+        setServerProbe(undefined);
+    };
+
+    const clone = () => {
+        if (!selectedProfile) return;
+        setSelectedId(undefined);
+        setEditing({
+            name: `${selectedProfile.name} Canary`,
+            host: selectedProfile.host,
+            user: selectedProfile.user,
+            sshPort: selectedProfile.sshPort,
+            remotePort: CANARY_SERVER_PORT,
+        });
         setNotice(undefined);
         setAuthChallenge(undefined);
         setServerProbe(undefined);
@@ -264,17 +287,121 @@ CBRANCH_BIND_ADDRESS=127.0.0.1 CBRANCH_PORT=${serverPort} pnpm --filter @cbranch
                     </div>
                 </aside>
                 <div className="grid gap-4 p-5">
-                    <div>
-                        <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
-                            SSH local forward
-                        </p>
-                        <h2 className="mt-1 text-lg font-semibold">
-                            {selectedId ? 'Edit connection' : 'New connection'}
-                        </h2>
-                        <p className="text-muted-foreground mt-1 text-sm">
-                            cbranch uses your system OpenSSH client, agent,
-                            keys, SSH config, and known_hosts file.
-                        </p>
+                    <div className="flex items-start justify-between gap-3">
+                        <div>
+                            <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+                                SSH local forward
+                            </p>
+                            <h2 className="mt-1 text-lg font-semibold">
+                                {selectedId
+                                    ? 'Edit connection'
+                                    : 'New connection'}
+                            </h2>
+                            <p className="text-muted-foreground mt-1 text-sm">
+                                cbranch uses your system OpenSSH client, agent,
+                                keys, SSH config, and known_hosts file.
+                            </p>
+                        </div>
+                        <TooltipProvider>
+                            <div className="flex shrink-0 gap-1">
+                                {selectedId && (
+                                    <Tooltip>
+                                        <TooltipTrigger
+                                            render={
+                                                <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    aria-label="Clone profile for canary"
+                                                    disabled={busy}
+                                                    onClick={clone}
+                                                >
+                                                    <Copy
+                                                        className="size-4"
+                                                        aria-hidden="true"
+                                                    />
+                                                </Button>
+                                            }
+                                        />
+                                        <TooltipContent>
+                                            Clone profile for canary
+                                        </TooltipContent>
+                                    </Tooltip>
+                                )}
+                                <Tooltip>
+                                    <TooltipTrigger
+                                        render={
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="icon"
+                                                aria-label="Save profile"
+                                                disabled={busy}
+                                                onClick={() => void save()}
+                                            >
+                                                <Save
+                                                    className="size-4"
+                                                    aria-hidden="true"
+                                                />
+                                            </Button>
+                                        }
+                                    />
+                                    <TooltipContent>
+                                        Save profile
+                                    </TooltipContent>
+                                </Tooltip>
+                                {selectedId && (
+                                    <Tooltip>
+                                        <TooltipTrigger
+                                            render={
+                                                <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    aria-label="Delete profile"
+                                                    disabled={busy}
+                                                    onClick={() =>
+                                                        void remove()
+                                                    }
+                                                >
+                                                    <Trash2
+                                                        className="size-4"
+                                                        aria-hidden="true"
+                                                    />
+                                                </Button>
+                                            }
+                                        />
+                                        <TooltipContent>
+                                            Delete profile
+                                        </TooltipContent>
+                                    </Tooltip>
+                                )}
+                                <Tooltip>
+                                    <TooltipTrigger
+                                        render={
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="icon"
+                                                aria-label="About and diagnostics"
+                                                disabled={busy}
+                                                onClick={() =>
+                                                    void showDiagnostics()
+                                                }
+                                            >
+                                                <Info
+                                                    className="size-4"
+                                                    aria-hidden="true"
+                                                />
+                                            </Button>
+                                        }
+                                    />
+                                    <TooltipContent>
+                                        About and diagnostics
+                                    </TooltipContent>
+                                </Tooltip>
+                            </div>
+                        </TooltipProvider>
                     </div>
                     <div className="grid gap-3 sm:grid-cols-2">
                         <label className="grid gap-1 text-sm">
@@ -362,12 +489,23 @@ CBRANCH_BIND_ADDRESS=127.0.0.1 CBRANCH_PORT=${serverPort} pnpm --filter @cbranch
                         </section>
                     )}
                     {(notice || connectionError) && (
-                        <p
+                        <div
                             role="alert"
-                            className="border border-destructive/40 bg-destructive/10 p-2 text-sm"
+                            className="flex items-center justify-between gap-2 border border-destructive/40 bg-destructive/10 p-2 text-sm"
                         >
-                            {connectionError ?? notice}
-                        </p>
+                            <span>{connectionError ?? notice}</span>
+                            {connectionError && (
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    disabled={busy}
+                                    onClick={onRetry}
+                                >
+                                    Retry backend
+                                </Button>
+                            )}
+                        </div>
                     )}
                     {serverProbe && (
                         <section className="grid gap-3 border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
@@ -418,40 +556,33 @@ CBRANCH_BIND_ADDRESS=127.0.0.1 CBRANCH_PORT=${serverPort} pnpm --filter @cbranch
                                     </details>
                                 </div>
                             )}
+                            {selectedId && (
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    disabled={busy}
+                                    onClick={() => void setupServer()}
+                                >
+                                    {serverProbe.status === 'missing'
+                                        ? 'Set up cbranch'
+                                        : 'Update cbranch'}
+                                </Button>
+                            )}
                         </section>
                     )}
-                    <div className="flex flex-wrap gap-2">
-                        <Button
-                            type="button"
-                            disabled={busy}
-                            onClick={() => void save()}
-                        >
-                            {busy ? 'Working…' : 'Save profile'}
-                        </Button>
+                    <div className="flex flex-wrap justify-end gap-2">
                         {selectedId && (
                             <>
                                 <Button
                                     type="button"
-                                    variant="outline"
+                                    variant="ghost"
                                     disabled={busy}
                                     onClick={() => void test()}
                                 >
                                     Test tunnel
                                 </Button>
-                                {serverProbe && (
-                                    <Button
-                                        type="button"
-                                        disabled={busy}
-                                        onClick={() => void setupServer()}
-                                    >
-                                        {serverProbe.status === 'missing'
-                                            ? 'Set up cbranch'
-                                            : 'Update cbranch'}
-                                    </Button>
-                                )}
                                 <Button
                                     type="button"
-                                    variant="outline"
                                     disabled={busy}
                                     onClick={() => void connect()}
                                 >
@@ -459,34 +590,8 @@ CBRANCH_BIND_ADDRESS=127.0.0.1 CBRANCH_PORT=${serverPort} pnpm --filter @cbranch
                                         ? 'Re-check and connect'
                                         : 'Connect'}
                                 </Button>
-                                <Button
-                                    type="button"
-                                    variant="destructive"
-                                    disabled={busy}
-                                    onClick={() => void remove()}
-                                >
-                                    Delete
-                                </Button>
                             </>
                         )}
-                        {connectionError && (
-                            <Button
-                                type="button"
-                                variant="outline"
-                                disabled={busy}
-                                onClick={onRetry}
-                            >
-                                Retry backend
-                            </Button>
-                        )}
-                        <Button
-                            type="button"
-                            variant="ghost"
-                            disabled={busy}
-                            onClick={() => void showDiagnostics()}
-                        >
-                            About and diagnostics
-                        </Button>
                     </div>
                     {diagnostics && (
                         <label className="grid gap-1 text-xs">

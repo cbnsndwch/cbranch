@@ -33,7 +33,7 @@ const profile = {
 
 const bridge = {
     listProfiles: vi.fn(async () => [profile]),
-    saveProfile: vi.fn(),
+    saveProfile: vi.fn(async () => profile),
     deleteProfile: vi.fn(),
     testProfile: vi.fn(),
     setupProfile: vi.fn(async () => ({
@@ -60,6 +60,7 @@ describe('ConnectionProfilesScreen', () => {
             .mockResolvedValueOnce({ status: 'missing' })
             .mockResolvedValueOnce({ status: 'ready' });
         bridge.listProfiles.mockClear();
+        bridge.saveProfile.mockClear();
         bridge.setupProfile.mockClear();
         bridge.connectProfile.mockClear();
         bridge.disconnect.mockClear();
@@ -129,6 +130,64 @@ describe('ConnectionProfilesScreen', () => {
             expect(bridge.setupProfile).toHaveBeenCalledWith(profile.id);
             expect(onConnect).toHaveBeenCalled();
         });
+    });
+
+    test('clones a selected profile into a new canary-port profile', async () => {
+        render(
+            <ConnectionProfilesScreen onConnect={vi.fn()} onRetry={vi.fn()} />,
+        );
+
+        fireEvent.click(
+            await screen.findByRole('button', { name: /Clerk VM/ }),
+        );
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Clone profile for canary' }),
+        );
+
+        expect(
+            screen.getByRole('heading', { name: 'New connection' }),
+        ).toBeTruthy();
+        expect(
+            (screen.getByLabelText('Profile name') as HTMLInputElement).value,
+        ).toBe('Clerk VM Canary');
+        expect(
+            (screen.getByLabelText('Remote cbranch port') as HTMLInputElement)
+                .value,
+        ).toBe('7421');
+        fireEvent.click(screen.getByRole('button', { name: 'Save profile' }));
+        await waitFor(() =>
+            expect(bridge.saveProfile).toHaveBeenCalledWith({
+                name: 'Clerk VM Canary',
+                host: 'clerk',
+                user: 'ubuntu',
+                sshPort: 22,
+                remotePort: 7421,
+            }),
+        );
+    });
+
+    test('keeps profile management in header icon controls', async () => {
+        render(
+            <ConnectionProfilesScreen onConnect={vi.fn()} onRetry={vi.fn()} />,
+        );
+
+        fireEvent.click(
+            await screen.findByRole('button', { name: /Clerk VM/ }),
+        );
+
+        expect(
+            screen.getByRole('button', { name: 'Save profile' }),
+        ).toBeTruthy();
+        expect(
+            screen.getByRole('button', { name: 'Delete profile' }),
+        ).toBeTruthy();
+        expect(
+            screen.getByRole('button', { name: 'About and diagnostics' }),
+        ).toBeTruthy();
+        expect(
+            screen.getByRole('button', { name: 'Test tunnel' }),
+        ).toBeTruthy();
+        expect(screen.getByRole('button', { name: 'Connect' })).toBeTruthy();
     });
 
     test('shows a Tailscale browser challenge for the selected profile', async () => {
