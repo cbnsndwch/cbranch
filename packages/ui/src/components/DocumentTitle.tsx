@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 
 import { setDesktopWindowTitle } from '../desktop/bridge';
+import { APP_INFO } from '../lib/app-info';
 import { useEngagementWorkspace } from '../rpc/hooks';
 import { useUiStore } from '../state/store';
 
@@ -24,12 +25,12 @@ export function DocumentTitle() {
         : undefined;
     const title =
         engagement && repository
-            ? `${engagement.name} · ${repository.name} • cBranch`
+            ? `${engagement.name} · ${repository.name} • ${APP_INFO.name}`
             : engagement
-              ? `${engagement.name} • cBranch`
+              ? `${engagement.name} • ${APP_INFO.name}`
               : repository
-                ? `${repository.name} • cBranch`
-                : 'cBranch';
+                ? `${repository.name} • ${APP_INFO.name}`
+                : APP_INFO.name;
 
     useEffect(() => {
         document.title = title;
@@ -38,8 +39,8 @@ export function DocumentTitle() {
 
     useEffect(
         () => () => {
-            document.title = 'cBranch';
-            void setDesktopWindowTitle('cBranch').catch(() => undefined);
+            document.title = APP_INFO.name;
+            void setDesktopWindowTitle(APP_INFO.name).catch(() => undefined);
         },
         [],
     );

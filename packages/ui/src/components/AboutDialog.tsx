@@ -1,4 +1,3 @@
-import { CBRANCH_BACKEND_VERSION } from '@cbranch/rpc-contract';
 import { useEffect, useState } from 'react';
 
 import {
@@ -7,6 +6,7 @@ import {
     loadDesktopBridge,
 } from '../desktop/bridge';
 import { requestDesktopUpdateCheck } from '../desktop/DesktopUpdater';
+import { APP_INFO } from '../lib/app-info';
 import { useOptionalConnection } from '../rpc/connection-provider';
 import { useUiStore } from '../state/store';
 import { Button } from './ui/button';
@@ -65,8 +65,6 @@ function AboutDialogBody() {
         : diagnostics?.tunnelState === 'connected'
           ? 'Tunnel connected'
           : 'Not connected';
-    const version = diagnostics?.desktopVersion ?? CBRANCH_BACKEND_VERSION;
-
     return (
         <Dialog
             open={true}
@@ -78,7 +76,7 @@ function AboutDialogBody() {
                 <div className="grid gap-5 p-5">
                     <div className="grid gap-1">
                         <DialogTitle className="text-xl tracking-tight">
-                            cBranch
+                            {APP_INFO.name}
                         </DialogTitle>
                         <DialogDescription>
                             A desktop-style Git client for connected teams.
@@ -87,7 +85,7 @@ function AboutDialogBody() {
 
                     <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 border-y py-4 text-sm">
                         <dt className="text-muted-foreground">Version</dt>
-                        <dd>v{version}</dd>
+                        <dd>v{APP_INFO.version}</dd>
                         <dt className="text-muted-foreground">Server</dt>
                         <dd>{serverStatus}</dd>
                         {diagnostics?.profile && (

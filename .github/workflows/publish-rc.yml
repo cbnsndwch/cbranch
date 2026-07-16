@@ -126,6 +126,8 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           CBRANCH_SERVER_VARIANT: canary
           VITE_CBRANCH_CANARY: '1'
+          VITE_CBRANCH_APP_NAME: cBranch Canary
+          VITE_CBRANCH_VERSION: ${{ env.VERSION }}
         with:
           tagName: ${{ github.ref_name }}
           releaseName: cBranch Canary ${{ env.VERSION }}

@@ -9,6 +9,13 @@ const { requestDesktopUpdateCheck } = vi.hoisted(() => ({
     requestDesktopUpdateCheck: vi.fn(),
 }));
 vi.mock('../desktop/DesktopUpdater', () => ({ requestDesktopUpdateCheck }));
+vi.mock('../lib/app-info', () => ({
+    APP_INFO: {
+        name: 'cBranch Canary',
+        version: '0.2.2-rc.9',
+        isCanary: true,
+    },
+}));
 vi.mock('../desktop/bridge', () => ({
     isDesktopSurface: () => true,
     loadDesktopBridge: async () => ({
@@ -43,12 +50,12 @@ test('shows desktop and connection details from the Help menu dialog', async () 
     const user = userEvent.setup();
     render(<AboutDialog />);
 
-    expect(screen.getByRole('dialog').textContent).toContain('cBranch');
+    expect(screen.getByRole('dialog').textContent).toContain('cBranch Canary');
     expect(screen.getByRole('dialog').textContent).toContain(
         'Copyright 2026 cbranch contributors.',
     );
     await waitFor(() =>
-        expect(screen.getByRole('dialog').textContent).toContain('v0.2.0'),
+        expect(screen.getByRole('dialog').textContent).toContain('v0.2.2-rc.9'),
     );
     expect(screen.getByRole('dialog').textContent).toContain(
         'Tunnel connected',

@@ -121,6 +121,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          VITE_CBRANCH_APP_NAME: cBranch
+          VITE_CBRANCH_VERSION: ${{ github.ref_name }}
         with:
           tagName: ${{ env.RELEASE_TAG }}
           releaseName: ${{ env.RELEASE_TAG }}

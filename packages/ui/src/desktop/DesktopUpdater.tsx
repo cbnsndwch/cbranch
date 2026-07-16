@@ -2,6 +2,7 @@ import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 import { Button } from '../components/ui/button';
+import { APP_INFO } from '../lib/app-info';
 import { useUiStore } from '../state/store';
 import { isDesktopSurface } from './bridge';
 
@@ -45,7 +46,7 @@ export function DesktopUpdater() {
             if (!mountedRef.current) return;
             useUiStore.getState().setLastUpdateCheckAt(Date.now());
             if (!update) {
-                if (manual) toast.success('cBranch is up to date.');
+                if (manual) toast.success(`${APP_INFO.name} is up to date.`);
                 return;
             }
             updateRef.current = update;
