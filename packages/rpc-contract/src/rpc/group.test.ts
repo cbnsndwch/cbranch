@@ -638,6 +638,7 @@ const handlers = CbranchRpcs.toLayer({
     PluginList: () => Effect.succeed([]),
     PluginEnable: () => Effect.fail(pluginActivationUnavailable()),
     PluginDisable: () => Effect.fail(pluginActivationUnavailable()),
+    PluginUninstall: () => Effect.fail(pluginActivationUnavailable()),
     PluginUpdate: () => Effect.fail(pluginActivationUnavailable()),
     PluginRollback: () => Effect.fail(pluginActivationUnavailable()),
     PluginAuditList: () => Effect.succeed({ events: [] }),

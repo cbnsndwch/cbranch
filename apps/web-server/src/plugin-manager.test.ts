@@ -102,6 +102,7 @@ describe('trusted plugin manager', () => {
                 manifest,
                 entrypoint: join(dataDirectory, 'activated', 'plugin.mjs'),
             })),
+            remove: vi.fn(),
         };
         const manager = makeTrustedPluginManager({
             dataDirectory,

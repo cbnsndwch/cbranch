@@ -177,6 +177,15 @@ export interface UiState {
     readonly setSelectedOid: (oid: Oid | null) => void;
     readonly setRepoSwitcherOpen: (open: boolean) => void;
     readonly setCommandPaletteOpen: (open: boolean) => void;
+    readonly pluginsDialogOpen: boolean;
+    readonly setPluginsDialogOpen: (open: boolean) => void;
+    readonly pluginCommandResult: {
+        readonly title: string;
+        readonly output?: string;
+    } | null;
+    readonly setPluginCommandResult: (
+        result: { readonly title: string; readonly output?: string } | null,
+    ) => void;
     readonly setEngagementManagerOpen: (open: boolean) => void;
     readonly setTheme: (theme: ThemePref) => void;
     readonly setFilters: (filters: LogFilters) => void;
@@ -390,6 +399,8 @@ export const useUiStore = create<UiState>(set => ({
     selectedOid: null,
     repoSwitcherOpen: false,
     commandPaletteOpen: false,
+    pluginsDialogOpen: false,
+    pluginCommandResult: null,
     engagementManagerOpen: false,
     theme: readThemePref(),
     filters: emptyFilters,
@@ -475,6 +486,8 @@ export const useUiStore = create<UiState>(set => ({
     setActiveEngagementId: activeEngagementId => set({ activeEngagementId }),
     setRepoSwitcherOpen: repoSwitcherOpen => set({ repoSwitcherOpen }),
     setCommandPaletteOpen: commandPaletteOpen => set({ commandPaletteOpen }),
+    setPluginsDialogOpen: pluginsDialogOpen => set({ pluginsDialogOpen }),
+    setPluginCommandResult: pluginCommandResult => set({ pluginCommandResult }),
     setEngagementManagerOpen: engagementManagerOpen =>
         set({ engagementManagerOpen }),
     setTheme: theme => {

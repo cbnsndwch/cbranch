@@ -1,0 +1,99 @@
+name: Publish Canary
+
+on:
+  push:
+    tags:
+      - 'rc-*'
+  workflow_dispatch:
+    inputs:
+      rc_version:
+        description: 'Version in the form X.Y.Z-rc.N'
+        required: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publish-canary
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: windows-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/tauri/src-tauri
+          shared-key: tauri-canary-x86_64-pc-windows-msvc
+
+      - name: Resolve version
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            VERSION='${{ inputs.rc_version }}'
+          else
+            TAG="${GITHUB_REF_NAME}"
+            [[ "$TAG" =~ ^rc-([0-9]+\.[0-9]+\.[0-9]+)(-([0-9]+))?$ ]]
+            VERSION="${BASH_REMATCH[1]}-rc.${BASH_REMATCH[3]:-0}"
+          fi
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+-rc\.[0-9]+$ ]]
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm gate
+
+      - name: Build Canary overlay
+        shell: bash
+        run: |
+          node -e '
+            const fs = require("fs");
+            const path = "apps/tauri/src-tauri/tauri.canary.conf.json";
+            const config = JSON.parse(fs.readFileSync(path, "utf8"));
+            config.version = process.env.VERSION;
+            fs.writeFileSync(path, JSON.stringify(config, null, 2) + "\n");
+          '
+
+      - name: Assert isolated Canary identity
+        shell: bash
+        run: |
+          node -e '
+            const fs = require("fs");
+            const base = JSON.parse(fs.readFileSync("apps/tauri/src-tauri/tauri.conf.json", "utf8"));
+            const overlay = JSON.parse(fs.readFileSync("apps/tauri/src-tauri/tauri.canary.conf.json", "utf8"));
+            const merged = { ...base, ...overlay, plugins: { ...base.plugins, ...overlay.plugins, updater: { ...base.plugins.updater, ...overlay.plugins.updater } } };
+            if (merged.productName !== "cBranch Canary" || merged.identifier !== "dev.cbranch.desktop.canary") process.exit(1);
+            if (!merged.version.includes("-rc.") || merged.plugins.updater.endpoints.some(endpoint => endpoint.includes("releases/latest/"))) process.exit(1);
+          '
+
+      - name: Build signed Canary release
+        uses: tauri-apps/tauri-action@v0.6.0
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        with:
+          tagName: rc
+          releaseName: cBranch Canary
+          releaseBody: Canary builds are for plugin-system testing only.
+          releaseDraft: false
+          prerelease: true
+          includeUpdaterJson: true
+          tauriScript: pnpm exec tauri
+          projectPath: apps/tauri
+          args: --target x86_64-pc-windows-msvc --bundles nsis --config src-tauri/tauri.canary.conf.json

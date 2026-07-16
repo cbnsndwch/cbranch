@@ -56,6 +56,7 @@ export interface PluginRepositoryStore {
         fingerprint: string,
         root: Uint8Array,
     ) => Promise<PluginRepository>;
+    readonly remove: (repositoryId: PluginRepositoryId) => Promise<void>;
 }
 
 export const makePluginRepositoryStore = (
@@ -196,6 +197,19 @@ export const makePluginRepositoryStore = (
                                   root: Buffer.from(root).toString('base64'),
                               })
                             : entry,
+                    ),
+                ];
+            }),
+        remove: repositoryId =>
+            update(current => {
+                if (
+                    !current.some(entry => entry.repository.id === repositoryId)
+                )
+                    throw new Error('Plugin repository was not found.');
+                return [
+                    undefined,
+                    current.filter(
+                        entry => entry.repository.id !== repositoryId,
                     ),
                 ];
             }),

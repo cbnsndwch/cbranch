@@ -1,4 +1,5 @@
 import { type ReactNode } from 'react';
+import { useQuery } from '@tanstack/react-query';
 
 import { type MenuEntry, MENUS } from './menu/menu-model';
 import { type MenuActions, useMenuActions } from './menu/use-menu-actions';
@@ -16,6 +17,8 @@ import {
     MenubarTrigger,
 } from './ui/menubar';
 import { ThemeToggle } from './ThemeToggle';
+import { useApi } from '../rpc/ApiProvider';
+import { useUiStore } from '../state/store';
 
 // The desktop shell's menu bar. The full nine-menu chrome renders from day one
 // (menu-hierarchy.md); items without a wired handler render greyed/disabled, driven by the
@@ -107,8 +110,12 @@ export function MenuBar() {
                         {menu.label}
                     </MenubarTrigger>
                     <MenubarContent>
-                        {menu.items.map((entry, i) =>
-                            renderEntry(entry, `${menu.id}.${i}`, actions),
+                        {menu.id === 'plugins' ? (
+                            <PluginEntries actions={actions} />
+                        ) : (
+                            menu.items.map((entry, i) =>
+                                renderEntry(entry, `${menu.id}.${i}`, actions),
+                            )
                         )}
                     </MenubarContent>
                 </MenubarMenu>
@@ -117,5 +124,56 @@ export function MenuBar() {
             <div className="flex-1" />
             <ThemeToggle />
         </Menubar>
+    );
+}
+
+function PluginEntries({ actions }: { readonly actions: MenuActions }) {
+    const api = useApi();
+    const repoId = useUiStore(state => state.activeRepoId);
+    const setResult = useUiStore(state => state.setPluginCommandResult);
+    const plugins = useQuery({
+        queryKey: ['plugins', 'installed'],
+        queryFn: () => api.pluginList(),
+    });
+    const commands = (plugins.data ?? []).flatMap(plugin =>
+        plugin.enabled
+            ? plugin.contributions.commands.map(command => ({
+                  plugin,
+                  command,
+              }))
+            : [],
+    );
+    return (
+        <>
+            {commands.length === 0 ? (
+                <MenubarItem disabled>(no plugins loaded)</MenubarItem>
+            ) : (
+                commands.map(({ plugin, command }) => (
+                    <MenubarItem
+                        key={command.id}
+                        onClick={() =>
+                            void api
+                                .pluginInvoke({
+                                    pluginId: plugin.lock.pluginId,
+                                    commandId: command.id,
+                                    repoId: String(repoId ?? 'global'),
+                                })
+                                .then(result =>
+                                    setResult({
+                                        title: command.title,
+                                        output: result.output,
+                                    }),
+                                )
+                        }
+                    >
+                        {command.title}
+                    </MenubarItem>
+                ))
+            )}
+            <MenubarSeparator />
+            <MenubarItem onClick={() => actions.run('plugins.settings')}>
+                Plugin settings…
+            </MenubarItem>
+        </>
     );
 }

@@ -1,0 +1,13 @@
+{
+    "$schema": "https://schema.tauri.app/config/2",
+    "productName": "cBranch Canary",
+    "mainBinaryName": "cBranch Canary",
+    "identifier": "dev.cbranch.desktop.canary",
+    "plugins": {
+        "updater": {
+            "endpoints": [
+                "https://github.com/cbnsndwch/cbranch/releases/download/rc/latest.json"
+            ]
+        }
+    }
+}

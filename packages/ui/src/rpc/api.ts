@@ -70,6 +70,13 @@ import {
     type Oid,
     type PatchSelection,
     type PullRequestListState,
+    type InstalledPlugin,
+    type PluginCatalogEntry,
+    type PluginGrant,
+    type PluginId,
+    type PluginInvocation,
+    type PluginRepository,
+    type PluginRepositoryId,
     type PluginRuntimeStatus,
     type RebasePlan,
     type RebaseStatus,
@@ -112,6 +119,31 @@ export type Unsubscribe = () => void;
 /** The transport-agnostic host API the UI depends on (mockable for component tests). */
 export interface CbranchApi {
     pluginRuntimeStatus(): Promise<PluginRuntimeStatus>;
+    pluginRepositoryList(): Promise<ReadonlyArray<PluginRepository>>;
+    pluginRepositoryAdd(url: string): Promise<PluginRepository>;
+    pluginRepositoryRefresh(repositoryId: PluginRepositoryId): Promise<void>;
+    pluginPublisherTrust(
+        repositoryId: PluginRepositoryId,
+        rootFingerprint: string,
+    ): Promise<PluginRepository>;
+    pluginCatalogList(
+        repositoryId: PluginRepositoryId,
+    ): Promise<ReadonlyArray<PluginCatalogEntry>>;
+    pluginInstall(input: {
+        readonly repositoryId: PluginRepositoryId;
+        readonly pluginId: PluginId;
+        readonly version: string;
+        readonly grant: PluginGrant;
+    }): Promise<InstalledPlugin>;
+    pluginList(): Promise<ReadonlyArray<InstalledPlugin>>;
+    pluginEnable(pluginId: PluginId): Promise<InstalledPlugin>;
+    pluginDisable(pluginId: PluginId): Promise<InstalledPlugin>;
+    pluginUninstall(pluginId: PluginId): Promise<void>;
+    pluginInvoke(input: {
+        readonly pluginId: PluginId;
+        readonly commandId: string;
+        readonly repoId: string;
+    }): Promise<PluginInvocation>;
     repoOpen(path: string): Promise<RepoHandle>;
     repoInit(input: {
         path: string;
@@ -635,6 +667,47 @@ export const makeApi = (runtime: AppRuntime): CbranchApi => {
     return {
         pluginRuntimeStatus: () =>
             runtime.runPromise(withClient(c => c.PluginRuntimeStatus({}))),
+        pluginRepositoryList: () =>
+            runtime.runPromise(withClient(c => c.PluginRepositoryList({}))),
+        pluginRepositoryAdd: url =>
+            runtime.runPromise(
+                withClient(c => c.PluginRepositoryAdd({ kind: 'https', url })),
+            ),
+        pluginRepositoryRefresh: repositoryId =>
+            runtime
+                .runPromise(
+                    withClient(c =>
+                        c.PluginRepositoryRefresh({ repositoryId }),
+                    ),
+                )
+                .then(() => undefined),
+        pluginPublisherTrust: (repositoryId, rootFingerprint) =>
+            runtime.runPromise(
+                withClient(c =>
+                    c.PluginPublisherTrust({
+                        repositoryId,
+                        rootFingerprint,
+                        approved: true,
+                    }),
+                ),
+            ),
+        pluginCatalogList: repositoryId =>
+            runtime.runPromise(
+                withClient(c => c.PluginCatalogList({ repositoryId })),
+            ),
+        pluginInstall: input =>
+            runtime.runPromise(withClient(c => c.PluginInstall(input))),
+        pluginList: () => runtime.runPromise(withClient(c => c.PluginList({}))),
+        pluginEnable: pluginId =>
+            runtime.runPromise(withClient(c => c.PluginEnable({ pluginId }))),
+        pluginDisable: pluginId =>
+            runtime.runPromise(withClient(c => c.PluginDisable({ pluginId }))),
+        pluginUninstall: pluginId =>
+            runtime.runPromise(
+                withClient(c => c.PluginUninstall({ pluginId })),
+            ),
+        pluginInvoke: input =>
+            runtime.runPromise(withClient(c => c.PluginInvoke(input))),
         repoOpen: path =>
             runtime.runPromise(withClient(c => c.RepoOpen({ path }))),
         repoInit: input =>

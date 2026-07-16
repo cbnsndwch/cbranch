@@ -193,6 +193,11 @@ export const CbranchRpcs = RpcGroup.make(
         success: InstalledPlugin,
         error: GitError,
     }),
+    Rpc.make('PluginUninstall', {
+        payload: PluginIdInput,
+        success: Schema.Void,
+        error: GitError,
+    }),
     Rpc.make('PluginUpdate', {
         payload: PluginUpdateInput,
         success: InstalledPlugin,

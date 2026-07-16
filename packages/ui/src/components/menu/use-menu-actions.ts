@@ -75,29 +75,8 @@ export function useMenuActions(): MenuActions {
             'navigate.forward': () => navigate(1),
             'help.about': () => useUiStore.getState().setAboutDialogOpen(true),
             'tools.settings': openSettings,
-            // Trusted local extensions are available, but remote installation is held back
-            // until signed artifacts can be safely materialized into an activation root.
             'plugins.settings': () =>
-                void api
-                    .pluginRuntimeStatus()
-                    .then(status =>
-                        toast.message(
-                            status.available
-                                ? 'Trusted plugin settings are not available yet'
-                                : 'Plugin runtime unavailable',
-                            {
-                                description:
-                                    status.reason ??
-                                    'Trusted extensions require an activated reviewed module.',
-                            },
-                        ),
-                    )
-                    .catch(error =>
-                        toast.error(
-                            'Could not check plugin runtime: ' +
-                                errorMessage(error),
-                        ),
-                    ),
+                useUiStore.getState().setPluginsDialogOpen(true),
             // New repository is app-global (usable with no repo open). REQ-P6-INIT-001.
             'repository.new': () =>
                 useUiStore.getState().setNewRepoDialogOpen(true),

@@ -46,6 +46,7 @@ export interface PluginArtifactStore {
         target: PluginCatalogEntry,
         grant: PluginGrant,
     ) => Promise<ActivatedPluginArtifact>;
+    readonly remove: (pluginId: string) => Promise<void>;
 }
 
 export type ActivatedPluginArtifact = {
@@ -190,6 +191,24 @@ export const makePluginArtifactStore = (
                 await rm(temporary, { recursive: true, force: true });
                 throw error;
             }
+        },
+        remove: async pluginId => {
+            if (!isSafePathComponent(pluginId)) {
+                throw new PluginPolicyError(
+                    'pluginArtifactInvalid',
+                    'Plugin target has an unsafe local storage path.',
+                );
+            }
+            await Promise.all([
+                rm(join(dataDirectory, 'artifacts', pluginId), {
+                    recursive: true,
+                    force: true,
+                }),
+                rm(join(dataDirectory, 'activated', pluginId), {
+                    recursive: true,
+                    force: true,
+                }),
+            ]);
         },
     };
 };

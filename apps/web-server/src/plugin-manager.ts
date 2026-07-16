@@ -90,6 +90,7 @@ export interface PluginManagerApi {
     readonly disable: (
         input: PluginIdInput,
     ) => Effect.Effect<InstalledPlugin, GitError>;
+    readonly uninstall: (input: PluginIdInput) => Effect.Effect<void, GitError>;
     readonly update: (
         input: PluginUpdateInput,
     ) => Effect.Effect<InstalledPlugin, GitError>;
@@ -333,6 +334,12 @@ export const makeTrustedPluginManager = (
             validateRepositoryUrl(kind, url);
             return repositoryStore.add(kind, url);
         },
+        repositoryRemove: async (
+            repositoryId: PluginRepositoryIdInput['repositoryId'],
+        ): Promise<void> => {
+            await repositoryStore.remove(repositoryId);
+            repositories.delete(String(repositoryId));
+        },
         publisherTrust: async (
             repositoryId: PluginPublisherTrustInput['repositoryId'],
             fingerprint: string,
@@ -534,6 +541,24 @@ export const makeTrustedPluginManager = (
             await recordAudit('disable', 'allowed', disabled);
             return installed(disabled);
         },
+        uninstall: async (pluginId: string): Promise<void> => {
+            const record = await getRecord(pluginId);
+            if (loaded.has(pluginId)) await manager.disable(pluginId);
+            records.delete(pluginId);
+            await persist();
+            try {
+                await artifactStore.remove(pluginId);
+                await recordAudit('uninstall', 'allowed', record);
+            } catch (error) {
+                await recordAudit(
+                    'uninstall',
+                    'failed',
+                    record,
+                    errorCode(error),
+                );
+                throw error;
+            }
+        },
         invoke: async (input: PluginInvokeInput): Promise<PluginInvocation> => {
             const record = await getRecord(String(input.pluginId));
             const operationId = PluginOperationId.make(randomUUID());
@@ -720,7 +745,8 @@ export const trustedPluginManagerLayer = Layer.sync(PluginManager, () => {
             effectFrom(() => manager.repositoryAdd(input.kind, input.url)),
         repositoryRefresh: input =>
             effectFrom(() => manager.repositoryRefresh(input.repositoryId)),
-        repositoryRemove: () => remoteInstallationUnavailable(),
+        repositoryRemove: input =>
+            effectFrom(() => manager.repositoryRemove(input.repositoryId)),
         publisherTrust: input =>
             effectFrom(() =>
                 manager.publisherTrust(
@@ -737,6 +763,8 @@ export const trustedPluginManagerLayer = Layer.sync(PluginManager, () => {
             effectFrom(() => manager.enable(String(input.pluginId))),
         disable: input =>
             effectFrom(() => manager.disable(String(input.pluginId))),
+        uninstall: input =>
+            effectFrom(() => manager.uninstall(String(input.pluginId))),
         update: () => remoteInstallationUnavailable(),
         rollback: () => remoteInstallationUnavailable(),
         auditList: input => effectFrom(() => manager.auditList(input)),

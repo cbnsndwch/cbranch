@@ -250,6 +250,8 @@ importers:
         specifier: ^8.1.2
         version: 8.1.2(@types/node@26.0.1)(esbuild@0.28.1)(jiti@2.7.0)(yaml@2.9.0)
 
+  plugins/hello-world: {}
+
 packages:
 
   '@asamuzakjp/css-color@5.1.11':

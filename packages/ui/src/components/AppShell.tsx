@@ -30,6 +30,7 @@ import { NewRepoDialog } from './NewRepoDialog';
 import { NoteEditorDialog } from './NoteEditorDialog';
 import { PatchApplyDialog } from './PatchApplyDialog';
 import { PatchExportDialog } from './PatchExportDialog';
+import { PluginCommandResultDialog, PluginsDialog } from './PluginsDialog';
 import { CommitTab } from './CommitTab';
 import { ConflictsPanel } from './ConflictsPanel';
 import { DiffPanel } from './DiffPanel';
@@ -211,6 +212,8 @@ export function AppShell() {
             <CleanDialog />
             <ArchiveDialog />
             <SettingsDialog />
+            <PluginsDialog />
+            <PluginCommandResultDialog />
             <NewRepoDialog />
             {repoId && (
                 <BisectStartDialog repoId={repoId} onSelectOid={selectOid} />

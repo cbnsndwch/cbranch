@@ -1,0 +1,42 @@
+name: Publish test plugins
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  hello-world:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Check out the static registry branch
+        run: |
+          git fetch origin plugin-registry || true
+          if git show-ref --verify --quiet refs/remotes/origin/plugin-registry; then
+            git worktree add registry origin/plugin-registry
+          else
+            git init registry
+            git -C registry checkout --orphan plugin-registry
+            git -C registry config user.name github-actions[bot]
+            git -C registry config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          fi
+      - name: Sign and publish registry metadata
+        env:
+          PLUGIN_TUF_PRIVATE_KEY: ${{ secrets.PLUGIN_TUF_PRIVATE_KEY }}
+          PLUGIN_REGISTRY_DIRECTORY: registry
+        run: node scripts/publish-plugin-registry.mjs
+      - name: Push registry branch
+        run: |
+          git -C registry add metadata targets
+          git -C registry commit -m "chore(plugins): publish hello world" || exit 0
+          git -C registry push "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" HEAD:plugin-registry
