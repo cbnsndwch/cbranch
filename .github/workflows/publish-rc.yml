@@ -18,7 +18,20 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm gate
+
   publish:
+    needs: gate
     runs-on: windows-latest
     env:
       GH_TOKEN: ${{ github.token }}
@@ -58,8 +71,6 @@ jobs:
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
 
       - run: pnpm install --frozen-lockfile
-      - run: pnpm gate
-
       - name: Build Canary overlay
         shell: bash
         run: |

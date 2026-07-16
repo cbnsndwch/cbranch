@@ -110,12 +110,12 @@ describe('useMenuActions wiring (menu reconciliation)', () => {
         });
     });
 
-    test('plugin settings reads the host trusted-extension status before reporting availability', () => {
+    test('plugin settings opens the plugin manager', () => {
         const { result } = renderHook(() => useMenuActions(), { wrapper });
 
         act(() => result.current.run('plugins.settings'));
 
-        expect(pluginRuntimeStatus).toHaveBeenCalledOnce();
+        expect(useUiStore.getState().pluginsDialogOpen).toBe(true);
     });
 
     test('createTag shows the tags view and opens the lifted create dialog', () => {
