@@ -31,8 +31,26 @@ jobs:
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm gate
 
-  publish:
+  server-bundle:
     needs: gate
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm package:server-bundle
+      - uses: actions/upload-artifact@v7
+        with:
+          name: cbranch-canary-server-linux-x64
+          path: apps/tauri/src-tauri/resources/cbranch-server.tar.gz
+          if-no-files-found: error
+
+  publish:
+    needs: [gate, server-bundle]
     runs-on: windows-latest
     env:
       GH_TOKEN: ${{ github.token }}
@@ -72,6 +90,10 @@ jobs:
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
 
       - run: pnpm install --frozen-lockfile
+      - uses: actions/download-artifact@v8
+        with:
+          name: cbranch-canary-server-linux-x64
+          path: apps/tauri/src-tauri/resources
       - name: Build Canary overlay
         shell: bash
         run: |
@@ -96,8 +118,10 @@ jobs:
           '
 
       - name: Build signed Canary release
+        id: tauri
         uses: tauri-apps/tauri-action@v0.6.0
         env:
+          GITHUB_TOKEN: ${{ github.token }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
         with:
           tagName: rc
@@ -109,3 +133,15 @@ jobs:
           tauriScript: pnpm exec tauri
           projectPath: apps/tauri
           args: --target x86_64-pc-windows-msvc --bundles nsis --config src-tauri/tauri.canary.conf.json
+
+      - name: Assert Canary bundle identity
+        shell: bash
+        env:
+          ARTIFACT_PATHS: ${{ steps.tauri.outputs.artifactPaths }}
+        run: |
+          echo "$ARTIFACT_PATHS" | node -e '
+            const paths = JSON.parse(require("fs").readFileSync(0, "utf8"));
+            const names = paths.map(path => path.split(/[\\/]/).pop());
+            if (!names.some(name => name.startsWith("cBranch Canary"))) process.exit(1);
+            if (names.some(name => name.startsWith("cbranch_"))) process.exit(1);
+          '
