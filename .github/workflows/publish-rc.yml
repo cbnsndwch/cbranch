@@ -54,6 +54,7 @@ jobs:
     runs-on: windows-latest
     env:
       GH_TOKEN: ${{ github.token }}
+      GITHUB_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -124,15 +125,38 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
         with:
-          tagName: rc
-          releaseName: cBranch Canary
+          tagName: ${{ github.ref_name }}
+          releaseName: cBranch Canary ${{ env.VERSION }}
           releaseBody: Canary builds are for plugin-system testing only.
-          releaseDraft: false
+          # GitHub permits uploading action assets while a release is a draft, then
+          # locks the completed per-version prerelease as immutable.
+          releaseDraft: true
           prerelease: true
           includeUpdaterJson: true
           tauriScript: pnpm exec tauri
           projectPath: apps/tauri
           args: --target x86_64-pc-windows-msvc --bundles nsis --config src-tauri/tauri.canary.conf.json
+
+      - name: Publish the Canary update manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir canary-feed
+          gh release download "$GITHUB_REF_NAME" --pattern latest.json --dir canary-feed
+          git fetch origin canary || true
+          if git show-ref --verify --quiet refs/remotes/origin/canary; then
+            git worktree add canary-branch origin/canary
+          else
+            git init canary-branch
+            git -C canary-branch checkout --orphan canary
+            git -C canary-branch config user.name github-actions[bot]
+            git -C canary-branch config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          fi
+          cp canary-feed/latest.json canary-branch/latest.json
+          git -C canary-branch add latest.json
+          git -C canary-branch commit -m "chore(canary): publish $VERSION"
+          git -C canary-branch push "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:canary
+          gh release edit "$GITHUB_REF_NAME" --draft=false --prerelease
 
       - name: Assert Canary bundle identity
         shell: bash

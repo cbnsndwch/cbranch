@@ -6,7 +6,7 @@
     "plugins": {
         "updater": {
             "endpoints": [
-                "https://github.com/cbnsndwch/cbranch/releases/download/rc/latest.json"
+                "https://raw.githubusercontent.com/cbnsndwch/cbranch/canary/latest.json"
             ]
         }
     }
