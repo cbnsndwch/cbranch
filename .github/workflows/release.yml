@@ -10,6 +10,8 @@ permissions:
 
 jobs:
   gate:
+    # Stable publishing must never consume an RC/prerelease tag such as v0.2.2-rc.1.
+    if: ${{ !contains(github.ref_name, '-') }}
     runs-on: ubuntu-latest
     env:
       RELEASE_TAG: ${{ github.ref_name }}
