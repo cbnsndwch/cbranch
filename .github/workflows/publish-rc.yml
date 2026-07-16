@@ -151,9 +151,9 @@ jobs:
           else
             git init canary-branch
             git -C canary-branch checkout --orphan canary
-            git -C canary-branch config user.name github-actions[bot]
-            git -C canary-branch config user.email 41898282+github-actions[bot]@users.noreply.github.com
           fi
+          git -C canary-branch config user.name github-actions[bot]
+          git -C canary-branch config user.email 41898282+github-actions[bot]@users.noreply.github.com
           cp canary-feed/latest.json canary-branch/latest.json
           git -C canary-branch add latest.json
           git -C canary-branch commit -m "chore(canary): publish $VERSION"
