@@ -1,4 +1,4 @@
-name: Release desktop clients
+name: Publish Release
 
 on:
   push:
@@ -68,7 +68,9 @@ jobs:
           if-no-files-found: error
 
   build:
-    needs: [gate, server-bundle]
+    needs: 
+      - gate
+      - server-bundle
     permissions:
       contents: write
     env:

@@ -2,7 +2,8 @@ name: Tauri Windows
 
 on:
   push:
-    branches: [develop]
+    branches:
+      - develop
   pull_request:
     paths:
       - '.github/workflows/**'

@@ -1,8 +1,9 @@
-name: ci
+name: Develop / CI
 
 on:
   push:
-    branches: ['**']
+    branches: 
+      - '**'
   pull_request:
 
 permissions:
