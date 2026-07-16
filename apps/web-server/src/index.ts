@@ -45,6 +45,7 @@ export {
 } from './tuf-plugin-repository';
 export {
     makePluginRepositoryStore,
+    FIRST_PARTY_PLUGIN_REGISTRY_URL,
     PLUGIN_REPOSITORY_FILE_NAME,
     type PluginRepositoryStore,
 } from './plugin-repository-store';

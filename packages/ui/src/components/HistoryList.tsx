@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 
 import { layoutCommits, maxLaneCount } from '../graph/layout';
 import { cn } from '../lib/cn';
+import { commitAvatarUrls } from '../lib/avatars';
 import {
     type DateMode,
     formatDate,
@@ -56,6 +57,36 @@ const initials = (name: string): string => {
             .toUpperCase() || '?'
     );
 };
+
+function CommitAvatar({
+    name,
+    email,
+}: {
+    readonly name: string;
+    readonly email: string;
+}) {
+    const urls = commitAvatarUrls(name, email);
+    const [urlIndex, setUrlIndex] = useState(0);
+    const url = urls[urlIndex];
+    if (url)
+        return (
+            <img
+                src={url}
+                alt=""
+                className="size-5.5 shrink-0 object-cover"
+                onError={() => setUrlIndex(index => index + 1)}
+            />
+        );
+    return (
+        <div
+            className="flex size-5.5 shrink-0 items-center justify-center text-[9px] font-semibold text-white"
+            style={{ background: 'var(--color-status-staged)' }}
+            aria-hidden="true"
+        >
+            {initials(name)}
+        </div>
+    );
+}
 
 // Virtualized streaming history (P1-HIST-1/2/3 + P1-UI-HIST-1): only visible rows render
 // (NF-PERF-3); rows append as the feed streams in. The lane/edge commit graph (spec 10) is
@@ -395,16 +426,10 @@ export function HistoryList({
                                         {row.subject}
                                     </span>
                                     {cols.avatar && (
-                                        <div
-                                            className="flex size-5.5 shrink-0 items-center justify-center text-[9px] font-semibold text-white"
-                                            style={{
-                                                background:
-                                                    'var(--color-status-staged)',
-                                            }}
-                                            aria-hidden="true"
-                                        >
-                                            {initials(row.authorName)}
-                                        </div>
+                                        <CommitAvatar
+                                            name={row.authorName}
+                                            email={row.authorEmail}
+                                        />
                                     )}
                                     {cols.authorName && (
                                         <span className="w-30 truncate">

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { cn } from '../lib/cn';
 import { useRepoState } from '../rpc/hooks';
@@ -96,7 +96,15 @@ export function AppShell() {
 
     // Surface the Conflicts view whenever an operation that can leave conflicts is in
     // progress for the active repo (merge / rebase / cherry-pick / revert / am / bisect).
-    const inProgress = useRepoState(repoId).data?.inProgress ?? 'none';
+    const repoState = useRepoState(repoId).data;
+    const inProgress = repoState?.inProgress ?? 'none';
+
+    // Bare repository routes are the app-open and repository-switch destinations. Once the
+    // snapshot arrives, promote the local HEAD to the selected commit route.
+    useEffect(() => {
+        if (selectedOid === null && repoState?.headOid)
+            selectOid(repoState.headOid);
+    }, [repoState?.headOid, selectedOid, selectOid]);
     const showConflicts = inProgress !== 'none';
 
     // The commit-dialog shortcut (Ctrl/Cmd+Shift+Enter) now rides the central keybinding

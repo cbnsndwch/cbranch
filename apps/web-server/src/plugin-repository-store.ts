@@ -19,6 +19,8 @@ import { Schema } from 'effect';
 import { resolvePluginDataDirectory } from './plugin-lock-store';
 
 export const PLUGIN_REPOSITORY_FILE_NAME = 'repositories.json';
+export const FIRST_PARTY_PLUGIN_REGISTRY_URL =
+    'https://raw.githubusercontent.com/cbnsndwch/cbranch/plugin-registry';
 const PLUGIN_REPOSITORY_VERSION = 1;
 
 class StoredRepository extends Schema.Class<StoredRepository>(
@@ -35,7 +37,27 @@ class PluginRepositoryFile extends Schema.Class<PluginRepositoryFile>(
 )({
     version: Schema.Literal(PLUGIN_REPOSITORY_VERSION),
     repositories: Schema.Array(StoredRepository),
+    /** Marks that the built-in registry migration has run. */
+    defaultsInitialized: Schema.optional(Schema.Boolean),
 }) {}
+
+const initialRepositoryFile = (): PluginRepositoryFile =>
+    new PluginRepositoryFile({
+        version: PLUGIN_REPOSITORY_VERSION,
+        defaultsInitialized: true,
+        repositories: [
+            new StoredRepository({
+                repository: new PluginRepository({
+                    id: PluginRepositoryId.make('cbranch-official'),
+                    kind: 'https',
+                    url: FIRST_PARTY_PLUGIN_REGISTRY_URL,
+                    trustState: 'untrusted',
+                    freshness: 'unknown',
+                    credentialState: 'not needed',
+                }),
+            }),
+        ],
+    });
 
 export interface PluginRepositoryStore {
     readonly list: () => Promise<readonly StoredRepository[]>;
@@ -72,9 +94,27 @@ export const makePluginRepositoryStore = (
 
     const load = async (): Promise<PluginRepositoryFile> => {
         try {
-            return Schema.decodeUnknownSync(PluginRepositoryFile)(
+            const stored = Schema.decodeUnknownSync(PluginRepositoryFile)(
                 JSON.parse(await readFile(file, 'utf8')),
             );
+            if (stored.defaultsInitialized) return stored;
+            // One-time migration for installations that had a registry file before the
+            // first-party source shipped. Future writes retain the marker, including an
+            // intentionally empty registry after the user removes it.
+            return new PluginRepositoryFile({
+                ...stored,
+                defaultsInitialized: true,
+                repositories: stored.repositories.some(
+                    entry =>
+                        entry.repository.url ===
+                        FIRST_PARTY_PLUGIN_REGISTRY_URL,
+                )
+                    ? stored.repositories
+                    : [
+                          ...initialRepositoryFile().repositories,
+                          ...stored.repositories,
+                      ],
+            });
         } catch (error) {
             if (
                 typeof error === 'object' &&
@@ -82,10 +122,7 @@ export const makePluginRepositoryStore = (
                 'code' in error &&
                 error.code === 'ENOENT'
             )
-                return new PluginRepositoryFile({
-                    version: PLUGIN_REPOSITORY_VERSION,
-                    repositories: [],
-                });
+                return initialRepositoryFile();
             throw error;
         }
     };
@@ -100,6 +137,7 @@ export const makePluginRepositoryStore = (
                     new PluginRepositoryFile({
                         version: PLUGIN_REPOSITORY_VERSION,
                         repositories,
+                        defaultsInitialized: true,
                     }),
                 ),
                 { mode: 0o600, flag: 'wx' },

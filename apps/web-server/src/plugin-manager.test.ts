@@ -75,7 +75,13 @@ describe('trusted plugin manager', () => {
         await expect(
             manager.repositoryAdd('https', 'http://plugins.example.test'),
         ).rejects.toThrow('forbidden transport');
-        expect(await manager.repositoryList()).toHaveLength(1);
+        expect(await manager.repositoryList()).toEqual(
+            expect.arrayContaining([
+                expect.objectContaining({
+                    url: 'https://plugins.example.test/catalog',
+                }),
+            ]),
+        );
     });
 
     test('persists a verified activated artifact disabled until explicit enablement', async () => {
