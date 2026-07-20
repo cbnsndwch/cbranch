@@ -105,6 +105,7 @@ WorkingDirectory=$current_dir
 Environment=CBRANCH_BIND_ADDRESS=127.0.0.1
 Environment=CBRANCH_PORT=$port
 Environment=CBRANCH_CONFIG=$config_root/config.json
+Environment=CBRANCH_RELEASE_VERSION=$version
 Environment=XDG_DATA_HOME=$data_root/data
 Environment=XDG_CONFIG_HOME=$config_root
 ExecStart="$node_bin" "$current_dir/dist/main.js"

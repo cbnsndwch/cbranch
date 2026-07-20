@@ -1,5 +1,6 @@
 fn main() {
     println!("cargo:rerun-if-env-changed=CBRANCH_SERVER_VARIANT");
+    println!("cargo:rerun-if-env-changed=CBRANCH_RELEASE_VERSION");
     let icon = if std::env::var("CBRANCH_SERVER_VARIANT").as_deref() == Ok("canary") {
         "icons/canary/icon.ico"
     } else {

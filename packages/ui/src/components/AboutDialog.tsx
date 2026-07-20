@@ -42,6 +42,7 @@ function AboutDialogBody() {
     const connection = useOptionalConnection();
     const [diagnostics, setDiagnostics] = useState<DesktopDiagnostics>();
     const [diagnosticsError, setDiagnosticsError] = useState(false);
+    const [serverVersion, setServerVersion] = useState<string>();
     const desktop = isDesktopSurface();
 
     useEffect(() => {
@@ -59,6 +60,22 @@ function AboutDialogBody() {
             active = false;
         };
     }, [desktop]);
+
+    const serverUrl = connection?.endpoint?.httpBaseUrl;
+    useEffect(() => {
+        if (!serverUrl) return;
+        let active = true;
+        void fetch(new URL('/healthz', serverUrl), { cache: 'no-store' })
+            .then(response => response.json() as Promise<{ version?: unknown }>)
+            .then(health => {
+                if (active && typeof health.version === 'string')
+                    setServerVersion(health.version);
+            })
+            .catch(() => undefined);
+        return () => {
+            active = false;
+        };
+    }, [serverUrl]);
 
     const serverStatus = connection
         ? connectionLabel[connection.status]
@@ -88,6 +105,14 @@ function AboutDialogBody() {
                         <dd>v{APP_INFO.version}</dd>
                         <dt className="text-muted-foreground">Server</dt>
                         <dd>{serverStatus}</dd>
+                        {serverVersion && (
+                            <>
+                                <dt className="text-muted-foreground">
+                                    Server version
+                                </dt>
+                                <dd>v{serverVersion}</dd>
+                            </>
+                        )}
                         {diagnostics?.profile && (
                             <>
                                 <dt className="text-muted-foreground">

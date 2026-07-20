@@ -148,6 +148,7 @@ describe('managed server installer', () => {
                 'utf8',
             );
             expect(unit).toContain('Description=cbranch-canary server');
+            expect(unit).toContain('Environment=CBRANCH_RELEASE_VERSION=0.1.0');
             expect(unit).toContain(
                 `WorkingDirectory=${join(
                     home,

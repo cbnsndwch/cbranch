@@ -34,6 +34,10 @@ fn server_variant() -> &'static str {
     }
 }
 
+fn release_version() -> &'static str {
+    option_env!("CBRANCH_RELEASE_VERSION").unwrap_or(env!("CARGO_PKG_VERSION"))
+}
+
 #[cfg(windows)]
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
@@ -411,7 +415,7 @@ fn server_bundle_path(app: &AppHandle) -> Result<PathBuf, String> {
 fn remote_setup_command(remote_port: u16) -> String {
     format!(
         "sh -c 'set -eu; stage=$(mktemp -d); cleanup() {{ rm -rf \"$stage\"; }}; trap cleanup EXIT HUP INT TERM; tar -xzf - -C \"$stage\"; exec sh \"$stage/cbranch-server/install.sh\" \"$@\"' cbranch-setup {} {} {}",
-        env!("CARGO_PKG_VERSION"),
+        release_version(),
         remote_port,
         server_variant(),
     )
@@ -807,14 +811,6 @@ pub fn run() {
         .manage(AppState::default())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
-        .setup(|app| {
-            // Canary builds intentionally expose the WebView inspector for release testing.
-            #[cfg(feature = "canary-devtools")]
-            app.get_webview_window("main")
-                .expect("cbranch main window is missing")
-                .open_devtools();
-            Ok(())
-        })
         .invoke_handler(tauri::generate_handler![
             list_profiles,
             save_profile,

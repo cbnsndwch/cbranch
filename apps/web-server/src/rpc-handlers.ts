@@ -10,7 +10,6 @@
 
 import { GitEngine } from '@cbranch/core';
 import {
-    CBRANCH_BACKEND_VERSION,
     CBRANCH_PROTOCOL_VERSION,
     CbranchRpcs,
     SystemInfo,
@@ -19,6 +18,7 @@ import { Effect, Stream } from 'effect';
 
 import { getUpload } from './patch-channel';
 import { PluginManager } from './plugin-manager';
+import { serverVersion } from './server-version';
 
 /** Layer providing the P1 RPC handlers; requires `GitEngine` (supplied by `gitEngineLayer`). */
 export const handlersLayer = CbranchRpcs.toLayer({
@@ -26,7 +26,7 @@ export const handlersLayer = CbranchRpcs.toLayer({
     SystemInfo: () =>
         Effect.succeed(
             new SystemInfo({
-                version: CBRANCH_BACKEND_VERSION,
+                version: serverVersion(),
                 protocolVersion: CBRANCH_PROTOCOL_VERSION,
                 capabilities: [
                     'system-info',
