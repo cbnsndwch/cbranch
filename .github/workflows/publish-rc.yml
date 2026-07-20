@@ -139,7 +139,7 @@ jobs:
           includeUpdaterJson: true
           tauriScript: pnpm exec tauri
           projectPath: apps/tauri
-          args: --target x86_64-pc-windows-msvc --bundles nsis --config src-tauri/tauri.canary.conf.json
+          args: --target x86_64-pc-windows-msvc --bundles nsis --config src-tauri/tauri.canary.conf.json --features canary-devtools
 
       - name: Publish the Canary update manifest
         shell: bash

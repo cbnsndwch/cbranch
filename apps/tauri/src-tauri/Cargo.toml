@@ -10,6 +10,9 @@ rust-version = "1.77"
 name = "cbranch_desktop"
 crate-type = ["cdylib", "rlib"]
 
+[features]
+canary-devtools = ["tauri/devtools"]
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 

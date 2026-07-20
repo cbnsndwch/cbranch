@@ -1,4 +1,4 @@
-import type { PluginCatalogEntry } from '@cbranch/plugin-contract';
+import { PluginCatalogEntry } from '@cbranch/plugin-contract';
 
 import { PluginPolicyError } from './policy';
 
@@ -168,7 +168,7 @@ const decodeCatalog = (
         const value = object(target, 'plugin target');
         const custom = object(value.custom, 'plugin target custom metadata');
         const hashes = object(value.hashes, 'plugin target hashes');
-        return {
+        return new PluginCatalogEntry({
             pluginId: string(
                 custom.pluginId,
                 'plugin id',
@@ -197,7 +197,7 @@ const decodeCatalog = (
             advisoryIds: array(custom.advisoryIds, 'advisory ids').map(
                 advisory => string(advisory, 'advisory id'),
             ),
-        };
+        });
     });
 
 const role = (roles: Record<string, unknown>, name: string): TufRole => {

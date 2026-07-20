@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 
+import { PluginCatalogEntry } from '@cbranch/plugin-contract';
 import { describe, expect, test } from 'vitest';
 
 import { verifyTufCatalog } from './tuf';
@@ -82,17 +83,17 @@ describe('TUF catalog verification', () => {
             }),
         );
 
-        await expect(
-            verifyTufCatalog(
-                { root, timestamp, snapshot, targets },
-                async () => true,
-            ),
-        ).resolves.toMatchObject([
+        const catalog = await verifyTufCatalog(
+            { root, timestamp, snapshot, targets },
+            async () => true,
+        );
+        expect(catalog).toMatchObject([
             {
                 pluginId: 'com.example.release',
                 artifactSha256: `sha256:${'a'.repeat(64)}`,
             },
         ]);
+        expect(catalog[0]).toBeInstanceOf(PluginCatalogEntry);
     });
 
     test('rejects changed metadata and insufficient signatures', async () => {

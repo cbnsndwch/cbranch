@@ -179,6 +179,11 @@ function PluginsDialogBody({ onClose }: { readonly onClose: () => void }) {
                     {selectedRepositoryId && (
                         <section className="grid gap-2">
                             <strong className="text-sm">Catalog</strong>
+                            {catalog.isLoading && (
+                                <p className="text-muted-foreground text-xs">
+                                    Verifying catalog…
+                                </p>
+                            )}
                             {catalog.isError && (
                                 <p
                                     role="alert"

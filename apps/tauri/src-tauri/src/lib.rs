@@ -807,6 +807,14 @@ pub fn run() {
         .manage(AppState::default())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
+        .setup(|app| {
+            // Canary builds intentionally expose the WebView inspector for release testing.
+            #[cfg(feature = "canary-devtools")]
+            app.get_webview_window("main")
+                .expect("cbranch main window is missing")
+                .open_devtools();
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             list_profiles,
             save_profile,
