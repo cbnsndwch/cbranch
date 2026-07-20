@@ -43,6 +43,8 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm package:server-bundle
+        env:
+          CBRANCH_RELEASE_VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.rc_version || github.ref_name }}
       - uses: actions/upload-artifact@v7
         with:
           name: cbranch-canary-server-linux-x64

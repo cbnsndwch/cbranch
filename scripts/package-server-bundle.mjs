@@ -25,6 +25,9 @@ if (existsSync(resource) && !force) process.exit(0);
 const desktopPackage = JSON.parse(
     readFileSync(join(root, 'apps/tauri/package.json'), 'utf8'),
 );
+const releaseVersion =
+    process.env.CBRANCH_RELEASE_VERSION?.replace(/^v/, '') ??
+    desktopPackage.version;
 const staging = mkdtempSync(join(tmpdir(), 'cbranch-server-'));
 const server = join(staging, 'cbranch-server');
 const archive = `${resource}.next`;
@@ -72,7 +75,7 @@ try {
     );
     writeFileSync(
         join(server, 'cbranch-server.json'),
-        `${JSON.stringify({ version: desktopPackage.version })}\n`,
+        `${JSON.stringify({ version: releaseVersion })}\n`,
     );
     mkdirSync(dirname(resource), { recursive: true });
     rmSync(archive, { force: true });
