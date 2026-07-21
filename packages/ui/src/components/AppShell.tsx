@@ -35,7 +35,6 @@ import { CommitTab } from './CommitTab';
 import { ConflictsPanel } from './ConflictsPanel';
 import { DiffPanel } from './DiffPanel';
 import { DocumentTitle } from './DocumentTitle';
-import { DesktopUpdater } from '../desktop/DesktopUpdater';
 import { FileHistoryPanel } from './FileHistoryPanel';
 import { HistoryPane } from './HistoryPane';
 import { HistoryStatusStrip } from './HistoryStatusStrip';
@@ -210,7 +209,6 @@ export function AppShell() {
         <>
             <CommandPalette />
             <AboutDialog />
-            <DesktopUpdater />
             <SessionActivityPanel />
             <RepoSwitcher />
             <EngagementManagerDialog />

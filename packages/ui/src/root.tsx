@@ -25,6 +25,7 @@ import type { Route } from './+types/root';
 import { ConnectionFailureScreen } from './components/ConnectionFailureScreen';
 import { ConnectionProfilesScreen } from './desktop/ConnectionProfilesScreen';
 import { isDesktopSurface } from './desktop/bridge';
+import { DesktopUpdater } from './desktop/DesktopUpdater';
 import { ConnectionProvider, useConnection } from './rpc/connection-provider';
 import { defaultHostEndpoint } from './rpc/client';
 import { SyncRouteToStore } from './state/SyncRouteToStore';
@@ -158,6 +159,7 @@ export default function Root() {
 
     return (
         <ConnectionProvider initialEndpoint={initialEndpoint}>
+            <DesktopUpdater />
             <ConnectionGate desktop={desktop} />
         </ConnectionProvider>
     );
