@@ -15,16 +15,18 @@ const runtimes: Array<{
     readonly dispose: ReturnType<typeof vi.fn>;
 }> = [];
 
+let systemInfo = {
+    version: CBRANCH_BACKEND_VERSION,
+    protocolVersion: CBRANCH_PROTOCOL_VERSION,
+};
+
 vi.mock('./client', async importOriginal => {
     const actual = await importOriginal<typeof import('./client')>();
     return {
         ...actual,
         makeAppRuntime: vi.fn(() => {
             const runtime = {
-                runPromise: vi.fn(async () => ({
-                    version: CBRANCH_BACKEND_VERSION,
-                    protocolVersion: CBRANCH_PROTOCOL_VERSION,
-                })),
+                runPromise: vi.fn(async () => systemInfo),
                 dispose: vi.fn(async () => undefined),
             };
             runtimes.push(runtime);
@@ -40,6 +42,12 @@ function Status() {
 
 afterEach(() => {
     runtimes.splice(0);
+    systemInfo = {
+        version: CBRANCH_BACKEND_VERSION,
+        protocolVersion: CBRANCH_PROTOCOL_VERSION,
+    };
+    vi.unstubAllEnvs();
+    vi.resetModules();
 });
 
 describe('ConnectionProvider', () => {
@@ -59,5 +67,34 @@ describe('ConnectionProvider', () => {
         expect(await screen.findByText('connected')).toBeTruthy();
         expect(runtimes).toHaveLength(2);
         expect(runtimes[0]!.dispose).toHaveBeenCalledOnce();
+    });
+
+    test('accepts the exact canary server release', async () => {
+        vi.stubEnv('VITE_CBRANCH_CANARY', '1');
+        vi.stubEnv('VITE_CBRANCH_VERSION', 'v0.2.2-rc.18');
+        systemInfo = {
+            version: '0.2.2-rc.18',
+            protocolVersion: CBRANCH_PROTOCOL_VERSION,
+        };
+        vi.resetModules();
+        const {
+            ConnectionProvider: CanaryConnectionProvider,
+            useConnection: useCanaryConnection,
+        } = await import('./connection-provider');
+
+        function CanaryStatus() {
+            const { status } = useCanaryConnection();
+            return <output>{status}</output>;
+        }
+
+        render(
+            <CanaryConnectionProvider
+                initialEndpoint={makeHostEndpoint('ws://127.0.0.1:7421/rpc')}
+            >
+                <CanaryStatus />
+            </CanaryConnectionProvider>,
+        );
+
+        expect(await screen.findByText('connected')).toBeTruthy();
     });
 });

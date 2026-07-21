@@ -17,6 +17,7 @@ import {
 
 import { useUiStore } from '../state/store';
 import { ConnectionErrorBoundary } from '../components/ConnectionErrorBoundary';
+import { APP_INFO } from '../lib/app-info';
 import { isBackendVersionCompatible } from '../lib/backend-version';
 import { makeApi } from './api';
 import { ApiProvider } from './ApiProvider';
@@ -46,6 +47,10 @@ interface ConnectionContextValue {
 }
 
 const ConnectionContext = createContext<ConnectionContextValue | null>(null);
+
+const requiredBackendVersion = APP_INFO.isCanary
+    ? APP_INFO.version
+    : CBRANCH_BACKEND_VERSION;
 
 const newQueryClient = () =>
     new QueryClient({
@@ -87,7 +92,9 @@ const compatibilityError = (info: {
             `The backend protocol is v${info.protocolVersion}, but this client requires v${CBRANCH_PROTOCOL_VERSION}. Update cbranch on the server or desktop client.`,
         );
     return new Error(
-        `The backend is v${info.version}, but this client requires v${CBRANCH_BACKEND_VERSION} or newer. Update cbranch on the server.`,
+        APP_INFO.isCanary
+            ? `The backend is v${info.version}, but this Canary client requires v${requiredBackendVersion}. Update cbranch on the server.`
+            : `The backend is v${info.version}, but this client requires v${requiredBackendVersion} or newer. Update cbranch on the server.`,
     );
 };
 
@@ -156,7 +163,7 @@ export function ConnectionProvider({
                     info.protocolVersion !== CBRANCH_PROTOCOL_VERSION ||
                     !isBackendVersionCompatible(
                         info.version,
-                        CBRANCH_BACKEND_VERSION,
+                        requiredBackendVersion,
                     )
                 )
                     throw compatibilityError(info);

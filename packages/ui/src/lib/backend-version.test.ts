@@ -7,6 +7,9 @@ describe('isBackendVersionCompatible', () => {
         expect(isBackendVersionCompatible('0.1.3', '0.1.3')).toBe(true);
         expect(isBackendVersionCompatible('0.1.4', '0.1.3')).toBe(true);
         expect(isBackendVersionCompatible('0.2.0', '0.1.3')).toBe(true);
+        expect(isBackendVersionCompatible('0.2.2-rc.18', '0.2.2-rc.18')).toBe(
+            true,
+        );
     });
 
     test('rejects old, malformed, and different-major servers', () => {

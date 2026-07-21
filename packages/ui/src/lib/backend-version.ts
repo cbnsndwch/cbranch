@@ -13,6 +13,7 @@ export const isBackendVersionCompatible = (
     backendVersion: string,
     requiredVersion: string,
 ): boolean => {
+    if (backendVersion === requiredVersion) return true;
     const backend = parseReleaseVersion(backendVersion);
     const required = parseReleaseVersion(requiredVersion);
     if (!backend || !required || backend[0] !== required[0]) return false;
