@@ -30,9 +30,9 @@ jobs:
           else
             git init registry
             git -C registry checkout --orphan plugin-registry
-            git -C registry config user.name github-actions[bot]
-            git -C registry config user.email 41898282+github-actions[bot]@users.noreply.github.com
           fi
+          git -C registry config user.name github-actions[bot]
+          git -C registry config user.email 41898282+github-actions[bot]@users.noreply.github.com
       - name: Sign and publish registry metadata
         env:
           PLUGIN_TUF_PRIVATE_KEY: ${{ secrets.PLUGIN_TUF_PRIVATE_KEY }}
@@ -41,5 +41,8 @@ jobs:
       - name: Push registry branch
         run: |
           git -C registry add metadata targets
-          git -C registry commit -m "chore(plugins): publish hello world" || exit 0
+          if git -C registry diff --cached --quiet; then
+            exit 0
+          fi
+          git -C registry commit -m "chore(plugins): publish hello world"
           git -C registry push "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" HEAD:plugin-registry
