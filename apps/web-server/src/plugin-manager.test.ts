@@ -1,6 +1,8 @@
+import { createHash } from 'node:crypto';
 import { mkdir, mkdtemp, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { zstdCompressSync } from 'node:zlib';
 
 import {
     InstalledPlugin,
@@ -9,14 +11,30 @@ import {
     PluginRepositoryId,
     type PluginManifest,
 } from '@cbranch/plugin-contract';
+import { digestManifestCapabilities } from '@cbranch/plugin-runtime';
 import { Schema } from 'effect';
-import { describe, expect, test, vi } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 
 import { makePluginLockStore } from './plugin-lock-store';
 import {
     activatedPluginDirectory,
     makeTrustedPluginManager,
 } from './plugin-manager';
+
+vi.mock('./tuf-signature-verifier', () => ({
+    verifyTufEd25519Signature: async () => true,
+}));
+
+afterEach(() => vi.unstubAllGlobals());
+
+const metadataEnvelope = (signed: unknown) => ({
+    signed,
+    signatures: [{ keyid: 'key-1', sig: 'signature' }],
+});
+const metadataBytes = (value: unknown) =>
+    new TextEncoder().encode(JSON.stringify(value));
+const metadataDigest = (value: Uint8Array) =>
+    createHash('sha256').update(value).digest('hex');
 
 const makeRecord = (
     enabled: boolean,
@@ -45,6 +63,7 @@ const makeRecord = (
                 {
                     id: `${pluginId}.run`,
                     title: 'Run release check',
+                    placement: 'plugins',
                 },
             ],
             panels: [],
@@ -105,6 +124,7 @@ describe('trusted plugin manager', () => {
         };
         const artifactStore = {
             stage: vi.fn(),
+            review: vi.fn(),
             activate: vi.fn(async () => ({
                 directory: join(dataDirectory, 'activated'),
                 manifest,
@@ -152,6 +172,102 @@ describe('trusted plugin manager', () => {
         expect((await manager.auditList({})).events[0]?.action).toBe('install');
     });
 
+    test('completes the HTTPS/TUF review, install, and enable lifecycle', async () => {
+        const dataDirectory = await mkdtemp(
+            join(tmpdir(), 'cbranch-plugin-manager-'),
+        );
+        const manifest: PluginManifest = {
+            schemaVersion: 1,
+            id: PluginId.make('com.example.release'),
+            version: '1.2.3',
+            displayName: 'Release',
+            publisherFingerprint: 'sha256:publisher',
+            engines: { cbranch: '>=0.2.0 <1.0.0', pluginContract: 1 },
+            runtime: 'trusted-esm',
+            entrypoint: 'plugin.mjs',
+            capabilities: ['ui.contribute'],
+            automation: [],
+            contributes: {
+                commands: [
+                    {
+                        id: 'com.example.release.run',
+                        title: 'Run release',
+                        placement: 'plugins',
+                    },
+                ],
+                panels: [],
+            },
+        };
+        const artifact = zstdCompressSync(
+            makeTar({
+                'plugin.json': JSON.stringify(manifest),
+                'plugin.mjs':
+                    "export default () => ({ commands: { 'com.example.release.run': () => 'done' } });",
+            }),
+        );
+        const targetPath =
+            'targets/com.example.release/1.2.3/release.cbranch-plugin';
+        const metadata = await tufMetadata({
+            artifact,
+            targetPath,
+            manifest,
+        });
+        vi.stubGlobal('fetch', async (url: URL | string) => {
+            const path = new URL(String(url)).pathname.replace('/catalog/', '');
+            const body =
+                path === targetPath
+                    ? artifact
+                    : metadata[path as keyof typeof metadata];
+            return new Response(body, {
+                headers: { 'content-length': String(body.byteLength) },
+            });
+        });
+        const manager = makeTrustedPluginManager({ dataDirectory });
+        const repository = await manager.repositoryAdd(
+            'https',
+            'https://plugins.example.test/catalog',
+        );
+
+        const untrusted = await manager.repositoryRefresh(repository.id);
+        const trusted = await manager.publisherTrust(
+            repository.id,
+            untrusted.repository.publisherFingerprint!,
+            true,
+        );
+        await manager.repositoryRefresh(trusted.id);
+        await manager.catalogList(trusted.id);
+        const review = await manager.installReview({
+            repositoryId: trusted.id,
+            pluginId: manifest.id,
+            version: manifest.version,
+        });
+        const installed = await manager.install({
+            repositoryId: trusted.id,
+            pluginId: manifest.id,
+            version: manifest.version,
+            artifactSha256: review.target.artifactSha256,
+            grant: {
+                capabilities: [],
+                repositoryIds: [],
+                networkOrigins: [],
+                automationActionIds: [],
+                hostAutomationApproved: false,
+            },
+        });
+
+        expect(review.manifest.contributes.commands).toEqual([
+            {
+                id: 'com.example.release.run',
+                title: 'Run release',
+                placement: 'plugins',
+            },
+        ]);
+        expect(installed.enabled).toBe(false);
+        await expect(manager.enable(manifest.id)).resolves.toMatchObject({
+            enabled: true,
+        });
+    });
+
     test('loads enabled reviewed modules on startup, invokes declared commands, audits hooks, and unloads', async () => {
         const dataDirectory = await mkdtemp(
             join(tmpdir(), 'cbranch-plugin-manager-'),
@@ -161,7 +277,12 @@ describe('trusted plugin manager', () => {
             dataDirectory,
             record,
             `export default ({ log }) => ({
-                commands: { 'com.example.release.run': input => 'ran:' + input },
+                commands: {
+                    'com.example.release.run': input =>
+                        input === 'dialog'
+                            ? { _tag: 'dialog', title: 'Release', body: 'Ready' }
+                            : 'ran:' + input,
+                },
                 commandExecuted: command => log('info', command),
             });`,
         );
@@ -179,6 +300,17 @@ describe('trusted plugin manager', () => {
                 input: 'check',
             }),
         ).resolves.toMatchObject({ state: 'completed', output: 'ran:check' });
+        await expect(
+            manager.invoke({
+                pluginId: record.pluginId,
+                commandId: 'com.example.release.run',
+                repoId: 'repo-1',
+                input: 'dialog',
+            }),
+        ).resolves.toMatchObject({
+            state: 'completed',
+            result: { _tag: 'dialog', title: 'Release', body: 'Ready' },
+        });
         expect(
             (await manager.auditList({})).events.map(event => event.action),
         ).toEqual(
@@ -290,3 +422,127 @@ describe('trusted plugin manager', () => {
         );
     });
 });
+
+const tufMetadata = async ({
+    artifact,
+    targetPath,
+    manifest,
+}: {
+    readonly artifact: Uint8Array;
+    readonly targetPath: string;
+    readonly manifest: PluginManifest;
+}) => {
+    const expires = new Date(Date.now() + 60_000).toISOString();
+    const targets = metadataBytes(
+        metadataEnvelope({
+            version: 1,
+            expires,
+            targets: {
+                [targetPath]: {
+                    length: artifact.byteLength,
+                    hashes: { sha256: metadataDigest(artifact) },
+                    custom: {
+                        pluginId: manifest.id,
+                        version: manifest.version,
+                        publisherFingerprint: manifest.publisherFingerprint,
+                        minimumCbranchVersion: '0.2.0',
+                        pluginContractVersion: 1,
+                        capabilityDigest:
+                            await digestManifestCapabilities(manifest),
+                        releaseNotes: '',
+                        advisoryIds: [],
+                    },
+                },
+            },
+        }),
+    );
+    const snapshot = metadataBytes(
+        metadataEnvelope({
+            version: 1,
+            expires,
+            meta: {
+                'targets.json': {
+                    length: targets.byteLength,
+                    hashes: { sha256: metadataDigest(targets) },
+                },
+            },
+        }),
+    );
+    const timestamp = metadataBytes(
+        metadataEnvelope({
+            version: 1,
+            expires,
+            meta: {
+                'snapshot.json': {
+                    length: snapshot.byteLength,
+                    hashes: { sha256: metadataDigest(snapshot) },
+                },
+            },
+        }),
+    );
+    const root = metadataBytes(
+        metadataEnvelope({
+            version: 1,
+            expires,
+            keys: {
+                'key-1': {
+                    keytype: 'ed25519',
+                    keyval: { public: 'a'.repeat(64) },
+                },
+            },
+            roles: {
+                root: { keyids: ['key-1'], threshold: 1 },
+                timestamp: { keyids: ['key-1'], threshold: 1 },
+                snapshot: { keyids: ['key-1'], threshold: 1 },
+                targets: { keyids: ['key-1'], threshold: 1 },
+            },
+        }),
+    );
+    return {
+        'metadata/root.json': root,
+        'metadata/timestamp.json': timestamp,
+        'metadata/snapshot.json': snapshot,
+        'metadata/targets.json': targets,
+    };
+};
+
+const makeTar = (files: Readonly<Record<string, string>>): Uint8Array => {
+    const entries = Object.entries(files).flatMap(([path, contents]) => {
+        const bytes = new TextEncoder().encode(contents);
+        const header = new Uint8Array(512);
+        writeTarString(header, 0, 100, path);
+        writeTarString(header, 100, 8, '0000600');
+        writeTarString(header, 124, 12, bytes.byteLength.toString(8));
+        header[156] = '0'.charCodeAt(0);
+        writeTarString(header, 257, 6, 'ustar');
+        writeTarString(header, 263, 2, '00');
+        header.fill(32, 148, 156);
+        const checksum = header.reduce((sum, byte) => sum + byte, 0);
+        writeTarString(header, 148, 8, checksum.toString(8));
+        const padding = new Uint8Array(
+            Math.ceil(bytes.byteLength / 512) * 512 - bytes.byteLength,
+        );
+        return [header, bytes, padding];
+    });
+    const length = entries.reduce(
+        (total, entry) => total + entry.byteLength,
+        0,
+    );
+    const archive = new Uint8Array(length + 1024);
+    let offset = 0;
+    for (const entry of entries) {
+        archive.set(entry, offset);
+        offset += entry.byteLength;
+    }
+    return archive;
+};
+
+const writeTarString = (
+    target: Uint8Array,
+    start: number,
+    length: number,
+    value: string,
+): void => {
+    target.set(new TextEncoder().encode(value), start);
+    target[start + length - 1] = 0;
+};

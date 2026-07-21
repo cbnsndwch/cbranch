@@ -443,16 +443,17 @@ reinstall to select the same verified targets and makes rollback deterministic.
   and cap returned output at 1 MiB. Cancellation, resource limits, and Git
   mutation brokering are deferred with the sandbox-worker design.
 
-### Deferred distribution and broker requirements
+### Distribution and broker delivery state
 
-> The following repository, TUF, install/update, and capability-broker
-> requirements remain the target design but are **deferred**. The current RPCs
-> return an explicit repository-verification-not-yet-implemented error rather
-> than bypassing their checks or accepting an arbitrary local path.
+> HTTPS repositories, explicit root trust, signed TUF catalog refresh, artifact
+> validation, reviewed installation, enablement, disablement, and uninstall are
+> implemented. Git-backed repositories, private credentials, root rotation,
+> update/rollback, and broker capabilities remain deferred. See the P9 delivery
+> ledger and test matrix in [`22-phase9-implementation-plan.md`](22-phase9-implementation-plan.md).
 
-- **REQ-PLG-REP-001.** Cbranch SHALL support an HTTPS repository and a Git
-  repository reachable over HTTPS or SSH, each carrying the TUF layout defined
-  above.
+- **REQ-PLG-REP-001.** Cbranch supports HTTPS repositories carrying the TUF
+  layout defined above. Git repositories reachable over HTTPS or SSH remain
+  deferred.
 - **REQ-PLG-REP-002.** Cbranch SHALL reject plain HTTP, local paths, URL
   userinfo, custom transport helpers, and cross-origin redirects for plugin
   repository or artifact access.

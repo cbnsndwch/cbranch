@@ -114,6 +114,11 @@ describe('plugin artifact store', () => {
         const store = makePluginArtifactStore({ dataDirectory: directory });
 
         await store.stage(activationTarget, archive);
+        await expect(store.review(activationTarget)).resolves.toMatchObject({
+            displayName: 'Release',
+            capabilities: [],
+            contributes: { commands: [], panels: [] },
+        });
         const activated = await store.activate(activationTarget, {
             capabilities: [],
             repositoryIds: [],

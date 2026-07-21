@@ -16,9 +16,20 @@
         "commands": [
             {
                 "id": "dev.cbranch.hello-world.greet",
-                "title": "Hello World: Greet"
+                "title": "Hello World: Greet",
+                "placement": "tools"
             }
         ],
-        "panels": []
+        "panels": [
+            {
+                "id": "welcome",
+                "title": "Hello World",
+                "placement": "plugins",
+                "content": {
+                    "_tag": "text",
+                    "text": "This panel is rendered by cbranch, not plugin code."
+                }
+            }
+        ]
     }
 }

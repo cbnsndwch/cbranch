@@ -46,6 +46,7 @@ export interface PluginArtifactStore {
         target: PluginCatalogEntry,
         grant: PluginGrant,
     ) => Promise<ActivatedPluginArtifact>;
+    readonly review: (target: PluginCatalogEntry) => Promise<PluginManifest>;
     readonly remove: (pluginId: string) => Promise<void>;
 }
 
@@ -123,14 +124,7 @@ export const makePluginArtifactStore = (
             const artifact = await readFile(staged);
             const actualSha256 = `sha256:${createHash('sha256').update(artifact).digest('hex')}`;
             validateArtifact(target, artifact.byteLength, actualSha256);
-            const files = readPluginArchive(
-                await decompressZstd(artifact),
-                artifact.byteLength,
-            );
-            const manifest = Schema.decodeUnknownSync(PluginManifest)(
-                JSON.parse(new TextDecoder().decode(files.get('plugin.json')!)),
-            );
-            await validateManifestTargetConsistency(manifest, target);
+            const { files, manifest } = await inspectArtifact(target, artifact);
             validateGrant(manifest, grant);
             if (!files.has(manifest.entrypoint)) {
                 throw invalidArchive(
@@ -192,6 +186,22 @@ export const makePluginArtifactStore = (
                 throw error;
             }
         },
+        review: async target => {
+            const artifact = await readFile(
+                join(
+                    dataDirectory,
+                    'artifacts',
+                    String(target.pluginId),
+                    `${target.version}.cbranch-plugin`,
+                ),
+            );
+            validateArtifact(
+                target,
+                artifact.byteLength,
+                `sha256:${createHash('sha256').update(artifact).digest('hex')}`,
+            );
+            return (await inspectArtifact(target, artifact)).manifest;
+        },
         remove: async pluginId => {
             if (!isSafePathComponent(pluginId)) {
                 throw new PluginPolicyError(
@@ -211,6 +221,24 @@ export const makePluginArtifactStore = (
             ]);
         },
     };
+};
+
+const inspectArtifact = async (
+    target: PluginCatalogEntry,
+    artifact: Uint8Array,
+): Promise<{
+    readonly files: Map<string, Uint8Array>;
+    readonly manifest: PluginManifest;
+}> => {
+    const files = readPluginArchive(
+        await decompressZstd(artifact),
+        artifact.byteLength,
+    );
+    const manifest = Schema.decodeUnknownSync(PluginManifest)(
+        JSON.parse(new TextDecoder().decode(files.get('plugin.json')!)),
+    );
+    await validateManifestTargetConsistency(manifest, target);
+    return { files, manifest };
 };
 
 const isSafePathComponent = (value: string): boolean =>

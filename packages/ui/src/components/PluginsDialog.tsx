@@ -1,5 +1,8 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { type PluginRepositoryId } from '@cbranch/rpc-contract';
+import {
+    type PluginInstallReview,
+    type PluginRepositoryId,
+} from '@cbranch/rpc-contract';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
@@ -62,6 +65,7 @@ function PluginsDialogBody({ onClose }: { readonly onClose: () => void }) {
     const [url, setUrl] = useState('');
     const [selectedRepositoryId, setSelectedRepositoryId] =
         useState<PluginRepositoryId>();
+    const [installReview, setInstallReview] = useState<PluginInstallReview>();
     const repositories = useQuery({
         queryKey: ['plugins', 'repositories'],
         queryFn: () => api.pluginRepositoryList(),
@@ -75,6 +79,9 @@ function PluginsDialogBody({ onClose }: { readonly onClose: () => void }) {
         queryFn: () => api.pluginCatalogList(selectedRepositoryId!),
         enabled: selectedRepositoryId !== undefined,
     });
+    const selectedRepository = repositories.data?.find(
+        repository => repository.id === selectedRepositoryId,
+    );
     const refresh = () => {
         void queryClient.invalidateQueries({ queryKey: ['plugins'] });
     };
@@ -208,22 +215,124 @@ function PluginsDialogBody({ onClose }: { readonly onClose: () => void }) {
                                     <Button
                                         size="sm"
                                         onClick={() =>
-                                            run(
-                                                api.pluginInstall({
+                                            void api
+                                                .pluginInstallReview({
                                                     repositoryId:
                                                         selectedRepositoryId,
                                                     pluginId: plugin.pluginId,
                                                     version: plugin.version,
-                                                    grant: EMPTY_GRANT,
-                                                }),
-                                                'Plugin installed. Enable it to use it.',
-                                            )
+                                                })
+                                                .then(setInstallReview)
+                                                .catch(error =>
+                                                    toast.error(
+                                                        errorMessage(error),
+                                                    ),
+                                                )
                                         }
                                     >
                                         Install
                                     </Button>
                                 </div>
                             ))}
+                        </section>
+                    )}
+
+                    {installReview && selectedRepositoryId && (
+                        <section className="grid gap-3 border p-3 text-xs">
+                            <strong className="text-sm">
+                                Review plugin install
+                            </strong>
+                            <p>
+                                {installReview.manifest.displayName}{' '}
+                                {installReview.manifest.version}
+                            </p>
+                            <p>
+                                Publisher:{' '}
+                                {installReview.manifest.publisherFingerprint}
+                            </p>
+                            <p>Repository: {selectedRepository?.url}</p>
+                            <p className="break-all">
+                                Digest: {installReview.target.artifactSha256}
+                            </p>
+                            <p>
+                                Compatibility: cbranch{' '}
+                                {installReview.manifest.engines.cbranch}; plugin
+                                contract{' '}
+                                {installReview.manifest.engines.pluginContract}
+                            </p>
+                            <p>
+                                Requested capabilities:{' '}
+                                {installReview.manifest.capabilities.join(
+                                    ', ',
+                                ) || 'None'}
+                            </p>
+                            <p>
+                                Commands:{' '}
+                                {installReview.manifest.contributes.commands
+                                    .map(command => command.title)
+                                    .join(', ') || 'None'}
+                            </p>
+                            <p>
+                                Panels:{' '}
+                                {installReview.manifest.contributes.panels
+                                    .map(panel => panel.title)
+                                    .join(', ') || 'None'}
+                            </p>
+                            <p>
+                                Automation:{' '}
+                                {installReview.manifest.automation
+                                    .map(action => action.id)
+                                    .join(', ') || 'None'}
+                            </p>
+                            <p>
+                                Advisories:{' '}
+                                {installReview.target.advisoryIds.join(', ') ||
+                                    'None'}
+                            </p>
+                            {installReview.target.releaseNotes && (
+                                <p className="whitespace-pre-wrap break-words">
+                                    Release notes:{' '}
+                                    {installReview.target.releaseNotes}
+                                </p>
+                            )}
+                            <p className="text-muted-foreground">
+                                This install grants no broker capabilities.
+                                Trusted plugin code still executes with your
+                                host-user authority.
+                            </p>
+                            <div className="flex gap-2">
+                                <Button
+                                    size="sm"
+                                    onClick={() =>
+                                        run(
+                                            api.pluginInstall({
+                                                repositoryId:
+                                                    selectedRepositoryId,
+                                                pluginId:
+                                                    installReview.target
+                                                        .pluginId,
+                                                version:
+                                                    installReview.target
+                                                        .version,
+                                                artifactSha256:
+                                                    installReview.target
+                                                        .artifactSha256,
+                                                grant: EMPTY_GRANT,
+                                            }),
+                                            'Plugin installed. Enable it to use it.',
+                                        )
+                                    }
+                                >
+                                    Confirm install
+                                </Button>
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => setInstallReview(undefined)}
+                                >
+                                    Cancel
+                                </Button>
+                            </div>
                         </section>
                     )}
 

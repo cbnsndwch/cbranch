@@ -1,6 +1,6 @@
 # P9 — Runtime Plugins: Implementation State and Delivery Plan
 
-**Status:** proposed for review
+**Status:** M1 complete; M2 in progress
 
 This is the execution ledger for [`21-runtime-plugin-system.md`](21-runtime-plugin-system.md).
 The specification remains authoritative. This document records the codebase as
@@ -31,8 +31,8 @@ plugin and turns remaining work into independently verifiable goal loops.
 | Permission review and broker APIs | not started | Grants are persisted and descriptive, but there is no install/update review or cbranch broker for Git, workspace, network, or host automation. |
 | Declarative command UI | partial | Command titles are rendered under `Plugins`; command output is shown in a host modal. The optional manifest `menu` field is ignored. |
 | Declarative panels, forms, status items | not started | `PluginPanelContribution` is only `{ id, title }` and no UI consumes it. Forms and status items are described by the specification but absent from the v1 schema. |
-| Result-dialog presentation | in flight | `packages/ui/src/components/PluginsDialog.tsx` has an uncommitted wrapping fix and regression test for long unbroken output. |
-| P9 planning and progress tracking | not started | `PROGRESS.md` has no P9 status. The specification still labels parts of the now-working signed HTTPS flow as deferred. |
+| Result-dialog presentation | done | RC21 ships the wrapping fix; the user verified the hello-world result has no overflow. |
+| P9 planning and progress tracking | in progress | M1 reconciles shipped HTTPS/TUF behavior, contract exposure, and the progress ledger. |
 
 ## Reconciliation Required
 
@@ -84,6 +84,18 @@ round-trip. `pnpm gate` must pass.
 or intentionally absent from the contract; no UI claims a security review that
 does not exist.
 
+#### M1 lifecycle matrix
+
+| Lifecycle | RPC and implementation | Test evidence | Status |
+| --- | --- | --- | --- |
+| Repository refresh | `PluginRepositoryRefresh` -> `plugin-manager.ts#repositoryRefresh` | `plugin-manager.test.ts` validates HTTPS source policy; `plugin-repository-transport.test.ts` covers origin and response bounds | HTTPS implemented; Git deferred |
+| Trust | `PluginPublisherTrust` -> `plugin-manager.ts#publisherTrust` | `plugin-manager.test.ts` covers root-fingerprint validation | implemented |
+| Install review/install | `PluginInstallReview`/`PluginInstall` -> verified staging and `plugin-artifact-store.ts` | `plugin-artifact-store.test.ts`, `plugin-manager.test.ts`, `PluginsDialog.test.tsx` | implemented; HTTPS/TUF lifecycle round-trip covered |
+| Enable/disable | `PluginEnable`/`PluginDisable` -> trusted lifecycle manager | `plugin-manager.test.ts` lifecycle coverage | implemented |
+| Uninstall | `PluginUninstall` -> trusted lifecycle manager | `plugin-manager.test.ts` lifecycle coverage | implemented |
+| Invocation | `PluginInvoke` -> declared trusted command | `plugin-manager.test.ts` lifecycle coverage | implemented |
+| Update/rollback | intentionally absent pending retained-version and policy design | RPC catalog test | deferred |
+
 ### M2 — Define Declarative UI Contributions
 
 **Purpose:** establish a small stable contract before rendering plugin UI in
@@ -107,6 +119,17 @@ the hello-world plugin artifact.
 
 **Exit:** one reviewed manifest can declare each supported contribution without
 the UI needing plugin code or unvalidated strings to choose layout behavior.
+
+#### M2 decisions
+
+- The contract remains at v1 because placements are optional additive fields;
+  omitted command placement preserves the existing `plugins` fallback.
+- Commands may name only `plugins` or `tools`. Panels may name only the
+  host-owned `plugins` region and contain `text` or `keyValue` data.
+- Structured results are `notice`, `dialog`, or `panel`. Existing output remains
+  capped at 1 MiB; host dialogs retain their standard accessible title and
+  Close/Esc/backdrop dismissal behavior.
+- Forms and status items are deferred from the first contribution contract.
 
 ### M3 — Render Commands and Panels in the Host UI
 

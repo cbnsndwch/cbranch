@@ -74,6 +74,7 @@ import {
     type PluginCatalogEntry,
     type PluginGrant,
     type PluginId,
+    type PluginInstallReview,
     type PluginInvocation,
     type PluginRepository,
     type PluginRepositoryId,
@@ -133,8 +134,14 @@ export interface CbranchApi {
         readonly repositoryId: PluginRepositoryId;
         readonly pluginId: PluginId;
         readonly version: string;
+        readonly artifactSha256: string;
         readonly grant: PluginGrant;
     }): Promise<InstalledPlugin>;
+    pluginInstallReview(input: {
+        readonly repositoryId: PluginRepositoryId;
+        readonly pluginId: PluginId;
+        readonly version: string;
+    }): Promise<PluginInstallReview>;
     pluginList(): Promise<ReadonlyArray<InstalledPlugin>>;
     pluginEnable(pluginId: PluginId): Promise<InstalledPlugin>;
     pluginDisable(pluginId: PluginId): Promise<InstalledPlugin>;
@@ -143,6 +150,7 @@ export interface CbranchApi {
         readonly pluginId: PluginId;
         readonly commandId: string;
         readonly repoId: string;
+        readonly engagementId?: string;
     }): Promise<PluginInvocation>;
     repoOpen(path: string): Promise<RepoHandle>;
     repoInit(input: {
@@ -697,6 +705,8 @@ export const makeApi = (runtime: AppRuntime): CbranchApi => {
             ),
         pluginInstall: input =>
             runtime.runPromise(withClient(c => c.PluginInstall(input))),
+        pluginInstallReview: input =>
+            runtime.runPromise(withClient(c => c.PluginInstallReview(input))),
         pluginList: () => runtime.runPromise(withClient(c => c.PluginList({}))),
         pluginEnable: pluginId =>
             runtime.runPromise(withClient(c => c.PluginEnable({ pluginId }))),

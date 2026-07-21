@@ -1,4 +1,7 @@
-import type { PluginCatalogEntry } from '@cbranch/plugin-contract';
+import {
+    type PluginCatalogEntry,
+    type PluginManifest,
+} from '@cbranch/plugin-contract';
 import type {
     PluginRepositoryTransport,
     TufSignatureVerifier,
@@ -56,6 +59,28 @@ export const makeTufPluginRepository = (
                 await options.transport.fetchTarget(entry.artifactPath),
             );
             return entry;
+        },
+        review: async (
+            pluginId: string,
+            version: string,
+        ): Promise<{
+            readonly target: PluginCatalogEntry;
+            readonly manifest: PluginManifest;
+        }> => {
+            const target = catalog.get(catalogKey(pluginId, version));
+            if (!target) {
+                throw new Error(
+                    'Plugin target is not in the current verified catalog.',
+                );
+            }
+            await options.artifactStore.stage(
+                target,
+                await options.transport.fetchTarget(target.artifactPath),
+            );
+            return {
+                target,
+                manifest: await options.artifactStore.review(target),
+            };
         },
     };
 };

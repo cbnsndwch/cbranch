@@ -76,14 +76,31 @@ export class PluginRepository extends Schema.Class<PluginRepository>(
     lastSuccessfulRefreshAt: Schema.optional(Schema.Number),
 }) {}
 
+/** Named host-owned command locations; arbitrary menu paths are not accepted. */
+export const PluginCommandPlacement = Schema.Literals(['plugins', 'tools']);
+export type PluginCommandPlacement = typeof PluginCommandPlacement.Type;
+
 /** A strictly declarative command rendered by cbranch, never plugin-supplied UI code. */
 export class PluginCommandContribution extends Schema.Class<PluginCommandContribution>(
     'PluginCommandContribution',
 )({
     id: Schema.String,
     title: Schema.String,
-    menu: Schema.optional(Schema.String),
+    placement: Schema.optional(PluginCommandPlacement),
 }) {}
+
+export const PluginPanelPlacement = Schema.Literals(['plugins']);
+export type PluginPanelPlacement = typeof PluginPanelPlacement.Type;
+
+export const PluginPanelContent = Schema.Union([
+    Schema.TaggedStruct('text', { text: Schema.String }),
+    Schema.TaggedStruct('keyValue', {
+        items: Schema.Array(
+            Schema.Struct({ label: Schema.String, value: Schema.String }),
+        ),
+    }),
+]);
+export type PluginPanelContent = typeof PluginPanelContent.Type;
 
 /** A host-rendered panel descriptor with no markup, script, style, or URL fields. */
 export class PluginPanelContribution extends Schema.Class<PluginPanelContribution>(
@@ -91,6 +108,8 @@ export class PluginPanelContribution extends Schema.Class<PluginPanelContributio
 )({
     id: Schema.String,
     title: Schema.String,
+    placement: Schema.optional(PluginPanelPlacement),
+    content: Schema.optional(PluginPanelContent),
 }) {}
 
 export class PluginContributions extends Schema.Class<PluginContributions>(
@@ -230,12 +249,23 @@ export const PluginInvocationState = Schema.Literals([
 ]);
 export type PluginInvocationState = typeof PluginInvocationState.Type;
 
+export const PluginCommandResult = Schema.Union([
+    Schema.TaggedStruct('notice', { message: Schema.String }),
+    Schema.TaggedStruct('dialog', {
+        title: Schema.String,
+        body: Schema.String,
+    }),
+    Schema.TaggedStruct('panel', { panelId: Schema.String }),
+]);
+export type PluginCommandResult = typeof PluginCommandResult.Type;
+
 export class PluginInvocation extends Schema.Class<PluginInvocation>(
     'PluginInvocation',
 )({
     operationId: PluginOperationId,
     state: PluginInvocationState,
     output: Schema.optional(Schema.String),
+    result: Schema.optional(PluginCommandResult),
 }) {}
 
 export const PluginRepositoryAddInput = Schema.Struct({
@@ -262,25 +292,28 @@ export const PluginInstallInput = Schema.Struct({
     repositoryId: PluginRepositoryId,
     pluginId: PluginId,
     version: Schema.String,
+    artifactSha256: Schema.String,
     grant: PluginGrant,
 });
 export type PluginInstallInput = typeof PluginInstallInput.Type;
 
+/** Verified, non-executing artifact details shown before a user installs a plugin. */
+export class PluginInstallReview extends Schema.Class<PluginInstallReview>(
+    'PluginInstallReview',
+)({
+    target: PluginCatalogEntry,
+    manifest: PluginManifest,
+}) {}
+
+export const PluginInstallReviewInput = Schema.Struct({
+    repositoryId: PluginRepositoryId,
+    pluginId: PluginId,
+    version: Schema.String,
+});
+export type PluginInstallReviewInput = typeof PluginInstallReviewInput.Type;
+
 export const PluginIdInput = Schema.Struct({ pluginId: PluginId });
 export type PluginIdInput = typeof PluginIdInput.Type;
-
-export const PluginUpdateInput = Schema.Struct({
-    pluginId: PluginId,
-    version: Schema.String,
-    grant: Schema.optional(PluginGrant),
-});
-export type PluginUpdateInput = typeof PluginUpdateInput.Type;
-
-export const PluginRollbackInput = Schema.Struct({
-    pluginId: PluginId,
-    version: Schema.String,
-});
-export type PluginRollbackInput = typeof PluginRollbackInput.Type;
 
 export const PluginAuditListInput = Schema.Struct({
     pluginId: Schema.optional(PluginId),
@@ -292,6 +325,7 @@ export const PluginInvokeInput = Schema.Struct({
     pluginId: PluginId,
     commandId: Schema.String,
     repoId: Schema.String,
+    engagementId: Schema.optional(Schema.String),
     input: Schema.optional(Schema.Unknown),
 });
 export type PluginInvokeInput = typeof PluginInvokeInput.Type;

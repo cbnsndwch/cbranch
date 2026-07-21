@@ -4,6 +4,8 @@ import { describe, expect, test } from 'vitest';
 import {
     InstalledPlugin,
     PluginBrokerRequest,
+    PluginCommandResult,
+    PluginInvocation,
     PluginManifest,
     PluginRepository,
 } from './schemas';
@@ -33,10 +35,17 @@ describe('plugin contract schemas', () => {
                     {
                         id: 'com.example.release.check',
                         title: 'Run check',
-                        menu: 'tools',
+                        placement: 'tools',
                     },
                 ],
-                panels: [{ id: 'status', title: 'Status' }],
+                panels: [
+                    {
+                        id: 'status',
+                        title: 'Status',
+                        placement: 'plugins',
+                        content: { _tag: 'text', text: 'Ready' },
+                    },
+                ],
             },
         });
 
@@ -92,6 +101,35 @@ describe('plugin contract schemas', () => {
         expect(installed.enabled).toBe(false);
     });
 
+    test('rejects arbitrary command and panel placements', () => {
+        const manifest = {
+            schemaVersion: 1,
+            id: 'com.example.release',
+            version: '1.2.3',
+            displayName: 'Release',
+            publisherFingerprint: 'sha256:publisher',
+            engines: { cbranch: '>=0.2.0 <1.0.0', pluginContract: 1 },
+            runtime: 'trusted-esm',
+            entrypoint: 'plugin.mjs',
+            capabilities: [],
+            automation: [],
+            contributes: {
+                commands: [
+                    {
+                        id: 'com.example.release.check',
+                        title: 'Run check',
+                        placement: 'arbitrary-menu',
+                    },
+                ],
+                panels: [],
+            },
+        };
+
+        expect(() =>
+            Schema.decodeUnknownSync(PluginManifest)(manifest),
+        ).toThrow();
+    });
+
     test('accepts only named broker operations', () => {
         const request = Schema.decodeUnknownSync(PluginBrokerRequest)({
             protocolVersion: 1,
@@ -107,6 +145,33 @@ describe('plugin contract schemas', () => {
                 operationId: 'operation-1',
                 kind: 'git.exec',
                 arguments: ['reset', '--hard'],
+            }),
+        ).toThrow();
+    });
+
+    test('defines only host-rendered structured command results', () => {
+        const invocation = Schema.decodeUnknownSync(PluginInvocation)({
+            operationId: 'operation-1',
+            state: 'completed',
+            result: { _tag: 'dialog', title: 'Release', body: 'Ready' },
+        });
+
+        expect(invocation.result).toEqual({
+            _tag: 'dialog',
+            title: 'Release',
+            body: 'Ready',
+        });
+        expect(() =>
+            Schema.decodeUnknownSync(PluginInvocation)({
+                operationId: 'operation-1',
+                state: 'completed',
+                result: { _tag: 'html', markup: '<script>alert(1)</script>' },
+            }),
+        ).toThrow();
+        expect(() =>
+            Schema.decodeUnknownSync(PluginCommandResult)({
+                _tag: 'html',
+                markup: '<script>alert(1)</script>',
             }),
         ).toThrow();
     });

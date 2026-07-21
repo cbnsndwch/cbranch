@@ -1,5 +1,6 @@
 import { type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { toast } from 'sonner';
 
 import { type MenuEntry, MENUS } from './menu/menu-model';
 import { type MenuActions, useMenuActions } from './menu/use-menu-actions';
@@ -112,6 +113,17 @@ export function MenuBar() {
                     <MenubarContent>
                         {menu.id === 'plugins' ? (
                             <PluginEntries actions={actions} />
+                        ) : menu.id === 'tools' ? (
+                            <>
+                                {menu.items.map((entry, i) =>
+                                    renderEntry(
+                                        entry,
+                                        `${menu.id}.${i}`,
+                                        actions,
+                                    ),
+                                )}
+                                <PluginCommandEntries placement="tools" />
+                            </>
                         ) : (
                             menu.items.map((entry, i) =>
                                 renderEntry(entry, `${menu.id}.${i}`, actions),
@@ -128,52 +140,81 @@ export function MenuBar() {
 }
 
 function PluginEntries({ actions }: { readonly actions: MenuActions }) {
+    return (
+        <>
+            <PluginCommandEntries placement="plugins" />
+            <MenubarSeparator />
+            <MenubarItem onClick={() => actions.run('plugins.settings')}>
+                Plugin settings…
+            </MenubarItem>
+        </>
+    );
+}
+
+function PluginCommandEntries({
+    placement,
+}: {
+    readonly placement: 'plugins' | 'tools';
+}) {
     const api = useApi();
     const repoId = useUiStore(state => state.activeRepoId);
+    const engagementId = useUiStore(state => state.activeEngagementId);
     const setResult = useUiStore(state => state.setPluginCommandResult);
     const plugins = useQuery({
         queryKey: ['plugins', 'installed'],
         queryFn: () => api.pluginList(),
     });
-    const commands = (plugins.data ?? []).flatMap(plugin =>
-        plugin.enabled
-            ? plugin.contributions.commands.map(command => ({
-                  plugin,
-                  command,
-              }))
-            : [],
-    );
+    const commands = (plugins.data ?? []).flatMap(plugin => {
+        if (!plugin.enabled) return [];
+        return plugin.contributions.commands
+            .filter(command => (command.placement ?? 'plugins') === placement)
+            .map(command => ({ plugin, command }));
+    });
     return (
         <>
-            {commands.length === 0 ? (
-                <MenubarItem disabled>(no plugins loaded)</MenubarItem>
-            ) : (
-                commands.map(({ plugin, command }) => (
-                    <MenubarItem
-                        key={command.id}
-                        onClick={() =>
-                            void api
-                                .pluginInvoke({
-                                    pluginId: plugin.lock.pluginId,
-                                    commandId: command.id,
-                                    repoId: String(repoId ?? 'global'),
-                                })
-                                .then(result =>
-                                    setResult({
-                                        title: command.title,
-                                        output: result.output,
-                                    }),
-                                )
-                        }
-                    >
-                        {command.title}
-                    </MenubarItem>
-                ))
-            )}
-            <MenubarSeparator />
-            <MenubarItem onClick={() => actions.run('plugins.settings')}>
-                Plugin settings…
-            </MenubarItem>
+            {commands.length === 0
+                ? placement === 'plugins' && (
+                      <MenubarItem disabled>(no plugins loaded)</MenubarItem>
+                  )
+                : commands.map(({ plugin, command }) => (
+                      <MenubarItem
+                          key={command.id}
+                          onClick={() =>
+                              void api
+                                  .pluginInvoke({
+                                      pluginId: plugin.lock.pluginId,
+                                      commandId: command.id,
+                                      repoId: String(repoId ?? 'global'),
+                                      engagementId: engagementId ?? undefined,
+                                  })
+                                  .then(result => {
+                                      if (result.result?._tag === 'notice') {
+                                          toast.success(result.result.message);
+                                      } else if (
+                                          result.result?._tag === 'dialog'
+                                      ) {
+                                          setResult({
+                                              title: result.result.title,
+                                              output: result.result.body,
+                                          });
+                                      } else if (
+                                          result.result?._tag === 'panel'
+                                      ) {
+                                          toast.success(
+                                              'Plugin panel updated.',
+                                          );
+                                      } else {
+                                          setResult({
+                                              title: command.title,
+                                              output: result.output,
+                                          });
+                                      }
+                                  })
+                          }
+                      >
+                          {command.title}
+                      </MenubarItem>
+                  ))}
         </>
     );
 }

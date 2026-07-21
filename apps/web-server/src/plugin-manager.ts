@@ -6,7 +6,9 @@ import { join, resolve } from 'node:path';
 
 import {
     PluginAuditPage,
+    PluginCommandResult,
     PluginInvocation,
+    PluginInstallReview,
     InstalledPlugin,
     PluginLockRecord,
     PluginOperationId,
@@ -17,20 +19,19 @@ import {
     type PluginCatalogEntry,
     type PluginIdInput,
     type PluginInstallInput,
+    type PluginInstallReviewInput,
     type PluginInvokeInput,
     type PluginPublisherTrustInput,
     type PluginRepository,
     type PluginRepositoryAddInput,
     type PluginRepositoryIdInput,
-    type PluginRollbackInput,
-    type PluginUpdateInput,
 } from '@cbranch/plugin-contract';
 import {
     digestGrant,
     isSafeRelativePath,
     validateRepositoryUrl,
 } from '@cbranch/plugin-runtime';
-import { Context, Effect, Layer } from 'effect';
+import { Context, Effect, Layer, Schema } from 'effect';
 
 import { GitError, type GitErrorCode } from '@cbranch/rpc-contract';
 
@@ -83,6 +84,9 @@ export interface PluginManagerApi {
     readonly install: (
         input: PluginInstallInput,
     ) => Effect.Effect<InstalledPlugin, GitError>;
+    readonly installReview: (
+        input: PluginInstallReviewInput,
+    ) => Effect.Effect<PluginInstallReview, GitError>;
     readonly list: () => Effect.Effect<readonly InstalledPlugin[], GitError>;
     readonly enable: (
         input: PluginIdInput,
@@ -91,12 +95,6 @@ export interface PluginManagerApi {
         input: PluginIdInput,
     ) => Effect.Effect<InstalledPlugin, GitError>;
     readonly uninstall: (input: PluginIdInput) => Effect.Effect<void, GitError>;
-    readonly update: (
-        input: PluginUpdateInput,
-    ) => Effect.Effect<InstalledPlugin, GitError>;
-    readonly rollback: (
-        input: PluginRollbackInput,
-    ) => Effect.Effect<InstalledPlugin, GitError>;
     readonly auditList: (
         input: PluginAuditListInput,
     ) => Effect.Effect<PluginAuditPage, GitError>;
@@ -346,7 +344,7 @@ export const makeTrustedPluginManager = (
             }
             return new PluginRuntimeStatus({
                 available: true,
-                reason: 'Trusted local ESM extensions execute as the host user. Remote installation remains unavailable until TUF repository verification is implemented.',
+                reason: 'Trusted local ESM extensions execute as the host user.',
             });
         },
         repositoryList: async (): Promise<readonly PluginRepository[]> =>
@@ -443,6 +441,12 @@ export const makeTrustedPluginManager = (
                 input.pluginId,
                 input.version,
             );
+            if (target.artifactSha256 !== input.artifactSha256) {
+                throw new PluginManagerError(
+                    'pluginMetadataInvalid',
+                    'The reviewed plugin artifact changed. Review it again before installing.',
+                );
+            }
             return manager.installVerified({
                 target,
                 repositoryId: input.repositoryId,
@@ -451,6 +455,22 @@ export const makeTrustedPluginManager = (
                 tufTargetVersion: 1,
                 grant: input.grant,
             });
+        },
+        installReview: async (
+            input: PluginInstallReviewInput,
+        ): Promise<PluginInstallReview> => {
+            const repository = repositories.get(String(input.repositoryId));
+            if (!repository) {
+                throw new PluginManagerError(
+                    'pluginMetadataInvalid',
+                    'Refresh the trusted plugin repository before reviewing an install.',
+                );
+            }
+            const review = await repository.review(
+                input.pluginId,
+                input.version,
+            );
+            return new PluginInstallReview(review);
         },
         list: async (): Promise<readonly InstalledPlugin[]> => {
             await requireReady();
@@ -620,9 +640,9 @@ export const makeTrustedPluginManager = (
                 );
             }
 
-            let output: string | undefined;
+            let outcome: Pick<PluginInvocation, 'output' | 'result'>;
             try {
-                output = serializePluginOutput(
+                outcome = serializePluginOutput(
                     await command(input.input, { repoId: input.repoId }),
                 );
                 await recordAudit(
@@ -691,7 +711,7 @@ export const makeTrustedPluginManager = (
             return new PluginInvocation({
                 operationId,
                 state: 'completed',
-                output,
+                ...outcome,
             });
         },
         auditList: async (
@@ -718,15 +738,6 @@ export const makeTrustedPluginManager = (
     };
     return manager;
 };
-
-const remoteInstallationUnavailable = <A>(): Effect.Effect<A, GitError> =>
-    Effect.fail(
-        new GitError({
-            code: 'pluginPolicyDenied',
-            message:
-                'Remote plugin repositories and installation remain unavailable until TUF repository verification is implemented.',
-        }),
-    );
 
 const toGitError = (error: unknown): GitError =>
     error instanceof PluginManagerError
@@ -764,6 +775,7 @@ export const trustedPluginManagerLayer = Layer.sync(PluginManager, () => {
         catalogList: input =>
             effectFrom(() => manager.catalogList(input.repositoryId)),
         install: input => effectFrom(() => manager.install(input)),
+        installReview: input => effectFrom(() => manager.installReview(input)),
         list: () => effectFrom(manager.list),
         enable: input =>
             effectFrom(() => manager.enable(String(input.pluginId))),
@@ -771,8 +783,6 @@ export const trustedPluginManagerLayer = Layer.sync(PluginManager, () => {
             effectFrom(() => manager.disable(String(input.pluginId))),
         uninstall: input =>
             effectFrom(() => manager.uninstall(String(input.pluginId))),
-        update: () => remoteInstallationUnavailable(),
-        rollback: () => remoteInstallationUnavailable(),
         auditList: input => effectFrom(() => manager.auditList(input)),
         invoke: input => effectFrom(() => manager.invoke(input)),
     };
@@ -789,14 +799,25 @@ const isSafePathComponent = (value: string): boolean =>
 const errorCode = (error: unknown): string =>
     error instanceof PluginManagerError ? error.code : 'pluginWorkerFailed';
 
-const serializePluginOutput = (value: unknown): string | undefined => {
-    if (value === undefined) return undefined;
+const serializePluginOutput = (
+    value: unknown,
+): Pick<PluginInvocation, 'output' | 'result'> => {
+    if (value === undefined) return {};
+    const result = Schema.decodeUnknownOption(PluginCommandResult)(value);
+    if (result._tag === 'Some') {
+        assertOutputLimit(JSON.stringify(result.value));
+        return { result: result.value };
+    }
     const output = typeof value === 'string' ? value : JSON.stringify(value);
+    assertOutputLimit(output);
+    return { output };
+};
+
+const assertOutputLimit = (output: string): void => {
     if (output.length > 1024 * 1024) {
         throw new PluginManagerError(
             'resultTooLarge',
             'Plugin command output exceeds the 1 MiB limit.',
         );
     }
-    return output;
 };

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 
@@ -29,14 +29,14 @@ const fakeApi = {
     })),
 } as unknown as CbranchApi;
 
-const renderMenuBar = () => {
+const renderMenuBar = (api: CbranchApi = fakeApi) => {
     const queryClient = new QueryClient({
         defaultOptions: { queries: { retry: false } },
     });
     return render(
         <MemoryRouter>
             <QueryClientProvider client={queryClient}>
-                <ApiProvider api={fakeApi}>
+                <ApiProvider api={api}>
                     <MenuBar />
                 </ApiProvider>
             </QueryClientProvider>
@@ -71,5 +71,32 @@ describe('MenuBar (full chrome from day one)', () => {
         for (const label of TOP_MENUS) {
             expect(screen.getByText(label)).toBeTruthy();
         }
+    });
+
+    test('renders a plugin command in its approved Tools placement', async () => {
+        const api = {
+            ...fakeApi,
+            pluginList: vi.fn(async () => [
+                {
+                    enabled: true,
+                    lock: { pluginId: 'com.example.release' },
+                    contributions: {
+                        commands: [
+                            {
+                                id: 'com.example.release.run',
+                                title: 'Run release',
+                                placement: 'tools',
+                            },
+                        ],
+                        panels: [],
+                    },
+                },
+            ]),
+        } as unknown as CbranchApi;
+        renderMenuBar(api);
+
+        fireEvent.click(screen.getByText('Tools'));
+
+        expect(await screen.findByText('Run release')).toBeTruthy();
     });
 });

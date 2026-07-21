@@ -17,6 +17,8 @@ import {
     PluginCatalogEntry,
     PluginIdInput,
     PluginInstallInput,
+    PluginInstallReview,
+    PluginInstallReviewInput,
     PluginInvocation,
     PluginInvokeInput,
     PluginPublisherTrustInput,
@@ -25,8 +27,6 @@ import {
     PluginRepositoryIdInput,
     PluginRepositoryRefresh,
     PluginRuntimeStatus,
-    PluginRollbackInput,
-    PluginUpdateInput,
 } from '@cbranch/plugin-contract';
 
 import { Rpc, RpcGroup } from '../effect-rpc-adapter';
@@ -178,6 +178,11 @@ export const CbranchRpcs = RpcGroup.make(
         success: InstalledPlugin,
         error: GitError,
     }),
+    Rpc.make('PluginInstallReview', {
+        payload: PluginInstallReviewInput,
+        success: PluginInstallReview,
+        error: GitError,
+    }),
     Rpc.make('PluginList', {
         payload: {},
         success: Schema.Array(InstalledPlugin),
@@ -196,16 +201,6 @@ export const CbranchRpcs = RpcGroup.make(
     Rpc.make('PluginUninstall', {
         payload: PluginIdInput,
         success: Schema.Void,
-        error: GitError,
-    }),
-    Rpc.make('PluginUpdate', {
-        payload: PluginUpdateInput,
-        success: InstalledPlugin,
-        error: GitError,
-    }),
-    Rpc.make('PluginRollback', {
-        payload: PluginRollbackInput,
-        success: InstalledPlugin,
         error: GitError,
     }),
     Rpc.make('PluginAuditList', {

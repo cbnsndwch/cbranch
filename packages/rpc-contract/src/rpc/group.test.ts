@@ -635,12 +635,11 @@ const handlers = CbranchRpcs.toLayer({
     PluginPublisherTrust: () => Effect.fail(pluginActivationUnavailable()),
     PluginCatalogList: () => Effect.succeed([]),
     PluginInstall: () => Effect.fail(pluginActivationUnavailable()),
+    PluginInstallReview: () => Effect.fail(pluginActivationUnavailable()),
     PluginList: () => Effect.succeed([]),
     PluginEnable: () => Effect.fail(pluginActivationUnavailable()),
     PluginDisable: () => Effect.fail(pluginActivationUnavailable()),
     PluginUninstall: () => Effect.fail(pluginActivationUnavailable()),
-    PluginUpdate: () => Effect.fail(pluginActivationUnavailable()),
-    PluginRollback: () => Effect.fail(pluginActivationUnavailable()),
     PluginAuditList: () => Effect.succeed({ events: [] }),
     PluginInvoke: () => Effect.fail(pluginActivationUnavailable()),
     RepoOpen: ({ path }) =>
@@ -1242,6 +1241,18 @@ describe('payload Schemas validate at the boundary (RPC-032)', () => {
         });
 
         expect(Exit.isSuccess(exit)).toBe(true);
+    });
+});
+
+describe('CbranchRpcs P9 lifecycle catalog', () => {
+    test('exposes only implemented lifecycle operations', () => {
+        expect(CbranchRpcs.requests.has('PluginInstallReview')).toBe(true);
+        expect(CbranchRpcs.requests.has('PluginInstall')).toBe(true);
+        expect(CbranchRpcs.requests.has('PluginEnable')).toBe(true);
+        expect(CbranchRpcs.requests.has('PluginDisable')).toBe(true);
+        expect(CbranchRpcs.requests.has('PluginUninstall')).toBe(true);
+        expect(CbranchRpcs.requests.has('PluginUpdate')).toBe(false);
+        expect(CbranchRpcs.requests.has('PluginRollback')).toBe(false);
     });
 });
 

@@ -141,6 +141,19 @@ Per-feature vertical slices, easiest-first (D18). Each = a `core` commit then a 
   REQ-P5-SM-001..006.
 - ⬜ S7 settings/config · ⬜ S8 interactive rebase.
 
+## P9 runtime plugins IN PROGRESS
+
+- M0 complete: RC21 fixed and manually verified long plugin-command result wrapping.
+- M1 complete: HTTPS/TUF lifecycle documentation is reconciled, unsupported
+  update/rollback RPCs are removed, and installation now requires a read-only
+  artifact review showing publisher, version, digest, requested capabilities,
+  and declarative contributions before confirmation. Broker grants remain empty
+  until broker capabilities are delivered.
+- Ledger and lifecycle matrix: [`docs/spec/22-phase9-implementation-plan.md`](docs/spec/22-phase9-implementation-plan.md).
+- Tests: the manager lifecycle fixture covers HTTPS root trust, TUF refresh,
+  artifact review, install, and enablement without executing code during review.
+- Next: M2 contribution-contract design.
+
 ## P8 multi-repo workspaces COMPLETE ✅
 
 - Done: host-persisted workspace CRUD, exclusive repo membership, unassigned migration,
