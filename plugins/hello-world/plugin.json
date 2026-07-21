@@ -1,7 +1,7 @@
 {
     "schemaVersion": 1,
     "id": "dev.cbranch.hello-world",
-    "version": "0.1.0",
+    "version": "0.1.1",
     "displayName": "Hello World",
     "publisherFingerprint": "sha256:development-only",
     "engines": {

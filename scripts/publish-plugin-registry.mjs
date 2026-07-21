@@ -78,6 +78,9 @@ execFileSync('pnpm', ['--filter', '@cbranch/plugin-hello-world', 'package'], {
     env: { ...process.env, PLUGIN_PUBLISHER_FINGERPRINT: fingerprint },
 });
 const artifactName = 'dev.cbranch.hello-world.cbranch-plugin';
+const manifest = JSON.parse(
+    await readFile(join('plugins', 'hello-world', 'plugin.json'), 'utf8'),
+);
 const artifact = await readFile(
     join('plugins', 'hello-world', 'artifacts', artifactName),
 );
@@ -90,8 +93,8 @@ const targets = bytes(
             [`targets/${artifactName}`]: {
                 ...meta(artifact),
                 custom: {
-                    pluginId: 'dev.cbranch.hello-world',
-                    version: '0.1.0',
+                    pluginId: manifest.id,
+                    version: manifest.version,
                     publisherFingerprint: fingerprint,
                     minimumCbranchVersion: '0.2.1',
                     pluginContractVersion: 1,

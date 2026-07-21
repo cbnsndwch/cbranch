@@ -1,6 +1,6 @@
 {
     "name": "@cbranch/plugin-hello-world",
-    "version": "0.1.0",
+    "version": "0.1.1",
     "private": true,
     "description": "Minimal trusted ESM plugin for exercising the cbranch plugin lifecycle.",
     "license": "MIT",
