@@ -11,6 +11,11 @@ vi.mock('@tauri-apps/api/window', () => tauriWindow);
 import { probeCbranchServer, setDesktopWindowTitle } from './bridge';
 
 describe('probeCbranchServer', () => {
+    afterEach(() => {
+        vi.unstubAllEnvs();
+        vi.resetModules();
+    });
+
     test('accepts a compatible cbranch health response', async () => {
         const request = vi.fn(
             async () =>
@@ -94,6 +99,27 @@ describe('probeCbranchServer', () => {
         ).resolves.toEqual({
             status: 'incompatible',
             protocolVersion: CBRANCH_PROTOCOL_VERSION,
+        });
+    });
+
+    test('accepts a canary server with the release tag version', async () => {
+        vi.stubEnv('VITE_CBRANCH_CANARY', '1');
+        vi.stubEnv('VITE_CBRANCH_VERSION', 'v0.2.2-rc.17');
+        vi.resetModules();
+        const { probeCbranchServer: probe } = await import('./bridge');
+        const request = vi.fn(
+            async () =>
+                new Response(
+                    JSON.stringify({
+                        service: 'cbranch',
+                        protocolVersion: CBRANCH_PROTOCOL_VERSION,
+                        version: '0.2.2-rc.17',
+                    }),
+                ),
+        );
+
+        await expect(probe('http://127.0.0.1:7421', request)).resolves.toEqual({
+            status: 'ready',
         });
     });
 });

@@ -67,7 +67,7 @@ const isHealthResponse = (
 
 const canaryVersion =
     import.meta.env.VITE_CBRANCH_CANARY === '1'
-        ? import.meta.env.VITE_CBRANCH_VERSION
+        ? import.meta.env.VITE_CBRANCH_VERSION?.replace(/^v/, '')
         : undefined;
 
 /** Probe the remote service through the active SSH forward before starting RPC. */
@@ -92,12 +92,14 @@ export const probeCbranchServer = async (
         return { status: 'incompatible' };
     }
     if (!isHealthResponse(body)) return { status: 'incompatible' };
-    if (canaryVersion && body.version !== canaryVersion)
-        return {
-            status: 'incompatible',
-            protocolVersion: body.protocolVersion,
-            version: body.version,
-        };
+    if (canaryVersion) {
+        if (body.version !== canaryVersion)
+            return {
+                status: 'incompatible',
+                protocolVersion: body.protocolVersion,
+                version: body.version,
+            };
+    }
     if (body.protocolVersion !== CBRANCH_PROTOCOL_VERSION)
         return {
             status: 'incompatible',
@@ -105,8 +107,9 @@ export const probeCbranchServer = async (
             version: body.version,
         };
     if (
-        typeof body.version !== 'string' ||
-        !isBackendVersionCompatible(body.version, CBRANCH_BACKEND_VERSION)
+        !canaryVersion &&
+        (typeof body.version !== 'string' ||
+            !isBackendVersionCompatible(body.version, CBRANCH_BACKEND_VERSION))
     )
         return {
             status: 'incompatible',
