@@ -124,8 +124,9 @@ the UI needing plugin code or unvalidated strings to choose layout behavior.
 
 - The contract remains at v1 because placements are optional additive fields;
   omitted command placement preserves the existing `plugins` fallback.
-- Commands may name only `plugins` or `tools`. Panels may name only the
-  host-owned `plugins` region and contain `text` or `keyValue` data.
+- Commands contribute only below the existing `Plugins` top-level menu. They
+  may be direct actions or declare a host-rendered nested submenu path. Panels
+  are currently declared but have no persistent shell region.
 - Structured results are `notice`, `dialog`, or `panel`. Existing output remains
   capped at 1 MiB; host dialogs retain their standard accessible title and
   Close/Esc/backdrop dismissal behavior.

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 
 import { type CbranchApi } from '../rpc/api';
@@ -59,6 +59,7 @@ describe('PluginsDialog', () => {
             </QueryClientProvider>,
         );
 
+        fireEvent.click(screen.getByRole('tab', { name: 'Repositories' }));
         fireEvent.click(await screen.findByRole('button', { name: 'Browse' }));
 
         expect((await screen.findByRole('alert')).textContent).toContain(
@@ -130,6 +131,7 @@ describe('PluginsDialog', () => {
             </QueryClientProvider>,
         );
 
+        fireEvent.click(screen.getByRole('tab', { name: 'Repositories' }));
         fireEvent.click(await screen.findByRole('button', { name: 'Browse' }));
         fireEvent.click(await screen.findByRole('button', { name: 'Install' }));
 
@@ -145,10 +147,18 @@ describe('PluginsDialog', () => {
         fireEvent.click(
             screen.getByRole('button', { name: 'Confirm install' }),
         );
-        expect(api.pluginInstall).toHaveBeenCalledWith(
-            expect.objectContaining({
-                artifactSha256: `sha256:${'a'.repeat(64)}`,
-            }),
+        await waitFor(() =>
+            expect(api.pluginInstall).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    artifactSha256: `sha256:${'a'.repeat(64)}`,
+                }),
+            ),
         );
+        expect(screen.queryByText('Review plugin install')).toBeNull();
+        expect(
+            screen
+                .getByRole('tab', { name: 'Installed' })
+                .getAttribute('aria-selected'),
+        ).toBe('true');
     });
 });

@@ -113,17 +113,6 @@ export function MenuBar() {
                     <MenubarContent>
                         {menu.id === 'plugins' ? (
                             <PluginEntries actions={actions} />
-                        ) : menu.id === 'tools' ? (
-                            <>
-                                {menu.items.map((entry, i) =>
-                                    renderEntry(
-                                        entry,
-                                        `${menu.id}.${i}`,
-                                        actions,
-                                    ),
-                                )}
-                                <PluginCommandEntries placement="tools" />
-                            </>
                         ) : (
                             menu.items.map((entry, i) =>
                                 renderEntry(entry, `${menu.id}.${i}`, actions),
@@ -142,7 +131,7 @@ export function MenuBar() {
 function PluginEntries({ actions }: { readonly actions: MenuActions }) {
     return (
         <>
-            <PluginCommandEntries placement="plugins" />
+            <PluginCommandEntries />
             <MenubarSeparator />
             <MenubarItem onClick={() => actions.run('plugins.settings')}>
                 Plugin settings…
@@ -151,11 +140,7 @@ function PluginEntries({ actions }: { readonly actions: MenuActions }) {
     );
 }
 
-function PluginCommandEntries({
-    placement,
-}: {
-    readonly placement: 'plugins' | 'tools';
-}) {
+function PluginCommandEntries() {
     const api = useApi();
     const repoId = useUiStore(state => state.activeRepoId);
     const engagementId = useUiStore(state => state.activeEngagementId);
@@ -164,57 +149,83 @@ function PluginCommandEntries({
         queryKey: ['plugins', 'installed'],
         queryFn: () => api.pluginList(),
     });
-    const commands = (plugins.data ?? []).flatMap(plugin => {
-        if (!plugin.enabled) return [];
-        return plugin.contributions.commands
-            .filter(command => (command.placement ?? 'plugins') === placement)
-            .map(command => ({ plugin, command }));
-    });
+    const commands = (plugins.data ?? []).flatMap(plugin =>
+        plugin.enabled
+            ? plugin.contributions.commands.map(command => ({
+                  plugin,
+                  command,
+              }))
+            : [],
+    );
+    type Command = (typeof commands)[number];
+    type MenuNode = {
+        readonly commands: Command[];
+        readonly children: Map<string, MenuNode>;
+    };
+    const root: MenuNode = { commands: [], children: new Map() };
+    for (const command of commands) {
+        let node = root;
+        for (const label of command.command.submenu ?? []) {
+            let child = node.children.get(label);
+            if (!child) {
+                child = { commands: [], children: new Map() };
+                node.children.set(label, child);
+            }
+            node = child;
+        }
+        node.commands.push(command);
+    }
+    const renderCommand = ({ plugin, command }: Command) => (
+        <MenubarItem
+            key={command.id}
+            onClick={() =>
+                void api
+                    .pluginInvoke({
+                        pluginId: plugin.lock.pluginId,
+                        commandId: command.id,
+                        repoId: String(repoId ?? 'global'),
+                        engagementId: engagementId ?? undefined,
+                    })
+                    .then(result => {
+                        if (result.result?._tag === 'notice') {
+                            toast.success(result.result.message);
+                        } else if (result.result?._tag === 'dialog') {
+                            setResult({
+                                title: result.result.title,
+                                output: result.result.body,
+                            });
+                        } else if (result.result?._tag === 'panel') {
+                            toast.success('Plugin panel updated.');
+                        } else {
+                            setResult({
+                                title: command.title,
+                                output: result.output,
+                            });
+                        }
+                    })
+            }
+        >
+            {command.title}
+        </MenubarItem>
+    );
+    const renderNode = (node: MenuNode, path: string): ReactNode[] => [
+        ...[...node.children].map(([label, child]) => (
+            <MenubarSub key={`${path}.${label}`}>
+                <MenubarSubTrigger>{label}</MenubarSubTrigger>
+                <MenubarSubContent>
+                    {renderNode(child, `${path}.${label}`)}
+                </MenubarSubContent>
+            </MenubarSub>
+        )),
+        ...node.commands.map(renderCommand),
+    ];
     return (
         <>
-            {commands.length === 0
-                ? placement === 'plugins' && (
-                      <MenubarItem disabled>(no plugins loaded)</MenubarItem>
-                  )
-                : commands.map(({ plugin, command }) => (
-                      <MenubarItem
-                          key={command.id}
-                          onClick={() =>
-                              void api
-                                  .pluginInvoke({
-                                      pluginId: plugin.lock.pluginId,
-                                      commandId: command.id,
-                                      repoId: String(repoId ?? 'global'),
-                                      engagementId: engagementId ?? undefined,
-                                  })
-                                  .then(result => {
-                                      if (result.result?._tag === 'notice') {
-                                          toast.success(result.result.message);
-                                      } else if (
-                                          result.result?._tag === 'dialog'
-                                      ) {
-                                          setResult({
-                                              title: result.result.title,
-                                              output: result.result.body,
-                                          });
-                                      } else if (
-                                          result.result?._tag === 'panel'
-                                      ) {
-                                          toast.success(
-                                              'Plugin panel updated.',
-                                          );
-                                      } else {
-                                          setResult({
-                                              title: command.title,
-                                              output: result.output,
-                                          });
-                                      }
-                                  })
-                          }
-                      >
-                          {command.title}
-                      </MenubarItem>
-                  ))}
+            {commands.length === 0 ? (
+                <MenubarItem disabled>(no plugins loaded)</MenubarItem>
+            ) : (
+                renderNode(root, 'plugins')
+            )}
         </>
     );
 }

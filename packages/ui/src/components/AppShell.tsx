@@ -40,7 +40,6 @@ import { HistoryPane } from './HistoryPane';
 import { HistoryStatusStrip } from './HistoryStatusStrip';
 import { MergeEditor } from './MergeEditor';
 import { MenuBar } from './MenuBar';
-import { PluginPanels } from './PluginPanels';
 import { RepositorySidebar } from './RepositorySidebar';
 import { RebaseDialog } from './RebaseDialog';
 import { ResetDialog } from './ResetDialog';
@@ -273,7 +272,6 @@ export function AppShell() {
                     <WorkspaceBar />
                     <ConnectionStatusIndicator />
                     {repoId ? <Toolbar /> : null}
-                    <PluginPanels />
 
                     {/* Main split — sidebar beside (view nav tabs over content). */}
                     <div className="flex min-h-0 flex-1 flex-col">

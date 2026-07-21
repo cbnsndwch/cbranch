@@ -87,6 +87,8 @@ export class PluginCommandContribution extends Schema.Class<PluginCommandContrib
     id: Schema.String,
     title: Schema.String,
     placement: Schema.optional(PluginCommandPlacement),
+    /** Host-rendered nested labels below the fixed Plugins top-level menu. */
+    submenu: Schema.optional(Schema.Array(Schema.String)),
 }) {}
 
 export const PluginPanelPlacement = Schema.Literals(['plugins']);

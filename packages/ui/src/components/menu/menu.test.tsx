@@ -73,7 +73,7 @@ describe('MenuBar (full chrome from day one)', () => {
         }
     });
 
-    test('renders a plugin command in its approved Tools placement', async () => {
+    test('renders a plugin command in a host-owned Plugins submenu', async () => {
         const api = {
             ...fakeApi,
             pluginList: vi.fn(async () => [
@@ -85,7 +85,8 @@ describe('MenuBar (full chrome from day one)', () => {
                             {
                                 id: 'com.example.release.run',
                                 title: 'Run release',
-                                placement: 'tools',
+                                placement: 'plugins',
+                                submenu: ['Release'],
                             },
                         ],
                         panels: [],
@@ -95,7 +96,8 @@ describe('MenuBar (full chrome from day one)', () => {
         } as unknown as CbranchApi;
         renderMenuBar(api);
 
-        fireEvent.click(screen.getByText('Tools'));
+        fireEvent.click(screen.getByText('Plugins'));
+        fireEvent.click(await screen.findByText('Release'));
 
         expect(await screen.findByText('Run release')).toBeTruthy();
     });

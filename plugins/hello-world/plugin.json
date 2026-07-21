@@ -1,7 +1,7 @@
 {
     "schemaVersion": 1,
     "id": "dev.cbranch.hello-world",
-    "version": "0.1.1",
+    "version": "0.1.2",
     "displayName": "Hello World",
     "publisherFingerprint": "sha256:development-only",
     "engines": {
@@ -17,7 +17,8 @@
             {
                 "id": "dev.cbranch.hello-world.greet",
                 "title": "Hello World: Greet",
-                "placement": "tools"
+                "placement": "plugins",
+                "submenu": ["Hello World"]
             }
         ],
         "panels": [

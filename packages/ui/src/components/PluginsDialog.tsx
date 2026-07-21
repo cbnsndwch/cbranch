@@ -27,6 +27,8 @@ const EMPTY_GRANT = {
     hostAutomationApproved: false,
 } as const;
 
+type PluginManagerTab = 'installed' | 'discover' | 'repositories';
+
 const errorMessage = (error: unknown): string =>
     error instanceof Error ? error.message : String(error);
 
@@ -63,6 +65,7 @@ function PluginsDialogBody({ onClose }: { readonly onClose: () => void }) {
     const api = useApi();
     const queryClient = useQueryClient();
     const [url, setUrl] = useState('');
+    const [tab, setTab] = useState<PluginManagerTab>('installed');
     const [selectedRepositoryId, setSelectedRepositoryId] =
         useState<PluginRepositoryId>();
     const [installReview, setInstallReview] = useState<PluginInstallReview>();
@@ -85,11 +88,16 @@ function PluginsDialogBody({ onClose }: { readonly onClose: () => void }) {
     const refresh = () => {
         void queryClient.invalidateQueries({ queryKey: ['plugins'] });
     };
-    const run = (operation: Promise<unknown>, success: string) => {
+    const run = (
+        operation: Promise<unknown>,
+        success: string,
+        onSuccess?: () => void,
+    ) => {
         void operation
             .then(() => {
                 toast.success(success);
                 refresh();
+                onSuccess?.();
             })
             .catch(error => toast.error(errorMessage(error)));
     };
@@ -106,84 +114,114 @@ function PluginsDialogBody({ onClose }: { readonly onClose: () => void }) {
                         </DialogDescription>
                     </DialogHeader>
 
-                    <section className="grid gap-2 border p-3">
-                        <strong className="text-sm">Add repository</strong>
-                        <div className="flex gap-2">
-                            <Input
-                                value={url}
-                                onChange={event => setUrl(event.target.value)}
-                                placeholder="https://raw.githubusercontent.com/org/repo/plugin-registry"
-                            />
+                    <div className="flex gap-1 border-b" role="tablist">
+                        {(
+                            [
+                                ['installed', 'Installed'],
+                                ['discover', 'Discover'],
+                                ['repositories', 'Repositories'],
+                            ] as const
+                        ).map(([id, label]) => (
                             <Button
-                                disabled={!url.trim()}
-                                onClick={() =>
-                                    run(
-                                        api.pluginRepositoryAdd(url.trim()),
-                                        'Repository added.',
-                                    )
-                                }
+                                key={id}
+                                size="sm"
+                                variant={tab === id ? 'default' : 'ghost'}
+                                role="tab"
+                                aria-selected={tab === id}
+                                onClick={() => setTab(id)}
                             >
-                                Add
+                                {label}
                             </Button>
-                        </div>
-                    </section>
+                        ))}
+                    </div>
 
-                    <section className="grid gap-2">
-                        <strong className="text-sm">Repositories</strong>
-                        {repositories.data?.map(repository => (
-                            <div
-                                key={repository.id}
-                                className="flex flex-wrap items-center gap-2 border p-2 text-xs"
-                            >
-                                <span className="min-w-0 flex-1 break-all">
-                                    {repository.url}
-                                </span>
-                                <span>{repository.trustState}</span>
+                    {tab === 'repositories' && (
+                        <section className="grid gap-2 border p-3">
+                            <strong className="text-sm">Add repository</strong>
+                            <div className="flex gap-2">
+                                <Input
+                                    value={url}
+                                    onChange={event =>
+                                        setUrl(event.target.value)
+                                    }
+                                    placeholder="https://raw.githubusercontent.com/org/repo/plugin-registry"
+                                />
                                 <Button
-                                    size="sm"
-                                    variant="outline"
+                                    disabled={!url.trim()}
                                     onClick={() =>
                                         run(
-                                            api.pluginRepositoryRefresh(
-                                                repository.id,
-                                            ),
-                                            'Repository refreshed.',
+                                            api.pluginRepositoryAdd(url.trim()),
+                                            'Repository added.',
                                         )
                                     }
                                 >
-                                    Refresh
-                                </Button>
-                                {repository.trustState === 'untrusted' &&
-                                    repository.publisherFingerprint && (
-                                        <Button
-                                            size="sm"
-                                            onClick={() =>
-                                                run(
-                                                    api.pluginPublisherTrust(
-                                                        repository.id,
-                                                        repository.publisherFingerprint!,
-                                                    ),
-                                                    'Publisher trusted.',
-                                                )
-                                            }
-                                        >
-                                            Trust publisher
-                                        </Button>
-                                    )}
-                                <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() =>
-                                        setSelectedRepositoryId(repository.id)
-                                    }
-                                >
-                                    Browse
+                                    Add
                                 </Button>
                             </div>
-                        ))}
-                    </section>
+                        </section>
+                    )}
 
-                    {selectedRepositoryId && (
+                    {tab === 'repositories' && (
+                        <section className="grid gap-2">
+                            <strong className="text-sm">Repositories</strong>
+                            {repositories.data?.map(repository => (
+                                <div
+                                    key={repository.id}
+                                    className="flex flex-wrap items-center gap-2 border p-2 text-xs"
+                                >
+                                    <span className="min-w-0 flex-1 break-all">
+                                        {repository.url}
+                                    </span>
+                                    <span>{repository.trustState}</span>
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() =>
+                                            run(
+                                                api.pluginRepositoryRefresh(
+                                                    repository.id,
+                                                ),
+                                                'Repository refreshed.',
+                                            )
+                                        }
+                                    >
+                                        Refresh
+                                    </Button>
+                                    {repository.trustState === 'untrusted' &&
+                                        repository.publisherFingerprint && (
+                                            <Button
+                                                size="sm"
+                                                onClick={() =>
+                                                    run(
+                                                        api.pluginPublisherTrust(
+                                                            repository.id,
+                                                            repository.publisherFingerprint!,
+                                                        ),
+                                                        'Publisher trusted.',
+                                                    )
+                                                }
+                                            >
+                                                Trust publisher
+                                            </Button>
+                                        )}
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => {
+                                            setSelectedRepositoryId(
+                                                repository.id,
+                                            );
+                                            setTab('discover');
+                                        }}
+                                    >
+                                        Browse
+                                    </Button>
+                                </div>
+                            ))}
+                        </section>
+                    )}
+
+                    {tab === 'discover' && selectedRepositoryId && (
                         <section className="grid gap-2">
                             <strong className="text-sm">Catalog</strong>
                             {catalog.isLoading && (
@@ -237,151 +275,182 @@ function PluginsDialogBody({ onClose }: { readonly onClose: () => void }) {
                         </section>
                     )}
 
-                    {installReview && selectedRepositoryId && (
-                        <section className="grid gap-3 border p-3 text-xs">
+                    {tab === 'installed' && (
+                        <section className="grid gap-2">
                             <strong className="text-sm">
-                                Review plugin install
+                                Installed plugins
                             </strong>
-                            <p>
-                                {installReview.manifest.displayName}{' '}
-                                {installReview.manifest.version}
-                            </p>
-                            <p>
-                                Publisher:{' '}
-                                {installReview.manifest.publisherFingerprint}
-                            </p>
-                            <p>Repository: {selectedRepository?.url}</p>
-                            <p className="break-all">
-                                Digest: {installReview.target.artifactSha256}
-                            </p>
-                            <p>
-                                Compatibility: cbranch{' '}
-                                {installReview.manifest.engines.cbranch}; plugin
-                                contract{' '}
-                                {installReview.manifest.engines.pluginContract}
-                            </p>
-                            <p>
-                                Requested capabilities:{' '}
-                                {installReview.manifest.capabilities.join(
-                                    ', ',
-                                ) || 'None'}
-                            </p>
-                            <p>
-                                Commands:{' '}
-                                {installReview.manifest.contributes.commands
-                                    .map(command => command.title)
-                                    .join(', ') || 'None'}
-                            </p>
-                            <p>
-                                Panels:{' '}
-                                {installReview.manifest.contributes.panels
-                                    .map(panel => panel.title)
-                                    .join(', ') || 'None'}
-                            </p>
-                            <p>
-                                Automation:{' '}
-                                {installReview.manifest.automation
-                                    .map(action => action.id)
-                                    .join(', ') || 'None'}
-                            </p>
-                            <p>
-                                Advisories:{' '}
-                                {installReview.target.advisoryIds.join(', ') ||
-                                    'None'}
-                            </p>
-                            {installReview.target.releaseNotes && (
-                                <p className="whitespace-pre-wrap break-words">
-                                    Release notes:{' '}
-                                    {installReview.target.releaseNotes}
-                                </p>
-                            )}
-                            <p className="text-muted-foreground">
-                                This install grants no broker capabilities.
-                                Trusted plugin code still executes with your
-                                host-user authority.
-                            </p>
-                            <div className="flex gap-2">
-                                <Button
-                                    size="sm"
-                                    onClick={() =>
-                                        run(
-                                            api.pluginInstall({
-                                                repositoryId:
-                                                    selectedRepositoryId,
-                                                pluginId:
-                                                    installReview.target
-                                                        .pluginId,
-                                                version:
-                                                    installReview.target
-                                                        .version,
-                                                artifactSha256:
-                                                    installReview.target
-                                                        .artifactSha256,
-                                                grant: EMPTY_GRANT,
-                                            }),
-                                            'Plugin installed. Enable it to use it.',
-                                        )
-                                    }
+                            {installed.data?.map(plugin => (
+                                <div
+                                    key={plugin.lock.pluginId}
+                                    className="flex items-center gap-2 border p-2 text-xs"
                                 >
-                                    Confirm install
-                                </Button>
-                                <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => setInstallReview(undefined)}
-                                >
-                                    Cancel
-                                </Button>
-                            </div>
+                                    <span className="flex-1">
+                                        {plugin.lock.pluginId}{' '}
+                                        {plugin.lock.version}
+                                    </span>
+                                    <Button
+                                        size="sm"
+                                        onClick={() =>
+                                            run(
+                                                plugin.enabled
+                                                    ? api.pluginDisable(
+                                                          plugin.lock.pluginId,
+                                                      )
+                                                    : api.pluginEnable(
+                                                          plugin.lock.pluginId,
+                                                      ),
+                                                plugin.enabled
+                                                    ? 'Plugin disabled.'
+                                                    : 'Plugin enabled.',
+                                            )
+                                        }
+                                    >
+                                        {plugin.enabled ? 'Disable' : 'Enable'}
+                                    </Button>
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() =>
+                                            run(
+                                                api.pluginUninstall(
+                                                    plugin.lock.pluginId,
+                                                ),
+                                                'Plugin uninstalled.',
+                                            )
+                                        }
+                                    >
+                                        Uninstall
+                                    </Button>
+                                </div>
+                            ))}
                         </section>
                     )}
-
-                    <section className="grid gap-2">
-                        <strong className="text-sm">Installed plugins</strong>
-                        {installed.data?.map(plugin => (
-                            <div
-                                key={plugin.lock.pluginId}
-                                className="flex items-center gap-2 border p-2 text-xs"
+                    {installReview && selectedRepositoryId && (
+                        <Dialog
+                            open
+                            onOpenChange={next =>
+                                !next && setInstallReview(undefined)
+                            }
+                        >
+                            <DialogContent
+                                style={{ width: 'min(640px, 92vw)' }}
                             >
-                                <span className="flex-1">
-                                    {plugin.lock.pluginId} {plugin.lock.version}
-                                </span>
-                                <Button
-                                    size="sm"
-                                    onClick={() =>
-                                        run(
-                                            plugin.enabled
-                                                ? api.pluginDisable(
-                                                      plugin.lock.pluginId,
-                                                  )
-                                                : api.pluginEnable(
-                                                      plugin.lock.pluginId,
-                                                  ),
-                                            plugin.enabled
-                                                ? 'Plugin disabled.'
-                                                : 'Plugin enabled.',
-                                        )
-                                    }
-                                >
-                                    {plugin.enabled ? 'Disable' : 'Enable'}
-                                </Button>
-                                <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() =>
-                                        run(
-                                            api.pluginUninstall(
-                                                plugin.lock.pluginId,
-                                            ),
-                                            'Plugin uninstalled.',
-                                        )
-                                    }
-                                >
-                                    Uninstall
-                                </Button>
-                            </div>
-                        ))}
-                    </section>
+                                <div className="grid max-h-[80vh] gap-3 overflow-y-auto p-4 text-xs">
+                                    <DialogTitle className="text-sm">
+                                        Review plugin install
+                                    </DialogTitle>
+                                    <p>
+                                        {installReview.manifest.displayName}{' '}
+                                        {installReview.manifest.version}
+                                    </p>
+                                    <p>
+                                        Publisher:{' '}
+                                        {
+                                            installReview.manifest
+                                                .publisherFingerprint
+                                        }
+                                    </p>
+                                    <p>Repository: {selectedRepository?.url}</p>
+                                    <p className="break-all">
+                                        Digest:{' '}
+                                        {installReview.target.artifactSha256}
+                                    </p>
+                                    <p>
+                                        Compatibility: cbranch{' '}
+                                        {installReview.manifest.engines.cbranch}
+                                        ; plugin contract{' '}
+                                        {
+                                            installReview.manifest.engines
+                                                .pluginContract
+                                        }
+                                    </p>
+                                    <p>
+                                        Requested capabilities:{' '}
+                                        {installReview.manifest.capabilities.join(
+                                            ', ',
+                                        ) || 'None'}
+                                    </p>
+                                    <p>
+                                        Commands:{' '}
+                                        {installReview.manifest.contributes.commands
+                                            .map(command => command.title)
+                                            .join(', ') || 'None'}
+                                    </p>
+                                    <p>
+                                        Panels:{' '}
+                                        {installReview.manifest.contributes.panels
+                                            .map(panel => panel.title)
+                                            .join(', ') || 'None'}
+                                    </p>
+                                    <p>
+                                        Automation:{' '}
+                                        {installReview.manifest.automation
+                                            .map(action => action.id)
+                                            .join(', ') || 'None'}
+                                    </p>
+                                    <p>
+                                        Advisories:{' '}
+                                        {installReview.target.advisoryIds.join(
+                                            ', ',
+                                        ) || 'None'}
+                                    </p>
+                                    {installReview.target.releaseNotes && (
+                                        <p className="whitespace-pre-wrap break-words">
+                                            Release notes:{' '}
+                                            {installReview.target.releaseNotes}
+                                        </p>
+                                    )}
+                                    <p className="text-muted-foreground">
+                                        This install grants no broker
+                                        capabilities. Trusted plugin code still
+                                        executes with your host-user authority.
+                                    </p>
+                                    <div className="flex gap-2">
+                                        <Button
+                                            size="sm"
+                                            onClick={() =>
+                                                run(
+                                                    api.pluginInstall({
+                                                        repositoryId:
+                                                            selectedRepositoryId,
+                                                        pluginId:
+                                                            installReview.target
+                                                                .pluginId,
+                                                        version:
+                                                            installReview.target
+                                                                .version,
+                                                        artifactSha256:
+                                                            installReview.target
+                                                                .artifactSha256,
+                                                        grant: EMPTY_GRANT,
+                                                    }),
+                                                    'Plugin installed. Enable it to use it.',
+                                                    () => {
+                                                        setInstallReview(
+                                                            undefined,
+                                                        );
+                                                        setTab('installed');
+                                                    },
+                                                )
+                                            }
+                                        >
+                                            Confirm install
+                                        </Button>
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={() =>
+                                                setInstallReview(undefined)
+                                            }
+                                        >
+                                            Cancel
+                                        </Button>
+                                    </div>
+                                </div>
+                            </DialogContent>
+                        </Dialog>
+                    )}
                 </div>
                 <DialogFooter className="border-t p-3">
                     <Button variant="outline" onClick={onClose}>

@@ -36,6 +36,7 @@ describe('plugin contract schemas', () => {
                         id: 'com.example.release.check',
                         title: 'Run check',
                         placement: 'tools',
+                        submenu: ['Release', 'Checks'],
                     },
                 ],
                 panels: [
