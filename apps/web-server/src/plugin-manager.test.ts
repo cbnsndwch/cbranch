@@ -3,11 +3,13 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import {
+    InstalledPlugin,
     PluginId,
     PluginLockRecord,
     PluginRepositoryId,
     type PluginManifest,
 } from '@cbranch/plugin-contract';
+import { Schema } from 'effect';
 import { describe, expect, test, vi } from 'vitest';
 
 import { makePluginLockStore } from './plugin-lock-store';
@@ -141,6 +143,10 @@ describe('trusted plugin manager', () => {
         });
 
         expect(installed.enabled).toBe(false);
+        expect(installed).toBeInstanceOf(InstalledPlugin);
+        expect(() =>
+            Schema.encodeUnknownSync(InstalledPlugin)(installed),
+        ).not.toThrow();
         expect((await manager.list())[0]?.lock.entrypoint).toBe('plugin.mjs');
         expect(artifactStore.activate).toHaveBeenCalledOnce();
         expect((await manager.auditList({})).events[0]?.action).toBe('install');

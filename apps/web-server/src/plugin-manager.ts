@@ -7,12 +7,12 @@ import { join, resolve } from 'node:path';
 import {
     PluginAuditPage,
     PluginInvocation,
+    InstalledPlugin,
     PluginLockRecord,
     PluginOperationId,
     PluginRepositoryRefresh,
     PluginRuntimeStatus,
     PluginAuditEvent,
-    type InstalledPlugin,
     type PluginAuditListInput,
     type PluginCatalogEntry,
     type PluginIdInput,
@@ -303,13 +303,14 @@ export const makeTrustedPluginManager = (
         return record;
     };
 
-    const installed = (record: PluginLockRecord): InstalledPlugin => ({
-        lock: record,
-        enabled: loaded.has(String(record.pluginId)),
-        grant: record.grant,
-        contributions: record.contributions,
-        availableVersions: [record.version],
-    });
+    const installed = (record: PluginLockRecord): InstalledPlugin =>
+        new InstalledPlugin({
+            lock: record,
+            enabled: loaded.has(String(record.pluginId)),
+            grant: record.grant,
+            contributions: record.contributions,
+            availableVersions: [record.version],
+        });
 
     const trustedRepository = async (
         repositoryId: PluginRepositoryIdInput['repositoryId'],
