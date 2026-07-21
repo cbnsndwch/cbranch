@@ -44,7 +44,7 @@ export function PluginCommandResultDialog() {
             <DialogContent style={{ width: 'min(480px, 92vw)' }}>
                 <div className="grid gap-3 p-4">
                     <DialogTitle>{result.title}</DialogTitle>
-                    <DialogDescription>
+                    <DialogDescription className="min-w-0 break-all whitespace-pre-wrap">
                         {result.output ?? 'Plugin command completed.'}
                     </DialogDescription>
                 </div>

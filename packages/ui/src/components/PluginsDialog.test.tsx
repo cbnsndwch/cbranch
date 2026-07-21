@@ -6,7 +6,7 @@ import { afterEach, describe, expect, test, vi } from 'vitest';
 import { type CbranchApi } from '../rpc/api';
 import { ApiProvider } from '../rpc/ApiProvider';
 import { useUiStore } from '../state/store';
-import { PluginsDialog } from './PluginsDialog';
+import { PluginCommandResultDialog, PluginsDialog } from './PluginsDialog';
 
 const repository = {
     id: 'official-repository',
@@ -17,9 +17,27 @@ const repository = {
     credentialState: 'not needed',
 };
 
-afterEach(() => useUiStore.setState({ pluginsDialogOpen: false }));
+afterEach(() =>
+    useUiStore.setState({
+        pluginsDialogOpen: false,
+        pluginCommandResult: null,
+    }),
+);
 
 describe('PluginsDialog', () => {
+    test('wraps unbroken command output inside its result dialog', () => {
+        const output = `repoId:${'a'.repeat(64)}`;
+        useUiStore.setState({
+            pluginCommandResult: { title: 'Plugin result', output },
+        });
+
+        render(<PluginCommandResultDialog />);
+
+        const description = screen.getByText(output);
+        expect(description.className).toContain('break-all');
+        expect(description.className).toContain('whitespace-pre-wrap');
+    });
+
     test('shows a catalog loading error instead of an empty panel', async () => {
         const api = {
             pluginRepositoryList: vi.fn(async () => [repository]),
