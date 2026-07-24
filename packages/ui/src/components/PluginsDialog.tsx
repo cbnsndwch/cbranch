@@ -65,6 +65,7 @@ function PluginsDialogBody({ onClose }: { readonly onClose: () => void }) {
     const api = useApi();
     const queryClient = useQueryClient();
     const [url, setUrl] = useState('');
+    const [credential, setCredential] = useState('');
     const [tab, setTab] = useState<PluginManagerTab>('installed');
     const [selectedRepositoryId, setSelectedRepositoryId] =
         useState<PluginRepositoryId>();
@@ -146,12 +147,27 @@ function PluginsDialogBody({ onClose }: { readonly onClose: () => void }) {
                                     }
                                     placeholder="https://raw.githubusercontent.com/org/repo/plugin-registry"
                                 />
+                                <Input
+                                    value={credential}
+                                    onChange={event =>
+                                        setCredential(event.target.value)
+                                    }
+                                    placeholder="Optional token (saved by Git)"
+                                    type="password"
+                                />
                                 <Button
                                     disabled={!url.trim()}
                                     onClick={() =>
                                         run(
-                                            api.pluginRepositoryAdd(url.trim()),
+                                            api.pluginRepositoryAdd(
+                                                url.trim(),
+                                                credential || undefined,
+                                            ),
                                             'Repository added.',
+                                            () => {
+                                                setUrl('');
+                                                setCredential('');
+                                            },
                                         )
                                     }
                                 >

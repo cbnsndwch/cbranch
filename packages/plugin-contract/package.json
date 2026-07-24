@@ -1,7 +1,6 @@
 {
     "name": "@cbranch/plugin-contract",
-    "version": "0.0.0",
-    "private": true,
+    "version": "1.0.0",
     "description": "Versioned plugin manifest, grant, repository, and broker data schemas.",
     "license": "MIT",
     "files": [
@@ -14,7 +13,14 @@
         ".": {
             "types": "./dist/index.d.ts",
             "default": "./dist/index.js"
+        },
+        "./author": {
+            "types": "./dist/author.d.ts",
+            "default": "./dist/author.js"
         }
+    },
+    "publishConfig": {
+        "access": "public"
     },
     "scripts": {
         "build": "tsc -b tsconfig.json",

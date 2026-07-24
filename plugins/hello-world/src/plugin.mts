@@ -1,21 +1,11 @@
-type PluginContext = {
-    readonly directory: string;
-    readonly log: (level: 'info' | 'warn' | 'error', message: string) => void;
-};
+import type { PluginFactory } from '@cbranch/plugin-contract/author';
 
-type CommandContext = {
-    readonly repoId: string;
-};
-
-export default function helloWorldPlugin({ log }: PluginContext) {
+const helloWorldPlugin: PluginFactory = ({ log }) => {
     log('info', 'Hello World plugin loaded.');
 
     return {
         commands: {
-            'dev.cbranch.hello-world.greet': (
-                input: unknown,
-                { repoId }: CommandContext,
-            ) => ({
+            'dev.cbranch.hello-world.greet': (input, { repoId }) => ({
                 message: 'Hello from the cbranch plugin system.',
                 repoId,
                 input,
@@ -28,4 +18,6 @@ export default function helloWorldPlugin({ log }: PluginContext) {
             log('info', 'Hello World plugin unloaded.');
         },
     };
-}
+};
+
+export default helloWorldPlugin;

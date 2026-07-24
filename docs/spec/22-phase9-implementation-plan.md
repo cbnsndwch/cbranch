@@ -25,7 +25,7 @@ plugin and turns remaining work into independently verifiable goal loops.
 | Contract and RPC catalog | partial | `packages/plugin-contract` and `packages/rpc-contract` define manifests, grants, installed records, repository lifecycle, and invocation schemas. `PluginUpdate` and `PluginRollback` are declared but have no manager implementation. |
 | Trusted ESM lifecycle | done for v1 commands | `apps/web-server/src/plugin-manager.ts` validates, loads, enables, disables, disposes, invokes, contains entrypoints, caps output, and records audits. |
 | HTTPS repository and signed artifacts | done for demonstrated path | TUF repository transport, root approval, catalog refresh, staging, archive validation, activation, and lock persistence exist in `apps/web-server/src/`. The hello-world artifact was browsed, installed, enabled, and invoked from a canary workspace. |
-| Repository source support | partial | HTTPS works. Git-backed repositories are explicitly refused by `repositoryRefresh`; private-credential and SSH workflows are not wired through the product UI. |
+| Repository source support | partial | HTTPS repositories, including private registries through Git's configured credential helper, work through the Plugins UI. Git-backed repositories and SSH remain explicitly refused by `repositoryRefresh`. |
 | Install and uninstall | done for demonstrated path | The Plugins dialog supports add, refresh, root trust, catalog browse, install, enable/disable, and uninstall. Installation currently applies an empty grant without a review flow. |
 | Update and rollback | not started | The RPC contract advertises both operations, but the manager and UI do not implement them. |
 | Permission review and broker APIs | not started | Grants are persisted and descriptive, but there is no install/update review or cbranch broker for Git, workspace, network, or host automation. |
@@ -180,9 +180,8 @@ model is stable.
 - Add scoped Git, workspace, network, and process broker APIs one capability at
   a time, preserving cbranch locks, confirmations, cancellation, redaction, and
   audit requirements.
-- Add private HTTPS credential storage, private Git/SSH repository handling,
-  Git-backed TUF sources, trust-root rotation, update review, rollback, and the
-  specified security-update policy.
+- Add private Git/SSH repository handling, Git-backed TUF sources, trust-root
+  rotation, update review, rollback, and the specified security-update policy.
 - Add end-to-end adversarial coverage required by P9: TUF expiry/replay/root
   rotation, credential redaction, archive attacks, permission expansion, and
   destructive operation confirmation.

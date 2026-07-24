@@ -44,8 +44,8 @@ The following decisions are fixed for the first release of this phase:
 - Plugins may receive a workspace-scoped filesystem and repository grant after
   explicit approval. The active engagement workspace is the default boundary;
   access outside it is a separate, high-risk grant.
-- Repositories may be public or private. Private HTTPS access uses a token held
-  only in the host OS secret store. Private Git repositories use the host's SSH
+- Repositories may be public or private. Private HTTPS access uses the host's
+  configured Git credential helper. Private Git repositories use the host's SSH
   configuration, keys, and agent; cbranch does not collect or store SSH keys.
 - Only artifacts signed by an explicitly trusted publisher are installable.
   Untrusted repositories may be added and browsed, but cannot install or update
@@ -200,11 +200,13 @@ under cbranch's control.
 An artifact manifest sets `runtime` to `"trusted-esm"` and names a safe relative
 `.mjs` or `.js` entrypoint. The module must default-export a factory receiving
 `{ directory, log }`, and return a hooks object. `commands` maps every declared
-command id to `(input, { repoId }) => output`; command ids must begin with the
+command id to `(input, { repoId, engagementId? }) => output`; command ids must begin with the
 plugin id and the implemented set must exactly match the reviewed declarations.
-`commandExecuted(commandId)`, `toolExecuteBefore`, `toolExecuteAfter`, and
-`dispose()` are optional hooks. Only `commandExecuted` currently has a host
-dispatch path. Hook errors are audited and do not fail a completed command.
+`commandExecuted(commandId)`, `toolExecuteBefore(execution)`,
+`toolExecuteAfter(execution)`, and `dispose()` are optional hooks. Tool hooks
+observe declared plugin command invocations only; they cannot veto or alter an
+invocation and receive no command input or output. Hook errors are audited and
+do not fail a command.
 
 Plugins must be self-contained and may not rely on runtime package installation.
 TypeScript source and npm package resolution are deferred until a production
@@ -272,19 +274,21 @@ the signed targets role and are not trusted before verification.
 
 ### HTTPS tokens
 
-For a private HTTPS repository, cbranch asks for an operator-created,
-least-privilege read token after the user has added the URL. The token is sent
-directly from the host service to that repository over HTTPS and is stored only
-in the OS secret store, keyed by the repository's stable local id. Configuration,
+For a private HTTPS repository, cbranch uses Git's configured credential helper
+for the repository HTTPS origin. A user may supply an operator-created,
+least-privilege read token while adding the repository; the host passes it once
+to `git credential approve` and then discards it. Before a request, the host
+uses `git credential fill` and uses only the returned password as the bearer
+token. A 401 response is reported to `git credential reject`. Configuration,
 lockfiles, logs, browser state, persisted or traced RPC request data, errors,
-and diagnostics contain only an opaque credential reference and never the token.
+and diagnostics never contain the token.
 
 The repository client attaches an authorization header only to the configured
 origin, strips it on every redirect, and rejects cross-origin redirects. It
 never sends a plugin-repository token to a plugin worker, Git remote, artifact
-URL at another origin, or browser client. If no secure secret store is available,
-cbranch permits use for the current process only and clearly states that the
-credential will not persist; it MUST NOT fall back to plaintext storage.
+URL at another origin, or browser client. Credential persistence and secure
+storage are controlled by the user's existing Git credential-helper setup;
+cbranch MUST NOT fall back to plaintext storage.
 
 ### Git over SSH
 
@@ -476,10 +480,10 @@ reinstall to select the same verified targets and makes rollback deterministic.
 
 ### Private access and secrets
 
-- **REQ-PLG-SEC-001.** HTTPS repository credentials SHALL be stored only in an
-  OS secret store and referenced elsewhere by an opaque identifier. If a secure
-  store is unavailable, cbranch MAY retain a credential in process memory for
-  the current run but MUST NOT persist it in plaintext.
+- **REQ-PLG-SEC-001.** HTTPS repository credentials SHALL be delegated only to
+  the host's configured Git credential helper. Cbranch SHALL not persist a
+  credential itself, retain it beyond an individual request, or fall back to
+  plaintext storage when the configured helper is unavailable.
 - **REQ-PLG-SEC-002.** Repository tokens SHALL never appear in URLs, config,
   lockfiles, logs, diagnostic exports, RPC responses, persisted or traced RPC
   request data, plugin worker messages, or browser state. Known token values
@@ -587,7 +591,7 @@ the canonical `GitError` union extended only when no existing code applies.
 | Method | Payload | Success | Notes |
 | --- | --- | --- | --- |
 | `plugin.repositoryList` | `{}` | `PluginRepository[]` | Redacted descriptors and trust/freshness state. |
-| `plugin.repositoryAdd` | `{ kind, url, credential? }` | `PluginRepository` | Credential is transferred once over guarded RPC, sent to the secret store, then discarded. |
+| `plugin.repositoryAdd` | `{ kind, url, credential? }` | `PluginRepository` | Credential is transferred once over guarded RPC, offered to Git's credential helper, then discarded. |
 | `plugin.repositoryRefresh` | `{ repositoryId }` | `RepositoryRefresh` | Fetches and verifies metadata; no plugin code runs. |
 | `plugin.repositoryRemove` | `{ repositoryId }` | `void` | Removes source configuration, not installed artifacts. |
 | `plugin.publisherTrust` | `{ repositoryId, rootFingerprint, approved }` | `PluginRepository` | Explicit root trust decision. |
@@ -602,9 +606,9 @@ the canonical `GitError` union extended only when no existing code applies.
 
 `plugin.repositoryAdd` is a deliberately narrow exception to the usual advice
 that secrets not traverse RPC: its optional credential is accepted only over the
-already Origin/Host-guarded private transport, passed immediately to the host
-secret-store adapter, redacted from tracing, and never returned or persisted in
-the configuration. A future native secret-store picker may remove even this
+already Origin/Host-guarded private transport, passed immediately to Git's
+credential helper, redacted from tracing, and never returned or persisted in
+the configuration. A future native credential picker may remove even this
 one-time transfer without changing repository semantics.
 
 Plugin contribution data is part of `plugin.list` / `plugin.invoke` results and

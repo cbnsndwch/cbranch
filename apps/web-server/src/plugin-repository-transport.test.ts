@@ -16,7 +16,7 @@ describe('HTTPS plugin repository transport', () => {
         });
         const transport = makeHttpsPluginRepositoryTransport({
             url: 'https://plugins.example.test/catalog',
-            credential: 'token',
+            getCredential: async () => 'token',
             fetch: fetch as unknown as typeof globalThis.fetch,
         });
 
@@ -47,5 +47,48 @@ describe('HTTPS plugin repository transport', () => {
         await expect(oversized.fetchMetadata('timestamp.json')).rejects.toThrow(
             'size limit',
         );
+    });
+
+    test('rejects a credential through its owner after an unauthorized response', async () => {
+        const rejectCredential = vi.fn(async () => undefined);
+        const transport = makeHttpsPluginRepositoryTransport({
+            url: 'https://plugins.example.test',
+            getCredential: async () => 'token',
+            rejectCredential,
+            fetch: async () => new Response(null, { status: 401 }),
+        });
+
+        await expect(transport.fetchMetadata('timestamp.json')).rejects.toThrow(
+            'HTTP 401',
+        );
+        expect(rejectCredential).toHaveBeenCalledOnce();
+        expect(rejectCredential).toHaveBeenCalledWith('token');
+    });
+
+    test('resolves a credential for each request instead of retaining it', async () => {
+        const getCredential = vi
+            .fn()
+            .mockResolvedValueOnce('first-token')
+            .mockResolvedValueOnce('second-token');
+        const requests: RequestInit[] = [];
+        const fetch = vi.fn(async (_url: URL | string, init?: RequestInit) => {
+            requests.push(init ?? {});
+            return new Response('metadata', {
+                headers: { 'content-length': '8' },
+            });
+        });
+        const transport = makeHttpsPluginRepositoryTransport({
+            url: 'https://plugins.example.test',
+            getCredential,
+            fetch: fetch as unknown as typeof globalThis.fetch,
+        });
+
+        await transport.fetchMetadata('timestamp.json');
+        await transport.fetchMetadata('snapshot.json');
+
+        expect(requests.map(request => request.headers)).toEqual([
+            { authorization: 'Bearer first-token' },
+            { authorization: 'Bearer second-token' },
+        ]);
     });
 });

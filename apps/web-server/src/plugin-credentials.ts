@@ -1,50 +1,94 @@
-// Host-only plugin repository credential boundary. Neither plugin-contract nor
-// plugin-runtime imports this module, so a token cannot reach a worker or browser API.
+// Host-only plugin repository credential boundary. Git owns the configured
+// credential helper, so cbranch never persists a registry token itself.
 
-import { randomUUID } from 'node:crypto';
-
-import type { PluginRepositoryId } from '@cbranch/plugin-contract';
-
-export type PluginCredentialReference = string & {
-    readonly __pluginCredentialReference: unique symbol;
-};
+import { spawn } from 'node:child_process';
 
 export interface PluginCredentialStore {
-    /** True only for an OS-backed secret store. */
-    readonly persistent: boolean;
-    /** Replaces a repository credential and returns only its opaque reference. */
+    /** Reads the token Git's configured credential helper supplies for this origin. */
+    readonly get: (repositoryUrl: string) => Promise<string | undefined>;
+    /** Offers a user-supplied token to Git's configured credential helper. */
     readonly replace: (
-        repositoryId: PluginRepositoryId,
+        repositoryUrl: string,
         credential: string,
-    ) => Promise<PluginCredentialReference>;
-    /** Host repository clients use this immediately before an authenticated request. */
-    readonly get: (
-        repositoryId: PluginRepositoryId,
-    ) => Promise<string | undefined>;
-    readonly remove: (repositoryId: PluginRepositoryId) => Promise<void>;
+    ) => Promise<void>;
+    /** Invalidates a rejected token in Git's configured credential helper. */
+    readonly reject: (
+        repositoryUrl: string,
+        credential: string,
+    ) => Promise<void>;
 }
 
-/**
- * Fallback when the platform has no secure secret store. Its contents disappear with
- * the process and the only externally visible value is a random opaque reference.
- */
-export const makeProcessCredentialStore = (): PluginCredentialStore => {
-    const credentials = new Map<
-        PluginRepositoryId,
-        { reference: PluginCredentialReference; value: string }
-    >();
+export type GitCredentialRunner = (
+    operation: 'fill' | 'approve' | 'reject',
+    input: string,
+) => Promise<string>;
 
-    return {
-        persistent: false,
-        replace: async (repositoryId, credential) => {
-            const reference =
-                `plugin-secret:${randomUUID()}` as PluginCredentialReference;
-            credentials.set(repositoryId, { reference, value: credential });
-            return reference;
-        },
-        get: async repositoryId => credentials.get(repositoryId)?.value,
-        remove: async repositoryId => {
-            credentials.delete(repositoryId);
-        },
-    };
+export const makeGitCredentialStore = (
+    run: GitCredentialRunner = runGitCredential,
+): PluginCredentialStore => ({
+    get: async repositoryUrl => {
+        const output = await run(
+            'fill',
+            credentialInput(repositoryUrl, undefined, true),
+        );
+        return credentialOutput(output).password;
+    },
+    replace: async (repositoryUrl, credential) => {
+        await run('approve', credentialInput(repositoryUrl, credential, true));
+    },
+    reject: async (repositoryUrl, credential) => {
+        await run('reject', credentialInput(repositoryUrl, credential, true));
+    },
+});
+
+const credentialInput = (
+    repositoryUrl: string,
+    password?: string,
+    includeIdentity = false,
+): string => {
+    const url = new URL(repositoryUrl);
+    if (url.protocol !== 'https:' || url.username || url.password)
+        throw new Error(
+            'Plugin credentials require a clean HTTPS repository URL.',
+        );
+    if (password?.match(/[\r\n\0]/))
+        throw new Error(
+            'Plugin credentials cannot contain control characters.',
+        );
+    const lines = [`protocol=https`, `host=${url.host}`];
+    // This namespaces cbranch registry credentials in helpers that key on username.
+    if (includeIdentity) lines.push('username=cbranch-plugin-registry');
+    if (password !== undefined) lines.push(`password=${password}`);
+    return `${lines.join('\n')}\n\n`;
 };
+
+const credentialOutput = (output: string): { readonly password?: string } => {
+    const values = new Map(
+        output
+            .split('\n')
+            .filter(Boolean)
+            .map(line => {
+                const separator = line.indexOf('=');
+                return [line.slice(0, separator), line.slice(separator + 1)];
+            }),
+    );
+    return { password: values.get('password') || undefined };
+};
+
+const runGitCredential: GitCredentialRunner = (operation, input) =>
+    new Promise((resolve, reject) => {
+        const child = spawn('git', ['credential', operation], {
+            env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
+            stdio: ['pipe', 'pipe', 'ignore'],
+        });
+        const chunks: Buffer[] = [];
+        child.once('error', () =>
+            reject(new Error('Git credential helper is unavailable.')),
+        );
+        child.stdout.on('data', (chunk: Buffer) => chunks.push(chunk));
+        child.once('close', code => {
+            if (code === 0) resolve(Buffer.concat(chunks).toString('utf8'));
+            else reject(new Error('Git credential helper could not complete.'));
+        });
+        child.stdin.end(input);
+    });

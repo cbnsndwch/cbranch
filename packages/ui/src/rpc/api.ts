@@ -121,7 +121,10 @@ export type Unsubscribe = () => void;
 export interface CbranchApi {
     pluginRuntimeStatus(): Promise<PluginRuntimeStatus>;
     pluginRepositoryList(): Promise<ReadonlyArray<PluginRepository>>;
-    pluginRepositoryAdd(url: string): Promise<PluginRepository>;
+    pluginRepositoryAdd(
+        url: string,
+        credential?: string,
+    ): Promise<PluginRepository>;
     pluginRepositoryRefresh(repositoryId: PluginRepositoryId): Promise<void>;
     pluginPublisherTrust(
         repositoryId: PluginRepositoryId,
@@ -151,6 +154,7 @@ export interface CbranchApi {
         readonly commandId: string;
         readonly repoId: string;
         readonly engagementId?: string;
+        readonly input?: unknown;
     }): Promise<PluginInvocation>;
     repoOpen(path: string): Promise<RepoHandle>;
     repoInit(input: {
@@ -677,9 +681,11 @@ export const makeApi = (runtime: AppRuntime): CbranchApi => {
             runtime.runPromise(withClient(c => c.PluginRuntimeStatus({}))),
         pluginRepositoryList: () =>
             runtime.runPromise(withClient(c => c.PluginRepositoryList({}))),
-        pluginRepositoryAdd: url =>
+        pluginRepositoryAdd: (url, credential) =>
             runtime.runPromise(
-                withClient(c => c.PluginRepositoryAdd({ kind: 'https', url })),
+                withClient(c =>
+                    c.PluginRepositoryAdd({ kind: 'https', url, credential }),
+                ),
             ),
         pluginRepositoryRefresh: repositoryId =>
             runtime

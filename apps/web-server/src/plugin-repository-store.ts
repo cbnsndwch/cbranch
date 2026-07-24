@@ -67,6 +67,7 @@ export interface PluginRepositoryStore {
     readonly add: (
         kind: PluginRepositorySourceKind,
         url: string,
+        credentialState?: PluginRepository['credentialState'],
     ) => Promise<PluginRepository>;
     readonly trust: (
         repositoryId: PluginRepositoryId,
@@ -77,6 +78,10 @@ export interface PluginRepositoryStore {
         repositoryId: PluginRepositoryId,
         fingerprint: string,
         root: Uint8Array,
+    ) => Promise<PluginRepository>;
+    readonly setCredentialState: (
+        repositoryId: PluginRepositoryId,
+        credentialState: PluginRepository['credentialState'],
     ) => Promise<PluginRepository>;
     readonly remove: (repositoryId: PluginRepositoryId) => Promise<void>;
 }
@@ -175,7 +180,7 @@ export const makePluginRepositoryStore = (
             (await writeTail.then(() => load())).repositories.find(
                 entry => entry.repository.id === repositoryId,
             ),
-        add: (kind, url) =>
+        add: (kind, url, credentialState = 'not needed') =>
             update(current => {
                 const repository = new PluginRepository({
                     id: PluginRepositoryId.make(randomUUID()),
@@ -183,7 +188,7 @@ export const makePluginRepositoryStore = (
                     url,
                     trustState: 'untrusted',
                     freshness: 'unknown',
-                    credentialState: 'not needed',
+                    credentialState,
                 });
                 return [
                     repository,
@@ -233,6 +238,29 @@ export const makePluginRepositoryStore = (
                             ? new StoredRepository({
                                   repository,
                                   root: Buffer.from(root).toString('base64'),
+                              })
+                            : entry,
+                    ),
+                ];
+            }),
+        setCredentialState: (repositoryId, credentialState) =>
+            update(current => {
+                const existing = current.find(
+                    entry => entry.repository.id === repositoryId,
+                );
+                if (!existing)
+                    throw new Error('Plugin repository was not found.');
+                const repository = new PluginRepository({
+                    ...existing.repository,
+                    credentialState,
+                });
+                return [
+                    repository,
+                    current.map(entry =>
+                        entry.repository.id === repositoryId
+                            ? new StoredRepository({
+                                  ...entry,
+                                  repository,
                               })
                             : entry,
                     ),

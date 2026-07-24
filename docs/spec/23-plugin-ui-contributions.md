@@ -101,6 +101,31 @@ the designated surface.
 
 ## Packaging and Release
 
+The public author SDK is `@cbranch/plugin-contract`. Plugin entrypoints import
+their factory type from `@cbranch/plugin-contract/author` and pin the released
+SDK major version that matches their manifest's `engines.pluginContract` value:
+
+```ts
+import type { PluginFactory } from '@cbranch/plugin-contract/author';
+
+const plugin: PluginFactory = ({ log }) => ({
+  commands: {
+    'com.example.release.deploy': (_input, { repoId }) => {
+      log('info', `Deploying ${repoId}.`);
+      return 'Started deployment.';
+    },
+  },
+});
+
+export default plugin;
+```
+
+The v1 SDK exposes only `directory`, structured `log`, declared command
+handlers, command lifecycle hooks, and `dispose`. It exposes no credentials,
+Git, filesystem, network, process, arbitrary host-tool, or browser APIs.
+`plugins/hello-world` is
+the maintained compatibility fixture for this contract.
+
 Plugins are self-contained `.cbranch-plugin` archives containing `plugin.json`
 and the declared ESM entrypoint. Do not run package-manager lifecycle scripts or
 download dependencies at installation time.
@@ -113,3 +138,23 @@ The first-party test registry is released independently from desktop canaries:
 The registry target version must match `plugin.json`. A private plugin publishes
 to its own signed TUF repository and must not commit client proprietary tooling,
 credentials, or artifacts to cbranch.
+
+## Private Registry Availability
+
+Authenticated HTTPS registries use the user's configured Git credential helper.
+An optional token supplied during repository addition is passed once to `git
+credential approve`; subsequent requests obtain a token through `git credential
+fill`. The host sends that token only to the configured HTTPS origin with
+redirects disabled, and reports a 401 response through `git credential reject`.
+Repository lists, locks, audits, errors, and browser state never expose the
+token. Cbranch does not implement or fall back to its own plaintext credential
+store.
+
+## External Author Workflow
+
+An external plugin author pins the released `@cbranch/plugin-contract` major
+version, develops in an isolated private repository, packages a deterministic
+archive, and publishes only the signed archive and TUF metadata to a private
+registry. Compatibility reports sent to cbranch must contain only sanitized
+manifest and contract data. Do not send proprietary source, build logs,
+repository paths, credentials, or client identifiers.

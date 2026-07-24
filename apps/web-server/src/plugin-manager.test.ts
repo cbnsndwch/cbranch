@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { mkdir, mkdtemp, symlink, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { zstdCompressSync } from 'node:zlib';
@@ -16,6 +16,7 @@ import { Schema } from 'effect';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 
 import { makePluginLockStore } from './plugin-lock-store';
+import type { PluginCredentialStore } from './plugin-credentials';
 import {
     activatedPluginDirectory,
     makeTrustedPluginManager,
@@ -35,6 +36,20 @@ const metadataBytes = (value: unknown) =>
     new TextEncoder().encode(JSON.stringify(value));
 const metadataDigest = (value: Uint8Array) =>
     createHash('sha256').update(value).digest('hex');
+
+const makeCredentialStore = (): PluginCredentialStore => {
+    const credentials = new Map<string, string>();
+    return {
+        get: vi.fn(async repositoryUrl => credentials.get(repositoryUrl)),
+        replace: vi.fn(async (repositoryUrl, credential) => {
+            credentials.set(repositoryUrl, credential);
+        }),
+        reject: vi.fn(async (repositoryUrl, credential) => {
+            if (credentials.get(repositoryUrl) === credential)
+                credentials.delete(repositoryUrl);
+        }),
+    };
+};
 
 const makeRecord = (
     enabled: boolean,
@@ -85,14 +100,22 @@ describe('trusted plugin manager', () => {
         const dataDirectory = await mkdtemp(
             join(tmpdir(), 'cbranch-plugin-manager-'),
         );
-        const manager = makeTrustedPluginManager({ dataDirectory });
+        const credentialStore = makeCredentialStore();
+        const manager = makeTrustedPluginManager({
+            dataDirectory,
+            credentialStore,
+        });
 
         await expect(
             manager.repositoryAdd(
                 'https',
                 'https://plugins.example.test/catalog',
+                'private-token-value',
             ),
-        ).resolves.toMatchObject({ trustState: 'untrusted' });
+        ).resolves.toMatchObject({
+            trustState: 'untrusted',
+            credentialState: 'available',
+        });
         await expect(
             manager.repositoryAdd('https', 'http://plugins.example.test'),
         ).rejects.toThrow('forbidden transport');
@@ -100,6 +123,116 @@ describe('trusted plugin manager', () => {
             expect.arrayContaining([
                 expect.objectContaining({
                     url: 'https://plugins.example.test/catalog',
+                }),
+            ]),
+        );
+        await expect(
+            readFile(join(dataDirectory, 'repositories.json'), 'utf8'),
+        ).resolves.not.toContain('private-token-value');
+        await expect(
+            makeTrustedPluginManager({
+                dataDirectory,
+                credentialStore,
+            }).repositoryList(),
+        ).resolves.toEqual(
+            expect.arrayContaining([
+                expect.objectContaining({
+                    url: 'https://plugins.example.test/catalog',
+                    credentialState: 'available',
+                }),
+            ]),
+        );
+    });
+
+    test('uses a private registry credential only for its configured HTTPS origin', async () => {
+        const dataDirectory = await mkdtemp(
+            join(tmpdir(), 'cbranch-plugin-manager-'),
+        );
+        const fetch = vi.fn(
+            async (_url: URL | string, _init?: RequestInit) =>
+                new Response('root metadata', {
+                    headers: { 'content-length': '13' },
+                }),
+        );
+        vi.stubGlobal('fetch', fetch);
+        const manager = makeTrustedPluginManager({
+            dataDirectory,
+            credentialStore: makeCredentialStore(),
+        });
+        const repository = await manager.repositoryAdd(
+            'https',
+            'https://private.example.test/registry',
+            'private-token-value',
+        );
+
+        await manager.repositoryRefresh(repository.id);
+
+        expect(fetch).toHaveBeenCalledWith(
+            new URL('https://private.example.test/registry/metadata/root.json'),
+            expect.objectContaining({
+                headers: { authorization: 'Bearer private-token-value' },
+                redirect: 'manual',
+            }),
+        );
+    });
+
+    test('marks a repository for credential replacement after a 401', async () => {
+        const dataDirectory = await mkdtemp(
+            join(tmpdir(), 'cbranch-plugin-manager-'),
+        );
+        const credentialStore = makeCredentialStore();
+        const manager = makeTrustedPluginManager({
+            dataDirectory,
+            credentialStore,
+        });
+        const repository = await manager.repositoryAdd(
+            'https',
+            'https://private.example.test/registry',
+            'private-token-value',
+        );
+        vi.stubGlobal('fetch', async () => new Response(null, { status: 401 }));
+
+        await expect(manager.repositoryRefresh(repository.id)).rejects.toThrow(
+            'HTTP 401',
+        );
+        await expect(manager.repositoryList()).resolves.toEqual(
+            expect.arrayContaining([
+                expect.objectContaining({
+                    id: repository.id,
+                    credentialState: 'needs attention',
+                }),
+            ]),
+        );
+        expect(credentialStore.reject).toHaveBeenCalledWith(
+            'https://private.example.test/registry',
+            'private-token-value',
+        );
+    });
+
+    test('does not add a repository when credential approval fails', async () => {
+        const dataDirectory = await mkdtemp(
+            join(tmpdir(), 'cbranch-plugin-manager-'),
+        );
+        const credentialStore = makeCredentialStore();
+        vi.mocked(credentialStore.replace).mockRejectedValueOnce(
+            new Error('credential helper failed'),
+        );
+        const manager = makeTrustedPluginManager({
+            dataDirectory,
+            credentialStore,
+        });
+
+        await expect(
+            manager.repositoryAdd(
+                'https',
+                'https://private.example.test/registry',
+                'private-token-value',
+            ),
+        ).rejects.toThrow('credential helper failed');
+        await expect(manager.repositoryList()).resolves.not.toEqual(
+            expect.arrayContaining([
+                expect.objectContaining({
+                    url: 'https://private.example.test/registry',
                 }),
             ]),
         );
@@ -212,7 +345,9 @@ describe('trusted plugin manager', () => {
             targetPath,
             manifest,
         });
+        let unauthorized = false;
         vi.stubGlobal('fetch', async (url: URL | string) => {
+            if (unauthorized) return new Response(null, { status: 401 });
             const path = new URL(String(url)).pathname.replace('/catalog/', '');
             const body =
                 path === targetPath
@@ -222,10 +357,14 @@ describe('trusted plugin manager', () => {
                 headers: { 'content-length': String(body.byteLength) },
             });
         });
-        const manager = makeTrustedPluginManager({ dataDirectory });
+        const manager = makeTrustedPluginManager({
+            dataDirectory,
+            credentialStore: makeCredentialStore(),
+        });
         const repository = await manager.repositoryAdd(
             'https',
             'https://plugins.example.test/catalog',
+            'private-token-value',
         );
 
         const untrusted = await manager.repositoryRefresh(repository.id);
@@ -236,6 +375,29 @@ describe('trusted plugin manager', () => {
         );
         await manager.repositoryRefresh(trusted.id);
         await manager.catalogList(trusted.id);
+        unauthorized = true;
+        await expect(manager.catalogList(trusted.id)).rejects.toThrow(
+            'HTTP 401',
+        );
+        await expect(manager.repositoryList()).resolves.toEqual(
+            expect.arrayContaining([
+                expect.objectContaining({
+                    id: trusted.id,
+                    credentialState: 'needs attention',
+                }),
+            ]),
+        );
+        await expect(
+            manager.installReview({
+                repositoryId: trusted.id,
+                pluginId: manifest.id,
+                version: manifest.version,
+            }),
+        ).rejects.toThrow('Refresh the trusted plugin repository');
+        unauthorized = false;
+        await expect(manager.catalogList(trusted.id)).resolves.not.toHaveLength(
+            0,
+        );
         const review = await manager.installReview({
             repositoryId: trusted.id,
             pluginId: manifest.id,
@@ -279,11 +441,17 @@ describe('trusted plugin manager', () => {
             `export default ({ log }) => ({
                 commands: {
                     'com.example.release.run': input =>
-                        input === 'dialog'
+                        input === 'fail'
+                            ? (() => {
+                                  throw new Error('expected failure');
+                              })()
+                            : input === 'dialog'
                             ? { _tag: 'dialog', title: 'Release', body: 'Ready' }
                             : 'ran:' + input,
                 },
                 commandExecuted: command => log('info', command),
+                toolExecuteBefore: execution => log('info', 'before:' + execution.engagementId),
+                toolExecuteAfter: execution => log('info', 'after:' + execution.state),
             });`,
         );
         const lockStore = makePluginLockStore({ dataDirectory });
@@ -297,9 +465,18 @@ describe('trusted plugin manager', () => {
                 pluginId: record.pluginId,
                 commandId: 'com.example.release.run',
                 repoId: 'repo-1',
+                engagementId: 'engagement-1',
                 input: 'check',
             }),
         ).resolves.toMatchObject({ state: 'completed', output: 'ran:check' });
+        await expect(
+            manager.invoke({
+                pluginId: record.pluginId,
+                commandId: 'com.example.release.run',
+                repoId: 'repo-1',
+                input: 'fail',
+            }),
+        ).rejects.toThrow('failed');
         await expect(
             manager.invoke({
                 pluginId: record.pluginId,
@@ -318,6 +495,8 @@ describe('trusted plugin manager', () => {
                 'load',
                 'invoke',
                 'hook.commandExecuted',
+                'hook.toolExecuteBefore',
+                'hook.toolExecuteAfter',
                 'log.info',
             ]),
         );

@@ -54,8 +54,8 @@ export {
     type PluginArtifactStore,
 } from './plugin-artifact-store';
 export {
-    makeProcessCredentialStore,
-    type PluginCredentialReference,
+    makeGitCredentialStore,
+    type GitCredentialRunner,
     type PluginCredentialStore,
 } from './plugin-credentials';
 export {

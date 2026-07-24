@@ -10,7 +10,9 @@ const MAX_TARGET_BYTES = 50 * 1024 * 1024;
 
 export type PluginRepositoryTransportOptions = {
     readonly url: string;
-    readonly credential?: string;
+    /** Resolves a credential immediately before each request; it is never cached here. */
+    readonly getCredential?: () => Promise<string | undefined>;
+    readonly rejectCredential?: (credential?: string) => Promise<void>;
     readonly fetch?: typeof globalThis.fetch;
 };
 
@@ -20,20 +22,24 @@ export const makeHttpsPluginRepositoryTransport = (
 ): PluginRepositoryTransport => {
     const baseUrl = validateRepositoryUrl('https', options.url);
     const fetcher = options.fetch ?? globalThis.fetch;
-    const authorization = options.credential
-        ? `Bearer ${options.credential}`
-        : undefined;
-
     const fetchPath = async (
         path: string,
         limit: number,
     ): Promise<Uint8Array> => {
         const url = resolveRepositoryPath(baseUrl, path);
+        const credential = await options.getCredential?.();
         const response = await fetcher(url, {
-            headers: authorization ? { authorization } : undefined,
+            headers: credential
+                ? { authorization: `Bearer ${credential}` }
+                : undefined,
             redirect: 'manual',
         });
-        if (response.type === 'opaqueredirect' || response.status >= 300) {
+        if (response.status === 401 && options.rejectCredential)
+            await options.rejectCredential(credential).catch(() => undefined);
+        if (
+            response.type === 'opaqueredirect' ||
+            (response.status >= 300 && response.status < 400)
+        ) {
             throw new Error('Plugin repository redirects are not allowed.');
         }
         if (!response.ok) {

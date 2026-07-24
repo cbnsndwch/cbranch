@@ -5,43 +5,17 @@ import { realpath } from 'node:fs/promises';
 import { extname, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-export type TrustedPluginContext = {
-    readonly directory: string;
-    readonly log: (
-        level: 'debug' | 'info' | 'warn' | 'error',
-        message: string,
-    ) => void;
-};
+import type {
+    PluginCommandContext,
+    PluginContext,
+    PluginFactory,
+    PluginHooks,
+} from '@cbranch/plugin-contract/author';
 
-export type TrustedPluginHooks = {
-    readonly commandExecuted?: (command: string) => void | Promise<void>;
-    readonly commands?: Readonly<
-        Record<
-            string,
-            (
-                input: unknown,
-                context: TrustedPluginCommandContext,
-            ) => unknown | Promise<unknown>
-        >
-    >;
-    readonly toolExecuteBefore?: (
-        tool: string,
-        arguments_: Record<string, unknown>,
-    ) => void | Promise<void>;
-    readonly toolExecuteAfter?: (
-        tool: string,
-        result: unknown,
-    ) => void | Promise<void>;
-    readonly dispose?: () => void | Promise<void>;
-};
-
-export type TrustedPluginCommandContext = {
-    readonly repoId: string;
-};
-
-export type TrustedPlugin = (
-    context: TrustedPluginContext,
-) => TrustedPluginHooks | Promise<TrustedPluginHooks>;
+export type TrustedPluginContext = PluginContext;
+export type TrustedPluginHooks = PluginHooks;
+export type TrustedPluginCommandContext = PluginCommandContext;
+export type TrustedPlugin = PluginFactory;
 
 export type TrustedPluginLoadOptions = {
     /** Activated root containing the immutable reviewed module. */

@@ -12,5 +12,8 @@
         "build": "tsc -b tsconfig.json && node scripts/prepare-artifact.mjs",
         "typecheck": "tsc -b tsconfig.json",
         "package": "pnpm build && tar --create --zstd --sort=name --mtime='UTC 1970-01-01' --owner=0 --group=0 --numeric-owner --file artifacts/dev.cbranch.hello-world.cbranch-plugin --directory dist plugin.json plugin.mjs"
+    },
+    "devDependencies": {
+        "@cbranch/plugin-contract": "workspace:^"
     }
 }

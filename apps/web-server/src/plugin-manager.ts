@@ -22,7 +22,7 @@ import {
     type PluginInstallReviewInput,
     type PluginInvokeInput,
     type PluginPublisherTrustInput,
-    type PluginRepository,
+    PluginRepository,
     type PluginRepositoryAddInput,
     type PluginRepositoryIdInput,
 } from '@cbranch/plugin-contract';
@@ -52,6 +52,10 @@ import {
     makePluginRepositoryStore,
     type PluginRepositoryStore,
 } from './plugin-repository-store';
+import {
+    makeGitCredentialStore,
+    type PluginCredentialStore,
+} from './plugin-credentials';
 import { makeHttpsPluginRepositoryTransport } from './plugin-repository-transport';
 import { verifyTufEd25519Signature } from './tuf-signature-verifier';
 import { makeTufPluginRepository } from './tuf-plugin-repository';
@@ -114,6 +118,7 @@ export type TrustedPluginManagerOptions = {
     readonly auditStore?: PluginAuditStore;
     readonly artifactStore?: PluginArtifactStore;
     readonly repositoryStore?: PluginRepositoryStore;
+    readonly credentialStore?: PluginCredentialStore;
 };
 
 /** Signed target data accepted only after a repository/TUF adapter verified it. */
@@ -183,6 +188,7 @@ export const makeTrustedPluginManager = (
         options.artifactStore ?? makePluginArtifactStore({ dataDirectory });
     const repositoryStore =
         options.repositoryStore ?? makePluginRepositoryStore({ dataDirectory });
+    const credentialStore = options.credentialStore ?? makeGitCredentialStore();
     const repositories = new Map<
         string,
         ReturnType<typeof makeTufPluginRepository>
@@ -199,6 +205,7 @@ export const makeTrustedPluginManager = (
         capability?: PluginAuditEvent['capability'],
         repoId?: string,
         operationId?: PluginAuditEvent['operationId'],
+        engagementId?: string,
     ): Promise<void> => {
         await auditStore.record(
             new PluginAuditEvent({
@@ -213,6 +220,7 @@ export const makeTrustedPluginManager = (
                 errorCode,
                 capability,
                 repoId,
+                engagementId,
             }),
         );
     };
@@ -325,6 +333,31 @@ export const makeTrustedPluginManager = (
             root: Buffer.from(stored.root, 'base64'),
             transport: makeHttpsPluginRepositoryTransport({
                 url: stored.repository.url,
+                getCredential: async () => {
+                    const credential = await credentialStore.get(
+                        stored.repository.url,
+                    );
+                    if (
+                        credential &&
+                        stored.repository.credentialState !== 'available'
+                    )
+                        await repositoryStore.setCredentialState(
+                            repositoryId,
+                            'available',
+                        );
+                    return credential;
+                },
+                rejectCredential: async credential => {
+                    if (credential)
+                        await credentialStore
+                            .reject(stored.repository.url, credential)
+                            .catch(() => undefined);
+                    repositories.delete(String(repositoryId));
+                    await repositoryStore.setCredentialState(
+                        repositoryId,
+                        'needs attention',
+                    );
+                },
             }),
             artifactStore,
             verifySignature: verifyTufEd25519Signature,
@@ -348,13 +381,25 @@ export const makeTrustedPluginManager = (
             });
         },
         repositoryList: async (): Promise<readonly PluginRepository[]> =>
-            (await repositoryStore.list()).map(entry => entry.repository),
+            (await repositoryStore.list()).map(
+                entry => new PluginRepository(entry.repository),
+            ),
         repositoryAdd: async (
             kind: PluginRepositoryAddInput['kind'],
             url: string,
+            credential?: string,
         ): Promise<PluginRepository> => {
             validateRepositoryUrl(kind, url);
-            return repositoryStore.add(kind, url);
+            if (!credential) return repositoryStore.add(kind, url);
+            await credentialStore.replace(url, credential);
+            try {
+                return await repositoryStore.add(kind, url, 'available');
+            } catch (error) {
+                await credentialStore
+                    .reject(url, credential)
+                    .catch(() => undefined);
+                throw error;
+            }
         },
         repositoryRemove: async (
             repositoryId: PluginRepositoryIdInput['repositoryId'],
@@ -404,6 +449,18 @@ export const makeTrustedPluginManager = (
             if (stored.repository.trustState !== 'trusted') {
                 const root = await makeHttpsPluginRepositoryTransport({
                     url: stored.repository.url,
+                    getCredential: () =>
+                        credentialStore.get(stored.repository.url),
+                    rejectCredential: async credential => {
+                        if (credential)
+                            await credentialStore
+                                .reject(stored.repository.url, credential)
+                                .catch(() => undefined);
+                        await repositoryStore.setCredentialState(
+                            repositoryId,
+                            'needs attention',
+                        );
+                    },
                 }).fetchMetadata('metadata/root.json');
                 const repository = await repositoryStore.setRoot(
                     repositoryId,
@@ -598,6 +655,7 @@ export const makeTrustedPluginManager = (
                     undefined,
                     input.repoId,
                     operationId,
+                    input.engagementId,
                 );
                 throw new PluginManagerError(
                     'pluginPermissionDenied',
@@ -617,6 +675,7 @@ export const makeTrustedPluginManager = (
                     undefined,
                     input.repoId,
                     operationId,
+                    input.engagementId,
                 );
                 throw new PluginManagerError(
                     'pluginPermissionDenied',
@@ -633,6 +692,7 @@ export const makeTrustedPluginManager = (
                     undefined,
                     input.repoId,
                     operationId,
+                    input.engagementId,
                 );
                 throw new PluginManagerError(
                     'pluginWorkerFailed',
@@ -640,10 +700,70 @@ export const makeTrustedPluginManager = (
                 );
             }
 
+            const hookTargets = [...loaded.values()].toSorted((left, right) =>
+                String(left.record.pluginId).localeCompare(
+                    String(right.record.pluginId),
+                ),
+            );
+            const execution = {
+                operationId: String(operationId),
+                pluginId: String(input.pluginId),
+                commandId: input.commandId,
+                repoId: input.repoId,
+                engagementId: input.engagementId,
+            };
+            const dispatchToolHooks = async (
+                stage: 'before' | 'after',
+                state?: 'completed' | 'failed',
+            ): Promise<void> => {
+                for (const target of hookTargets) {
+                    if (
+                        stage === 'before'
+                            ? !target.hooks.toolExecuteBefore
+                            : !target.hooks.toolExecuteAfter
+                    )
+                        continue;
+                    try {
+                        if (stage === 'before')
+                            await target.hooks.toolExecuteBefore?.(execution);
+                        else
+                            await target.hooks.toolExecuteAfter?.({
+                                ...execution,
+                                state: state!,
+                            });
+                        await recordAudit(
+                            `hook.toolExecute${stage === 'before' ? 'Before' : 'After'}`,
+                            'allowed',
+                            target.record,
+                            undefined,
+                            undefined,
+                            input.repoId,
+                            operationId,
+                            input.engagementId,
+                        ).catch(() => undefined);
+                    } catch (error) {
+                        await recordAudit(
+                            `hook.toolExecute${stage === 'before' ? 'Before' : 'After'}`,
+                            'failed',
+                            target.record,
+                            errorCode(error),
+                            undefined,
+                            input.repoId,
+                            operationId,
+                            input.engagementId,
+                        ).catch(() => undefined);
+                    }
+                }
+            };
+
+            await dispatchToolHooks('before');
             let outcome: Pick<PluginInvocation, 'output' | 'result'>;
             try {
                 outcome = serializePluginOutput(
-                    await command(input.input, { repoId: input.repoId }),
+                    await command(input.input, {
+                        repoId: input.repoId,
+                        engagementId: input.engagementId,
+                    }),
                 );
                 await recordAudit(
                     'invoke',
@@ -664,50 +784,45 @@ export const makeTrustedPluginManager = (
                     input.repoId,
                     operationId,
                 );
+                await dispatchToolHooks('after', 'failed');
                 throw new PluginManagerError(
                     'pluginWorkerFailed',
                     `Plugin command ${input.commandId} failed.`,
                 );
             }
 
+            await dispatchToolHooks('after', 'completed');
+
             // Hooks see completed commands in a stable order, even if an earlier hook fails.
-            await [...loaded.values()]
-                .toSorted((left, right) =>
-                    String(left.record.pluginId).localeCompare(
-                        String(right.record.pluginId),
-                    ),
-                )
-                .reduce(
-                    (chain, target) =>
-                        chain.then(async () => {
-                            if (!target.hooks.commandExecuted) return;
-                            try {
-                                await target.hooks.commandExecuted(
-                                    input.commandId,
-                                );
-                                await recordAudit(
-                                    'hook.commandExecuted',
-                                    'allowed',
-                                    target.record,
-                                    undefined,
-                                    undefined,
-                                    input.repoId,
-                                    operationId,
-                                );
-                            } catch (error) {
-                                await recordAudit(
-                                    'hook.commandExecuted',
-                                    'failed',
-                                    target.record,
-                                    errorCode(error),
-                                    undefined,
-                                    input.repoId,
-                                    operationId,
-                                );
-                            }
-                        }),
-                    Promise.resolve(),
-                );
+            await hookTargets.reduce(
+                (chain, target) =>
+                    chain.then(async () => {
+                        if (!target.hooks.commandExecuted) return;
+                        try {
+                            await target.hooks.commandExecuted(input.commandId);
+                            await recordAudit(
+                                'hook.commandExecuted',
+                                'allowed',
+                                target.record,
+                                undefined,
+                                undefined,
+                                input.repoId,
+                                operationId,
+                            );
+                        } catch (error) {
+                            await recordAudit(
+                                'hook.commandExecuted',
+                                'failed',
+                                target.record,
+                                errorCode(error),
+                                undefined,
+                                input.repoId,
+                                operationId,
+                            );
+                        }
+                    }),
+                Promise.resolve(),
+            );
             return new PluginInvocation({
                 operationId,
                 state: 'completed',
@@ -759,7 +874,9 @@ export const trustedPluginManagerLayer = Layer.sync(PluginManager, () => {
         runtimeStatus: () => effectFrom(manager.runtimeStatus),
         repositoryList: () => effectFrom(manager.repositoryList),
         repositoryAdd: input =>
-            effectFrom(() => manager.repositoryAdd(input.kind, input.url)),
+            effectFrom(() =>
+                manager.repositoryAdd(input.kind, input.url, input.credential),
+            ),
         repositoryRefresh: input =>
             effectFrom(() => manager.repositoryRefresh(input.repositoryId)),
         repositoryRemove: input =>

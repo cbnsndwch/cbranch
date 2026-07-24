@@ -1,32 +1,60 @@
-import { PluginRepositoryId } from '@cbranch/plugin-contract';
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
 
-import { makeProcessCredentialStore } from './plugin-credentials';
+import { makeGitCredentialStore } from './plugin-credentials';
 
-describe('process plugin credential store', () => {
-    test('returns an opaque reference and retains credentials only in process memory', async () => {
-        const store = makeProcessCredentialStore();
-        const repositoryId = PluginRepositoryId.make('repository-1');
-        const token = 'private-token-value';
+describe('Git plugin credentials', () => {
+    test('uses Git credential operations keyed to the registry HTTPS origin', async () => {
+        const run = vi
+            .fn()
+            .mockResolvedValueOnce('username=token\npassword=from-git\n\n')
+            .mockResolvedValue('');
+        const store = makeGitCredentialStore(run);
 
-        const reference = await store.replace(repositoryId, token);
+        await expect(
+            store.get('https://registry.example.test/plugins/catalog'),
+        ).resolves.toBe('from-git');
+        await store.replace(
+            'https://registry.example.test/plugins/catalog',
+            'user-token',
+        );
+        await store.reject(
+            'https://registry.example.test/plugins/catalog',
+            'user-token',
+        );
 
-        expect(store.persistent).toBe(false);
-        expect(reference).toMatch(/^plugin-secret:/);
-        expect(reference).not.toContain(token);
-        expect(await store.get(repositoryId)).toBe(token);
+        expect(run).toHaveBeenNthCalledWith(
+            1,
+            'fill',
+            'protocol=https\nhost=registry.example.test\nusername=cbranch-plugin-registry\n\n',
+        );
+        expect(run).toHaveBeenNthCalledWith(
+            2,
+            'approve',
+            'protocol=https\nhost=registry.example.test\nusername=cbranch-plugin-registry\npassword=user-token\n\n',
+        );
+        expect(run).toHaveBeenNthCalledWith(
+            3,
+            'reject',
+            'protocol=https\nhost=registry.example.test\nusername=cbranch-plugin-registry\npassword=user-token\n\n',
+        );
     });
 
-    test('replaces and removes the credential keyed to a repository id', async () => {
-        const store = makeProcessCredentialStore();
-        const repositoryId = PluginRepositoryId.make('repository-1');
+    test('does not accept a credential URL with embedded authentication', async () => {
+        const store = makeGitCredentialStore(vi.fn());
 
-        const first = await store.replace(repositoryId, 'first-token');
-        const second = await store.replace(repositoryId, 'second-token');
+        await expect(
+            store.get('https://token@registry.example.test/catalog'),
+        ).rejects.toThrow('clean HTTPS');
+    });
 
-        expect(second).not.toBe(first);
-        expect(await store.get(repositoryId)).toBe('second-token');
-        await store.remove(repositoryId);
-        expect(await store.get(repositoryId)).toBeUndefined();
+    test('does not allow a token to add fields to Git credential input', async () => {
+        const store = makeGitCredentialStore(vi.fn());
+
+        await expect(
+            store.replace(
+                'https://registry.example.test',
+                'token\nurl=https://evil',
+            ),
+        ).rejects.toThrow('control characters');
     });
 });
