@@ -51,7 +51,13 @@ const credentialInput = (
         throw new Error(
             'Plugin credentials require a clean HTTPS repository URL.',
         );
-    if (password?.match(/[\r\n\0]/))
+    if (
+        password !== undefined &&
+        Array.from(password).some(character => {
+            const code = character.charCodeAt(0);
+            return code === 0 || code === 10 || code === 13;
+        })
+    )
         throw new Error(
             'Plugin credentials cannot contain control characters.',
         );
