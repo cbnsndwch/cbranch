@@ -84,6 +84,12 @@ try {
         'dist/mcp.d.ts',
         'dist/daemon.js',
         'dist/daemon.d.ts',
+        'dist/tui.js',
+        'dist/tui.d.ts',
+        'dist/tui-daemon.js',
+        'dist/tui-daemon.d.ts',
+        'dist/tui-protocol.js',
+        'dist/tui-protocol.d.ts',
         'dist/opencode-adapter.js',
         'dist/opencode-adapter.d.ts',
         'README.md',
@@ -91,6 +97,45 @@ try {
         'CHANGELOG.md',
     ];
     for (const file of requiredFiles) statSync(join(packageDirectory, file));
+
+    const tuiImportClosure = new Set();
+    const visitTuiImport = file => {
+        const path = join(packageDirectory, 'dist', file);
+        if (tuiImportClosure.has(file)) return;
+        tuiImportClosure.add(file);
+        const source = readFileSync(path, 'utf8');
+        if (source.includes('better-sqlite3')) {
+            throw new Error(
+                `Packed TUI import closure references better-sqlite3 from ${file}.`,
+            );
+        }
+        const imports = source.matchAll(
+            /(?:\bfrom\s*|\bimport\s*(?:\(\s*)?)["']([^"']+)["']/gu,
+        );
+        for (const match of imports) {
+            const specifier = match[1];
+            if (specifier === 'better-sqlite3') {
+                throw new Error(
+                    `Packed TUI import closure imports better-sqlite3 from ${file}.`,
+                );
+            }
+            if (!specifier?.startsWith('.')) continue;
+            if (!specifier?.endsWith('.js')) continue;
+            visitTuiImport(
+                resolve(dirname(path), specifier).slice(
+                    join(packageDirectory, 'dist').length + 1,
+                ),
+            );
+        }
+    };
+    visitTuiImport('tui.js');
+    for (const forbidden of ['control.js', 'store.js', 'cli.js', 'index.js']) {
+        if (tuiImportClosure.has(forbidden)) {
+            throw new Error(
+                `Packed TUI import closure reaches forbidden ${forbidden}.`,
+            );
+        }
+    }
     if ((statSync(join(packageDirectory, 'dist/cli.js')).mode & 0o111) === 0) {
         throw new Error('Packed CLI is not executable.');
     }
@@ -172,6 +217,8 @@ allowBuilds:
 const plugin = await import('@cbranch/opencode-goal-supervisor/opencode');
 const mcp = await import('@cbranch/opencode-goal-supervisor/mcp');
 const daemon = await import('@cbranch/opencode-goal-supervisor/daemon');
+const tui = await import('@cbranch/opencode-goal-supervisor/tui');
+const tuiDaemon = await import('@cbranch/opencode-goal-supervisor/tui-daemon');
 const adapter = await import('@cbranch/opencode-goal-supervisor/opencode-adapter');
 
 for (const name of [
@@ -192,6 +239,12 @@ if (root.GOAL_SUPERVISOR_VERSION !== mcp.GOAL_SUPERVISOR_VERSION) {
     throw new Error('Root and MCP versions do not match.');
 }
 if (typeof daemon.runGoalDaemon !== 'function') throw new Error('Invalid daemon export.');
+if (typeof tui.default?.tui !== 'function' || typeof tui.default?.id !== 'string') {
+    throw new Error('Invalid TUI-only plugin export.');
+}
+if (typeof tuiDaemon.createPersistentDaemonManager !== 'function') {
+    throw new Error('Invalid persistent TUI daemon export.');
+}
 if (typeof adapter.createOpenCodeAdapter !== 'function') throw new Error('Invalid adapter export.');
 
 const store = new root.GoalStore(':memory:');

@@ -1,4 +1,5 @@
 export * from './domain.js';
+export * from './goal-plan.js';
 export * from './store.js';
 export * from './supervisor.js';
 export {

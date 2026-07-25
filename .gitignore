@@ -13,6 +13,7 @@ node_modules/
 dist/
 build/
 coverage/
+.opencode/goal-supervisor/
 
 # react-router framework-mode generated route types (typegen)
 .react-router/

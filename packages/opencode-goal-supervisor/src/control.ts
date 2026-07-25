@@ -23,9 +23,12 @@ import {
     type RecoveryGoalState,
     type WorkUnit,
 } from './domain.js';
+import { parseGoalPlanMarkdown } from './goal-plan.js';
 import {
     GoalStore,
+    type ExecutingGoalPlan,
     type GoalInspection,
+    type GoalPlanLaunchInput,
     type GoalStatus,
     type GoalStoreOptions,
     type IntegrityReport,
@@ -80,6 +83,14 @@ export const ControlCreateRequestSchema = z
     .object({
         ...controlEnvelope,
         objective: NonEmptyTextSchema.max(20_000),
+        budget: GoalBudgetSchema.optional(),
+    })
+    .strict();
+export const ControlCreateProposeApproveStartRequestSchema = z
+    .object({
+        ...controlEnvelope,
+        planMarkdown: z.string(),
+        actor: DomainIdSchema,
         budget: GoalBudgetSchema.optional(),
     })
     .strict();
@@ -209,6 +220,9 @@ export const ControlPermissionScopeRequestSchema = z
 
 export type ControlPlanInput = z.output<typeof ControlPlanInputSchema>;
 export type ControlCreateRequest = z.input<typeof ControlCreateRequestSchema>;
+export type ControlCreateProposeApproveStartRequest = z.input<
+    typeof ControlCreateProposeApproveStartRequestSchema
+>;
 export type ControlListRequest = z.input<typeof ControlListRequestSchema>;
 export type ControlGoalRequest = z.input<typeof ControlGoalRequestSchema>;
 export type ControlPlanRequest = z.input<typeof ControlPlanRequestSchema>;
@@ -631,6 +645,33 @@ export class GoalControlService {
                 this.#store.create(
                     this.workspace,
                     request.objective,
+                    request.budget,
+                ),
+        );
+    }
+
+    createProposeApproveStart(
+        input: ControlCreateProposeApproveStartRequest,
+    ): ExecutingGoalPlan {
+        const request = parseRequest(
+            ControlCreateProposeApproveStartRequestSchema,
+            input,
+        );
+        this.#authorize(request.authToken);
+        const plan = parseGoalPlanMarkdown(request.planMarkdown);
+        return this.#mutate(
+            request.commandId,
+            {
+                operation: 'create-propose-approve-start',
+                plan,
+                actor: request.actor,
+                budget: request.budget,
+            },
+            () =>
+                this.#store.createProposeApproveStart(
+                    this.workspace,
+                    plan satisfies GoalPlanLaunchInput,
+                    request.actor,
                     request.budget,
                 ),
         );

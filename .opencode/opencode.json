@@ -1,6 +1,20 @@
 {
     "$schema": "https://opencode.ai/config.json",
     "lsp": true,
+    "mcp": {
+        "goal-supervisor": {
+            "type": "local",
+            "command": [
+                "node",
+                "packages/opencode-goal-supervisor/dist/cli.js",
+                "--workspace",
+                ".",
+                "mcp"
+            ],
+            "cwd": ".",
+            "enabled": true
+        }
+    },
     "skills": {
         "paths": [".agents/skills"]
     }

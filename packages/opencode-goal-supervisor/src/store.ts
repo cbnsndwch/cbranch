@@ -168,6 +168,15 @@ export type PlanInput = {
     readonly authoredBy: string;
 };
 
+export type GoalPlanLaunchInput = PlanInput & {
+    readonly objective: string;
+};
+
+export type ExecutingGoalPlan = {
+    readonly goal: Goal;
+    readonly plan: Plan;
+};
+
 export type StoredGoalEvent = GoalEvent & { readonly sequence: number };
 
 export type IssuedApproval = {
@@ -1153,6 +1162,33 @@ export class GoalStore {
         budget?: GoalBudget,
     ): Goal {
         return this.create(workspace, objective, budget);
+    }
+
+    createProposeApproveStart(
+        workspace: string,
+        input: GoalPlanLaunchInput,
+        actor: string,
+        budget: GoalBudget = DEFAULT_GOAL_BUDGET,
+    ): ExecutingGoalPlan {
+        if (typeof input.objective !== 'string' || !input.objective.trim()) {
+            throw new Error('A launch objective is required.');
+        }
+        return this.#database
+            .transaction(() => {
+                const created = this.create(workspace, input.objective, budget);
+                const plan = this.proposePlan(created.id, input);
+                this.approvePlan(created.id, plan.id, actor);
+                const startApproval = this.issueApproval(
+                    created.id,
+                    { type: 'goal-action', action: 'unattended-start' },
+                    actor,
+                    'Approve atomic goal-plan launch',
+                    MAX_APPROVAL_TTL_MS,
+                );
+                const goal = this.startGoal(created.id, startApproval.token);
+                return { goal, plan };
+            })
+            .immediate();
     }
 
     get(id: string): Goal | undefined {

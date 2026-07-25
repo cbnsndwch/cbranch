@@ -6,6 +6,7 @@ import {
     mkdirSync,
     openSync,
     readFileSync,
+    renameSync,
     statSync,
     unlinkSync,
     writeFileSync,
@@ -40,12 +41,29 @@ export interface GoalDaemonOptions extends GoalSupervisorOptions {
     readonly cancellationBatchSize?: number;
     readonly globalConcurrency?: number;
     readonly workspaceConcurrency?: number;
+    readonly serviceIdentity?: string;
     readonly signal?: AbortSignal;
     readonly onError?: (error: Error) => void;
+    readonly onReady?: () => void;
 }
 
 export interface RunGoalDaemonOptions extends GoalDaemonOptions {
     readonly handleSignals?: boolean;
+}
+
+export type GoalDaemonHandleState =
+    | 'running'
+    | 'contended'
+    | 'stopped'
+    | 'failed';
+
+export interface GoalDaemonHandle {
+    /** True only when this handle acquired the workspace lock. */
+    readonly owned: boolean;
+    readonly state: GoalDaemonHandleState;
+    readonly done: Promise<void>;
+    /** Aborts and awaits only a daemon owned by this handle. */
+    readonly stop: () => Promise<void>;
 }
 
 type ValidatedDaemonOptions = GoalDaemonOptions & {
@@ -70,6 +88,7 @@ type WorkspaceLockOwner = {
     readonly token: string;
     readonly workspace: string;
     readonly createdAt: string;
+    readonly serviceIdentity?: string;
 };
 
 const INCOMPLETE_LOCK_FRESHNESS_MS = 5_000;
@@ -77,9 +96,14 @@ const INCOMPLETE_LOCK_FRESHNESS_MS = 5_000;
 export const workspaceLockRecoveryPath = (path: string): string =>
     `${resolve(path)}.recovery`;
 
+export const workspaceReadinessPath = (path: string): string =>
+    `${resolve(path)}.ready`;
+
 export interface WorkspaceLock {
     readonly path: string;
     readonly owner: WorkspaceLockOwner;
+    readonly readinessPath: string;
+    readonly markReady: (serviceIdentity?: string) => void;
     readonly release: () => void;
 }
 
@@ -109,6 +133,12 @@ const errorCode = (error: unknown): string | undefined =>
         ? error.code
         : undefined;
 
+const cleanupAggregateError = (
+    errors: readonly unknown[],
+    message: string,
+    cause: unknown,
+): AggregateError => new AggregateError(errors, message, { cause });
+
 const processIsAlive = (pid: number): boolean => {
     if (!Number.isSafeInteger(pid) || pid <= 0) return false;
     try {
@@ -130,7 +160,10 @@ const parseLockOwner = (text: string): WorkspaceLockOwner | undefined => {
             typeof value.workspace !== 'string' ||
             !value.workspace ||
             typeof value.createdAt !== 'string' ||
-            Number.isNaN(Date.parse(value.createdAt))
+            Number.isNaN(Date.parse(value.createdAt)) ||
+            (value.serviceIdentity !== undefined &&
+                (typeof value.serviceIdentity !== 'string' ||
+                    !/^sha256:[a-f0-9]{64}$/u.test(value.serviceIdentity)))
         ) {
             return undefined;
         }
@@ -185,20 +218,135 @@ const workspaceLock = (
     owner: WorkspaceLockOwner,
 ): WorkspaceLock => {
     let released = false;
+    let ready = false;
+    const readinessPath = workspaceReadinessPath(path);
+    const removeOwnerLock = (): void => {
+        try {
+            const current = readFileSync(path, 'utf8');
+            const currentOwner = parseLockOwner(current);
+            if (currentOwner?.token !== owner.token) return;
+            removeLockIfUnchanged(path, current);
+        } catch (error) {
+            if (errorCode(error) !== 'ENOENT') throw error;
+        }
+    };
+    try {
+        unlinkSync(readinessPath);
+    } catch (error) {
+        if (errorCode(error) !== 'ENOENT') {
+            try {
+                removeOwnerLock();
+            } catch (lockError) {
+                throw cleanupAggregateError(
+                    [error, lockError],
+                    'Could not clean stale readiness or its matching workspace lock.',
+                    error,
+                );
+            }
+            throw error;
+        }
+    }
+    const removeReadiness = (): void => {
+        try {
+            const current = readFileSync(readinessPath, 'utf8');
+            let marker: { readonly token?: unknown };
+            try {
+                marker = JSON.parse(current) as {
+                    readonly token?: unknown;
+                };
+            } catch {
+                return;
+            }
+            if (marker.token !== owner.token) return;
+            removeLockIfUnchanged(readinessPath, current);
+        } catch (error) {
+            if (errorCode(error) !== 'ENOENT') throw error;
+        }
+    };
     return {
         path,
         owner,
+        readinessPath,
+        markReady: serviceIdentity => {
+            if (released) {
+                throw new Error('Cannot mark a released workspace lock ready.');
+            }
+            if (ready) return;
+            if (
+                serviceIdentity !== undefined &&
+                serviceIdentity !== owner.serviceIdentity
+            ) {
+                throw new Error(
+                    'Daemon readiness identity does not match its owner lock.',
+                );
+            }
+            const readinessIdentity = owner.serviceIdentity;
+            const currentOwner = parseLockOwner(readFileSync(path, 'utf8'));
+            if (currentOwner?.token !== owner.token) {
+                throw new WorkspaceLockedError(path, currentOwner?.pid);
+            }
+            const candidatePath = `${readinessPath}.${owner.token}.candidate`;
+            let file: number | undefined;
+            try {
+                file = openSync(candidatePath, 'wx', 0o600);
+                writeFileSync(
+                    file,
+                    `${JSON.stringify({
+                        token: owner.token,
+                        readyAt: new Date().toISOString(),
+                        ...(readinessIdentity
+                            ? { serviceIdentity: readinessIdentity }
+                            : {}),
+                    })}\n`,
+                    { encoding: 'utf8' },
+                );
+                closeSync(file);
+                file = undefined;
+                renameSync(candidatePath, readinessPath);
+                const after = parseLockOwner(readFileSync(path, 'utf8'));
+                if (after?.token !== owner.token) {
+                    removeReadiness();
+                    throw new WorkspaceLockedError(path, after?.pid);
+                }
+                ready = true;
+            } finally {
+                if (file !== undefined) closeSync(file);
+                try {
+                    unlinkSync(candidatePath);
+                } catch {
+                    // Atomic rename normally consumed the unique candidate.
+                }
+            }
+        },
         release: () => {
             if (released) return;
             released = true;
+            let cleanupError: unknown;
             try {
                 const current = readFileSync(path, 'utf8');
                 const currentOwner = parseLockOwner(current);
                 if (currentOwner?.token !== owner.token) return;
-                removeLockIfUnchanged(path, current);
+                try {
+                    unlinkSync(readinessPath);
+                } catch (error) {
+                    if (errorCode(error) !== 'ENOENT') cleanupError = error;
+                }
+                try {
+                    removeLockIfUnchanged(path, current);
+                } catch (error) {
+                    if (cleanupError) {
+                        throw cleanupAggregateError(
+                            [cleanupError, error],
+                            'Could not release workspace readiness and lock state.',
+                            error,
+                        );
+                    }
+                    throw error;
+                }
             } catch (error) {
                 if (errorCode(error) !== 'ENOENT') throw error;
             }
+            if (cleanupError) throw cleanupError;
         },
     };
 };
@@ -218,11 +366,18 @@ export const acquireWorkspaceLock = (
     path: string,
     workspace: string,
     pid = process.pid,
+    serviceIdentity?: string,
 ): WorkspaceLock => {
     const absolutePath = resolve(path);
     const absoluteWorkspace = resolve(workspace);
     const recoveryPath = workspaceLockRecoveryPath(absolutePath);
     mkdirSync(dirname(absolutePath), { recursive: true, mode: 0o700 });
+    if (
+        serviceIdentity !== undefined &&
+        !/^sha256:[a-f0-9]{64}$/u.test(serviceIdentity)
+    ) {
+        throw new TypeError('Daemon service identity is invalid.');
+    }
 
     for (let attempt = 0; attempt < 3; attempt++) {
         const owner: WorkspaceLockOwner = {
@@ -230,6 +385,7 @@ export const acquireWorkspaceLock = (
             token: randomUUID(),
             workspace: absoluteWorkspace,
             createdAt: new Date().toISOString(),
+            ...(serviceIdentity ? { serviceIdentity } : {}),
         };
         const serialized = `${JSON.stringify(owner)}\n`;
         if (recoveryInProgress(recoveryPath)) {
@@ -329,6 +485,12 @@ const validateOptions = (
         throw new TypeError('workspace must be nonempty.');
     }
     const workspace = resolve(options.workspace);
+    if (
+        options.serviceIdentity !== undefined &&
+        !/^sha256:[a-f0-9]{64}$/u.test(options.serviceIdentity)
+    ) {
+        throw new TypeError('serviceIdentity must be a SHA-256 identity.');
+    }
     const owner = DomainIdSchema.parse(
         options.owner ?? `daemon-${process.pid}`,
     );
@@ -594,7 +756,12 @@ export const goalDaemon = (
         const lock = yield* Effect.acquireRelease(
             Effect.try({
                 try: () =>
-                    acquireWorkspaceLock(options.lockPath, options.workspace),
+                    acquireWorkspaceLock(
+                        options.lockPath,
+                        options.workspace,
+                        process.pid,
+                        options.serviceIdentity,
+                    ),
                 catch: error =>
                     new GoalDaemonError(
                         'Could not acquire the workspace daemon lock.',
@@ -756,6 +923,21 @@ export const goalDaemon = (
             startImmediately: true,
         });
         yield* Effect.forkScoped(observationLoop, { startImmediately: true });
+        yield* Effect.try({
+            try: () => lock.markReady(options.serviceIdentity),
+            catch: error =>
+                new GoalDaemonError(
+                    'Could not publish daemon readiness marker.',
+                    { cause: error },
+                ),
+        });
+        yield* Effect.try({
+            try: () => options.onReady?.(),
+            catch: error =>
+                new GoalDaemonError('Daemon readiness callback failed.', {
+                    cause: error,
+                }),
+        });
         yield* waitForShutdown(options.signal);
     });
 
@@ -790,4 +972,89 @@ export const runGoalDaemon = async (
             process.removeListener('SIGTERM', stop);
         }
     }
+};
+
+const hasWorkspaceLockedCause = (error: unknown): boolean => {
+    const seen = new Set<unknown>();
+    let current = error;
+    while (current && !seen.has(current)) {
+        if (current instanceof WorkspaceLockedError) return true;
+        seen.add(current);
+        current =
+            typeof current === 'object' &&
+            current !== null &&
+            'cause' in current
+                ? current.cause
+                : undefined;
+    }
+    return false;
+};
+
+/**
+ * Starts a background daemon and resolves only after startup reconciliation.
+ * A lock race is reported as a non-owned handle rather than a startup failure.
+ */
+export const startGoalDaemon = async (
+    options: RunGoalDaemonOptions,
+): Promise<GoalDaemonHandle> => {
+    const controller = new AbortController();
+    const signal = options.signal
+        ? anyAbortSignal([controller.signal, options.signal])
+        : controller.signal;
+    let resolveReady!: (owned: boolean) => void;
+    let rejectReady!: (error: unknown) => void;
+    const ready = new Promise<boolean>((resolvePromise, rejectPromise) => {
+        resolveReady = resolvePromise;
+        rejectReady = rejectPromise;
+    });
+    let state: GoalDaemonHandleState = 'running';
+    let reachedReadiness = false;
+    const done = runGoalDaemon({
+        ...options,
+        signal,
+        handleSignals: false,
+        onReady: () => {
+            options.onReady?.();
+            reachedReadiness = true;
+            resolveReady(true);
+        },
+    }).then(
+        () => {
+            state = 'stopped';
+            if (!reachedReadiness) {
+                rejectReady(
+                    new GoalDaemonError(
+                        'Goal daemon stopped before becoming ready.',
+                    ),
+                );
+            }
+        },
+        error => {
+            if (!reachedReadiness && hasWorkspaceLockedCause(error)) {
+                state = 'contended';
+                resolveReady(false);
+                return;
+            }
+            state = 'failed';
+            if (!reachedReadiness) rejectReady(error);
+            throw error;
+        },
+    );
+    // The owner may choose to observe `done`, but a late daemon failure must
+    // never become an unhandled rejection merely because startup succeeded.
+    void done.catch(() => undefined);
+
+    const owned = await ready;
+    return {
+        owned,
+        get state() {
+            return state;
+        },
+        done,
+        stop: async () => {
+            if (!owned) return;
+            controller.abort('daemon handle stopped');
+            await done;
+        },
+    };
 };

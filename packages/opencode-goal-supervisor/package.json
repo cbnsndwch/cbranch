@@ -32,6 +32,14 @@
             "types": "./dist/daemon.d.ts",
             "default": "./dist/daemon.js"
         },
+        "./tui": {
+            "types": "./dist/tui.d.ts",
+            "default": "./dist/tui.js"
+        },
+        "./tui-daemon": {
+            "types": "./dist/tui-daemon.d.ts",
+            "default": "./dist/tui-daemon.js"
+        },
         "./opencode-adapter": {
             "types": "./dist/opencode-adapter.d.ts",
             "default": "./dist/opencode-adapter.js"

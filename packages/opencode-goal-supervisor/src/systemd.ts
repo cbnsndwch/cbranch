@@ -1,10 +1,11 @@
-import { randomUUID } from 'node:crypto';
-import { constants } from 'node:fs';
+import { createHash, randomUUID } from 'node:crypto';
+import { constants, type Stats } from 'node:fs';
 import {
     chmod,
     lstat,
     mkdir,
     open,
+    readFile,
     realpath,
     rename,
     unlink,
@@ -108,6 +109,27 @@ export interface GenerateSystemdUserServiceOptions {
     readonly restartSec?: number;
 }
 
+export type SystemdServiceIdentity = `sha256:${string}`;
+
+/** Identity of the exact service configuration expected to publish readiness. */
+export const systemdServiceIdentity = (
+    options: GenerateSystemdUserServiceOptions,
+): SystemdServiceIdentity => {
+    const input = JSON.stringify({
+        cliPath: absolutePath(options.cliPath, 'CLI path'),
+        executablePath: absolutePath(options.executablePath, 'Executable path'),
+        openCodeUrl: openCodeUrl(options.openCodeUrl),
+        restartSec: positiveInteger(
+            options.restartSec ?? 5,
+            'RestartSec',
+            3_600,
+        ),
+        serviceConfigurationVersion: 1,
+        workspace: absolutePath(options.workspace, 'Workspace path'),
+    });
+    return `sha256:${createHash('sha256').update(input).digest('hex')}`;
+};
+
 export const generateSystemdUserService = (
     options: GenerateSystemdUserServiceOptions,
 ): string => {
@@ -120,6 +142,7 @@ export const generateSystemdUserService = (
         'RestartSec',
         3_600,
     );
+    const serviceIdentity = systemdServiceIdentity(options);
     const command = [
         executable,
         cli,
@@ -128,6 +151,8 @@ export const generateSystemdUserService = (
         workspace,
         '--opencode-url',
         url,
+        '--internal-service-identity',
+        serviceIdentity,
     ]
         .map(quoteSystemdArgument)
         .join(' ');
@@ -196,11 +221,36 @@ export interface WriteSystemdUserServiceOptions extends GenerateSystemdUserServi
 export interface WrittenSystemdUserService {
     readonly unitPath: string;
     readonly unitName: string;
+    readonly changed: boolean;
+    readonly serviceIdentity: SystemdServiceIdentity;
     readonly lifecycleCommands: SystemdLifecycleCommands;
 }
 
-export const defaultSystemdUserDirectory = (): string =>
-    join(homedir(), '.config', 'systemd', 'user');
+export const defaultSystemdUserDirectory = (): string => {
+    const xdgConfigHome = process.env.XDG_CONFIG_HOME;
+    const configHome =
+        xdgConfigHome &&
+        isAbsolute(xdgConfigHome) &&
+        !hasControlCharacters(xdgConfigHome)
+            ? resolve(xdgConfigHome)
+            : join(homedir(), '.config');
+    return join(configHome, 'systemd', 'user');
+};
+
+const validateInstalledUnit = (info: Stats): void => {
+    if (
+        !info.isFile() ||
+        info.isSymbolicLink() ||
+        (process.platform !== 'win32' && (info.mode & 0o777) !== 0o600) ||
+        (process.platform !== 'win32' &&
+            typeof process.getuid === 'function' &&
+            info.uid !== process.getuid())
+    ) {
+        throw new Error(
+            'Installed systemd unit must be an owner-only regular file.',
+        );
+    }
+};
 
 export const writeSystemdUserService = async (
     options: WriteSystemdUserServiceOptions,
@@ -217,6 +267,7 @@ export const writeSystemdUserService = async (
     }
     const name = unitName(basename(unitPath));
     const content = generateSystemdUserService(options);
+    const serviceIdentity = systemdServiceIdentity(options);
 
     try {
         await lstat(configuredDirectory);
@@ -231,12 +282,9 @@ export const writeSystemdUserService = async (
     if (!directoryInfo.isDirectory() || directoryInfo.isSymbolicLink()) {
         throw new Error('Systemd unit directory must be a real directory.');
     }
-    if (
-        process.platform !== 'win32' &&
-        (directoryInfo.mode & 0o777) !== 0o700
-    ) {
+    if (process.platform !== 'win32' && (directoryInfo.mode & 0o022) !== 0) {
         throw new Error(
-            'Systemd user unit directory must have owner-only permissions (0700).',
+            'Systemd user unit directory may not be writable by group or other users.',
         );
     }
     if (
@@ -260,6 +308,21 @@ export const writeSystemdUserService = async (
         `.${name}.${process.pid}.${randomUUID()}.tmp`,
     );
     const destination = join(realConfiguredDirectory, name);
+    try {
+        const destinationInfo = await lstat(destination);
+        validateInstalledUnit(destinationInfo);
+        if ((await readFile(destination, 'utf8')) === content) {
+            return {
+                unitPath: destination,
+                unitName: name,
+                changed: false,
+                serviceIdentity,
+                lifecycleCommands: systemdLifecycleCommands(name),
+            };
+        }
+    } catch (error) {
+        if (errorCode(error) !== 'ENOENT') throw error;
+    }
     let handle: Awaited<ReturnType<typeof open>> | undefined;
     try {
         handle = await open(temporaryPath, 'wx', 0o600);
@@ -273,19 +336,7 @@ export const writeSystemdUserService = async (
         handle = undefined;
         await rename(temporaryPath, destination);
         const destinationInfo = await lstat(destination);
-        if (
-            !destinationInfo.isFile() ||
-            destinationInfo.isSymbolicLink() ||
-            (process.platform !== 'win32' &&
-                (destinationInfo.mode & 0o777) !== 0o600) ||
-            (process.platform !== 'win32' &&
-                typeof process.getuid === 'function' &&
-                destinationInfo.uid !== process.getuid())
-        ) {
-            throw new Error(
-                'Installed systemd unit must be an owner-only regular file.',
-            );
-        }
+        validateInstalledUnit(destinationInfo);
     } catch (error) {
         await handle?.close().catch(() => undefined);
         await unlink(temporaryPath).catch(() => undefined);
@@ -295,6 +346,8 @@ export const writeSystemdUserService = async (
     return {
         unitPath: destination,
         unitName: name,
+        changed: true,
+        serviceIdentity,
         lifecycleCommands: systemdLifecycleCommands(name),
     };
 };
@@ -305,8 +358,11 @@ export type DaemonServiceStatus =
           readonly status: 'running' | 'stale';
           readonly lockPath: string;
           readonly pid: number;
+          readonly token: string;
           readonly workspace: string;
           readonly createdAt: string;
+          readonly ready: boolean;
+          readonly serviceIdentity?: SystemdServiceIdentity;
       }
     | {
           readonly status: 'invalid';
@@ -336,6 +392,55 @@ const invalidLock = (
     lockPath,
     detail,
 });
+
+const inspectReadiness = async (
+    lockPath: string,
+    token: string,
+    ownerServiceIdentity?: SystemdServiceIdentity,
+): Promise<{
+    readonly ready: boolean;
+    readonly serviceIdentity?: SystemdServiceIdentity;
+}> => {
+    let handle: Awaited<ReturnType<typeof open>>;
+    try {
+        handle = await open(
+            `${lockPath}.ready`,
+            constants.O_RDONLY |
+                constants.O_NONBLOCK |
+                (constants.O_NOFOLLOW ?? 0),
+        );
+    } catch {
+        return { ready: false };
+    }
+    try {
+        const info = await handle.stat();
+        if (!info.isFile() || info.size <= 0 || info.size > 4_096) {
+            return { ready: false };
+        }
+        const value = JSON.parse(
+            await handle.readFile({ encoding: 'utf8' }),
+        ) as Record<string, unknown>;
+        const ready =
+            value.token === token &&
+            typeof value.readyAt === 'string' &&
+            !Number.isNaN(Date.parse(value.readyAt)) &&
+            value.serviceIdentity === ownerServiceIdentity;
+        if (!ready) return { ready: false };
+        return {
+            ready: true,
+            ...(typeof value.serviceIdentity === 'string'
+                ? {
+                      serviceIdentity:
+                          value.serviceIdentity as SystemdServiceIdentity,
+                  }
+                : {}),
+        };
+    } catch {
+        return { ready: false };
+    } finally {
+        await handle.close();
+    }
+};
 
 /** Inspect the daemon lock without following symlinks or removing stale data. */
 export const inspectDaemonServiceStatus = async (
@@ -412,7 +517,10 @@ export const inspectDaemonServiceStatus = async (
             !isAbsolute(record.workspace) ||
             hasControlCharacters(record.workspace) ||
             typeof record.createdAt !== 'string' ||
-            Number.isNaN(Date.parse(record.createdAt))
+            Number.isNaN(Date.parse(record.createdAt)) ||
+            (record.serviceIdentity !== undefined &&
+                (typeof record.serviceIdentity !== 'string' ||
+                    !/^sha256:[a-f0-9]{64}$/u.test(record.serviceIdentity)))
         ) {
             return invalidLock(
                 lockPath,
@@ -427,14 +535,22 @@ export const inspectDaemonServiceStatus = async (
             );
         }
         const pid = Number(record.pid);
+        const alive = (options.isPidAlive ?? pidIsAlive)(pid);
+        const serviceIdentity = record.serviceIdentity as
+            | SystemdServiceIdentity
+            | undefined;
+        const readiness = alive
+            ? await inspectReadiness(lockPath, record.token, serviceIdentity)
+            : { ready: false as const };
         return {
-            status: (options.isPidAlive ?? pidIsAlive)(pid)
-                ? 'running'
-                : 'stale',
+            status: alive ? 'running' : 'stale',
             lockPath,
             pid,
+            token: record.token,
             workspace: ownerWorkspace,
             createdAt: record.createdAt,
+            ready: readiness.ready,
+            ...(serviceIdentity ? { serviceIdentity } : {}),
         };
     } catch {
         return invalidLock(lockPath, 'Daemon lock could not be read safely.');

@@ -1,5 +1,6 @@
 import {
     access,
+    mkdir,
     mkdtemp,
     readFile,
     rm,
@@ -9,12 +10,14 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { afterEach, describe, expect, test } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 
 import {
     acquireWorkspaceLock,
     runGoalDaemon,
+    startGoalDaemon,
     workspaceLockRecoveryPath,
+    workspaceReadinessPath,
     WorkspaceLockedError,
 } from './daemon.js';
 import { GoalStore, type PlanInput } from './store.js';
@@ -23,6 +26,7 @@ import {
     GoalSupervisor,
     type GoalSessionAdapter,
 } from './supervisor.js';
+import { inspectDaemonServiceStatus } from './systemd.js';
 
 const directories: string[] = [];
 const stores: GoalStore[] = [];
@@ -102,6 +106,75 @@ const startParallelGoal = (
 };
 
 describe('workspace daemon lock', () => {
+    test('stores an optional service identity without breaking legacy acquisition', async () => {
+        const workspace = await workspaceFor();
+        const legacyPath = join(workspace, 'legacy.lock');
+        const identityPath = join(workspace, 'identity.lock');
+        const serviceIdentity = `sha256:${'d'.repeat(64)}`;
+        const legacy = acquireWorkspaceLock(legacyPath, workspace);
+        const identified = acquireWorkspaceLock(
+            identityPath,
+            workspace,
+            process.pid,
+            serviceIdentity,
+        );
+
+        expect(
+            JSON.parse(await readFile(legacyPath, 'utf8')),
+        ).not.toHaveProperty('serviceIdentity');
+        expect(
+            JSON.parse(await readFile(identityPath, 'utf8')).serviceIdentity,
+        ).toBe(serviceIdentity);
+        expect(() => identified.markReady(`sha256:${'e'.repeat(64)}`)).toThrow(
+            'does not match',
+        );
+        identified.markReady();
+        expect(
+            JSON.parse(await readFile(identified.readinessPath, 'utf8'))
+                .serviceIdentity,
+        ).toBe(serviceIdentity);
+
+        legacy.release();
+        identified.release();
+    });
+
+    test('removes its published lock when stale readiness cleanup fails', async () => {
+        const workspace = await workspaceFor();
+        const path = join(workspace, 'daemon.lock');
+        await mkdir(workspaceReadinessPath(path));
+
+        expect(() => acquireWorkspaceLock(path, workspace)).toThrow();
+
+        await expect(access(path)).rejects.toMatchObject({ code: 'ENOENT' });
+    });
+
+    test('keeps markReady failures owned and releases the lock after cleanup', async () => {
+        const workspace = await workspaceFor();
+        const path = join(workspace, 'daemon.lock');
+        const lock = acquireWorkspaceLock(path, workspace);
+        await mkdir(lock.readinessPath);
+
+        expect(() => lock.markReady()).toThrow();
+        await expect(access(path)).resolves.toBeUndefined();
+
+        await rm(lock.readinessPath, { recursive: true });
+        lock.release();
+        await expect(access(path)).rejects.toMatchObject({ code: 'ENOENT' });
+    });
+
+    test('releases the owner lock even when readiness cleanup fails', async () => {
+        const workspace = await workspaceFor();
+        const path = join(workspace, 'daemon.lock');
+        const lock = acquireWorkspaceLock(path, workspace);
+        lock.markReady();
+        await rm(lock.readinessPath);
+        await mkdir(lock.readinessPath);
+
+        expect(() => lock.release()).toThrow();
+
+        await expect(access(path)).rejects.toMatchObject({ code: 'ENOENT' });
+    });
+
     test('rejects a second live owner and releases the original lock', async () => {
         const workspace = await workspaceFor();
         const path = join(workspace, 'daemon.lock');
@@ -110,8 +183,15 @@ describe('workspace daemon lock', () => {
         expect(() => acquireWorkspaceLock(path, workspace)).toThrow(
             WorkspaceLockedError,
         );
+        first.markReady();
+        expect(
+            JSON.parse(await readFile(first.readinessPath, 'utf8')).token,
+        ).toBe(first.owner.token);
         first.release();
         await expect(access(path)).rejects.toMatchObject({ code: 'ENOENT' });
+        await expect(
+            access(workspaceReadinessPath(path)),
+        ).rejects.toMatchObject({ code: 'ENOENT' });
     });
 
     test('replaces a stale PID but never deletes another owner token', async () => {
@@ -127,10 +207,21 @@ describe('workspace daemon lock', () => {
             })}\n`,
             { mode: 0o600 },
         );
+        await writeFile(
+            workspaceReadinessPath(path),
+            `${JSON.stringify({
+                token: 'stale-token',
+                readyAt: '2026-01-01T00:00:00.000Z',
+            })}\n`,
+            { mode: 0o600 },
+        );
         const lock = acquireWorkspaceLock(path, workspace);
         expect(JSON.parse(await readFile(path, 'utf8')).token).toBe(
             lock.owner.token,
         );
+        await expect(
+            access(workspaceReadinessPath(path)),
+        ).rejects.toMatchObject({ code: 'ENOENT' });
         await writeFile(
             path,
             `${JSON.stringify({
@@ -192,6 +283,142 @@ describe('workspace daemon lock', () => {
 });
 
 describe('Effect goal daemon', () => {
+    test('publishes readiness only after startup reconciliation completes', async () => {
+        const workspace = await workspaceFor();
+        const store = openStore(workspace);
+        startParallelGoal(store, workspace, 1);
+        const attempt = store.claimNextWork('worker', 60_000)!;
+        await new GoalSupervisor(store, fakeAdapter()).dispatchPending(1);
+        store.cancelGoal(
+            store.getWorkUnit(attempt.workUnitId)!.goalId,
+            'Hold startup cancellation',
+        );
+        const lockPath = join(workspace, 'daemon.lock');
+        const serviceIdentity = `sha256:${'a'.repeat(64)}`;
+        const controller = new AbortController();
+        let entered!: () => void;
+        const startupEntered = new Promise<void>(resolve => {
+            entered = resolve;
+        });
+        let release!: () => void;
+        const releaseStartup = new Promise<void>(resolve => {
+            release = resolve;
+        });
+        let ready!: () => void;
+        const readyCalled = new Promise<void>(resolve => {
+            ready = resolve;
+        });
+        const running = runGoalDaemon({
+            workspace,
+            store,
+            lockPath,
+            handleSignals: false,
+            signal: controller.signal,
+            adapter: fakeAdapter({
+                async abort() {
+                    entered();
+                    await releaseStartup;
+                    return { aborted: true };
+                },
+            }),
+            onReady: ready,
+            serviceIdentity,
+        });
+        await startupEntered;
+
+        await expect(
+            inspectDaemonServiceStatus(lockPath, {
+                workspace,
+                isPidAlive: () => true,
+            }),
+        ).resolves.toMatchObject({
+            status: 'running',
+            ready: false,
+            serviceIdentity,
+        });
+        await expect(
+            access(workspaceReadinessPath(lockPath)),
+        ).rejects.toMatchObject({ code: 'ENOENT' });
+
+        release();
+        await readyCalled;
+        await expect(
+            inspectDaemonServiceStatus(lockPath, {
+                workspace,
+                isPidAlive: () => true,
+            }),
+        ).resolves.toMatchObject({
+            status: 'running',
+            ready: true,
+            serviceIdentity,
+        });
+        controller.abort('readiness observed');
+        await running;
+        await expect(
+            access(workspaceReadinessPath(lockPath)),
+        ).rejects.toMatchObject({ code: 'ENOENT' });
+    });
+
+    test('removes lock and readiness state when startup reconciliation fails', async () => {
+        const workspace = await workspaceFor();
+        const store = openStore(workspace);
+        const lockPath = join(workspace, 'daemon.lock');
+        const onReady = vi.fn();
+        vi.spyOn(store, 'startupReconcile').mockImplementation(() => {
+            throw new Error('startup failed');
+        });
+
+        await expect(
+            runGoalDaemon({
+                workspace,
+                store,
+                lockPath,
+                handleSignals: false,
+                adapter: fakeAdapter(),
+                onReady,
+            }),
+        ).rejects.toThrow('Startup reconciliation failed');
+
+        expect(onReady).not.toHaveBeenCalled();
+        await expect(access(lockPath)).rejects.toMatchObject({
+            code: 'ENOENT',
+        });
+        await expect(
+            access(workspaceReadinessPath(lockPath)),
+        ).rejects.toMatchObject({ code: 'ENOENT' });
+    });
+
+    test('reports readiness only after startup and resolves lock races without ownership', async () => {
+        const workspace = await workspaceFor();
+        const lockPath = join(workspace, 'daemon.lock');
+        let readyCalls = 0;
+        const handles = await Promise.all(
+            Array.from({ length: 2 }, () =>
+                startGoalDaemon({
+                    workspace,
+                    adapter: fakeAdapter(),
+                    lockPath,
+                    onReady: () => readyCalls++,
+                }),
+            ),
+        );
+        const owner = handles.find(handle => handle.owned);
+        const contender = handles.find(handle => !handle.owned);
+
+        expect(owner?.state).toBe('running');
+        expect(contender?.state).toBe('contended');
+        expect(readyCalls).toBe(1);
+        if (!owner || !contender) throw new Error('Expected one daemon owner.');
+
+        await contender.stop();
+        await expect(access(lockPath)).resolves.toBeUndefined();
+        await owner.stop();
+        expect(owner.state).toBe('stopped');
+        await expect(access(lockPath)).rejects.toMatchObject({
+            code: 'ENOENT',
+        });
+    });
+
     test('runs startup, interrupts loops, checkpoints, closes, and unlocks', async () => {
         const workspace = await workspaceFor();
         const store = openStore(workspace);

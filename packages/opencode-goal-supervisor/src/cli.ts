@@ -2,7 +2,7 @@
 
 import { randomUUID } from 'node:crypto';
 import { lstat, readFile, realpath } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
+import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import {
@@ -14,6 +14,7 @@ import {
 } from './control.js';
 import { runGoalDaemon, type RunGoalDaemonOptions } from './daemon.js';
 import { runGoalMcp } from './mcp.js';
+import { parseGoalPlanMarkdown } from './goal-plan.js';
 import {
     createOpenCodeAdapter,
     type OpenCodeSessionAdapter,
@@ -26,6 +27,21 @@ import {
     type DaemonServiceStatus,
     type WrittenSystemdUserService,
 } from './systemd.js';
+import {
+    goalLaunchCommandId,
+    MAX_TUI_BRIDGE_GOALS,
+    MAX_TUI_BRIDGE_REQUEST_BYTES,
+    TUI_BRIDGE_COMMAND,
+    TUI_BRIDGE_PROTOCOL,
+    TuiBridgeFailureResponseSchema,
+    TuiBridgeInitResponseSchema,
+    TuiBridgeLaunchResponseSchema,
+    TuiBridgeListResponseSchema,
+    TuiBridgeRequestSchema,
+    type TuiBridgeFailureResponse,
+    type TuiBridgeRequest,
+    type TuiBridgeSuccessResponse,
+} from './tui-protocol.js';
 
 const executableName = 'cbranch-goal-supervisor';
 const defaultOpenCodeUrl = 'http://127.0.0.1:4096/';
@@ -95,6 +111,7 @@ export type ParsedCliArguments = ParsedBase &
               readonly reconciliationIntervalMs: number;
               readonly cancellationIntervalMs: number;
               readonly observationRestartIntervalMs: number;
+              readonly serviceIdentity?: string;
           }
         | { readonly command: 'status'; readonly goalId?: string }
         | {
@@ -242,6 +259,15 @@ const onlyPositionals = (
 const validateId = (value: string, label: string): string => {
     if (value.length > 128 || !/^[A-Za-z0-9][A-Za-z0-9._:-]*$/u.test(value)) {
         throw new Error(`${label} must be a compact ID without whitespace.`);
+    }
+    return value;
+};
+
+const validateServiceIdentity = (value: string): string => {
+    if (!/^sha256:[a-f0-9]{64}$/u.test(value)) {
+        throw new Error(
+            '--internal-service-identity must be a lowercase SHA-256 identity.',
+        );
     }
     return value;
 };
@@ -520,6 +546,7 @@ export const parseCliArguments = (
                 '--reconciliation-interval-ms': 'value',
                 '--cancellation-interval-ms': 'value',
                 '--observation-restart-interval-ms': 'value',
+                '--internal-service-identity': 'value',
             },
             command,
         );
@@ -550,6 +577,16 @@ export const parseCliArguments = (
             ),
             globalConcurrency,
             workspaceConcurrency,
+            ...(optionValue(parsed.options, '--internal-service-identity')
+                ? {
+                      serviceIdentity: validateServiceIdentity(
+                          optionValue(
+                              parsed.options,
+                              '--internal-service-identity',
+                          )!,
+                      ),
+                  }
+                : {}),
             dispatchIntervalMs: parseInteger(
                 optionValue(parsed.options, '--dispatch-interval-ms'),
                 1_000,
@@ -718,12 +755,18 @@ interface OutputWriter {
     write(value: string): unknown;
 }
 
+export type TuiBridgeInput = AsyncIterable<
+    string | Uint8Array<ArrayBufferLike>
+>;
+
 export interface CliDependencies {
     readonly cwd?: () => string;
+    readonly stdin?: TuiBridgeInput;
     readonly stdout?: OutputWriter;
     readonly stderr?: OutputWriter;
     readonly initWorkspaceControl?: typeof initWorkspaceControl;
     readonly openWorkspaceControl?: typeof openWorkspaceControl;
+    readonly parseGoalPlanMarkdown?: typeof parseGoalPlanMarkdown;
     readonly readFile?: typeof readFile;
     readonly randomUUID?: () => string;
     readonly createOpenCodeAdapter?: typeof createOpenCodeAdapter;
@@ -746,10 +789,12 @@ type ResolvedCliDependencies = Required<
 
 const dependencies = (input: CliDependencies): ResolvedCliDependencies => ({
     cwd: input.cwd ?? (() => process.cwd()),
+    stdin: input.stdin ?? process.stdin,
     stdout: input.stdout ?? process.stdout,
     stderr: input.stderr ?? process.stderr,
     initWorkspaceControl: input.initWorkspaceControl ?? initWorkspaceControl,
     openWorkspaceControl: input.openWorkspaceControl ?? openWorkspaceControl,
+    parseGoalPlanMarkdown: input.parseGoalPlanMarkdown ?? parseGoalPlanMarkdown,
     readFile: input.readFile ?? readFile,
     randomUUID: input.randomUUID ?? randomUUID,
     createOpenCodeAdapter: input.createOpenCodeAdapter ?? createOpenCodeAdapter,
@@ -791,6 +836,214 @@ const concise = (value: unknown): string =>
 const errorMessage = (error: unknown): string => {
     const message = concise(error instanceof Error ? error.message : error);
     return message || 'Goal supervisor command failed.';
+};
+
+export type TuiBridgeDependencies = Pick<
+    CliDependencies,
+    | 'stdin'
+    | 'stdout'
+    | 'initWorkspaceControl'
+    | 'openWorkspaceControl'
+    | 'parseGoalPlanMarkdown'
+>;
+
+class InvalidTuiBridgeRequestError extends Error {}
+
+const readTuiBridgeRequest = async (
+    input: TuiBridgeInput,
+): Promise<TuiBridgeRequest> => {
+    const chunks: Buffer[] = [];
+    let byteLength = 0;
+    for await (const chunk of input) {
+        const bytes =
+            typeof chunk === 'string' ? Buffer.from(chunk, 'utf8') : chunk;
+        byteLength += bytes.byteLength;
+        if (byteLength > MAX_TUI_BRIDGE_REQUEST_BYTES) {
+            throw new InvalidTuiBridgeRequestError(
+                'TUI bridge request exceeds the input limit.',
+            );
+        }
+        chunks.push(Buffer.from(bytes));
+    }
+    if (byteLength === 0) {
+        throw new InvalidTuiBridgeRequestError(
+            'TUI bridge request must contain one JSON object.',
+        );
+    }
+
+    let source: string;
+    try {
+        source = new TextDecoder('utf-8', { fatal: true }).decode(
+            Buffer.concat(chunks, byteLength),
+        );
+    } catch {
+        throw new InvalidTuiBridgeRequestError(
+            'TUI bridge request must be valid UTF-8.',
+        );
+    }
+
+    let value: unknown;
+    try {
+        value = JSON.parse(source);
+    } catch {
+        throw new InvalidTuiBridgeRequestError(
+            'TUI bridge request must contain exactly one JSON object.',
+        );
+    }
+    const request = TuiBridgeRequestSchema.safeParse(value);
+    if (!request.success) {
+        throw new InvalidTuiBridgeRequestError(
+            'TUI bridge request does not match the protocol.',
+        );
+    }
+    return request.data;
+};
+
+const insideWorkspace = (workspace: string, path: string): boolean => {
+    const local = relative(workspace, path);
+    return (
+        local === '' ||
+        (!isAbsolute(local) && local !== '..' && !local.startsWith(`..${sep}`))
+    );
+};
+
+const terminalSummary = (value: string): string =>
+    Array.from(value)
+        .map(character => {
+            const code = character.codePointAt(0)!;
+            return code < 0x20 || (code >= 0x7f && code <= 0x9f)
+                ? ' '
+                : character;
+        })
+        .join('')
+        .replace(/[\s\u2028\u2029]+/gu, ' ')
+        .trim()
+        .slice(0, 500);
+
+const bridgeErrorMessage = (
+    error: unknown,
+    loadedTokens: readonly string[],
+): string => {
+    let value = error instanceof Error ? error.message : String(error);
+    for (const token of loadedTokens) {
+        if (token) value = value.replaceAll(token, '[REDACTED]');
+    }
+    const message = terminalSummary(value);
+    return message || 'Goal supervisor TUI operation failed.';
+};
+
+const bridgeSuccess = async (
+    request: TuiBridgeRequest,
+    resolved: ResolvedCliDependencies,
+    loadedTokens: string[],
+): Promise<TuiBridgeSuccessResponse> => {
+    if (request.operation === 'init') {
+        const initialized = await resolved.initWorkspaceControl(
+            request.workspace,
+        );
+        loadedTokens.push(initialized.internalTransportAuthToken);
+        try {
+            return TuiBridgeInitResponseSchema.parse({
+                protocol: TUI_BRIDGE_PROTOCOL,
+                ok: true,
+                operation: 'init',
+                workspace: initialized.workspace,
+            });
+        } finally {
+            await initialized.control.close();
+        }
+    }
+
+    const parsedPlan =
+        request.operation === 'launch'
+            ? resolved.parseGoalPlanMarkdown(request.planMarkdown)
+            : undefined;
+    const initialized = await resolved.openWorkspaceControl(request.workspace);
+    loadedTokens.push(initialized.internalTransportAuthToken);
+    try {
+        const authToken = initialized.internalTransportAuthToken;
+        if (request.operation === 'list') {
+            const goals = initialized.control.list({ authToken });
+            return TuiBridgeListResponseSchema.parse({
+                protocol: TUI_BRIDGE_PROTOCOL,
+                ok: true,
+                operation: 'list',
+                total: goals.length,
+                hasExecuting: goals.some(goal => goal.state === 'executing'),
+                goals: goals.slice(0, MAX_TUI_BRIDGE_GOALS).map(goal => ({
+                    id: terminalSummary(goal.id),
+                    state: goal.state,
+                    objective: terminalSummary(goal.objective),
+                })),
+            });
+        }
+
+        if (
+            !isAbsolute(request.planPath) ||
+            resolve(request.planPath) !== request.planPath ||
+            !insideWorkspace(initialized.workspace, request.planPath)
+        ) {
+            throw new Error(
+                'Goal-plan path must be canonical, absolute, and within the workspace.',
+            );
+        }
+        const result = initialized.control.createProposeApproveStart({
+            authToken,
+            commandId: goalLaunchCommandId(
+                initialized.workspace,
+                request.planPath,
+                parsedPlan!,
+                request.actor,
+            ),
+            planMarkdown: request.planMarkdown,
+            actor: request.actor,
+        });
+        const current = initialized.control.status({
+            authToken,
+            goalId: result.goal.id,
+        });
+        return TuiBridgeLaunchResponseSchema.parse({
+            protocol: TUI_BRIDGE_PROTOCOL,
+            ok: true,
+            operation: 'launch',
+            goal: { id: current.goal.id, state: current.goal.state },
+        });
+    } finally {
+        await initialized.control.close();
+    }
+};
+
+/** Runs the private one-request stdio bridge used by the Bun-hosted TUI. */
+export const runTuiBridge = async (
+    arguments_: readonly string[] = [],
+    inputDependencies: TuiBridgeDependencies = {},
+): Promise<number> => {
+    const resolved = dependencies(inputDependencies);
+    const loadedTokens: string[] = [];
+    let response: TuiBridgeSuccessResponse | TuiBridgeFailureResponse;
+    try {
+        if (arguments_.length !== 0) {
+            throw new InvalidTuiBridgeRequestError(
+                'The TUI bridge accepts no command-line arguments.',
+            );
+        }
+        const request = await readTuiBridgeRequest(resolved.stdin);
+        response = await bridgeSuccess(request, resolved, loadedTokens);
+    } catch (error) {
+        const invalid = error instanceof InvalidTuiBridgeRequestError;
+        response = TuiBridgeFailureResponseSchema.parse({
+            protocol: TUI_BRIDGE_PROTOCOL,
+            ok: false,
+            error: {
+                code: invalid ? 'invalid-request' : 'operation-failed',
+                message: invalid
+                    ? 'Invalid TUI bridge request.'
+                    : bridgeErrorMessage(error, loadedTokens),
+            },
+        });
+    }
+    resolved.stdout.write(`${JSON.stringify(response)}\n`);
+    return response.ok ? 0 : 1;
 };
 
 const shellArgument = (value: string): string =>
@@ -1259,6 +1512,14 @@ const daemonStatusText = (status: DaemonServiceStatus): string =>
           ? `invalid (${status.detail})`
           : 'stopped';
 
+const publicDaemonStatus = (
+    status: DaemonServiceStatus,
+): Omit<DaemonServiceStatus, 'token'> => {
+    if (status.status !== 'running' && status.status !== 'stale') return status;
+    const { token: _token, ...publicStatus } = status;
+    return publicStatus;
+};
+
 const executeDoctor = async (
     parsed: Extract<ParsedCliArguments, { readonly command: 'doctor' }>,
     resolved: ResolvedCliDependencies,
@@ -1291,7 +1552,7 @@ const executeDoctor = async (
                 control: { available: false, detail },
                 database,
                 token,
-                service,
+                service: publicDaemonStatus(service),
                 openCode: {
                     url: parsed.openCodeUrl,
                     healthy: false,
@@ -1357,7 +1618,7 @@ const executeDoctor = async (
                 ...doctor,
                 database,
                 token,
-                service,
+                service: publicDaemonStatus(service),
                 openCode,
             });
         } else {
@@ -1426,6 +1687,9 @@ const executeServe = async (
         reconciliationIntervalMs: parsed.reconciliationIntervalMs,
         cancellationIntervalMs: parsed.cancellationIntervalMs,
         observationRestartIntervalMs: parsed.observationRestartIntervalMs,
+        ...(parsed.serviceIdentity
+            ? { serviceIdentity: parsed.serviceIdentity }
+            : {}),
         onError: error => resolved.stderr.write(`${errorMessage(error)}\n`),
     });
 };
@@ -1447,6 +1711,9 @@ export const runCli = async (
     inputDependencies: CliDependencies = {},
 ): Promise<number> => {
     const resolved = dependencies(inputDependencies);
+    if (arguments_[0] === TUI_BRIDGE_COMMAND) {
+        return runTuiBridge(arguments_.slice(1), resolved);
+    }
     try {
         const parsed = parseCliArguments(arguments_, resolved.cwd());
         if (parsed.command === 'plan') {

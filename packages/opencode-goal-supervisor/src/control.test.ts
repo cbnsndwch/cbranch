@@ -13,6 +13,7 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import Database from 'better-sqlite3';
 import { afterEach, describe, expect, test } from 'vitest';
 
 import {
@@ -80,6 +81,12 @@ const plan = (destructive = false) => ({
     ],
     finalVerificationRequirements: [],
 });
+
+const goalPlanMarkdown = (destructive = false) =>
+    `# Operator-reviewed plan\n\n\`\`\`goal-plan\n${JSON.stringify({
+        objective: 'Launch an approved goal atomically',
+        ...plan(destructive),
+    })}\n\`\`\`\n`;
 
 describe('GoalControlService transport authentication', () => {
     test('creates an owner-only token, canonicalizes real paths, and rejects bad auth', async () => {
@@ -394,6 +401,153 @@ describe('GoalControlService semantics', () => {
                 .inspect({ authToken, goalId: goal.id })
                 .approvals.every(approval => !('tokenHash' in approval)),
         ).toBe(true);
+    });
+
+    test('atomically creates, approves, and starts a plan with durable replay', async () => {
+        const directory = await workspace();
+        const databasePath = join(directory, 'operator.db');
+        const actionToken = 'launch-token-00000000000000000000000000000000';
+        const store = new GoalStore(databasePath, {
+            tokenFactory: () => actionToken,
+        });
+        stores.push(store);
+        const initialized = await openControl(directory, store);
+        const { control, internalTransportAuthToken: authToken } = initialized;
+        const request = {
+            authToken,
+            commandId: 'operator-launch-1',
+            planMarkdown: goalPlanMarkdown(true),
+            actor: 'operator-tui',
+        };
+
+        const launched = control.createProposeApproveStart(request);
+        expect(launched).toMatchObject({
+            goal: {
+                state: 'executing',
+                objective: 'Launch an approved goal atomically',
+            },
+            plan: {
+                objective: 'Launch an approved goal atomically',
+                revision: 1,
+            },
+        });
+        expect(launched.goal.activePlanId).toBe(launched.plan.id);
+        expect(JSON.stringify(launched)).not.toContain(actionToken);
+        expect(control.createProposeApproveStart(request)).toEqual(launched);
+        expect(control.list({ authToken })).toHaveLength(1);
+        expect(
+            store
+                .events(launched.goal.id)
+                .every(event => event.commandId === request.commandId),
+        ).toBe(true);
+
+        const inspection = control.inspect({
+            authToken,
+            goalId: launched.goal.id,
+        });
+        expect(inspection.plans).toEqual([launched.plan]);
+        expect(inspection.approvals).toHaveLength(1);
+        expect(inspection.approvals[0]).toMatchObject({
+            scope: { type: 'goal-action', action: 'unattended-start' },
+            decidedBy: 'operator-tui',
+        });
+        expect(inspection.approvals[0]?.consumedAt).toBeTypeOf('string');
+        expect(store.claimNextWork('worker', 60_000)).toBeUndefined();
+
+        await control.close();
+        controls.splice(controls.indexOf(control), 1);
+        store.close();
+        stores.splice(stores.indexOf(store), 1);
+        const reopenedStore = new GoalStore(databasePath, {
+            tokenFactory: () => {
+                throw new Error('Replay unexpectedly invoked the launch.');
+            },
+        });
+        stores.push(reopenedStore);
+        const reopened = await openWorkspaceControl(directory, {
+            store: reopenedStore,
+            closeStore: false,
+        });
+        controls.push(reopened.control);
+        expect(
+            reopened.control.createProposeApproveStart({
+                ...request,
+                authToken: reopened.internalTransportAuthToken,
+            }),
+        ).toEqual(launched);
+
+        const database = new Database(databasePath, { readonly: true });
+        const persisted = {
+            commands: database
+                .prepare(
+                    'SELECT request_json, result_json, error FROM command_inbox',
+                )
+                .all(),
+            approvals: database
+                .prepare(
+                    'SELECT scope_json, reason, token_hash, consumed_at FROM approvals',
+                )
+                .all(),
+            events: database
+                .prepare('SELECT payload_json FROM goal_events')
+                .all(),
+        };
+        expect(JSON.stringify(persisted)).not.toContain(actionToken);
+        expect(database.prepare('SELECT status FROM plans').get()).toEqual({
+            status: 'approved',
+        });
+        database.close();
+    });
+
+    test('rolls back every launch effect when internal approval issuance fails', async () => {
+        const directory = await workspace();
+        const databasePath = join(directory, 'rollback.db');
+        const store = new GoalStore(databasePath, {
+            tokenFactory: () => 'invalid',
+        });
+        stores.push(store);
+        const initialized = await openControl(directory, store);
+        const { control, internalTransportAuthToken: authToken } = initialized;
+        const request = {
+            authToken,
+            commandId: 'operator-launch-rollback',
+            planMarkdown: goalPlanMarkdown(),
+            actor: 'operator-tui',
+        };
+
+        expect(() => control.createProposeApproveStart(request)).toThrow(
+            'invalid approval token',
+        );
+        expect(control.list({ authToken })).toEqual([]);
+        expect(() => control.createProposeApproveStart(request)).toThrow(
+            'invalid approval token',
+        );
+
+        const database = new Database(databasePath, { readonly: true });
+        for (const table of [
+            'goals',
+            'plans',
+            'work_units',
+            'approvals',
+            'goal_events',
+        ]) {
+            expect(
+                database
+                    .prepare(`SELECT COUNT(*) AS count FROM ${table}`)
+                    .get(),
+            ).toEqual({ count: 0 });
+        }
+        expect(
+            database
+                .prepare(
+                    'SELECT command_id, result_json FROM command_inbox WHERE command_id = ?',
+                )
+                .get(request.commandId),
+        ).toEqual({
+            command_id: request.commandId,
+            result_json: null,
+        });
+        database.close();
     });
 
     test('recovers unknown outcomes only with an explicit scoped decision', async () => {

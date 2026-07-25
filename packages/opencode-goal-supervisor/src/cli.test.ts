@@ -7,20 +7,37 @@ import {
     writeFile,
 } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 
 import { afterEach, describe, expect, test, vi } from 'vitest';
 
-import { parseCliArguments, runCli, type CliDependencies } from './cli.js';
+import {
+    parseCliArguments,
+    runCli,
+    type CliDependencies,
+    type TuiBridgeInput,
+} from './cli.js';
 import {
     initWorkspaceControl,
     openWorkspaceControl,
+    type GoalControlService,
     type InitializedWorkspaceControl,
 } from './control.js';
+import { parseGoalPlanMarkdown } from './goal-plan.js';
 import { GoalStore } from './store.js';
+import {
+    goalLaunchCommandId,
+    MAX_TUI_BRIDGE_GOALS,
+    MAX_TUI_BRIDGE_REQUEST_BYTES,
+    TUI_BRIDGE_COMMAND,
+    TUI_BRIDGE_PROTOCOL,
+    TuiBridgeFailureResponseSchema,
+    TuiBridgeResponseSchema,
+} from './tui-protocol.js';
 
 const directories: string[] = [];
 const approvalToken = 'a'.repeat(32);
+const serviceIdentity = `sha256:${'c'.repeat(64)}`;
 
 const workspace = async (): Promise<string> => {
     const directory = await mkdtemp(join(tmpdir(), 'goal-cli-'));
@@ -59,6 +76,74 @@ const invoke = async (
     });
     return { exitCode, stdout: stdout.value(), stderr: stderr.value() };
 };
+
+const bridgeInput = (value: string | Uint8Array): TuiBridgeInput => ({
+    async *[Symbol.asyncIterator]() {
+        yield value;
+    },
+});
+
+const invokeBridge = async (
+    source: string | Uint8Array,
+    overrides: CliDependencies = {},
+    arguments_: readonly string[] = [],
+) => {
+    const root = '/unused';
+    return invoke(root, [TUI_BRIDGE_COMMAND, ...arguments_], {
+        stdin: bridgeInput(source),
+        ...overrides,
+    });
+};
+
+const bridgeRequest = (
+    operation: 'init' | 'list' | 'launch',
+    workspacePath: string,
+    extra: Readonly<Record<string, unknown>> = {},
+): string =>
+    JSON.stringify({
+        protocol: TUI_BRIDGE_PROTOCOL,
+        operation,
+        workspace: workspacePath,
+        ...extra,
+    });
+
+const goalMarkdown = (pretty = false): string =>
+    [
+        '# Confirmed goal',
+        '```goal-plan',
+        JSON.stringify(
+            {
+                ...(pretty ? { authoredBy: 'planner' } : {}),
+                objective: 'Exercise the private bridge',
+                units: [
+                    {
+                        id: 'unit-1',
+                        title: 'Implement',
+                        instructions: 'Implement and verify the bridge.',
+                        dependencyIds: [],
+                        acceptanceCriteria: ['The bridge is verified'],
+                        verificationRequirements: [],
+                    },
+                ],
+                ...(!pretty ? { authoredBy: 'planner' } : {}),
+            },
+            null,
+            pretty ? 4 : undefined,
+        ),
+        '```',
+    ].join('\n');
+
+const initializedBridgeControl = (
+    canonicalWorkspace: string,
+    control: object,
+    token = 'loaded-control-secret',
+): InitializedWorkspaceControl =>
+    ({
+        workspace: canonicalWorkspace,
+        tokenPath: join(canonicalWorkspace, 'control.token'),
+        internalTransportAuthToken: token,
+        control,
+    }) as unknown as InitializedWorkspaceControl;
 
 const plan = {
     authoredBy: 'planner',
@@ -186,6 +271,21 @@ describe('parseCliArguments', () => {
         });
     });
 
+    test('accepts only a valid private serve service identity', () => {
+        expect(
+            parseCliArguments(
+                ['serve', '--internal-service-identity', serviceIdentity],
+                '/tmp/workspace',
+            ),
+        ).toMatchObject({ command: 'serve', serviceIdentity });
+        expect(() =>
+            parseCliArguments(
+                ['serve', '--internal-service-identity', 'invalid'],
+                '/tmp/workspace',
+            ),
+        ).toThrow('lowercase SHA-256 identity');
+    });
+
     test.each(
         (
             [
@@ -267,6 +367,355 @@ describe('parseCliArguments', () => {
         ).map(arguments_ => [arguments_] as const),
     )('rejects invalid argv %j', arguments_ => {
         expect(() => parseCliArguments(arguments_, '/tmp/workspace')).toThrow();
+    });
+
+    test('keeps the private TUI bridge outside the public parser', () => {
+        expect(() =>
+            parseCliArguments([TUI_BRIDGE_COMMAND], '/tmp/workspace'),
+        ).toThrow('Unknown command');
+    });
+});
+
+describe('private TUI bridge', () => {
+    test.each([
+        ['malformed JSON', '{'],
+        [
+            'multiple JSON objects',
+            `${bridgeRequest('list', '/workspace')}\n${bridgeRequest('list', '/workspace')}`,
+        ],
+        [
+            'an unknown field',
+            bridgeRequest('list', '/workspace', { unknown: true }),
+        ],
+        [
+            'an auth token field',
+            bridgeRequest('list', '/workspace', {
+                authToken: 'request-secret',
+            }),
+        ],
+        [
+            'a transport command field',
+            bridgeRequest('list', '/workspace', {
+                commandId: 'caller-controlled',
+            }),
+        ],
+    ])('rejects %s before opening state', async (_label, source) => {
+        const initialize = vi.fn();
+        const open = vi.fn();
+
+        const result = await invokeBridge(source, {
+            initWorkspaceControl:
+                initialize as unknown as typeof initWorkspaceControl,
+            openWorkspaceControl:
+                open as unknown as typeof openWorkspaceControl,
+        });
+        const response = TuiBridgeFailureResponseSchema.parse(
+            JSON.parse(result.stdout),
+        );
+
+        expect(result.exitCode).toBe(1);
+        expect(result.stdout.endsWith('\n')).toBe(true);
+        expect(result.stdout.trim().split('\n')).toHaveLength(1);
+        expect(result.stderr).toBe('');
+        expect(response.error.code).toBe('invalid-request');
+        expect(initialize).not.toHaveBeenCalled();
+        expect(open).not.toHaveBeenCalled();
+    });
+
+    test('rejects oversized input and bridge arguments before opening state', async () => {
+        const initialize = vi.fn();
+        const open = vi.fn();
+        const dependencies: CliDependencies = {
+            initWorkspaceControl:
+                initialize as unknown as typeof initWorkspaceControl,
+            openWorkspaceControl:
+                open as unknown as typeof openWorkspaceControl,
+        };
+
+        const oversized = await invokeBridge(
+            'x'.repeat(MAX_TUI_BRIDGE_REQUEST_BYTES + 1),
+            dependencies,
+        );
+        const withArgument = await invokeBridge(
+            bridgeRequest('list', '/workspace'),
+            dependencies,
+            ['unexpected'],
+        );
+
+        expect(oversized.exitCode).toBe(1);
+        expect(withArgument.exitCode).toBe(1);
+        expect(oversized.stderr).toBe('');
+        expect(withArgument.stderr).toBe('');
+        expect(initialize).not.toHaveBeenCalled();
+        expect(open).not.toHaveBeenCalled();
+    });
+
+    test('rejects malformed launch Markdown before opening state', async () => {
+        const open = vi.fn();
+        const result = await invokeBridge(
+            bridgeRequest('launch', '/workspace', {
+                planPath: '/workspace/goal.md',
+                planMarkdown: 'not a goal plan',
+                actor: 'operator',
+            }),
+            {
+                openWorkspaceControl:
+                    open as unknown as typeof openWorkspaceControl,
+            },
+        );
+
+        expect(result.exitCode).toBe(1);
+        expect(open).not.toHaveBeenCalled();
+        expect(result.stderr).toBe('');
+    });
+
+    test('initializes and returns only the canonical workspace before closing', async () => {
+        const close = vi.fn(async () => undefined);
+        const initialize = vi.fn(async () =>
+            initializedBridgeControl('/canonical/workspace', { close }),
+        );
+
+        const result = await invokeBridge(bridgeRequest('init', '/requested'), {
+            initWorkspaceControl:
+                initialize as unknown as typeof initWorkspaceControl,
+        });
+
+        expect(result.exitCode).toBe(0);
+        expect(JSON.parse(result.stdout)).toEqual({
+            protocol: TUI_BRIDGE_PROTOCOL,
+            ok: true,
+            operation: 'init',
+            workspace: '/canonical/workspace',
+        });
+        expect(initialize).toHaveBeenCalledWith('/requested');
+        expect(close).toHaveBeenCalledOnce();
+        expect(result.stderr).toBe('');
+    });
+
+    test('lists an exact total with a bounded terminal-safe projection', async () => {
+        const close = vi.fn(async () => undefined);
+        const goals = Array.from(
+            { length: MAX_TUI_BRIDGE_GOALS + 5 },
+            (_, index) => ({
+                id: `goal-${index}`,
+                state:
+                    index === MAX_TUI_BRIDGE_GOALS + 4
+                        ? ('executing' as const)
+                        : ('paused' as const),
+                objective: `Goal ${index}\n\u001b[31mstatus`,
+            }),
+        );
+        const list = vi.fn(() => goals);
+        const open = vi.fn(async () =>
+            initializedBridgeControl('/workspace', { list, close }),
+        );
+
+        const result = await invokeBridge(bridgeRequest('list', '/workspace'), {
+            openWorkspaceControl:
+                open as unknown as typeof openWorkspaceControl,
+        });
+        const response = TuiBridgeResponseSchema.parse(
+            JSON.parse(result.stdout),
+        );
+
+        expect(response).toMatchObject({
+            ok: true,
+            operation: 'list',
+            total: goals.length,
+            hasExecuting: true,
+        });
+        if (!response.ok || response.operation !== 'list') {
+            throw new Error('Expected a list response.');
+        }
+        expect(response.goals).toHaveLength(MAX_TUI_BRIDGE_GOALS);
+        expect(
+            Array.from(JSON.stringify(response.goals)).every(character => {
+                const code = character.codePointAt(0)!;
+                return code >= 0x20 && (code < 0x7f || code > 0x9f);
+            }),
+        ).toBe(true);
+        expect(list).toHaveBeenCalledWith({
+            authToken: 'loaded-control-secret',
+        });
+        expect(close).toHaveBeenCalledOnce();
+    });
+
+    test('reparses and launches without exposing control fields', async () => {
+        const canonicalWorkspace = '/workspace';
+        const planPath = join(canonicalWorkspace, 'plans', 'goal.md');
+        const markdown = goalMarkdown();
+        const parsedPlan = parseGoalPlanMarkdown(markdown);
+        const close = vi.fn(async () => undefined);
+        const create = vi.fn(() => ({
+            goal: { id: 'goal-1', state: 'executing' as const },
+        }));
+        const status = vi.fn(() => ({
+            goal: { id: 'goal-1', state: 'executing' as const },
+        }));
+        const parse = vi.fn(parseGoalPlanMarkdown);
+        const open = vi.fn(async () =>
+            initializedBridgeControl(canonicalWorkspace, {
+                createProposeApproveStart: create,
+                status,
+                close,
+            }),
+        );
+
+        const result = await invokeBridge(
+            bridgeRequest('launch', canonicalWorkspace, {
+                planPath,
+                planMarkdown: markdown,
+                actor: 'operator',
+            }),
+            {
+                openWorkspaceControl:
+                    open as unknown as typeof openWorkspaceControl,
+                parseGoalPlanMarkdown: parse,
+            },
+        );
+
+        expect(result.exitCode).toBe(0);
+        expect(JSON.parse(result.stdout)).toEqual({
+            protocol: TUI_BRIDGE_PROTOCOL,
+            ok: true,
+            operation: 'launch',
+            goal: { id: 'goal-1', state: 'executing' },
+        });
+        expect(parse).toHaveBeenCalledWith(markdown);
+        expect(create).toHaveBeenCalledWith({
+            authToken: 'loaded-control-secret',
+            commandId: goalLaunchCommandId(
+                canonicalWorkspace,
+                planPath,
+                parsedPlan,
+                'operator',
+            ),
+            planMarkdown: markdown,
+            actor: 'operator',
+        });
+        expect(status).toHaveBeenCalledWith({
+            authToken: 'loaded-control-secret',
+            goalId: 'goal-1',
+        });
+        expect(result.stdout).not.toContain('loaded-control-secret');
+        expect(result.stdout).not.toContain('commandId');
+        expect(close).toHaveBeenCalledOnce();
+    });
+
+    test('keeps one launch ID but returns current state after replay', async () => {
+        const canonicalWorkspace = '/workspace';
+        const planPath = join(canonicalWorkspace, 'goal.md');
+        const commandIds: string[] = [];
+        const states = ['executing', 'achieved'] as const;
+        const closes: ReturnType<typeof vi.fn>[] = [];
+        const open = vi.fn(async () => {
+            const close = vi.fn(async () => undefined);
+            closes.push(close);
+            return initializedBridgeControl(canonicalWorkspace, {
+                close,
+                createProposeApproveStart: (
+                    request: Parameters<
+                        GoalControlService['createProposeApproveStart']
+                    >[0],
+                ) => {
+                    commandIds.push(request.commandId!);
+                    return {
+                        goal: { id: 'goal-1', state: 'executing' },
+                    } as ReturnType<
+                        GoalControlService['createProposeApproveStart']
+                    >;
+                },
+                status: () => ({
+                    goal: {
+                        id: 'goal-1',
+                        state: states[commandIds.length - 1],
+                    },
+                }),
+            });
+        });
+        const launch = async (planMarkdown: string) =>
+            await invokeBridge(
+                bridgeRequest('launch', canonicalWorkspace, {
+                    planPath,
+                    planMarkdown,
+                    actor: 'operator',
+                }),
+                {
+                    openWorkspaceControl:
+                        open as unknown as typeof openWorkspaceControl,
+                },
+            );
+
+        const first = await launch(goalMarkdown());
+        const replay = await launch(goalMarkdown(true));
+
+        expect(first.exitCode).toBe(0);
+        expect(replay.exitCode).toBe(0);
+        expect(JSON.parse(first.stdout)).toMatchObject({
+            goal: { id: 'goal-1', state: 'executing' },
+        });
+        expect(JSON.parse(replay.stdout)).toMatchObject({
+            goal: { id: 'goal-1', state: 'achieved' },
+        });
+        expect(commandIds).toHaveLength(2);
+        expect(commandIds[0]).toBe(commandIds[1]);
+        expect(closes).toHaveLength(2);
+        for (const close of closes) expect(close).toHaveBeenCalledOnce();
+    });
+
+    test('rejects a lexical path escape without rereading or mutating', async () => {
+        const canonicalWorkspace = '/workspace';
+        const close = vi.fn(async () => undefined);
+        const create = vi.fn();
+        const read = vi.fn();
+        const open = vi.fn(async () =>
+            initializedBridgeControl(canonicalWorkspace, {
+                createProposeApproveStart: create,
+                close,
+            }),
+        );
+
+        const result = await invokeBridge(
+            bridgeRequest('launch', canonicalWorkspace, {
+                planPath: resolve(canonicalWorkspace, '..', 'outside.md'),
+                planMarkdown: goalMarkdown(),
+                actor: 'operator',
+            }),
+            {
+                openWorkspaceControl:
+                    open as unknown as typeof openWorkspaceControl,
+                readFile: read as unknown as typeof readFile,
+            },
+        );
+
+        expect(result.exitCode).toBe(1);
+        expect(result.stdout).toContain('within the workspace');
+        expect(create).not.toHaveBeenCalled();
+        expect(read).not.toHaveBeenCalled();
+        expect(close).toHaveBeenCalledOnce();
+    });
+
+    test('redacts a loaded control token from operation errors', async () => {
+        const token = 's'.repeat(512);
+        const close = vi.fn(async () => undefined);
+        const list = vi.fn(() => {
+            throw new Error(`database failed while using ${token}`);
+        });
+        const open = vi.fn(async () =>
+            initializedBridgeControl('/workspace', { list, close }, token),
+        );
+
+        const result = await invokeBridge(bridgeRequest('list', '/workspace'), {
+            openWorkspaceControl:
+                open as unknown as typeof openWorkspaceControl,
+        });
+
+        expect(result.exitCode).toBe(1);
+        expect(result.stdout).not.toContain(token);
+        expect(result.stdout).not.toContain(token.slice(0, 100));
+        expect(result.stdout).toContain('[REDACTED]');
+        expect(result.stderr).toBe('');
+        expect(close).toHaveBeenCalledOnce();
     });
 });
 
@@ -674,6 +1123,8 @@ describe('CLI process seams', () => {
                 '2',
                 '--dispatch-interval-ms',
                 '25',
+                '--internal-service-identity',
+                serviceIdentity,
             ],
             {
                 initWorkspaceControl:
@@ -694,6 +1145,7 @@ describe('CLI process seams', () => {
                 globalConcurrency: 3,
                 workspaceConcurrency: 2,
                 dispatchIntervalMs: 25,
+                serviceIdentity,
             }),
         );
         expect(JSON.parse(result.stdout)).toMatchObject({
