@@ -5,6 +5,8 @@ import { join } from 'node:path';
 import { describe, expect, test } from 'vitest';
 
 import {
+    FIRST_PARTY_PLUGIN_REGISTRY_FINGERPRINT,
+    FIRST_PARTY_PLUGIN_REGISTRY_ROOT,
     FIRST_PARTY_PLUGIN_REGISTRY_URL,
     makePluginRepositoryStore,
     PLUGIN_REPOSITORY_FILE_NAME,
@@ -23,8 +25,50 @@ describe('plugin repository store', () => {
                     id: 'cbranch-official',
                     kind: 'https',
                     url: FIRST_PARTY_PLUGIN_REGISTRY_URL,
-                    trustState: 'untrusted',
+                    publisherFingerprint:
+                        FIRST_PARTY_PLUGIN_REGISTRY_FINGERPRINT,
+                    trustState: 'trusted',
+                    freshness: 'fresh',
                 },
+                root: FIRST_PARTY_PLUGIN_REGISTRY_ROOT,
+            },
+        ]);
+    });
+
+    test('migrates an untrusted first-party registry to the bundled root', async () => {
+        const dataDirectory = await mkdtemp(
+            join(tmpdir(), 'cbranch-plugin-repository-'),
+        );
+        await writeFile(
+            join(dataDirectory, PLUGIN_REPOSITORY_FILE_NAME),
+            JSON.stringify({
+                version: 1,
+                defaultsInitialized: true,
+                repositories: [
+                    {
+                        repository: {
+                            id: 'cbranch-official',
+                            kind: 'https',
+                            url: FIRST_PARTY_PLUGIN_REGISTRY_URL,
+                            trustState: 'untrusted',
+                            freshness: 'unknown',
+                            credentialState: 'not needed',
+                        },
+                    },
+                ],
+            }),
+        );
+
+        await expect(
+            makePluginRepositoryStore({ dataDirectory }).list(),
+        ).resolves.toMatchObject([
+            {
+                repository: {
+                    trustState: 'trusted',
+                    publisherFingerprint:
+                        FIRST_PARTY_PLUGIN_REGISTRY_FINGERPRINT,
+                },
+                root: FIRST_PARTY_PLUGIN_REGISTRY_ROOT,
             },
         ]);
     });

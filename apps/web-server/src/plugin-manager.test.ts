@@ -176,6 +176,36 @@ describe('trusted plugin manager', () => {
         );
     });
 
+    test('does not invoke the credential helper for a public publisher fetch', async () => {
+        const dataDirectory = await mkdtemp(
+            join(tmpdir(), 'cbranch-plugin-manager-'),
+        );
+        const credentialStore = makeCredentialStore();
+        const fetch = vi.fn(
+            async (_url: URL | string, _init?: RequestInit) =>
+                new Response('root metadata', {
+                    headers: { 'content-length': '13' },
+                }),
+        );
+        vi.stubGlobal('fetch', fetch);
+        const manager = makeTrustedPluginManager({
+            dataDirectory,
+            credentialStore,
+        });
+        const repository = await manager.repositoryAdd(
+            'https',
+            'https://plugins.example.test/registry',
+        );
+
+        await manager.repositoryRefresh(repository.id);
+
+        expect(credentialStore.get).not.toHaveBeenCalled();
+        expect(fetch).toHaveBeenCalledWith(
+            new URL('https://plugins.example.test/registry/metadata/root.json'),
+            expect.objectContaining({ headers: undefined, redirect: 'manual' }),
+        );
+    });
+
     test('marks a repository for credential replacement after a 401', async () => {
         const dataDirectory = await mkdtemp(
             join(tmpdir(), 'cbranch-plugin-manager-'),
@@ -206,6 +236,27 @@ describe('trusted plugin manager', () => {
         expect(credentialStore.reject).toHaveBeenCalledWith(
             'https://private.example.test/registry',
             'private-token-value',
+        );
+    });
+
+    test('reports an untrusted publisher metadata fetch failure to the caller', async () => {
+        const dataDirectory = await mkdtemp(
+            join(tmpdir(), 'cbranch-plugin-manager-'),
+        );
+        const manager = makeTrustedPluginManager({
+            dataDirectory,
+            credentialStore: makeCredentialStore(),
+        });
+        const repository = await manager.repositoryAdd(
+            'https',
+            'https://plugins.example.test/registry',
+        );
+        vi.stubGlobal('fetch', async () => {
+            throw new Error('network unavailable');
+        });
+
+        await expect(manager.repositoryRefresh(repository.id)).rejects.toThrow(
+            'Could not fetch publisher metadata: network unavailable',
         );
     });
 

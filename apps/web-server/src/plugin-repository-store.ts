@@ -21,6 +21,10 @@ import { resolvePluginDataDirectory } from './plugin-lock-store';
 export const PLUGIN_REPOSITORY_FILE_NAME = 'repositories.json';
 export const FIRST_PARTY_PLUGIN_REGISTRY_URL =
     'https://raw.githubusercontent.com/cbnsndwch/cbranch/plugin-registry';
+export const FIRST_PARTY_PLUGIN_REGISTRY_ROOT =
+    'eyJzaWduZWQiOnsiX3R5cGUiOiJyb290IiwidmVyc2lvbiI6MSwiZXhwaXJlcyI6IjIwMjctMDctMTZUMDE6MzE6NDQuNTM2WiIsImtleXMiOnsiY2EyMWU1ZDM2YjI1YzJlN2JhZDk0ZWJlMTFhZjFjNjQ1MGY1ODg1MTllMDBjNTgwYThjY2RmMmIzMGMyNmQ2ZiI6eyJrZXl0eXBlIjoiZWQyNTUxOSIsImtleXZhbCI6eyJwdWJsaWMiOiJjYzQ4MmVhZjhhZmYzZDIwNjkzMTA2MzMzZjY2ZmU4ZDI5MGJjN2VlNTUxYmVhNWJiODMzN2NlMjkxMGQ1NmVhIn19fSwicm9sZXMiOnsicm9vdCI6eyJrZXlpZHMiOlsiY2EyMWU1ZDM2YjI1YzJlN2JhZDk0ZWJlMTFhZjFjNjQ1MGY1ODg1MTllMDBjNTgwYThjY2RmMmIzMGMyNmQ2ZiJdLCJ0aHJlc2hvbGQiOjF9LCJ0aW1lc3RhbXAiOnsia2V5aWRzIjpbImNhMjFlNWQzNmIyNWMyZTdiYWQ5NGViZTExYWYxYzY0NTBmNTg4NTE5ZTAwYzU4MGE4Y2NkZjJiMzBjMjZkNmYiXSwidGhyZXNob2xkIjoxfSwic25hcHNob3QiOnsia2V5aWRzIjpbImNhMjFlNWQzNmIyNWMyZTdiYWQ5NGViZTExYWYxYzY0NTBmNTg4NTE5ZTAwYzU4MGE4Y2NkZjJiMzBjMjZkNmYiXSwidGhyZXNob2xkIjoxfSwidGFyZ2V0cyI6eyJrZXlpZHMiOlsiY2EyMWU1ZDM2YjI1YzJlN2JhZDk0ZWJlMTFhZjFjNjQ1MGY1ODg1MTllMDBjNTgwYThjY2RmMmIzMGMyNmQ2ZiJdLCJ0aHJlc2hvbGQiOjF9fX0sInNpZ25hdHVyZXMiOlt7ImtleWlkIjoiY2EyMWU1ZDM2YjI1YzJlN2JhZDk0ZWJlMTFhZjFjNjQ1MGY1ODg1MTllMDBjNTgwYThjY2RmMmIzMGMyNmQ2ZiIsInNpZyI6ImNlODI1OTYyN2ZlNTY3NjY5NDhlNjM3MzZjMGRiNDkwY2MyMDI3NTBmMmNmOTlmYzg2MDVjZDMxODE3YjZkODI1MTNmNmZlY2M2MDQzOGI1MjdkODYxOGM3OTM1MWRkMzZkOTUxMmIyY2EwYTRhNTVlN2Y3NDBlN2ZlZDI1ZDA3In1dfQo=';
+export const FIRST_PARTY_PLUGIN_REGISTRY_FINGERPRINT =
+    'sha256:85aef5664a41cf851120125cff8779a683454901da86e17b437e536fb4024585';
 const PLUGIN_REPOSITORY_VERSION = 1;
 
 class StoredRepository extends Schema.Class<StoredRepository>(
@@ -51,13 +55,24 @@ const initialRepositoryFile = (): PluginRepositoryFile =>
                     id: PluginRepositoryId.make('cbranch-official'),
                     kind: 'https',
                     url: FIRST_PARTY_PLUGIN_REGISTRY_URL,
-                    trustState: 'untrusted',
-                    freshness: 'unknown',
+                    publisherFingerprint:
+                        FIRST_PARTY_PLUGIN_REGISTRY_FINGERPRINT,
+                    trustState: 'trusted',
+                    freshness: 'fresh',
                     credentialState: 'not needed',
                 }),
+                root: FIRST_PARTY_PLUGIN_REGISTRY_ROOT,
             }),
         ],
     });
+
+const isUntrustedFirstPartyRepository = (entry: StoredRepository): boolean =>
+    entry.repository.id === 'cbranch-official' &&
+    entry.repository.url === FIRST_PARTY_PLUGIN_REGISTRY_URL &&
+    entry.repository.trustState === 'untrusted';
+
+const firstPartyRepository = (): StoredRepository =>
+    initialRepositoryFile().repositories[0]!;
 
 export interface PluginRepositoryStore {
     readonly list: () => Promise<readonly StoredRepository[]>;
@@ -102,22 +117,29 @@ export const makePluginRepositoryStore = (
             const stored = Schema.decodeUnknownSync(PluginRepositoryFile)(
                 JSON.parse(await readFile(file, 'utf8')),
             );
-            if (stored.defaultsInitialized) return stored;
+            const repositories = stored.repositories.map(entry =>
+                isUntrustedFirstPartyRepository(entry)
+                    ? firstPartyRepository()
+                    : entry,
+            );
+            if (stored.defaultsInitialized) {
+                return new PluginRepositoryFile({ ...stored, repositories });
+            }
             // One-time migration for installations that had a registry file before the
             // first-party source shipped. Future writes retain the marker, including an
             // intentionally empty registry after the user removes it.
             return new PluginRepositoryFile({
                 ...stored,
                 defaultsInitialized: true,
-                repositories: stored.repositories.some(
+                repositories: repositories.some(
                     entry =>
                         entry.repository.url ===
                         FIRST_PARTY_PLUGIN_REGISTRY_URL,
                 )
-                    ? stored.repositories
+                    ? repositories
                     : [
                           ...initialRepositoryFile().repositories,
-                          ...stored.repositories,
+                          ...repositories,
                       ],
             });
         } catch (error) {

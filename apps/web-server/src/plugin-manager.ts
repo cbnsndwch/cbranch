@@ -334,6 +334,8 @@ export const makeTrustedPluginManager = (
             transport: makeHttpsPluginRepositoryTransport({
                 url: stored.repository.url,
                 getCredential: async () => {
+                    if (stored.repository.credentialState === 'not needed')
+                        return undefined;
                     const credential = await credentialStore.get(
                         stored.repository.url,
                     );
@@ -364,6 +366,41 @@ export const makeTrustedPluginManager = (
         });
         repositories.set(String(repositoryId), repository);
         return repository;
+    };
+
+    const fetchPublisherRoot = async (
+        repositoryId: PluginRepositoryIdInput['repositoryId'],
+        url: string,
+        credentialState: PluginRepository['credentialState'],
+    ): Promise<Uint8Array> => {
+        try {
+            return await makeHttpsPluginRepositoryTransport({
+                url,
+                getCredential: () =>
+                    credentialState === 'not needed'
+                        ? Promise.resolve(undefined)
+                        : credentialStore.get(url),
+                rejectCredential: async credential => {
+                    if (credential)
+                        await credentialStore
+                            .reject(url, credential)
+                            .catch(() => undefined);
+                    await repositoryStore.setCredentialState(
+                        repositoryId,
+                        'needs attention',
+                    );
+                },
+            }).fetchMetadata('metadata/root.json');
+        } catch (error) {
+            const detail =
+                error instanceof Error && error.message
+                    ? error.message.slice(0, 500)
+                    : 'the repository did not return valid metadata.';
+            throw new PluginManagerError(
+                'pluginMetadataInvalid',
+                `Could not fetch publisher metadata: ${detail}`,
+            );
+        }
     };
 
     const manager = {
@@ -447,21 +484,11 @@ export const makeTrustedPluginManager = (
                     'Git-backed plugin repositories are not implemented yet.',
                 );
             if (stored.repository.trustState !== 'trusted') {
-                const root = await makeHttpsPluginRepositoryTransport({
-                    url: stored.repository.url,
-                    getCredential: () =>
-                        credentialStore.get(stored.repository.url),
-                    rejectCredential: async credential => {
-                        if (credential)
-                            await credentialStore
-                                .reject(stored.repository.url, credential)
-                                .catch(() => undefined);
-                        await repositoryStore.setCredentialState(
-                            repositoryId,
-                            'needs attention',
-                        );
-                    },
-                }).fetchMetadata('metadata/root.json');
+                const root = await fetchPublisherRoot(
+                    repositoryId,
+                    stored.repository.url,
+                    stored.repository.credentialState,
+                );
                 const repository = await repositoryStore.setRoot(
                     repositoryId,
                     `sha256:${createHash('sha256').update(root).digest('hex')}`,
