@@ -1,5 +1,65 @@
 # Changelog
 
+## v0.2.2
+
+### Features
+
+- Add a durable OpenCode goal supervisor by @cbnsndwch
+- Add the operator TUI goal-launch workflow by @cbnsndwch
+- Add the `bro` OpenCode clarification command by @cbnsndwch
+- Add a private plugin registry author SDK by @cbnsndwch
+- Add host-owned plugin submenus by @cbnsndwch
+- Release the hello-world plugin 0.1.1 by @cbnsndwch
+- Add declarative plugin contribution UI by @cbnsndwch
+- Streamline connection profiles by @cbnsndwch
+- Improve canary repository defaults by @cbnsndwch
+- Isolate the canary desktop application by @cbnsndwch
+- Add a canary plugin lifecycle by @cbnsndwch
+- Enable trusted ESM extensions by @cbnsndwch
+- Add runtime plugin foundations by @cbnsndwch
+
+### Bug Fixes
+
+- Persist the verified TUF target version by @cbnsndwch
+- Reject credential control characters in the web server by @cbnsndwch
+- Publish plugin registry branch updates by @cbnsndwch
+- Wrap plugin command result output by @cbnsndwch
+- Serialize installed plugin responses by @cbnsndwch
+- Validate matching canary RPC servers by @cbnsndwch
+- Accept matching managed canary servers by @cbnsndwch
+- Check desktop updates before connecting by @cbnsndwch
+- Stamp the server bundle version for canary builds by @cbnsndwch
+- Report managed server versions in canary builds by @cbnsndwch
+- Serialize verified plugin catalog entries by @cbnsndwch
+- Reload trusted plugin catalogs by @cbnsndwch
+- Embed a distinct Windows canary icon by @cbnsndwch
+- Use a shared UI build identity by @cbnsndwch
+- Configure the canary-feed author by @cbnsndwch
+- Publish immutable canary releases by @cbnsndwch
+- Align canary release packaging by @cbnsndwch
+- Install the browser for the canary gate by @cbnsndwch
+- Run the canary gate on Linux by @cbnsndwch
+- Ignore prerelease tags in stable publishing by @cbnsndwch
+- Retain the trusted plugin registry root by @cbnsndwch
+- Accept semantic RC tags in CI by @cbnsndwch
+
+### Maintenance
+
+- Document the goal-supervisor TUI workflow by @cbnsndwch
+- Update workspace dependencies by @cbnsndwch
+- Add the goal-supervisor specification by @cbnsndwch
+- Remove the obsolete OpenCode plugin by @cbnsndwch
+- Add the plugin UI-contributions implementation plan by @cbnsndwch
+- Trigger registry publishing by tag by @cbnsndwch
+- Format release workflows by @cbnsndwch
+- Update GitHub Actions labels by @cbnsndwch
+- Enable VS Code experimental modern UI by @cbnsndwch
+- Document the trusted plugin lifecycle by @cbnsndwch
+- Document the trusted plugin model by @cbnsndwch
+- Add plugin workspace lock entries by @cbnsndwch
+
+**Full commit history:** https://github.com/cbnsndwch/cbranch/compare/v0.2.1...v0.2.2
+
 ## v0.2.1
 
 ### Features
