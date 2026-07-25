@@ -1,0 +1,69 @@
+{
+    "name": "@cbranch/opencode-goal-supervisor",
+    "version": "0.1.0",
+    "description": "Durable, verified goal supervision for OpenCode.",
+    "license": "MIT",
+    "bin": {
+        "cbranch-goal-supervisor": "./dist/cli.js"
+    },
+    "files": [
+        "dist",
+        "README.md",
+        "LICENSE",
+        "CHANGELOG.md"
+    ],
+    "type": "module",
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "default": "./dist/index.js"
+        },
+        "./opencode": {
+            "types": "./dist/opencode.d.ts",
+            "default": "./dist/opencode.js"
+        },
+        "./mcp": {
+            "types": "./dist/mcp.d.ts",
+            "default": "./dist/mcp.js"
+        },
+        "./daemon": {
+            "types": "./dist/daemon.d.ts",
+            "default": "./dist/daemon.js"
+        },
+        "./opencode-adapter": {
+            "types": "./dist/opencode-adapter.d.ts",
+            "default": "./dist/opencode-adapter.js"
+        }
+    },
+    "publishConfig": {
+        "access": "public"
+    },
+    "scripts": {
+        "build": "tsc -b tsconfig.json",
+        "typecheck": "tsc -b tsconfig.json",
+        "typecheck:test": "tsc -p tsconfig.test.json",
+        "test": "vitest run --root ../.. packages/opencode-goal-supervisor/src",
+        "prepack": "pnpm run build",
+        "pack:check": "node ../../scripts/verify-goal-supervisor-package.mjs"
+    },
+    "dependencies": {
+        "@modelcontextprotocol/sdk": "^1.26.0",
+        "@opencode-ai/sdk": "1.17.18",
+        "better-sqlite3": "^12.8.0",
+        "effect": "4.0.0-beta.92",
+        "zod": "^4.1.8"
+    },
+    "devDependencies": {
+        "@opencode-ai/plugin": "1.17.18",
+        "@types/better-sqlite3": "^7.6.13",
+        "@types/node": "^26.0.1"
+    },
+    "peerDependencies": {
+        "@opencode-ai/plugin": ">=1.17.18 <1.18.0"
+    },
+    "engines": {
+        "node": ">=20"
+    }
+}

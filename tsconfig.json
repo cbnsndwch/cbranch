@@ -3,6 +3,7 @@
     "files": [],
     "references": [
         { "path": "packages/plugin-contract" },
+        { "path": "packages/opencode-goal-supervisor" },
         { "path": "packages/plugin-runtime" },
         { "path": "packages/rpc-contract" },
         { "path": "packages/core" },

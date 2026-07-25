@@ -3,13 +3,27 @@
     "version": "0.0.0",
     "private": true,
     "description": "A cross-platform, browser-based Git GUI",
+    "keywords": [],
+    "homepage": "https://github.com/cbnsndwch/cbranch#readme",
+    "bugs": {
+        "url": "https://github.com/cbnsndwch/cbranch/issues"
+    },
     "license": "MIT",
+    "author": "",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/cbnsndwch/cbranch.git"
+    },
+    "directories": {
+        "doc": "docs"
+    },
     "type": "module",
+    "main": "index.js",
     "scripts": {
         "lint": "oxlint",
         "format": "oxfmt",
         "format:check": "oxfmt --check",
-        "typecheck": "tsc -b tsconfig.json && pnpm --filter @cbranch/ui typecheck && pnpm --filter @cbranch/plugin-contract typecheck:test && pnpm --filter @cbranch/plugin-runtime typecheck:test && pnpm --filter @cbranch/rpc-contract typecheck:test && pnpm --filter @cbranch/core typecheck:test && pnpm --filter @cbranch/web-server typecheck:test",
+        "typecheck": "tsc -b tsconfig.json && pnpm --filter @cbranch/ui typecheck && pnpm --filter @cbranch/plugin-contract typecheck:test && pnpm --filter @cbranch/plugin-runtime typecheck:test && pnpm --filter @cbranch/rpc-contract typecheck:test && pnpm --filter @cbranch/core typecheck:test && pnpm --filter @cbranch/web-server typecheck:test && pnpm --filter @cbranch/opencode-goal-supervisor typecheck:test",
         "build": "pnpm -r build",
         "dev": "pnpm build:libs && concurrently \"pnpm --filter @cbranch/web-server dev\" \"pnpm --filter @cbranch/ui dev\"",
         "build:libs": "pnpm --filter @cbranch/plugin-contract build && pnpm --filter @cbranch/plugin-runtime build && pnpm --filter @cbranch/rpc-contract build && pnpm --filter @cbranch/core build",

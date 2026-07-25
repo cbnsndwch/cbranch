@@ -24,6 +24,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 // tauri -> ui.
 const ALLOWED_INTERNAL = {
     '@cbranch/plugin-contract': new Set([]),
+    '@cbranch/opencode-goal-supervisor': new Set([]),
     '@cbranch/plugin-runtime': new Set(['@cbranch/plugin-contract']),
     '@cbranch/rpc-contract': new Set(['@cbranch/plugin-contract']),
     '@cbranch/core': new Set(['@cbranch/rpc-contract']),

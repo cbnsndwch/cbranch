@@ -45,6 +45,10 @@ TypeScript is in any case a build-time-only dependency that is not shipped.
 | lucide-react (latest) | ISC | Yes | Yes | Yes — retain copyright + ISC text | https://github.com/lucide-icons/lucide |
 | cmdk (1.1.x) | MIT | Yes | Yes | Yes — retain copyright + MIT text | https://github.com/pacocoursey/cmdk |
 | effect (4.0.0-beta.92, pinned; provides `@effect/rpc`, http, socket under `effect/unstable/*`) | MIT | Yes | Yes | Yes — retain copyright + MIT text | https://github.com/Effect-TS/effect |
+| better-sqlite3 (12.11.x) | MIT | Yes | Yes | Yes — retain copyright + MIT text | https://github.com/WiseLibs/better-sqlite3 |
+| @modelcontextprotocol/sdk (1.29.x) | MIT | Yes | Yes | Yes — retain copyright + MIT text | https://github.com/modelcontextprotocol/typescript-sdk |
+| @opencode-ai/sdk (1.17.x) | MIT | Yes | Yes | Yes — retain copyright + MIT text | https://github.com/anomalyco/opencode |
+| zod (4.1.x) | MIT | Yes | Yes | Yes — retain copyright + MIT text | https://github.com/colinhacks/zod |
 | @shikijs/codemirror (latest) | MIT | Yes | Yes | Yes — retain copyright + MIT text | https://github.com/shikijs/shiki |
 | chokidar (4.x) | MIT | Yes | Yes | Yes — retain copyright + MIT text | https://github.com/paulmillr/chokidar |
 | ws (8.21.x; the Node WebSocket impl used by Effect's socket layer) | MIT | Yes | Yes | Yes — retain copyright + MIT text | https://github.com/websockets/ws |
