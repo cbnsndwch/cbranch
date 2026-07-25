@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.2.3
+
+### Bug Fixes
+
+- Guide plugin publisher trust and allow repository removal by @cbnsndwch
+
+**Full commit history:** https://github.com/cbnsndwch/cbranch/compare/v0.2.2...v0.2.3
+
 ## v0.2.2
 
 ### Features
