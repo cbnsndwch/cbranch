@@ -183,55 +183,105 @@ function PluginsDialogBody({ onClose }: { readonly onClose: () => void }) {
                             {repositories.data?.map(repository => (
                                 <div
                                     key={repository.id}
-                                    className="flex flex-wrap items-center gap-2 border p-2 text-xs"
+                                    className="grid gap-2 border p-2 text-xs"
                                 >
-                                    <span className="min-w-0 flex-1 break-all">
-                                        {repository.url}
-                                    </span>
-                                    <span>{repository.trustState}</span>
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={() =>
-                                            run(
-                                                api.pluginRepositoryRefresh(
-                                                    repository.id,
-                                                ),
-                                                'Repository refreshed.',
-                                            )
-                                        }
-                                    >
-                                        Refresh
-                                    </Button>
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <span className="min-w-0 flex-1 break-all">
+                                            {repository.url}
+                                        </span>
+                                        <span>{repository.trustState}</span>
+                                    </div>
                                     {repository.trustState === 'untrusted' &&
-                                        repository.publisherFingerprint && (
-                                            <Button
-                                                size="sm"
-                                                onClick={() =>
-                                                    run(
-                                                        api.pluginPublisherTrust(
-                                                            repository.id,
-                                                            repository.publisherFingerprint!,
-                                                        ),
-                                                        'Publisher trusted.',
-                                                    )
-                                                }
-                                            >
-                                                Trust publisher
-                                            </Button>
+                                        !repository.publisherFingerprint && (
+                                            <p className="text-muted-foreground">
+                                                Fetch the publisher fingerprint,
+                                                then review and trust it before
+                                                browsing.
+                                            </p>
                                         )}
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={() => {
-                                            setSelectedRepositoryId(
-                                                repository.id,
-                                            );
-                                            setTab('discover');
-                                        }}
-                                    >
-                                        Browse
-                                    </Button>
+                                    <div className="flex flex-wrap gap-2">
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={() =>
+                                                run(
+                                                    api.pluginRepositoryRefresh(
+                                                        repository.id,
+                                                    ),
+                                                    'Repository refreshed.',
+                                                )
+                                            }
+                                        >
+                                            {repository.trustState ===
+                                                'untrusted' &&
+                                            !repository.publisherFingerprint
+                                                ? 'Fetch publisher'
+                                                : 'Refresh'}
+                                        </Button>
+                                        {repository.trustState ===
+                                            'untrusted' &&
+                                            repository.publisherFingerprint && (
+                                                <Button
+                                                    size="sm"
+                                                    onClick={() =>
+                                                        run(
+                                                            api.pluginPublisherTrust(
+                                                                repository.id,
+                                                                repository.publisherFingerprint!,
+                                                            ),
+                                                            'Publisher trusted.',
+                                                        )
+                                                    }
+                                                >
+                                                    Trust publisher
+                                                </Button>
+                                            )}
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            disabled={
+                                                repository.trustState !==
+                                                'trusted'
+                                            }
+                                            title={
+                                                repository.trustState ===
+                                                'trusted'
+                                                    ? undefined
+                                                    : 'Trust the publisher before browsing its catalog.'
+                                            }
+                                            onClick={() => {
+                                                setSelectedRepositoryId(
+                                                    repository.id,
+                                                );
+                                                setTab('discover');
+                                            }}
+                                        >
+                                            Browse
+                                        </Button>
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={() =>
+                                                run(
+                                                    api.pluginRepositoryRemove(
+                                                        repository.id,
+                                                    ),
+                                                    'Repository removed.',
+                                                    () => {
+                                                        if (
+                                                            selectedRepositoryId ===
+                                                            repository.id
+                                                        )
+                                                            setSelectedRepositoryId(
+                                                                undefined,
+                                                            );
+                                                    },
+                                                )
+                                            }
+                                        >
+                                            Remove
+                                        </Button>
+                                    </div>
                                 </div>
                             ))}
                         </section>

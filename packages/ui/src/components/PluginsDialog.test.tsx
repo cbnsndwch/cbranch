@@ -17,6 +17,12 @@ const repository = {
     credentialState: 'not needed',
 };
 
+const untrustedRepository = {
+    ...repository,
+    trustState: 'untrusted' as const,
+    freshness: 'unknown' as const,
+};
+
 afterEach(() =>
     useUiStore.setState({
         pluginsDialogOpen: false,
@@ -64,6 +70,86 @@ describe('PluginsDialog', () => {
 
         expect((await screen.findByRole('alert')).textContent).toContain(
             'Catalog verification failed.',
+        );
+    });
+
+    test('guides untrusted repositories through publisher trust and removal', async () => {
+        const remove = vi.fn(async () => undefined);
+        const refresh = vi.fn(async () => undefined);
+        const api = {
+            pluginRepositoryList: vi.fn(async () => [untrustedRepository]),
+            pluginList: vi.fn(async () => []),
+            pluginRepositoryRefresh: refresh,
+            pluginRepositoryRemove: remove,
+        } as unknown as CbranchApi;
+        const queryClient = new QueryClient({
+            defaultOptions: { queries: { retry: false } },
+        });
+        useUiStore.setState({ pluginsDialogOpen: true });
+
+        render(
+            <QueryClientProvider client={queryClient}>
+                <ApiProvider api={api}>
+                    <PluginsDialog />
+                </ApiProvider>
+            </QueryClientProvider>,
+        );
+
+        fireEvent.click(screen.getByRole('tab', { name: 'Repositories' }));
+        expect(
+            await screen.findByText(/Fetch the publisher fingerprint/),
+        ).toBeTruthy();
+        expect(
+            (
+                screen.getByRole('button', {
+                    name: 'Browse',
+                }) as HTMLButtonElement
+            ).disabled,
+        ).toBe(true);
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Fetch publisher' }),
+        );
+        await waitFor(() =>
+            expect(refresh).toHaveBeenCalledWith(repository.id),
+        );
+        fireEvent.click(screen.getByRole('button', { name: 'Remove' }));
+        await waitFor(() => expect(remove).toHaveBeenCalledWith(repository.id));
+    });
+
+    test('offers explicit publisher trust after a fingerprint is fetched', async () => {
+        const trust = vi.fn(async () => ({ ...repository }));
+        const api = {
+            pluginRepositoryList: vi.fn(async () => [
+                {
+                    ...untrustedRepository,
+                    publisherFingerprint: 'sha256:publisher',
+                },
+            ]),
+            pluginList: vi.fn(async () => []),
+            pluginPublisherTrust: trust,
+        } as unknown as CbranchApi;
+        const queryClient = new QueryClient({
+            defaultOptions: { queries: { retry: false } },
+        });
+        useUiStore.setState({ pluginsDialogOpen: true });
+
+        render(
+            <QueryClientProvider client={queryClient}>
+                <ApiProvider api={api}>
+                    <PluginsDialog />
+                </ApiProvider>
+            </QueryClientProvider>,
+        );
+
+        fireEvent.click(screen.getByRole('tab', { name: 'Repositories' }));
+        fireEvent.click(
+            await screen.findByRole('button', { name: 'Trust publisher' }),
+        );
+        await waitFor(() =>
+            expect(trust).toHaveBeenCalledWith(
+                repository.id,
+                'sha256:publisher',
+            ),
         );
     });
 

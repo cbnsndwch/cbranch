@@ -125,6 +125,7 @@ export interface CbranchApi {
         url: string,
         credential?: string,
     ): Promise<PluginRepository>;
+    pluginRepositoryRemove(repositoryId: PluginRepositoryId): Promise<void>;
     pluginRepositoryRefresh(repositoryId: PluginRepositoryId): Promise<void>;
     pluginPublisherTrust(
         repositoryId: PluginRepositoryId,
@@ -687,6 +688,12 @@ export const makeApi = (runtime: AppRuntime): CbranchApi => {
                     c.PluginRepositoryAdd({ kind: 'https', url, credential }),
                 ),
             ),
+        pluginRepositoryRemove: repositoryId =>
+            runtime
+                .runPromise(
+                    withClient(c => c.PluginRepositoryRemove({ repositoryId })),
+                )
+                .then(() => undefined),
         pluginRepositoryRefresh: repositoryId =>
             runtime
                 .runPromise(
