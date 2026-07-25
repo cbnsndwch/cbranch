@@ -30,5 +30,4 @@ minimumReleaseAgeExclude:
   - '@tanstack/virtual-core'
 
 patchedDependencies:
-  oh-my-goal@1.0.0: patches/oh-my-goal@1.0.0.patch
   react-router-devtools@6.2.1: patches/react-router-devtools@6.2.1.patch

@@ -3,6 +3,5 @@
     "lsp": true,
     "skills": {
         "paths": [".agents/skills"]
-    },
-    "plugin": ["../node_modules/oh-my-goal/dist/index.js"]
+    }
 }

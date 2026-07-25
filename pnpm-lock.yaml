@@ -7,7 +7,6 @@ settings:
 packageExtensionsChecksum: sha256-ORjGECD1rPcwcXsZtrG7Xb4mxeLOObb+MWblKtKwMeg=
 
 patchedDependencies:
-  oh-my-goal@1.0.0: a732f51fe1e27d5a3553003805f4a5dc99070436012c6776dacf49e82a4a9aae
   react-router-devtools@6.2.1: 18fda087233cb42199b0fe4066228129f9a3e01665fbde5944ef8fd2757f01ed
 
 importers:
@@ -29,9 +28,6 @@ importers:
       concurrently:
         specifier: ^10.0.3
         version: 10.0.3
-      oh-my-goal:
-        specifier: ^1.0.0
-        version: 1.0.0(patch_hash=a732f51fe1e27d5a3553003805f4a5dc99070436012c6776dacf49e82a4a9aae)
       oxfmt:
         specifier: 0.58.0
         version: 0.58.0
