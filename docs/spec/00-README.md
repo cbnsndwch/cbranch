@@ -53,9 +53,12 @@ Read the documents in the following order. Documents 01–04 are foundational an
 | 21 | [`21-runtime-plugin-system.md`](21-runtime-plugin-system.md) | **Phase 9** — OpenCode-style trusted host extensions: reviewed local ESM modules, explicit publisher trust, TUF-backed HTTPS installation, declarative contributions, lifecycle audit, and deferred broker/distribution capabilities. |
 | 22 | [`22-phase9-implementation-plan.md`](22-phase9-implementation-plan.md) | **Phase 9 implementation plan** — observed implementation state, reconciliation work, and independently verifiable delivery milestones. Adds no product requirements. |
 | 23 | [`23-plugin-ui-contributions.md`](23-plugin-ui-contributions.md) | **Plugin UI contributions** — public manifest, command-result, packaging, and host-surface handoff for independently developed plugins. |
+| 24 | [`24-opencode-goal-supervisor.md`](24-opencode-goal-supervisor.md) | **OpenCode goal supervisor (authoritative)** - durable local goals, approvals, dispatch, verification, recovery, security, and release readiness. |
 
-> **Documents 14 and 15 are authoritative for the wire contract and live-data
-> design.** Read them alongside 02–04; all other documents reconcile to them.
+> **Documents 14 and 15 are authoritative for the cbranch wire contract and
+> live-data design. Document 24 is authoritative for the independent OpenCode
+> goal supervisor.** Read 14 and 15 alongside 02–04; all other cbranch product
+> documents reconcile to them.
 
 ---
 
