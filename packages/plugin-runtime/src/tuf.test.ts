@@ -87,13 +87,14 @@ describe('TUF catalog verification', () => {
             { root, timestamp, snapshot, targets },
             async () => true,
         );
-        expect(catalog).toMatchObject([
+        expect(catalog.entries).toMatchObject([
             {
                 pluginId: 'com.example.release',
                 artifactSha256: `sha256:${'a'.repeat(64)}`,
             },
         ]);
-        expect(catalog[0]).toBeInstanceOf(PluginCatalogEntry);
+        expect(catalog.targetsVersion).toBe(1);
+        expect(catalog.entries[0]).toBeInstanceOf(PluginCatalogEntry);
     });
 
     test('rejects changed metadata and insufficient signatures', async () => {

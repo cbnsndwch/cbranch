@@ -33,12 +33,17 @@ export type TufRepositoryMetadata = {
     readonly targets: Uint8Array;
 };
 
+export type VerifiedTufCatalog = {
+    readonly entries: readonly PluginCatalogEntry[];
+    readonly targetsVersion: number;
+};
+
 /** Verify the root/timestamp/snapshot/targets chain and decode signed plugin targets. */
 export const verifyTufCatalog = async (
     metadata: TufRepositoryMetadata,
     verifySignature: TufSignatureVerifier,
     now = Date.now(),
-): Promise<readonly PluginCatalogEntry[]> => {
+): Promise<VerifiedTufCatalog> => {
     const root = parseEnvelope(metadata.root, 'root');
     const rootSigned = object(root.signed, 'root signed metadata');
     const keys = object(rootSigned.keys, 'root keys');
@@ -76,7 +81,12 @@ export const verifyTufCatalog = async (
     await verifyRole(targets, role(roles, 'targets'), keys, verifySignature);
     const targetsSigned = object(targets.signed, 'targets signed metadata');
     validateVersionAndExpiry(targetsSigned, 'targets', now);
-    return decodeCatalog(object(targetsSigned.targets, 'targets metadata'));
+    return {
+        entries: decodeCatalog(
+            object(targetsSigned.targets, 'targets metadata'),
+        ),
+        targetsVersion: number(targetsSigned.version, 'targets version'),
+    };
 };
 
 const parseEnvelope = (bytes: Uint8Array, roleName: string): TufEnvelope => {

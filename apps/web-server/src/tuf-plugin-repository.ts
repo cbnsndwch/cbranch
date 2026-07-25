@@ -18,11 +18,16 @@ export type TufPluginRepositoryOptions = {
     readonly now?: () => number;
 };
 
+type VerifiedPluginTarget = {
+    readonly target: PluginCatalogEntry;
+    readonly tufTargetVersion: number;
+};
+
 /** Fetch and verify a repository catalog before staging one selected signed target. */
 export const makeTufPluginRepository = (
     options: TufPluginRepositoryOptions,
 ) => {
-    let catalog = new Map<string, PluginCatalogEntry>();
+    let catalog = new Map<string, VerifiedPluginTarget>();
 
     return {
         refresh: async (): Promise<readonly PluginCatalogEntry[]> => {
@@ -31,23 +36,26 @@ export const makeTufPluginRepository = (
                 options.transport.fetchMetadata('metadata/snapshot.json'),
                 options.transport.fetchMetadata('metadata/targets.json'),
             ]);
-            const entries = await verifyTufCatalog(
+            const verifiedCatalog = await verifyTufCatalog(
                 { root: options.root, timestamp, snapshot, targets },
                 options.verifySignature,
                 options.now?.(),
             );
             catalog = new Map(
-                entries.map(entry => [
+                verifiedCatalog.entries.map(entry => [
                     catalogKey(entry.pluginId, entry.version),
-                    entry,
+                    {
+                        target: entry,
+                        tufTargetVersion: verifiedCatalog.targetsVersion,
+                    },
                 ]),
             );
-            return entries;
+            return verifiedCatalog.entries;
         },
         stage: async (
             pluginId: string,
             version: string,
-        ): Promise<PluginCatalogEntry> => {
+        ): Promise<VerifiedPluginTarget> => {
             const entry = catalog.get(catalogKey(pluginId, version));
             if (!entry) {
                 throw new Error(
@@ -55,8 +63,8 @@ export const makeTufPluginRepository = (
                 );
             }
             await options.artifactStore.stage(
-                entry,
-                await options.transport.fetchTarget(entry.artifactPath),
+                entry.target,
+                await options.transport.fetchTarget(entry.target.artifactPath),
             );
             return entry;
         },
@@ -74,12 +82,12 @@ export const makeTufPluginRepository = (
                 );
             }
             await options.artifactStore.stage(
-                target,
-                await options.transport.fetchTarget(target.artifactPath),
+                target.target,
+                await options.transport.fetchTarget(target.target.artifactPath),
             );
             return {
-                target,
-                manifest: await options.artifactStore.review(target),
+                target: target.target,
+                manifest: await options.artifactStore.review(target.target),
             };
         },
     };

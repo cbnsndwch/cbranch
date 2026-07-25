@@ -425,6 +425,7 @@ describe('trusted plugin manager', () => {
             },
         ]);
         expect(installed.enabled).toBe(false);
+        expect(installed.lock.tufTargetVersion).toBe(7);
         await expect(manager.enable(manifest.id)).resolves.toMatchObject({
             enabled: true,
         });
@@ -614,7 +615,7 @@ const tufMetadata = async ({
     const expires = new Date(Date.now() + 60_000).toISOString();
     const targets = metadataBytes(
         metadataEnvelope({
-            version: 1,
+            version: 7,
             expires,
             targets: {
                 [targetPath]: {

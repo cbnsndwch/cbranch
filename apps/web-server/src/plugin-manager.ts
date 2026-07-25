@@ -494,22 +494,20 @@ export const makeTrustedPluginManager = (
                     'pluginMetadataInvalid',
                     'Refresh the trusted plugin repository before installing.',
                 );
-            const target = await repository.stage(
+            const verifiedTarget = await repository.stage(
                 input.pluginId,
                 input.version,
             );
-            if (target.artifactSha256 !== input.artifactSha256) {
+            if (verifiedTarget.target.artifactSha256 !== input.artifactSha256) {
                 throw new PluginManagerError(
                     'pluginMetadataInvalid',
                     'The reviewed plugin artifact changed. Review it again before installing.',
                 );
             }
             return manager.installVerified({
-                target,
+                target: verifiedTarget.target,
                 repositoryId: input.repositoryId,
-                // The target role version is retained by the repository adapter in the
-                // next cut; installation is still bound to its signed artifact digest.
-                tufTargetVersion: 1,
+                tufTargetVersion: verifiedTarget.tufTargetVersion,
                 grant: input.grant,
             });
         },
