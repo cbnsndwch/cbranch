@@ -3,8 +3,8 @@
 ## Status and normative language
 
 This document is the authoritative specification for
-`@cbranch/opencode-goal-supervisor`. It describes the implemented `0.1.0`
-contract. `MUST`, `MUST NOT`, `SHOULD`, and `MAY` are normative.
+`@cbranch/opencode-goal-supervisor`. It describes the `0.1.0` contract. `MUST`,
+`MUST NOT`, `SHOULD`, and `MAY` are normative.
 
 The package is an independent local control plane for approved OpenCode work. It
 does not change cbranch's Git RPC contract, host service, browser UI, or Git
@@ -50,8 +50,11 @@ open the same workspace state rather than contacting a daemon control socket.
 | `verification.ts` | Bounded direct process spawn, controlled environment, output cap, redaction, digest, cancellation. | Shell interpretation and sandbox claims. |
 | `daemon.ts` | Effect-scoped ownership, startup reconciliation, polling loops, concurrency, signals, finalization. | Multi-workspace or multi-host ownership. |
 | `opencode-adapter.ts` | OpenCode session create, prompt, probe, outcome read, abort, health, and event normalization. | Goal policy decisions. |
-| `opencode.ts` | Trusted plugin tools and relevant event/permission audit bridge. | Work scheduling or permission answers. |
+| `opencode.ts` | Optional Node-hosted tool and event bridge; not loaded by the OpenCode 1.17 Bun server host. | Work scheduling or permission answers. |
 | `mcp.ts` | Authenticated stdio MCP tools over `GoalControlService`. | Network MCP transport. |
+| `tui-protocol.ts` | Bun-safe strict request/response schemas and deterministic confirmed-launch identity. | SQLite, tokens, and control mutation. |
+| `tui.ts` | Bun-safe TUI-only operator commands, confined plan-file dialog, local confirmation, and persistent service control. | SQLite imports, model prompts, model tools, or inline/HTTP approval input. |
+| `tui-daemon.ts` | Per-workspace systemd user-service status, bootstrap, readiness, and stop operations for the TUI. | Killing or replacing independently managed daemons. |
 | `cli.ts` | Operator command parsing, output, process lifecycle, daemon and MCP entrypoints. | Direct transition bypass. |
 | `systemd.ts` | Safe user-unit generation, atomic write, lifecycle command rendering, lock inspection. | Running `systemctl`. |
 
@@ -81,7 +84,7 @@ The states are `draft`, `ready`, `executing`, `paused`, `needs-replan`,
 | Current state | Legal policy actions and target | Required guard |
 |---|---|---|
 | `draft` | `plan-ready` to `ready`; `cancel` to `cancelled`; `replan`, `decision`, or `block` to the named nonterminal state. | `plan-ready` requires an approved plan. |
-| `ready` | `start` to `executing`; `pause`, `cancel`, `replan`, `decision`, `block`/`fail`, or `unknown-outcome` to the named state. | `start` requires an active approved plan and consumed unattended-start approval. |
+| `ready` | `start` to `executing`; `pause`, `cancel`, `replan`, `decision`, `block`/`fail`, or `unknown-outcome` to the named state. | `start` requires an active approved plan and consumed unattended-start token, except inside the atomic confirmed TUI transaction. |
 | `executing` | `pause`, `cancel`, `replan`, `decision`, `block`/`fail`, `unknown-outcome`, or `achieve`. | `achieve` requires all required active-plan units accepted and all required final verification passed. |
 | `paused` | `resume` to `ready` or `executing`; `cancel`, `replan`, `decision`, `block`/`fail`, or `unknown-outcome`. | `resume` requires a resume approval. The implemented control resumes to `executing`. |
 | `needs-replan` | `plan-ready` to `ready`; `cancel`, `decision`, `block`/`fail`, or `unknown-outcome`. | `plan-ready` requires an approved revision of the active plan. |
@@ -129,18 +132,24 @@ the active plan.
 
 GS-PLAN-5: Only the latest proposed revision MAY be approved. Approval MUST
 supersede the previous approved plan, materialize new work units and dependency
-edges, set the active plan, and move the goal to `ready`. Only active-plan units
-MAY be claimed.
+edges, and set the active plan. Approval alone MUST move the goal to `ready`; the
+GS-TUI-5 transaction MAY continue atomically to `executing`. Only active-plan
+units MAY be claimed.
 
 GS-PLAN-6: A dependency is satisfied only when the prerequisite work unit is
 `accepted`. Optional units do not block final achievement, but required units do.
 
 GS-APP-1: Plan approval MUST be an explicit authenticated operator operation.
-It does not issue or consume an action token and MUST NOT start execution.
+Plan approval by itself does not issue or consume an action token and MUST NOT
+start execution. The local confirmation in GS-TUI-5 is the sole exception: it
+approves the plan and unattended start as part of one atomic operator
+transaction.
 
 GS-APP-2: Unattended start, normal resume, blocked resume, unknown-outcome
 recovery, budget raise, and destructive-unit approval MUST use separate scoped
-action tokens.
+action tokens, except that the GS-TUI-5 local operator confirmation authorizes
+unattended start within its atomic transaction. It MUST NOT authorize any other
+scope.
 
 GS-APP-3: An action token MUST have 256 bits of generated entropy in the normal
 implementation, MUST be stored only as a SHA-256 hash, MUST be bound to one goal
@@ -319,6 +328,12 @@ and workspace. Exact replay MUST return the persisted result or persisted
 redacted error without rerunning the handler. Reuse with different input MUST
 fail.
 
+GS-IDEM-3: The confirmed TUI launch idempotency key MUST derive from the
+canonical workspace, canonical selected file path, normalized validated plan,
+and actor. It MUST NOT derive from Markdown or JSON formatting. Retrying the same
+launch, including after formatting-only changes, MUST replay the original goal
+transaction rather than create another goal.
+
 GS-DISP-1: Work claim MUST create one outbox `dispatch-attempt` command with
 stable key `attempt:<attempt-id>`. Retries and dispatcher lease reclamation MUST
 retain that key.
@@ -430,9 +445,10 @@ policy.
 |---|---|
 | CLI | Opens canonical workspace control, loads the owner-only token internally, generates mutation IDs, validates argv before state where possible, supports human or JSON output. |
 | MCP | Local stdio only; the launching process loads and validates the workspace token out of band, injects it at the control edge, and never exposes it as a model-authored tool field; mutation IDs are preserved or generated at the MCP edge. |
-| Plugin | Trusted OpenCode process loads the token and injects it into tools; records linked session and permission observations; closes its control on dispose. |
+| Plugin | Optional Node-hosted integration only. OpenCode 1.17's Bun server host MUST use the MCP surface instead because it cannot load the native SQLite dependency. |
+| TUI | Bun-hosted local operator surface; registers autocomplete commands, accepts path and confirmation only through local dialogs, and delegates token-bearing SQLite work to one-shot Node children without stopping its persistent service. |
 | Library | Exposes domain, store, supervisor, verifier, control, adapter, daemon, and systemd APIs from the package root. |
-| systemd | Writes a user unit only; lifecycle remains an explicit operator action. |
+| systemd | CLI initialization writes a manual unit only; a confirmed TUI launch manages only its dedicated per-workspace user unit. |
 
 GS-CTRL-1: Initialization MUST canonicalize an existing workspace with
 `realpath`, reject a symlinked control directory, require exact owner-only POSIX
@@ -443,12 +459,15 @@ GS-CTRL-2: Every control method MUST schema-validate input, authenticate using a
 hash-before-constant-time comparison, and fence goal IDs to the canonical
 workspace. Public inspection MUST omit approval token hashes.
 
-GS-CTRL-3: The CLI MUST implement only `init`, `serve`, `status`, `plan`,
-`start`, `pause`, `resume`, `cancel`, `approve`, `recover`, `doctor`, and `mcp`.
-Legacy direct `create`, `list`, and `transition` CLI commands MUST remain absent.
+GS-CTRL-3: The public operator CLI MUST implement only `init`, `serve`, `status`,
+`plan`, `start`, `pause`, `resume`, `cancel`, `approve`, `recover`, `doctor`, and
+`mcp`. Legacy direct `create`, `list`, and `transition` CLI commands MUST remain
+absent. The private TUI bridge entrypoint in GS-TUI-9 MUST remain hidden from
+public usage and accept only its versioned stdin protocol.
 
-GS-CTRL-4: `init --systemd` MUST write the unit and print lifecycle commands. It
-MUST NOT run `systemctl`, enable the unit, start it, or enable login lingering.
+GS-CTRL-4: CLI `init --systemd` MUST write the manual unit and print lifecycle
+commands. It MUST NOT run `systemctl`, enable the unit, start it, or enable login
+lingering. This restriction does not apply to GS-TUI-6 service bootstrap.
 
 GS-CTRL-5: `doctor` MUST check database/token permissions, daemon lock status,
 SQLite integrity and migration version, lifecycle projection agreement, and
@@ -458,34 +477,134 @@ GS-CTRL-6: `doctor --recover` MUST perform only startup lease reconciliation in
 addition to normal checks. It MUST NOT imply unknown-effect resolution,
 projection rebuild, corruption repair, or stale-lock deletion.
 
-GS-CTRL-7: Model-facing plugin and MCP `goal_approve` tools MUST be request-only.
-They MUST render an operator CLI instruction and MUST NOT approve plans, issue
+GS-CTRL-7: Model-facing MCP `goal_approve` MUST be request-only. It MUST render
+an operator CLI instruction and MUST NOT approve plans, issue
 action tokens, consume destructive approvals, or accept an actor field. Approval
-mutation authority belongs to the operator CLI. OpenCode's tool rendering and
-permission prompts are the host-owned status and approval-request UI primitives.
-Any identifier rendered into an operator command MUST first pass the domain ID
-schema, and incomplete requests MUST NOT render shell-active placeholders.
+mutation authority belongs to the operator CLI or the local confirmed TUI
+transaction in GS-TUI-5, never to a model-facing tool. OpenCode's tool rendering
+and permission prompts are the host-owned status and approval-request UI
+primitives. Any identifier rendered into an operator command MUST first pass the
+domain ID schema, and incomplete requests MUST NOT render shell-active
+placeholders.
+
+## Operator TUI workflow
+
+GS-TUI-1: The `./tui` export MUST be a TUI-only plugin. It MUST register exactly
+the `/goal`, `/goal-status`, and `/goal-daemon-stop` autocomplete commands and
+MUST NOT register a model tool or create a model prompt. `/goal` MUST accept no
+inline arguments.
+
+GS-TUI-2: `/goal` MUST open a local path dialog. HTTP command dispatch MAY open
+that dialog but MUST NOT provide, prefill, or select the path, provide
+confirmation, or pass equivalent payload data to the launch operation. Only
+local TUI dialog callbacks MAY supply the path and confirmation.
+
+GS-TUI-3: One `/goal` submission MUST read exactly one file. The selected file
+MUST resolve within the canonical workspace without symlink traversal, MUST be a
+regular non-symlink file, MUST contain valid UTF-8, and MUST be no larger than
+1,048,576 raw bytes. The read MUST reject replacement or mutation detected while
+the file is opened or read.
+
+GS-TUI-4: The Markdown document MUST contain exactly one fenced block whose info
+string is exactly `goal-plan`. Its content MUST be one JSON value accepted by the
+strict plan schema. Parsing MUST reject duplicate object keys, unknown schema
+fields, malformed JSON, invalid dependencies, duplicate IDs, and a cyclic plan
+DAG before confirmation.
+
+GS-TUI-5: Before launch, the local `DialogConfirm` MUST show the validated plan
+objective, unit count, canonical file path, and SHA-256 digest of the raw file
+bytes. Only its local confirm action MAY initiate atomic creation through the
+supported TUI flow. That transaction MAY create the goal, propose the plan,
+approve the plan, and authorize unattended start; it MUST be all-or-nothing and
+MUST enter execution without a separate start token. This confirmation is the
+TUI operator approval boundary, not model-tool approval, and MUST NOT approve a
+destructive unit. GS-SEC-9 defines the separate authority of arbitrary shell
+execution.
+
+GS-TUI-6: After the atomic transaction commits or idempotently replays, the TUI
+MUST ensure a persistent hardened systemd user service dedicated to that
+canonical workspace. Service bootstrap failure MUST NOT roll back or delete the
+durable goal. Retrying the same confirmed launch MUST replay the transaction and
+retry service bootstrap. On TUI initialization, an existing executing goal MUST
+cause the managed service to be reconciled with the current OpenCode URL so work
+can continue after an OpenCode restart. Initialization MUST NOT start a service
+when no executing goal exists. Service readiness MUST require a token-bound
+marker published only after daemon startup reconciliation and loop
+initialization; lock ownership alone is not readiness. A managed readiness
+marker MUST also match the deterministic identity of the executable, CLI,
+workspace, OpenCode URL, and generated service configuration.
+
+GS-TUI-7: `/goal-status` MUST be read-only. `/goal-daemon-stop` MUST act through
+systemd and MUST target only the exact per-workspace unit managed by this TUI
+integration. It MUST NOT signal a lock-holder or kill an independently managed
+daemon. TUI disposal MUST unregister its commands and close its control
+connection without stopping or disabling the service.
+
+GS-TUI-8: Automatic persistent execution through the TUI MUST require Linux, a
+functioning systemd user manager, and `systemctl --user`. An unsupported host or
+unavailable user manager MUST fail safely and MUST NOT fall back to an
+OpenCode-owned or in-process unattended daemon. Any goal already committed
+before bootstrap failure remains durable.
+
+GS-TUI-9: The TUI static import closure MUST NOT reach `control.ts`, `store.ts`,
+`cli.ts`, the package root, or `better-sqlite3`. Init, list, and launch MUST each
+use one strict, bounded request to the verified Node 20+ CLI bridge. The bridge
+MUST keep the control token in the Node child, return only schema-validated
+token-free projections, close control before exiting, and accept no public CLI
+arguments beyond its hidden protocol entrypoint. The TUI MUST validate the
+selected plan before confirmation; the Node child MUST revalidate the confirmed
+snapshot and derive its command ID rather than trusting a caller-supplied ID.
+Timeout or output-limit termination MUST await child exit, escalate after a
+bounded grace period, and report launch outcomes as potentially committed so an
+idempotent retry can resolve them.
 
 ## systemd adapter
 
-GS-SD-1: The default unit path MUST be
-`~/.config/systemd/user/cbranch-goal-supervisor.service`. The user unit
-directory MUST be real, owner-only, and resolve within the configured unit
-directory. The unit MUST be written through an owner-only temporary file and
-atomic rename. The CLI MUST use this fixed unit name, so generating it for a
-second workspace replaces the first definition rather than creating a second
-service.
+GS-SD-1: The manual CLI default unit path MUST be
+`~/.config/systemd/user/cbranch-goal-supervisor.service`. The CLI MUST continue
+to use that fixed name, so manually generating it for a second workspace replaces
+the first manual definition. A TUI-managed unit MUST instead have a stable
+identity dedicated to its canonical workspace and MUST NOT replace another
+workspace's TUI-managed unit.
 
-GS-SD-2: Generated arguments MUST use systemd quoting that escapes backslash,
+GS-SD-2: The user unit directory MUST be real, owned by the current user, not
+writable by group or other users, and resolve within the configured unit
+directory. A unit MUST be written through an owner-only temporary file and
+atomic rename. Standard owner-controlled `0755` systemd user directories are
+valid.
+
+GS-SD-3: Generated arguments MUST use systemd quoting that escapes backslash,
 double quote, dollar, and percent. Inputs MUST be absolute and free of control
 characters; the OpenCode URL MUST be credential-free HTTP or HTTPS.
 
-GS-SD-3: The implemented unit MUST include `Type=simple`, absolute Node and CLI
+GS-SD-4: Every generated unit MUST include `Type=simple`, absolute Node and CLI
 paths, workspace `WorkingDirectory`, `Restart=on-failure`, `RestartSec=5s`,
 `UMask=0077`, `NoNewPrivileges=true`, private temporary/device settings,
 strict system protection, kernel/control-group/namespace/SUID/personality and
 capability restrictions, address families `AF_UNIX AF_INET AF_INET6`, and the
 workspace as `ReadWritePaths`.
+
+GS-SD-5: TUI bootstrap MUST install or verify its per-workspace unit, reload the
+user manager when required, enable the unit, and start or confirm it. The service
+MUST remain independent of the OpenCode process and survive OpenCode restarts.
+User-manager survival after logout MAY still depend on host lingering policy;
+the package MUST NOT enable lingering.
+
+GS-SD-6: TUI status MUST perform no lifecycle mutation. TUI stop MUST invoke
+systemd only for the derived per-workspace unit. Unit contention or an
+independently owned daemon lock MUST fail closed and MUST NOT trigger process
+termination.
+
+GS-SD-7: TUI lifecycle mutations MUST be serialized. Ownership of a managed unit
+MUST require its loaded `FragmentPath` to equal the expected canonical
+per-workspace unit path. A verified unit MUST be disabled when an independent
+daemon owns the lock, without signaling that lock PID. An unchanged active unit
+MUST NOT be restarted; changed OpenCode URL or unit content MUST be reloaded and
+restarted, and readiness MUST match the desired service identity before rollout
+is complete. Serialization MUST use an owner-token interprocess lock with
+bounded waiting and stale-owner recovery in addition to in-process ordering.
+Node and `systemctl` discovery MAY use only verified absolute candidates, and
+the user unit path MUST honor an absolute `XDG_CONFIG_HOME`.
 
 ## Security and data layout
 
@@ -500,7 +619,8 @@ backup, and systemd unit permissions MUST be hardened to `0600` where supported.
 
 GS-SEC-3: The control token authenticates local transports but does not authorize
 sensitive goal actions by itself. Scoped action tokens MUST enforce plan-start,
-resume, recovery, budget, and destructive policy as specified.
+resume, recovery, budget, and destructive policy as specified, except for the
+local confirmed atomic TUI launch in GS-TUI-5.
 
 GS-SEC-8: The local MCP process MUST validate its out-of-band workspace token
 before registering handlers. MCP tool schemas MUST omit that transport token so
@@ -508,8 +628,8 @@ model-authored arguments cannot replace or disclose it. The stdio child process,
 its launcher, and same-user process access remain within the trusted-local threat
 boundary; this is not remote-client authentication.
 
-GS-SEC-4: The OpenCode plugin is trusted code executing in the OpenCode process.
-Operators MUST review and pin it. Plugin event recording MUST NOT modify a host
+GS-SEC-4: The OpenCode TUI plugin is trusted code executing in the OpenCode
+process. Operators MUST review and pin it. It MUST NOT answer or modify a host
 permission decision.
 
 GS-SEC-5: Approved agent and verifier execution is arbitrary user-authority
@@ -527,11 +647,20 @@ endpoint is operator-selected and outside transport confidentiality guarantees;
 operators SHOULD require HTTPS. The implemented adapter passes only `baseUrl`
 and does not configure HTTP credentials or custom headers.
 
+GS-SEC-9: The trusted-local model treats arbitrary shell or process execution as
+operator authority. A model granted that authority can invoke the private TUI
+bridge or public approval CLI without a dialog. The package MUST NOT describe
+the TUI confirmation as a cryptographic human-presence boundary against such a
+model. It MUST continue to prevent approval through MCP tool arguments and HTTP
+TUI command payloads. Same-user process isolation remains outside GS-SEC-1.
+
 GS-DATA-1: Workspace state MUST live in
 `.opencode/goal-supervisor/goal.db`, with normal SQLite `-wal` and `-shm` files.
 The transport token MUST be `control.token`; the owner lock MUST be
-`daemon.lock`; `daemon.lock.recovery` MAY exist only while serializing stale-lock
-replacement. Transcript and artifact bodies MUST NOT be added to this layout.
+`daemon.lock`; `daemon.lock.ready` MAY exist only for the matching ready owner;
+`daemon.lock.recovery` MAY exist only while serializing stale-lock replacement.
+`daemon.lock.lifecycle` MAY exist only while a TUI systemd lifecycle mutation is
+in progress. Transcript and artifact bodies MUST NOT be added to this layout.
 
 GS-DATA-2: Store opening MUST enable foreign keys, WAL journal mode,
 `synchronous=FULL`, and a 5,000 ms busy timeout before normal operation.
@@ -561,13 +690,14 @@ opened, integrity-checked backup.
 | Recovery | Cross-connection exclusive claims, lease renewal fencing, outbox retries, probe outcomes across database reopen, stale delivery rejection, no post-dispatch requeue, pause/cancel fencing, and every budget threshold. |
 | Verification | Exit policy, timeout, abort, output overflow, cwd escape, spawn error, credential redaction, deterministic digest, baseline comparison. |
 | Supervisor | Dispatch boundary, ambiguous failure, all probe statuses, concurrency, active renewal, structured outcome, unit/final verification, cancellation, observation deduplication. |
-| Daemon | Owner lock, stale replacement, token-safe release, startup reconciliation, scoped shutdown, checkpoint/close, active limits. |
+| Daemon | Owner lock, stale replacement, token-safe readiness and release, startup reconciliation, scoped shutdown, checkpoint/close, active limits. |
 | OpenCode adapter | Exact create/prompt shapes, restart idempotency, probe state, whole-text JSON, transcript pointer, abort, event filtering, client construction. |
 | Control | Token modes and ownership, canonical workspace, bad auth, workspace fence, command replay, all scoped actions, public redaction, doctor and recovery. |
-| CLI | Strict argv, no legacy transitions, validation before open, plan parse, full operator workflow, JSON redaction, systemd no-exec behavior, doctor exit, serve and MCP cleanup. |
-| MCP/plugin | Exact tool catalog, out-of-band MCP auth, request-only model approvals, command replay, workspace fence, plugin restart, durable permission correlation, linked event audit, unchanged host permission decision. |
-| systemd | Injection-safe quoting, absolute paths, hardening, atomic owner-only install, exact lifecycle commands, safe status inspection and symlink rejection. |
-| Packaging | Packed required files, executable bin, bin mapping, root exports, plugin default export, MCP entry export. |
+| CLI | Strict argv, no legacy transitions, validation before open, plan parse, full operator workflow, JSON redaction, private bounded TUI bridge, systemd no-exec behavior, doctor exit, serve and MCP cleanup. |
+| TUI | Exact autocomplete catalog, Bun-safe import closure, one-shot Node bridge, no inline arguments or model prompt, HTTP dispatch isolation, confined stable UTF-8 file reads, 1 MiB cap, strict fenced JSON and duplicate-key rejection, canonical summary, local-confirm-only atomic launch, idempotent replay, status, stop, and disposal. |
+| MCP | Exact tool catalog, out-of-band auth, request-only model approvals, command replay, workspace fence, and unchanged host permission ownership. |
+| systemd | Injection-safe quoting, absolute paths, hardening, atomic owner-only install, exact CLI lifecycle commands, readiness polling, verified unit ownership, serialized per-workspace install/enable/start/retry/stop, unchanged-unit no-op, OpenCode restart survival, unsupported-host failure, safe status inspection, XDG path handling, and symlink rejection. |
+| Packaging | Packed required files, executable bin, bin mapping, root exports, plugin and TUI default exports, MCP entry export. |
 
 GS-TEST-1: Package changes MUST run package tests, production and test
 typechecking, lint, and formatting checks. Changes to persistence, domain, or
@@ -590,12 +720,12 @@ same release change.
 
 GS-REL-3: Published files MUST be limited by the package manifest to `dist`,
 `README.md`, `LICENSE`, and `CHANGELOG.md`. `prepack` MUST build the package. The
-CLI bin and root, `opencode`, `mcp`, `daemon`, and `opencode-adapter` exports MUST
-remain importable as declared.
+CLI bin and root, `opencode`, `mcp`, `daemon`, `tui`, and `opencode-adapter`
+exports MUST remain importable as declared.
 
 GS-REL-4: `pack:check` MUST build and pack into temporary storage, verify
 required runtime/declaration/document files, verify executable CLI and bin
-mapping, import required root symbols, validate plugin and MCP exports, and
+mapping, import required root symbols, validate plugin, TUI, and MCP exports, and
 remove temporary files.
 
 GS-REL-5: A release MUST originate from a reviewed Git tag and SHOULD be
@@ -607,8 +737,9 @@ GS-REL-6: Operators MUST pin exact versions, back up before upgrade, read the
 changelog, stop daemon and state clients, let store opening apply migrations,
 run doctor, and only then restore unattended service.
 
-GS-REL-7: Node 20 and newer is the supported runtime declaration. Bun is not a
-supported runtime. The OpenCode SDK MUST remain pinned to `1.17.18` for `0.1.0`,
+GS-REL-7: Node 20 and newer is required for the store, CLI, MCP, daemon, and
+bridge child. Only the TUI import closure is supported in OpenCode's pinned Bun
+host, and it MUST delegate SQLite work to Node. The OpenCode SDK MUST remain pinned to `1.17.18` for `0.1.0`,
 and the plugin peer range MUST remain within `>=1.17.18 <1.18.0`. The real-server
 fixture MUST be rerun with the exact target OpenCode binary before unattended
 deployment; the repository fixture has passed against OpenCode `1.17.20`.
@@ -623,6 +754,8 @@ platform.
 Unattended operation requires all of the following preconditions:
 
 - Exact package and compatible OpenCode versions are tested on the target host.
+- Automatic TUI persistence runs only on Linux with a tested systemd user
+  manager and `systemctl --user`; unsupported hosts fail safely.
 - One trusted user owns the local workspace, daemon, control clients, and
   OpenCode process.
 - The filesystem provides reliable SQLite WAL, process/file locking, ownership,
@@ -645,7 +778,7 @@ Known limitations that MUST remain explicit:
 - No multi-host ownership, distributed consensus, remote control API, or
   automatic failover.
 - No hostile multi-user isolation and no defense against root, the same user,
-  same-user processes, writable workspace compromise, or a compromised plugin or
+  same-user processes, writable workspace compromise, or a compromised TUI plugin or
   OpenCode server.
 - No exactly-once guarantee for arbitrary external effects; ambiguity stops at
   `unknown-outcome` for operator reconciliation.
@@ -654,4 +787,6 @@ Known limitations that MUST remain explicit:
 - No automatic token usage metering in the OpenCode adapter.
 - No automatic rerun/reset control for a recorded failed final verification in
   `0.1.0`.
-- No systemd enable/start/linger action during initialization.
+- CLI `init --systemd` does not enable, start, or configure lingering. A confirmed
+  TUI launch does enable and start only its dedicated per-workspace unit and
+  never enables lingering.

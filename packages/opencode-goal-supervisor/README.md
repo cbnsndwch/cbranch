@@ -13,8 +13,9 @@ boundary. See [Readiness](#readiness) before enabling unattended operation.
 ## Compatibility and installation
 
 - Node.js 20 or newer is required.
-- Bun is not a supported runtime. Use Node for the CLI, MCP process, daemon, and
-  package checks.
+- Standalone CLI, MCP, daemon, and package processes require Node. The TUI export
+  is Bun-import-safe inside the pinned OpenCode host, but delegates every SQLite
+  control operation to a verified Node child.
 - The package version is currently `0.1.0`; its changelog still marks that
   version as unreleased.
 - The OpenCode SDK is pinned to `1.17.18`.
@@ -25,9 +26,12 @@ boundary. See [Readiness](#readiness) before enabling unattended operation.
   OpenCode upgrade before unattended use.
 - `better-sqlite3` is a native dependency and must install successfully for the
   target Node version and platform.
+- Automatic daemon persistence from the operator TUI requires Linux, a working
+  systemd user manager, and `systemctl --user`. On unsupported hosts the TUI
+  workflow fails safely instead of falling back to an OpenCode-owned daemon.
 
 For a published release, pin the exact package version. A project-local install
-keeps the CLI and MCP server tied to the workspace lockfile:
+keeps the CLI, MCP server, and TUI plugin tied to the workspace lockfile:
 
 ```sh
 pnpm add --save-dev --save-exact @cbranch/opencode-goal-supervisor@0.1.0
@@ -55,35 +59,156 @@ The daemon talks to an OpenCode HTTP server. The default URL is
 model provider, and permitted to perform the approved work. `serve` does not
 start OpenCode.
 
-### Plugin
+### Model-facing tools
 
-Add the package export to the project `opencode.json`:
+OpenCode 1.17 runs server plugins under Bun, which cannot load this package's
+native `better-sqlite3` control plane. Configure the Node stdio MCP process
+described below instead of adding the `./opencode` export to `opencode.json`.
+The source checkout uses this configuration:
 
 ```json
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugin": ["@cbranch/opencode-goal-supervisor/opencode"]
+  "mcp": {
+    "goal-supervisor": {
+      "type": "local",
+      "command": [
+        "node",
+        "packages/opencode-goal-supervisor/dist/cli.js",
+        "--workspace",
+        ".",
+        "mcp"
+      ],
+      "cwd": ".",
+      "enabled": true
+    }
+  }
 }
 ```
 
-The trusted in-process plugin initializes workspace state and exposes these
-tools:
+The MCP process exposes these model-facing tools:
 
 `goal_create`, `goal_list`, `goal_plan`, `goal_status`, `goal_start`,
 `goal_pause`, `goal_resume`, `goal_cancel`, `goal_approve`, `goal_inspect`,
 `goal_recover`, `goal_raise_budget`, and `goal_doctor`.
 
-The plugin injects the workspace control credential internally. It records
-events and permission decisions only for OpenCode sessions that the supervisor
-has durably linked to an attempt. It does not answer permission prompts, launch
-work, or use `session.idle` as a scheduling trigger.
-
-OpenCode renders these tools with its host-owned tool UI and retains ownership of
+The Node child injects the workspace control credential internally. OpenCode
+renders the MCP tools with its host-owned tool UI and retains ownership of
 permission prompts. `goal_status` provides the durable status view.
 `goal_approve` is intentionally an approval-request view: it prints the exact
 operator CLI command but cannot approve a plan, issue an action token, or consume
-a destructive approval. This prevents a model from declaring itself the
-operator. Sensitive approval mutations are CLI-only.
+a destructive approval. This prevents self-approval through model-facing tool
+arguments. Model-facing approval mutations remain unavailable; operators use
+the CLI or the separate local TUI confirmation flow described below.
+
+### Operator TUI plugin
+
+Declare the TUI target separately in project `.opencode/tui.json`:
+
+```json
+{
+  "$schema": "https://opencode.ai/tui.json",
+  "plugin": ["@cbranch/opencode-goal-supervisor/tui"]
+}
+```
+
+The TUI-only package export is
+`@cbranch/opencode-goal-supervisor/tui`. It registers these OpenCode
+autocomplete commands and does not register model tools:
+
+- `/goal` opens the local operator launch dialog.
+- `/goal-status` opens a read-only workspace and daemon status view.
+- `/goal-daemon-stop` stops only this workspace's TUI-managed systemd user unit.
+
+`/goal` takes no inline arguments. It prompts locally for a path and reads
+exactly one canonical workspace-confined file. The file must be a regular,
+non-symlink UTF-8 Markdown file no larger than 1 MiB; the path must not escape
+through a symlink. The document must contain exactly one fenced code block whose
+info string is exactly `goal-plan`; its body is a JSON plan in the shape shown
+below. The block is parsed with the strict plan schema; unknown fields, malformed
+JSON, duplicate object keys, invalid dependencies, and cyclic graphs are
+rejected. Before launch, a local `DialogConfirm` shows the objective, unit count,
+canonical file path, and SHA-256 digest of the raw file bytes.
+
+Only that local confirmation launches the goal through the supported TUI flow.
+It is the operator approval boundary for one atomic create, propose,
+plan-approve, and unattended-start transaction. This is the narrow exception to
+the otherwise separate approval and start workflows below. It never approves a
+destructive work unit; each such materialized unit still requires its own scoped
+approval.
+
+An HTTP-dispatched `/goal` command may open the dialog, but HTTP input cannot
+supply the path or confirmation and dispatch payload fields are ignored. The
+path and approval come only from local dialog callbacks, and invoking the
+command sends no model prompt.
+
+The launch idempotency key derives from the canonical workspace, canonical file
+path, normalized validated plan, and actor. Retrying the same confirmed launch,
+including after formatting-only Markdown or JSON changes, replays the durable
+result rather than creating another goal. To intentionally run the same semantic
+plan as a new goal, review it under a new canonical plan-file path.
+
+After either the atomic commit or its replay, the TUI ensures a persistent,
+hardened systemd user service dedicated to that canonical workspace. A service
+bootstrap failure does not roll back the durable executing goal; retrying the
+same launch replays the goal transaction and retries daemon bootstrap. The
+service survives OpenCode restarts. Disposing the TUI unregisters its commands
+and does not stop the service. Independently managed daemons are never killed.
+When OpenCode starts with an executing durable goal, the TUI
+reconciles the service with the current local OpenCode URL so work resumes after
+the host restart. A token-bound readiness marker prevents launch success from
+being reported before startup reconciliation finishes. The marker also binds the
+running process to the exact generated service configuration, so a failed reload
+or restart is retried rather than mistaken for a completed rollout.
+
+The Bun-hosted TUI never imports the SQLite store and never receives the control
+token. Each init, list, or launch operation is one strict, bounded JSON request
+to a short-lived verified Node 20+ child. The child loads the token internally,
+closes SQLite before exiting, and returns a schema-validated token-free result.
+If a launch child times out after mutation begins, the result is potentially
+committed; confirming the same snapshot again resolves that outcome through the
+same idempotency key.
+
+This trusted-local design deliberately treats unrestricted shell/process
+execution as operator authority. A model granted arbitrary shell access can call
+the private bridge or the public approval CLI directly, so the dialog is not a
+cryptographic human-presence proof against such a model. Do not grant arbitrary
+shell execution unless that authority is intended. The enforced separation is
+that MCP tool arguments and HTTP TUI command payloads cannot approve or confirm.
+
+A typical handoff is:
+
+1. Ask the planning agent to write `.local/plans/<name>.md` and include exactly
+   one structured block among its review notes.
+2. Select `/goal`, enter that relative path in the local dialog, and review the
+   objective, unit count, path, and digest.
+3. Confirm once to create, approve, and start that exact snapshot.
+
+````markdown
+# Reviewed implementation plan
+
+Human-readable rationale may surround the structured plan.
+
+```goal-plan
+{
+  "objective": "Implement and verify the reviewed change",
+  "authoredBy": "planner",
+  "units": [
+    {
+      "id": "implement",
+      "title": "Implement the change",
+      "instructions": "Follow the reviewed design and run its checks.",
+      "dependencyIds": [],
+      "acceptanceCriteria": ["The reviewed behavior is implemented"],
+      "verificationRequirements": [],
+      "required": true,
+      "destructive": false
+    }
+  ],
+  "finalVerificationRequirements": []
+}
+```
+````
 
 ### MCP
 
@@ -125,7 +250,7 @@ input. Process ownership and permission to launch the local stdio command are
 part of the trusted-single-user transport boundary. Mutating requests may supply
 `commandId`; the MCP edge generates one when omitted.
 
-MCP `goal_approve`, like the plugin tool, only renders the operator-only CLI
+MCP `goal_approve` only renders the operator-only CLI
 instruction. It cannot mutate approval state or issue tokens.
 
 Run a standalone MCP process with:
@@ -216,7 +341,9 @@ cbranch-goal-supervisor --json plan \
 
 Goal creation and plan proposal are separate durable transactions inside this
 CLI workflow. If schema or graph validation rejects the proposal, the new draft
-goal remains and can receive a corrected plan.
+goal remains and can receive a corrected plan. The confirmed operator TUI
+workflow is the explicit exception: it atomically creates, proposes, approves,
+and authorizes unattended start.
 
 The JSON output contains `createdGoal.id` and `plan.id`. To propose a revision
 for an existing `needs-replan` goal, use its ID instead of `--objective`:
@@ -234,12 +361,12 @@ cbranch-goal-supervisor approve <goal-id> approve-plan \
 ```
 
 Approval materializes the plan units and moves `draft` or `needs-replan` to
-`ready`. It does not start execution.
+`ready`. In this CLI workflow it does not start execution.
 
 ## Start approval workflow
 
-Starting is deliberately a separate, two-step token operation. First issue a
-short-lived action token:
+For the standalone CLI workflow, starting is deliberately a separate, two-step
+token operation. First issue a short-lived action token:
 
 ```sh
 cbranch-goal-supervisor --json approve <goal-id> issue-start \
@@ -303,7 +430,7 @@ command; policy-specific operations are required.
 
 A unit with `"destructive": true` is not claimable after the plan starts until
 that exact materialized work unit is approved. Retrieve the generated
-`workUnit.id` with plugin or MCP `goal_inspect`, then issue and consume a
+`workUnit.id` with MCP `goal_inspect`, then issue and consume a
 work-unit-scoped token:
 
 ```sh
@@ -333,7 +460,7 @@ The default budget for each goal is:
 The scheduler checks all limits before each claim. Exhaustion moves an executing
 goal to `blocked`. Status reports usage and limits.
 
-Plugin and MCP `goal_create` accept an optional complete `budget` object. Raising
+MCP `goal_create` accepts an optional complete `budget` object. Raising
 an existing budget requires every new limit to be at least its current value and
 uses a two-step token workflow:
 
@@ -342,7 +469,7 @@ cbranch-goal-supervisor --json approve <goal-id> issue-budget \
   --reason "Reviewed additional execution allowance"
 ```
 
-Then call plugin or MCP `goal_raise_budget` with this payload. MCP transport
+Then call MCP `goal_raise_budget` with this payload. MCP transport
 authentication is injected by the local MCP process and is not a tool field:
 
 ```json
@@ -424,7 +551,8 @@ never automatically requeued.
 
 ## Run the daemon
 
-Run one execution owner per workspace:
+For manually managed or non-TUI operation, run one execution owner per
+workspace:
 
 ```sh
 cbranch-goal-supervisor serve \
@@ -458,7 +586,32 @@ bound, checkpoint SQLite, close the store, and release the matching lock token.
 Active external sessions are not blindly terminated at daemon shutdown; the
 next owner reconciles their durable references and leases.
 
-### systemd user service
+### TUI-managed systemd user service
+
+After a confirmed `/goal` transaction commits or replays, the TUI installs,
+reloads, enables, and starts a hardened persistent systemd user service with an
+identity dedicated to the canonical workspace. `/goal-status` only reads its
+state. `/goal-daemon-stop` acts through systemd and targets only that exact
+TUI-managed unit; it does not signal a lock-holder or kill an independently
+managed `serve` process. Closing or restarting OpenCode ends the TUI bridge
+client but leaves the service running. On the next OpenCode start, any
+executing durable goal causes the TUI to update and restart its managed service
+with the current OpenCode URL.
+
+Lifecycle mutations are serialized with a workspace-local interprocess lock.
+The manager verifies the loaded systemd `FragmentPath`, disables only its own
+verified unit when an independent daemon owns the workspace, and does not
+rewrite or restart an unchanged ready service.
+
+Automatic persistence requires Linux with a functioning systemd user manager
+and `systemctl --user`. Unsupported hosts and unavailable user managers fail
+safely and do not fall back to a process owned by the TUI. Because service
+bootstrap happens after the durable goal transaction, a bootstrap error leaves
+the goal intact and a retry retries the bootstrap. Persistence after logout
+still depends on host policy and login lingering; the package does not enable
+lingering.
+
+### Manual CLI systemd user service
 
 Generate a hardened user unit while initializing:
 
@@ -485,8 +638,9 @@ systemctl --user stop cbranch-goal-supervisor.service
 systemctl --user disable cbranch-goal-supervisor.service
 ```
 
-User-manager persistence after logout depends on host policy and login lingering;
-the package does not enable lingering.
+This fixed-name unit is the manual CLI path and is separate from per-workspace
+TUI-managed units. User-manager persistence after logout depends on host policy
+and login lingering; the package does not enable lingering.
 
 ## Doctor and integrity recovery
 
@@ -525,7 +679,7 @@ append-only `goal_events` log into only the `goals` lifecycle projection. Plans,
 work units, attempts, approvals, command and observation inboxes, outbox delivery
 history, evidence, verification results, budgets, cancellation requests, and
 session references remain durable source records and are not reconstructed. Stop
-the daemon and close plugin and MCP state users before operator-directed rebuild.
+the daemon and close MCP and TUI state users before operator-directed rebuild.
 
 ## Data, migrations, and backup
 
@@ -536,12 +690,15 @@ Workspace data is under `.opencode/goal-supervisor/`:
 | `goal.db` | SQLite state, event log, plans, attempts, approvals, evidence pointers, verification summaries, inboxes, and outbox. |
 | `goal.db-wal`, `goal.db-shm` | SQLite WAL files while connections are open. |
 | `control.token` | Internal transport credential used by control surfaces. |
-| `daemon.lock` | Live execution-owner PID, workspace, creation time, and random owner token. |
+| `daemon.lock` | Live execution-owner PID, workspace, creation time, random owner token, and optional service identity. |
+| `daemon.lock.ready` | Token-bound readiness marker published after startup reconciliation. |
 | `daemon.lock.recovery` | Temporary stale-lock replacement guard; persistence means recovery was interrupted and requires operator inspection. |
+| `daemon.lock.lifecycle` | Short-lived owner-token lock serializing TUI systemd lifecycle changes across OpenCode processes. |
 
-The directory is `0700`; the token, database files, and daemon lock are `0600`
-on POSIX filesystems. Database file hardening is best effort where chmod semantics
-are unavailable. The generated systemd unit lives outside this directory.
+The directory is `0700`; the token, database files, daemon lock, and readiness
+marker are `0600` on POSIX filesystems. Database file hardening is best effort
+where chmod semantics are unavailable. The generated systemd unit lives outside
+this directory.
 
 Opening the store applies transactional migrations recorded in
 `schema_migrations`. The current database migration is version 3; the serialized
@@ -554,7 +711,7 @@ conservatively ineligible to finalize an active plan and must be rerun.
 
 For an upgrade:
 
-1. Stop the workspace daemon and close MCP and OpenCode processes using the plugin.
+1. Stop the workspace daemon and close MCP and OpenCode processes.
 2. Create and verify a backup.
 3. Install an exact reviewed package version and read `CHANGELOG.md`.
 4. Run `init`, which opens the database and applies migrations.
@@ -732,12 +889,16 @@ one host and local filesystem.
   OpenCode process, or root. Such actors can read credentials, alter the
   database, impersonate control clients, replace package code, or mutate work
   directly.
+- Arbitrary shell/process access is operator-equivalent in this trust model. It
+  can invoke private or public Node control entrypoints without using the TUI;
+  model-facing MCP and HTTP surfaces remain request-only, but they are not a
+  sandbox around separately granted shell authority.
 - Action tokens provide explicit, scoped, expiring, one-time authorization on
   top of transport authentication. They do not make an untrusted control client
   safe after the token is disclosed.
-- The plugin is trusted code inside OpenCode. Review and pin it like any other
-  code-executing dependency. OpenCode permissions still govern agent tools; the
-  plugin records but does not override host permission decisions.
+- The TUI plugin is trusted code inside OpenCode. Review and pin it like any
+  other code-executing dependency. OpenCode permissions still govern agent
+  tools; the TUI does not answer or override host permission decisions.
 - Approved agent work and verification commands can read or modify workspace
   files, invoke arbitrary programs, access credentials available to the user,
   perform network requests, and create irreversible external effects. The
@@ -772,7 +933,7 @@ cbranch-goal-supervisor serve --opencode-url http://127.0.0.1:4096/
 Run `serve` in a separate terminal before `start` if immediate dispatch is
 desired. Follow progress with `status <goal-id>`.
 
-## Unattended operation
+## Manual unattended operation
 
 Initialize and generate the unit, but leave lifecycle choice to the operator:
 
@@ -786,8 +947,10 @@ cbranch-goal-supervisor doctor
 ```
 
 The daemon can run before goals exist. It schedules only goals that have an
-approved plan, an explicitly consumed unattended-start token, viable budget,
-satisfied dependencies, and any required destructive-unit approval.
+approved plan, an explicitly authorized unattended start, viable budget,
+satisfied dependencies, and any required destructive-unit approval. In this
+manual workflow authorization is the consumed start token; in the TUI workflow
+it is the local confirmation committed in the atomic launch transaction.
 
 ## Packaging and release policy
 
@@ -801,8 +964,8 @@ satisfied dependencies, and any required destructive-unit approval.
   The repository currently contains no automatic publication workflow, package
   signature, or SBOM claim beyond npm provenance.
 - `prepack` builds TypeScript. The package contains `dist`, `README.md`,
-  `LICENSE`, and `CHANGELOG.md` and publishes the CLI plus root, plugin, MCP,
-  daemon, and OpenCode adapter exports.
+  `LICENSE`, and `CHANGELOG.md` and publishes the CLI plus root, Node-hosted
+  plugin, MCP, daemon, TUI, and OpenCode adapter exports.
 
 Before tagging or publishing, run:
 
@@ -813,9 +976,10 @@ pnpm --filter @cbranch/opencode-goal-supervisor pack:check
 `pack:check` creates the tarball, installs it into an isolated temporary consumer,
 verifies runtime and declaration files, version/compatibility metadata and the
 executable CLI bin mapping, imports every public entry through package-name
-resolution, opens an in-memory store, executes the installed `.bin`, and removes
-its temporary files. Also run the repository quality gate for the reviewed
-commit.
+resolution including `./tui`, validates its TUI-only default export, opens an
+in-memory store, verifies that the TUI import closure cannot reach the native
+store, executes the installed `.bin`, and removes its temporary files.
+Also run the repository quality gate for the reviewed commit.
 
 ## Readiness
 
@@ -826,6 +990,8 @@ below is true:
 
 - The exact package and compatible OpenCode versions have been tested together
   on the target host.
+- Automatic TUI persistence is used only on Linux with a tested systemd user
+  manager and `systemctl --user`; unsupported hosts are expected to fail safely.
 - The workspace is on a reliable local filesystem with trustworthy ownership,
   locking, WAL, and chmod behavior.
 - One trusted OS user owns the workspace, control files, OpenCode process, and
