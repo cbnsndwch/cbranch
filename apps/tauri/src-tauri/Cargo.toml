@@ -1,6 +1,6 @@
 [package]
 name = "cbranch-desktop"
-version = "0.2.3"
+version = "0.2.4"
 description = "SSH-forwarded desktop client for cbranch"
 authors = ["cbranch contributors"]
 edition = "2021"

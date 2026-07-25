@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.2.4
+
+### Bug Fixes
+
+- Bootstrap public plugin registry trust without credential lookup by @cbnsndwch
+
+**Full commit history:** https://github.com/cbnsndwch/cbranch/compare/v0.2.3...v0.2.4
+
 ## v0.2.3
 
 ### Bug Fixes
