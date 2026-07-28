@@ -68,6 +68,9 @@ importers:
       '@cbranch/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@cbranch/inference':
+        specifier: workspace:*
+        version: link:../../packages/inference
       '@cbranch/plugin-contract':
         specifier: workspace:*
         version: link:../../packages/plugin-contract
@@ -77,9 +80,18 @@ importers:
       '@cbranch/rpc-contract':
         specifier: workspace:*
         version: link:../../packages/rpc-contract
+      '@cbranch/workspace-intelligence':
+        specifier: workspace:*
+        version: link:../../packages/workspace-intelligence
       '@effect/platform-node':
         specifier: 4.0.0-beta.92
         version: 4.0.0-beta.92(effect@4.0.0-beta.92)(ioredis@5.11.1)
+      '@tanstack/ai':
+        specifier: 0.42.0
+        version: 0.42.0
+      '@tanstack/ai-openai':
+        specifier: 0.16.0
+        version: 0.16.0(@tanstack/ai@0.42.0)(ws@8.21.0)(zod@4.4.3)
       effect:
         specifier: 4.0.0-beta.92
         version: 4.0.0-beta.92
@@ -102,6 +114,16 @@ importers:
       effect:
         specifier: 4.0.0-beta.92
         version: 4.0.0-beta.92
+    devDependencies:
+      '@types/node':
+        specifier: ^26.0.1
+        version: 26.0.1
+
+  packages/inference:
+    dependencies:
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
     devDependencies:
       '@types/node':
         specifier: ^26.0.1
@@ -191,6 +213,9 @@ importers:
       '@tauri-apps/plugin-updater':
         specifier: ^2.10.1
         version: 2.10.1
+      '@xyflow/react':
+        specifier: ^12.11.2
+        version: 12.11.2(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
@@ -240,6 +265,9 @@ importers:
       '@react-router/node':
         specifier: ^8.1.0
         version: 8.1.0(react-router@8.1.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@6.0.3)
+      '@react-sigma/core':
+        specifier: ^5.0.6
+        version: 5.0.6(graphology@0.26.0(graphology-types@0.24.8))(react@19.2.7)(sigma@3.0.3(graphology-types@0.24.8))
       '@tailwindcss/vite':
         specifier: ^4.3.2
         version: 4.3.2(vite@8.1.2(@types/node@26.0.1)(esbuild@0.28.1)(jiti@2.7.0)(yaml@2.9.0))
@@ -258,6 +286,9 @@ importers:
       '@types/react-dom':
         specifier: ^19.2.3
         version: 19.2.3(@types/react@19.2.17)
+      graphology:
+        specifier: ^0.26.0
+        version: 0.26.0(graphology-types@0.24.8)
       jsdom:
         specifier: ^29.1.1
         version: 29.1.1
@@ -267,12 +298,25 @@ importers:
       react-router-devtools:
         specifier: ^6.2.1
         version: 6.2.1(patch_hash=18fda087233cb42199b0fe4066228129f9a3e01665fbde5944ef8fd2757f01ed)(@types/node@26.0.1)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(csstype@3.2.3)(esbuild@0.28.1)(jiti@2.7.0)(react-dom@19.2.7(react@19.2.7))(react-router@8.1.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7)(solid-js@1.9.13)(vite@8.1.2(@types/node@26.0.1)(esbuild@0.28.1)(jiti@2.7.0)(yaml@2.9.0))(yaml@2.9.0)
+      sigma:
+        specifier: ^3.0.3
+        version: 3.0.3(graphology-types@0.24.8)
       tailwindcss:
         specifier: ^4.3.2
         version: 4.3.2
       vite:
         specifier: ^8.1.2
         version: 8.1.2(@types/node@26.0.1)(esbuild@0.28.1)(jiti@2.7.0)(yaml@2.9.0)
+
+  packages/workspace-intelligence:
+    dependencies:
+      '@cbranch/rpc-contract':
+        specifier: workspace:*
+        version: link:../rpc-contract
+    devDependencies:
+      '@types/node':
+        specifier: ^26.0.1
+        version: 26.0.1
 
   plugins/hello-world:
     devDependencies:
@@ -281,6 +325,9 @@ importers:
         version: link:../../packages/plugin-contract
 
 packages:
+
+  '@ag-ui/core@0.0.52':
+    resolution: {integrity: sha512-Xo0bUaNV56EqylzcrAuhUkQX7et7+SZIrqZZtEByGwEq/I1EHny6ZMkWHLkKR7UNi0FJZwJyhKYmKJS3B2SEgA==}
 
   '@ai-sdk/provider@3.0.8':
     resolution: {integrity: sha512-oGMAgGoQdBXbZqNG0Ze56CHjDZ1IDYOwGYxYjO5KLSlz5HiNQ9udIXsPZ61VWaHGZ5XW/jyjmr6t2xz2jGVwbQ==}
@@ -1347,6 +1394,13 @@ packages:
       typescript:
         optional: true
 
+  '@react-sigma/core@5.0.6':
+    resolution: {integrity: sha512-Xu2qXyvDZIhmvGC1n8d7Kcxm5Ntcz4HbPIM7CPDD2e4h3s/oxVpVPX7wtsNreJRRPj9mK+3oqB6SWXNI4mTqVg==}
+    peerDependencies:
+      graphology: ^0.26.0
+      react: ^18.0.0 || ^19.0.0
+      sigma: ^3.0.2
+
   '@remix-run/node-fetch-server@0.13.3':
     resolution: {integrity: sha512-UfjOXed/DQteaM5VyTfqTeGpHwyL2J5aoRGY6cydip4tt1ehNNeSwuXCC7AEGE0RWBs/7bgKxYkL/B/+UDe4AA==}
 
@@ -1617,6 +1671,27 @@ packages:
     peerDependencies:
       vite: ^5.2.0 || ^6 || ^7 || ^8
 
+  '@tanstack/ai-event-client@0.6.8':
+    resolution: {integrity: sha512-h7/HLz9u2LF9ba6uKFMnSZkFlkzQONJ5u3Hi+4qGxpsHyvcGRtW6v186jaFLoklndhEwyC49ytkC4eafi7Qq8w==}
+
+  '@tanstack/ai-openai@0.16.0':
+    resolution: {integrity: sha512-IB02HKOdBLva+5/9VaiLTvQxVIwksQthLqn5G9xWCfQRBekCTXFHyBj+YpmJ5axuL85zoqKUAw0PBVoRwUJi3Q==}
+    peerDependencies:
+      '@tanstack/ai': ^0.40.0
+      zod: ^4.0.0
+
+  '@tanstack/ai-utils@0.3.1':
+    resolution: {integrity: sha512-fgbjd5DohL3k5rTWr/KInauLVYMiHVm0cnmTsNrzL3cr4wWhEld5vmFSrjiwUWACAuONjZa+uBXuS+ZSO8fwDQ==}
+
+  '@tanstack/ai@0.42.0':
+    resolution: {integrity: sha512-OyUA1tl6Oj93jjdyDofMb53tf3GhHgLWJ376h/5qjdwtUG1YOr6134khd1Aq2lfIZbmj2HR+y3XqD9UMXSjk1A==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      '@opentelemetry/api': '>=1.9.0'
+    peerDependenciesMeta:
+      '@opentelemetry/api':
+        optional: true
+
   '@tanstack/devtools-client@0.0.5':
     resolution: {integrity: sha512-hsNDE3iu4frt9cC2ppn1mNRnLKo2uc1/1hXAyY9z4UYb+o40M2clFAhiFoo4HngjfGJDV3x18KVVIq7W4Un+zA==}
     engines: {node: '>=18'}
@@ -1656,6 +1731,11 @@ packages:
     hasBin: true
     peerDependencies:
       solid-js: '>=1.9.7'
+
+  '@tanstack/openai-base@0.9.7':
+    resolution: {integrity: sha512-Bfla4zR0RNF3htTgzLMhfs5bbyqdXLZunXBRWdzghki9+jw2upuiKfHxgc8eAe3X+/mFP84KQSMEfKZxW98oBQ==}
+    peerDependencies:
+      '@tanstack/ai': ^0.40.0
 
   '@tanstack/query-core@5.101.2':
     resolution: {integrity: sha512-hH5MLoJhF7KaIGd7q3xTXGXvslI+GYlM1Z/35aSHHWaCJWB7XvTSHYuV3eM7tw+aE0mT/xMro4M4Q9rCGHT0lw==}
@@ -1805,8 +1885,26 @@ packages:
   '@types/chai@5.2.3':
     resolution: {integrity: sha512-Mw558oeA9fFbv65/y4mHtXDs9bPnFMZAL/jxdPFUpOHHIXX91mcgEHbS5Lahr+pwZFR8A7GQleRWeI6cGFC2UA==}
 
+  '@types/d3-color@3.1.3':
+    resolution: {integrity: sha512-iO90scth9WAbmgv7ogoq57O9YpKmFBbmoEoCHDB2xMBY0+/KVrqAaCDyCE16dUspeOvIxFFRI+0sEtqDqy2b4A==}
+
+  '@types/d3-drag@3.0.7':
+    resolution: {integrity: sha512-HE3jVKlzU9AaMazNufooRJ5ZpWmLIoc90A37WU2JMmeq28w1FQqCZswHZ3xR+SuxYftzHq6WU6KJHvqxKzTxxQ==}
+
   '@types/d3-hierarchy@1.1.11':
     resolution: {integrity: sha512-lnQiU7jV+Gyk9oQYk0GGYccuexmQPTp08E0+4BidgFdiJivjEvf+esPSdZqCZ2C7UwTWejWpqetVaU8A+eX3FA==}
+
+  '@types/d3-interpolate@3.0.4':
+    resolution: {integrity: sha512-mgLPETlrpVV1YRJIglr4Ez47g7Yxjl1lj7YKsiMCb27VJH9W8NVM6Bb9d8kkpG/uAQS5AmbA48q2IAolKKo1MA==}
+
+  '@types/d3-selection@3.0.11':
+    resolution: {integrity: sha512-bhAXu23DJWsrI45xafYpkQ4NtcKMwWnAC/vKrd2l+nxMFuvOT3XMYTIj2opv8vq8AO5Yh7Qac/nSeP/3zjTK0w==}
+
+  '@types/d3-transition@3.0.9':
+    resolution: {integrity: sha512-uZS5shfxzO3rGlu0cC3bjmMFKsXv+SmZZcgp0KD22ts4uGXp5EVYGzu/0YdwZeKmddhcAccYtREJKkPfXkZuCg==}
+
+  '@types/d3-zoom@3.0.8':
+    resolution: {integrity: sha512-iqMC4/YlFCSlO8+2Ii1GGGliCAY4XdeG748w5vQUbevlbDu0zSjH/+jojorQVBK/se0j6DUFNPBGSqD3YWYnDw==}
 
   '@types/deep-eql@4.0.2':
     resolution: {integrity: sha512-c9h9dVVMigMPc4bwTvC5dxqtqJZwQPePsWjPlpSOnojbor6pGqdk541lfA7AqFQr5pB1BRdq0juY9db81BwyFw==}
@@ -1888,6 +1986,22 @@ packages:
 
   '@vitest/utils@4.1.9':
     resolution: {integrity: sha512-A51o8ymO5PpqlWNnBP9ZHPXDIpuMtTLlGSjN7la4US+LJzoUMyhwjA5QXlm39JexgwHKW4Xjs8Z2d3dLCXOeuA==}
+
+  '@xyflow/react@12.11.2':
+    resolution: {integrity: sha512-eLAlDWJfWnQEhJwGMjlWdAXO9eYllKpliUmPQlAmOLxz6mExXuzMVDUKLMquixgkrtmMFFtug3jGKmYYld12cA==}
+    peerDependencies:
+      '@types/react': '>=17'
+      '@types/react-dom': '>=17'
+      react: '>=17'
+      react-dom: '>=17'
+    peerDependenciesMeta:
+      '@types/react':
+        optional: true
+      '@types/react-dom':
+        optional: true
+
+  '@xyflow/system@0.0.79':
+    resolution: {integrity: sha512-czLyOh91NF0hIzbNzwi8I6GlqG23BHh2435OddfI6uiaLH3xdrdygO93gqgH1Bv9mhy8XPFQJOBn1FTq4LvEWA==}
 
   accepts@2.0.0:
     resolution: {integrity: sha512-5cvg6CtKwfgdmVqY1WIiXKc3Q1bkRqGLi+2W/6ao+6Y7gu/RCwRuAhGEzh5B4KlszSuTLgZYuqFqo5bImjNKng==}
@@ -2027,6 +2141,9 @@ packages:
 
   class-variance-authority@0.7.1:
     resolution: {integrity: sha512-Ka+9Trutv7G8M6WT6SeiRWz792K5qEqIGEGzXKhAE6xOWAY6pPH8U+9IY3oCMv6kqTmLsv7Xh/2w2RigkePMsg==}
+
+  classcat@5.0.5:
+    resolution: {integrity: sha512-JhZUT7JFcQy/EzW605k/ktHtncoo9vnyW/2GspNYwFlN1C/WmjuV/xtS04e9SOkL2sTdw0VAZ2UGCcQ9lR6p6w==}
 
   classnames@2.5.1:
     resolution: {integrity: sha512-saHYOzhIQs6wy2sVxTM6bUDsQO4F50V9RQ22qBpEdCW+I+/Wmke2HOl6lS6dTpdxVhb88/I6+Hs+438c3lfUow==}
@@ -2301,6 +2418,10 @@ packages:
     resolution: {integrity: sha512-aIL5Fx7mawVa300al2BnEE4iNvo1qETxLrPI/o05L7z6go7fCw1J6EQmbK4FmJ2AS7kgVF/KEZWufBfdClMcPg==}
     engines: {node: '>= 0.6'}
 
+  events@3.3.0:
+    resolution: {integrity: sha512-mQw+2fkQbALzQ7V0MY0IqdnXNOeTtP4r0lN9z7AAawCXgqea7bDii20AYrIBrFd/Hx0M2Ocz6S111CaFkUcb0Q==}
+    engines: {node: '>=0.8.x'}
+
   eventsource-parser@3.1.0:
     resolution: {integrity: sha512-kJezFj9YFAMLeORyi7aCLxLbD5/qWMQnoMVlVPyHIll7lgRJCc3JVln9Vgl9nwQi0YkMnhdGTMNn7CkRRAptMg==}
     engines: {node: '>=18.0.0'}
@@ -2442,6 +2563,19 @@ packages:
 
   graceful-fs@4.2.11:
     resolution: {integrity: sha512-RbJ5/jmFcNNCcDV5o9eTnBLJ/HszWV0P73bc+Ff4nS/rJj+YaS6IGyiOL0VoBYX+l1Wrl3k63h/KrH+nhJ0XvQ==}
+
+  graphology-types@0.24.8:
+    resolution: {integrity: sha512-hDRKYXa8TsoZHjgEaysSRyPdT6uB78Ci8WnjgbStlQysz7xR52PInxNsmnB7IBOM1BhikxkNyCVEFgmPKnpx3Q==}
+
+  graphology-utils@2.5.2:
+    resolution: {integrity: sha512-ckHg8MXrXJkOARk56ZaSCM1g1Wihe2d6iTmz1enGOz4W/l831MBCKSayeFQfowgF8wd+PQ4rlch/56Vs/VZLDQ==}
+    peerDependencies:
+      graphology-types: '>=0.23.0'
+
+  graphology@0.26.0:
+    resolution: {integrity: sha512-8SSImzgUUYC89Z042s+0r/vMibY7GX/Emz4LDO5e7jYXhuoWfHISPFJYjpRLUSJGq6UQ6xlenvX1p/hJdfXuXg==}
+    peerDependencies:
+      graphology-types: '>=0.24.0'
 
   has-flag@4.0.0:
     resolution: {integrity: sha512-EykJT/Q1KjTWctppgIAgfSO0tKVuZUjhgMr17kqTumMl6Afv3EISleU7qZUzoXDFTAHTDC4NOoG/ZxU3EvlMPQ==}
@@ -2846,6 +2980,26 @@ packages:
   oniguruma-to-es@4.3.6:
     resolution: {integrity: sha512-csuQ9x3Yr0cEIs/Zgx/OEt9iBw9vqIunAPQkx19R/fiMq2oGVTgcMqO/V3Ybqefr1TBvosI6jU539ksaBULJyA==}
 
+  openai@6.49.0:
+    resolution: {integrity: sha512-aYCc0C6L864eR6WSYIwQGyXriw/nIyZx0ObvhzOEVuk0zoBDpynjSbrionWI7q65B5H8jJX0DXR9snEzM6bfPg==}
+    peerDependencies:
+      '@aws-sdk/credential-provider-node': '>=3.972.0 <4'
+      '@smithy/hash-node': '>=4.3.0 <5'
+      '@smithy/signature-v4': '>=5.4.0 <6'
+      ws: ^8.18.0
+      zod: ^3.25 || ^4.0
+    peerDependenciesMeta:
+      '@aws-sdk/credential-provider-node':
+        optional: true
+      '@smithy/hash-node':
+        optional: true
+      '@smithy/signature-v4':
+        optional: true
+      ws:
+        optional: true
+      zod:
+        optional: true
+
   ora@9.4.1:
     resolution: {integrity: sha512-6VlU9MLXbjVQD04AZCMX28hVtA5bUoadvUqO76MUCVA0ilwJbMiHsITRPfyVm6p/BC0Av/BXMujx39WCe1LEqw==}
     engines: {node: '>=20'}
@@ -2889,6 +3043,9 @@ packages:
   parseurl@1.3.3:
     resolution: {integrity: sha512-CiyeOxFT/JZyN5m0z9PfXw4SCBJ6Sygz1Dpl0wqjlhDEGGBP1GnsUVEL0p63hoG1fcj3fHynXi9NYO4nWOL+qQ==}
     engines: {node: '>= 0.8'}
+
+  partial-json@0.1.7:
+    resolution: {integrity: sha512-Njv/59hHaokb/hRUjce3Hdv12wd60MtM9Z5Olmn+nehe0QDAsRtRbJPvJ0Z91TusF0SuZRIvnM+S4l6EIP8leA==}
 
   path-key@3.1.1:
     resolution: {integrity: sha512-ojmeN0qd+y0jszEtoY48r0Peq5dwMEkIlCOu6Q5f41lfkswXuKtYrhgoTpLnyIcHm24Uhqx+5Tqm2InSwLhE6Q==}
@@ -3225,6 +3382,9 @@ packages:
 
   siginfo@2.0.0:
     resolution: {integrity: sha512-ybx0WO1/8bSBLEWXZvEd7gMW3Sn3JFlW3TvX1nREbDLRNQNaeNN8WK0meBwPdAaOI7TtRRRJn/Es1zhrrCHu7g==}
+
+  sigma@3.0.3:
+    resolution: {integrity: sha512-5H0zFlx6/NTQpqBg4Rm569ZOpnBOXMaS25UQThIWMU3XyzI5AhmorK/gnl87BvJBLhQd0tW4C0LIp3enWzMoNw==}
 
   signal-exit@4.1.0:
     resolution: {integrity: sha512-bzyZ1e88w9O1iNJbKnOlvYTrWPDl46O1bG0D3XInv+9tkPrxrN8jUUTiFlDkkmKWgn1M6CfIA13SuGqOa9Korw==}
@@ -3681,8 +3841,29 @@ packages:
     peerDependencies:
       zod: ^3.25.28 || ^4
 
+  zod@3.25.76:
+    resolution: {integrity: sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==}
+
   zod@4.1.8:
     resolution: {integrity: sha512-5R1P+WwQqmmMIEACyzSvo4JXHY5WiAFHRMg+zBZKgKS+Q1viRa0C1hmUKtHltoIFKtIdki3pRxkmpP74jnNYHQ==}
+
+  zod@4.4.3:
+    resolution: {integrity: sha512-ytENFjIJFl2UwYglde2jchW2Hwm4GJFLDiSXWdTrJQBIN9Fcyp7n4DhxJEiWNAJMV1/BqWfW/kkg71UDcHJyTQ==}
+
+  zustand@4.5.7:
+    resolution: {integrity: sha512-CHOUy7mu3lbD6o6LJLfllpjkzhHXSBlX8B9+qPddUsIfeF5S/UZ5q0kmCsnRqT1UHFQZchNFDDzMbQsuesHWlw==}
+    engines: {node: '>=12.7.0'}
+    peerDependencies:
+      '@types/react': '>=16.8'
+      immer: '>=9.0.6'
+      react: '>=16.8'
+    peerDependenciesMeta:
+      '@types/react':
+        optional: true
+      immer:
+        optional: true
+      react:
+        optional: true
 
   zustand@5.0.14:
     resolution: {integrity: sha512-/8tAspM5LMPr28b3fwLYrtdj77ECpfZviaP75CMTnwO8ISyaE4GDIG/9rDDYq/cH9D2Xw2A2RXglLInmVBQB/g==}
@@ -3706,6 +3887,10 @@ packages:
     resolution: {integrity: sha512-bXE4cR/kVZhKZX/RjPEflHaKVhUVl85noU3v6b8apfQEc1x4A+zBxjZ4lN8LqGd6WZ3dl98pY4o717VFmoPp+A==}
 
 snapshots:
+
+  '@ag-ui/core@0.0.52':
+    dependencies:
+      zod: 3.25.76
 
   '@ai-sdk/provider@3.0.8':
     dependencies:
@@ -4618,6 +4803,12 @@ snapshots:
     optionalDependencies:
       typescript: 6.0.3
 
+  '@react-sigma/core@5.0.6(graphology@0.26.0(graphology-types@0.24.8))(react@19.2.7)(sigma@3.0.3(graphology-types@0.24.8))':
+    dependencies:
+      graphology: 0.26.0(graphology-types@0.24.8)
+      react: 19.2.7
+      sigma: 3.0.3(graphology-types@0.24.8)
+
   '@remix-run/node-fetch-server@0.13.3': {}
 
   '@rolldown/binding-android-arm64@1.1.3':
@@ -4821,6 +5012,33 @@ snapshots:
       tailwindcss: 4.3.2
       vite: 8.1.2(@types/node@26.0.1)(esbuild@0.28.1)(jiti@2.7.0)(yaml@2.9.0)
 
+  '@tanstack/ai-event-client@0.6.8':
+    dependencies:
+      '@tanstack/devtools-event-client': 0.4.4
+
+  '@tanstack/ai-openai@0.16.0(@tanstack/ai@0.42.0)(ws@8.21.0)(zod@4.4.3)':
+    dependencies:
+      '@tanstack/ai': 0.42.0
+      '@tanstack/ai-utils': 0.3.1
+      '@tanstack/openai-base': 0.9.7(@tanstack/ai@0.42.0)(ws@8.21.0)(zod@4.4.3)
+      openai: 6.49.0(ws@8.21.0)(zod@4.4.3)
+      zod: 4.4.3
+    transitivePeerDependencies:
+      - '@aws-sdk/credential-provider-node'
+      - '@smithy/hash-node'
+      - '@smithy/signature-v4'
+      - ws
+
+  '@tanstack/ai-utils@0.3.1': {}
+
+  '@tanstack/ai@0.42.0':
+    dependencies:
+      '@ag-ui/core': 0.0.52
+      '@standard-schema/spec': 1.1.0
+      '@tanstack/ai-event-client': 0.6.8
+      '@tanstack/ai-utils': 0.3.1
+      partial-json: 0.1.7
+
   '@tanstack/devtools-client@0.0.5':
     dependencies:
       '@tanstack/devtools-event-client': 0.4.4
@@ -4887,6 +5105,18 @@ snapshots:
       - bufferutil
       - csstype
       - utf-8-validate
+
+  '@tanstack/openai-base@0.9.7(@tanstack/ai@0.42.0)(ws@8.21.0)(zod@4.4.3)':
+    dependencies:
+      '@tanstack/ai': 0.42.0
+      '@tanstack/ai-utils': 0.3.1
+      openai: 6.49.0(ws@8.21.0)(zod@4.4.3)
+    transitivePeerDependencies:
+      - '@aws-sdk/credential-provider-node'
+      - '@smithy/hash-node'
+      - '@smithy/signature-v4'
+      - ws
+      - zod
 
   '@tanstack/query-core@5.101.2': {}
 
@@ -5014,7 +5244,28 @@ snapshots:
       '@types/deep-eql': 4.0.2
       assertion-error: 2.0.1
 
+  '@types/d3-color@3.1.3': {}
+
+  '@types/d3-drag@3.0.7':
+    dependencies:
+      '@types/d3-selection': 3.0.11
+
   '@types/d3-hierarchy@1.1.11': {}
+
+  '@types/d3-interpolate@3.0.4':
+    dependencies:
+      '@types/d3-color': 3.1.3
+
+  '@types/d3-selection@3.0.11': {}
+
+  '@types/d3-transition@3.0.9':
+    dependencies:
+      '@types/d3-selection': 3.0.11
+
+  '@types/d3-zoom@3.0.8':
+    dependencies:
+      '@types/d3-interpolate': 3.0.4
+      '@types/d3-selection': 3.0.11
 
   '@types/deep-eql@4.0.2': {}
 
@@ -5134,6 +5385,31 @@ snapshots:
       '@vitest/pretty-format': 4.1.9
       convert-source-map: 2.0.0
       tinyrainbow: 3.1.0
+
+  '@xyflow/react@12.11.2(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)':
+    dependencies:
+      '@xyflow/system': 0.0.79
+      classcat: 5.0.5
+      react: 19.2.7
+      react-dom: 19.2.7(react@19.2.7)
+      zustand: 4.5.7(@types/react@19.2.17)(react@19.2.7)
+    optionalDependencies:
+      '@types/react': 19.2.17
+      '@types/react-dom': 19.2.3(@types/react@19.2.17)
+    transitivePeerDependencies:
+      - immer
+
+  '@xyflow/system@0.0.79':
+    dependencies:
+      '@types/d3-drag': 3.0.7
+      '@types/d3-interpolate': 3.0.4
+      '@types/d3-selection': 3.0.11
+      '@types/d3-transition': 3.0.9
+      '@types/d3-zoom': 3.0.8
+      d3-drag: 3.0.0
+      d3-interpolate: 3.0.1
+      d3-selection: 3.0.0
+      d3-zoom: 3.0.0
 
   accepts@2.0.0:
     dependencies:
@@ -5284,6 +5560,8 @@ snapshots:
   class-variance-authority@0.7.1:
     dependencies:
       clsx: 2.1.1
+
+  classcat@5.0.5: {}
 
   classnames@2.5.1: {}
 
@@ -5555,6 +5833,8 @@ snapshots:
 
   etag@1.8.1: {}
 
+  events@3.3.0: {}
+
   eventsource-parser@3.1.0: {}
 
   eventsource@3.0.7:
@@ -5697,6 +5977,17 @@ snapshots:
   gopd@1.2.0: {}
 
   graceful-fs@4.2.11: {}
+
+  graphology-types@0.24.8: {}
+
+  graphology-utils@2.5.2(graphology-types@0.24.8):
+    dependencies:
+      graphology-types: 0.24.8
+
+  graphology@0.26.0(graphology-types@0.24.8):
+    dependencies:
+      events: 3.3.0
+      graphology-types: 0.24.8
 
   has-flag@4.0.0: {}
 
@@ -6064,6 +6355,11 @@ snapshots:
       regex: 6.1.0
       regex-recursion: 6.0.2
 
+  openai@6.49.0(ws@8.21.0)(zod@4.4.3):
+    optionalDependencies:
+      ws: 8.21.0
+      zod: 4.4.3
+
   ora@9.4.1:
     dependencies:
       chalk: 5.6.2
@@ -6130,6 +6426,8 @@ snapshots:
       entities: 8.0.0
 
   parseurl@1.3.3: {}
+
+  partial-json@0.1.7: {}
 
   path-key@3.1.1: {}
 
@@ -6549,6 +6847,13 @@ snapshots:
 
   siginfo@2.0.0: {}
 
+  sigma@3.0.3(graphology-types@0.24.8):
+    dependencies:
+      events: 3.3.0
+      graphology-utils: 2.5.2(graphology-types@0.24.8)
+    transitivePeerDependencies:
+      - graphology-types
+
   signal-exit@4.1.0: {}
 
   simple-concat@1.0.1: {}
@@ -6924,7 +7229,18 @@ snapshots:
     dependencies:
       zod: 4.1.8
 
+  zod@3.25.76: {}
+
   zod@4.1.8: {}
+
+  zod@4.4.3: {}
+
+  zustand@4.5.7(@types/react@19.2.17)(react@19.2.7):
+    dependencies:
+      use-sync-external-store: 1.6.0(react@19.2.7)
+    optionalDependencies:
+      '@types/react': 19.2.17
+      react: 19.2.7
 
   zustand@5.0.14(@types/react@19.2.17)(react@19.2.7)(use-sync-external-store@1.6.0(react@19.2.7)):
     optionalDependencies:
