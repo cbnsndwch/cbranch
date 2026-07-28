@@ -18,6 +18,7 @@ import {
     WorkspaceIntelligenceEnrichmentFailure,
     WorkspaceIntelligenceEnrichmentUsage,
     WorkspaceIntelligenceInferredEdge,
+    WorkspaceIntelligenceArchiveDescriptor,
     WorkspaceIntelligenceRunId,
     WorkspaceIntelligenceSemanticSearchResult,
     InferenceModelDiscovery as RpcInferenceModelDiscovery,
@@ -66,6 +67,17 @@ const rpcEnrichmentAttempt = (
                       attempt.failure,
                   ),
               }),
+    });
+
+/** The RPC contract requires a schema-class instance before NDJSON encoding. */
+export const workspaceIntelligenceArchiveDescriptor = (
+    runId: string,
+    token: string,
+): WorkspaceIntelligenceArchiveDescriptor =>
+    new WorkspaceIntelligenceArchiveDescriptor({
+        url: `${WORKSPACE_INTELLIGENCE_ARCHIVE_CHANNEL_PATH}?token=${encodeURIComponent(token)}`,
+        filename: `workspace-intelligence-${runId}.tar`,
+        contentType: 'application/x-tar',
     });
 
 /** Layer providing the P1 RPC handlers; requires `GitEngine` (supplied by `gitEngineLayer`). */
@@ -386,11 +398,7 @@ export const handlersLayer = CbranchRpcs.toLayer({
                         engagementId,
                         runId,
                     );
-                    return {
-                        url: `${WORKSPACE_INTELLIGENCE_ARCHIVE_CHANNEL_PATH}?token=${encodeURIComponent(token)}`,
-                        filename: `workspace-intelligence-${runId}.tar`,
-                        contentType: 'application/x-tar',
-                    };
+                    return workspaceIntelligenceArchiveDescriptor(runId, token);
                 },
                 catch: workspaceIntelligenceError,
             }),
