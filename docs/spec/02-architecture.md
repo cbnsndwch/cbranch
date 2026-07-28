@@ -80,9 +80,11 @@ does not re-define their content.
   `packages/rpc-contract` and MUST provide only a different transport binding
   (`webview.postMessage`). No Git logic may be duplicated in the extension.
 - **REQ-ARCH-007** Dependency direction MUST be acyclic: `ui` → `rpc-contract`;
-  `web-server`/`vscode-ext` → `core` + `rpc-contract`; `core` → `rpc-contract`
-  (types only). A build or lint check MUST fail if a forbidden edge is
-  introduced (e.g. `core` importing `ui`).
+  `workspace-intelligence` → `rpc-contract` (types/contracts only);
+  `web-server` → `core` + `workspace-intelligence` + `rpc-contract`;
+  `vscode-ext` → `core` + `rpc-contract`; and `core` → `rpc-contract` (types
+  only). A build or lint check MUST fail if a forbidden edge is introduced (for
+  example, `core` importing `ui` or `workspace-intelligence` importing `core`).
 
 ### The GitEngine interface
 

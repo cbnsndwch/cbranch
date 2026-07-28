@@ -391,14 +391,75 @@ single `Stream<RebaseStep>` — the pause/continue/skip/abort UX needs request/r
 
 ---
 
-## 8. In-progress operation state (shared by P1 banner, P4/P5 verbs)
+## 8. Workspace Intelligence — deterministic pilot
+
+Workspace Intelligence uses the same multiplexed RPC connection. These methods
+are workspace scoped, not repository-mutation operations, and therefore do not
+take a Git lock. The server validates every requested repository ID against the
+authoritative Engagement membership before a run is persisted.
+
+| Method | Payload | Success | Notes |
+|---|---|---|---|
+| `workspaceIntelligence.start` | `{ engagementId, repoIds? }` | `WorkspaceIntelligenceRun` | Persists and returns a generated `runId` before background work begins. |
+| `workspaceIntelligence.runGet` | `{ engagementId, runId }` | `WorkspaceIntelligenceRun` | Reads persisted status and coverage. |
+| `workspaceIntelligence.runReport` | `{ engagementId, runId }` | `WorkspaceIntelligenceReport` | Reads the bounded deterministic Markdown report and artifact counts. |
+| `workspaceIntelligence.presentationGet` | `{ engagementId, runId }` | `WorkspaceIntelligencePresentation` | Reads bounded per-run layout, expansion, filter, and selected-node choices from mutable workspace state, never from a run artifact. |
+| `workspaceIntelligence.presentationSet` ✎ | `{ engagementId, presentation }` | `WorkspaceIntelligencePresentation` | Atomically persists normalized per-run exploration state; graph records and immutable artifacts are never accepted or changed. |
+| `workspaceIntelligence.graphSearch` | `{ engagementId, runId, query, limit? }` | `WorkspaceIntelligenceGraphSearchResult` | Returns at most 100 matching graph nodes with evidence; it never transfers the whole graph. |
+| `workspaceIntelligence.semanticSearch` | `{ engagementId, runId, query, limit?, profileId? }` | `WorkspaceIntelligenceSemanticSearchResult` | User-invoked embedding rerank of at most 200 host-selected graph chunks. Uses the workspace embedding default when `profileId` is omitted and safely returns lexical fallback nodes when unavailable. |
+| `workspaceIntelligence.graphNeighborhood` | `{ engagementId, runId, nodeId, limit? }` | `WorkspaceIntelligenceGraphNeighborhood` | Returns at most 100 immediate adjacent edges and their endpoint nodes for progressive exploration. |
+| `workspaceIntelligence.componentOverrides` | `{ engagementId }` | `WorkspaceIntelligenceComponentOverride[]` | Reads workspace-local component presentation curation. |
+| `workspaceIntelligence.componentOverridesSet` ✎ | `{ engagementId, overrides }` | `WorkspaceIntelligenceComponentOverride[]` | Atomically replaces component curation and records audit actions. |
+| `workspaceIntelligence.curationActions` | `{ engagementId }` | `WorkspaceIntelligenceCurationAction[]` | Reads mutable workspace curation history; immutable run artifacts are excluded. |
+| `workspaceIntelligence.curationActionAppend` ✎ | `{ engagementId, action }` | `WorkspaceIntelligenceCurationAction` | Records an explicit edge curation action with stable target metadata; component actions derive from override updates. |
+| `workspaceIntelligence.curationActionsClear` ✎ | `{ engagementId }` | `void` | Explicitly clears mutable workspace curation only; never deletes a run. |
+| `workspaceIntelligence.runList` | `{ engagementId }` | `WorkspaceIntelligenceRun[]` | Newest first; excludes no history. |
+| `workspaceIntelligence.runCancel` | `{ engagementId, runId }` | `WorkspaceIntelligenceRun` | Requests cooperative cancellation and retains the run. |
+| `workspaceIntelligence.runDelete` | `{ engagementId, runId }` | `void` | Deletes an explicitly confirmed, non-current finalized run. |
+| `workspaceIntelligence.currentSet` | `{ engagementId, runId }` | `void` | Selects an explicitly chosen validated finalized run as current. |
+| `workspaceIntelligence.currentClear` | `{ engagementId }` | `void` | Explicitly clears the mutable current pointer without deleting an artifact. |
+| `workspaceIntelligence.runHistoryClear` | `{ engagementId }` | `void` | Clears explicitly confirmed inactive run artifacts and their enrichment/index children; curation remains. |
+| `workspaceIntelligence.archiveRequest` | `{ engagementId, runId }` | `WorkspaceIntelligenceArchiveDescriptor` | Mints a one-time, short-lived HTTP download URL for the selected validated run. |
+| `workspaceIntelligence.runSubscribe` ⇉ | `{ engagementId, runId, afterSequence? }` | `WorkspaceIntelligenceRunEvent` | Replays persisted events strictly after the supplied sequence, then delivers live events. |
+| `workspaceIntelligence.enrichmentStart` ✎ | `{ engagementId, runId, profileId?, evidenceLimit? }` | `WorkspaceIntelligenceEnrichmentAttempt` | Runs optional selected-evidence enrichment. Omitting `profileId` uses the workspace generation default; deterministic artifacts are never changed. |
+| `workspaceIntelligence.enrichmentCancel` ✎ | `{ engagementId, runId }` | `void` | Requests cancellation of the active provider call for that run; a retained immutable cancelled attempt is returned by the start call. |
+| `workspaceIntelligence.enrichmentList` | `{ engagementId, runId }` | `WorkspaceIntelligenceEnrichmentAttempt[]` | Lists independent immutable children, newest first. |
+| `workspaceIntelligence.enrichmentPreferredGet` | `{ engagementId, runId }` | `WorkspaceIntelligenceEnrichmentAttempt?` | Reads the mutable workspace presentation selection. |
+| `workspaceIntelligence.enrichmentPreferredSet` ✎ | `{ engagementId, runId, attemptId? }` | `WorkspaceIntelligenceEnrichmentAttempt?` | Selects one completed immutable attempt, or clears the selection when `attemptId` is omitted. |
+
+The run schema carries opaque run/workspace identifiers, selected repository IDs,
+state, timestamps, event sequence, validity/current flags, and explicit coverage.
+Event sequence numbers are monotonically increasing per run. Graph artifacts stay
+host-side; search deliberately returns a small evidence-bearing projection.
+
+### 8.1 Inference profile settings
+
+Inference profile configuration also uses the multiplexed RPC connection, but it
+is host-local configuration rather than provider execution. The wire contract
+contains only provider metadata and an optional named credential reference; it
+never contains credential values.
+
+| Method | Payload | Success | Notes |
+|---|---|---|---|
+| `inferenceProfiles.get` | `{}` | `InferenceProfile[]` | Reads up to 32 local provider profiles. |
+| `inferenceModels.discover` | `{ profileId }` | `InferenceModelDiscovery` | Performs bounded OpenAI-compatible `GET /models` discovery for one saved remote profile. It sends no workspace evidence and returns model IDs only. |
+| `inferenceProfiles.set` ✎ | `{ profiles }` | `InferenceProfile[]` | Replaces validated profile metadata and named secret references only. |
+| `workspaceInferenceDefaults.get` | `{ engagementId }` | `WorkspaceInferenceDefaults` | Reads generation/embedding profile selections for one workspace. |
+| `workspaceInferenceDefaults.set` ✎ | `{ engagementId, defaults }` | `WorkspaceInferenceDefaults` | Persists selections only when the referenced enabled profile supports the capability. |
+
+`InferenceSecretReference` is `{ kind: "environment" | "secret-store", name }`.
+Profile IDs, endpoints, executable paths, and model IDs are configuration data;
+API keys, tokens, passwords, and authorization headers are rejected rather than
+stored or returned.
+
+## 9. In-progress operation state (shared by P1 banner, P4/P5 verbs)
 `RepoState.inProgress` is derived from git-dir markers (enumerate the exact mapping in the spec:
 `MERGE_HEAD`, `CHERRY_PICK_HEAD`, `REVERT_HEAD`, `rebase-merge/` vs `rebase-apply/`, `BISECT_LOG`,
 `sequencer/`). It selects which `sequencer.*` / `rebase.*` / `bisect.*` verbs are offered.
 
 ---
 
-## 9. Open items handed to the spec author
+## 10. Open items handed to the spec author
 - Author the remaining payload/success Schemas to the patterns in §5 (one per catalog row).
 - Reconcile `04-domain-model.md` result types into these Schemas (single definition).
 - Add the per-operation **lock policy table** + acquisition timeout to `12-nonfunctional.md` (§3.2).
