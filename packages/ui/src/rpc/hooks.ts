@@ -46,6 +46,9 @@ import {
     type GitHubPullRequestList,
     type GitHubPullRequestCreated,
     type GitHubPullRequestPreview,
+    type InferenceProfile,
+    type InferenceProfileDiscovery,
+    type InferenceModelDiscovery,
     type KeyBinding,
     type LogQuery,
     type MergeMode,
@@ -79,6 +82,7 @@ import {
     type TagType,
     type WorkingTreeStatus,
     type WorktreeInfo,
+    type WorkspaceInferenceDefaults,
 } from '@cbranch/rpc-contract';
 import {
     type InfiniteData,
@@ -2174,6 +2178,102 @@ export const useSetAppSettings = () => {
         mutationFn: patch => api.appSettingsSet(patch),
         onSettled: () => {
             void qc.invalidateQueries({ queryKey: queryKeys.appSettings() });
+        },
+    });
+};
+
+/** Host-local provider metadata; credential values never reach the browser. */
+export const useInferenceProfiles = (): UseQueryResult<
+    ReadonlyArray<InferenceProfile>
+> => {
+    const api = useApi();
+    return useQuery({
+        queryKey: queryKeys.inferenceProfiles(),
+        queryFn: () => api.inferenceProfilesGet(),
+    });
+};
+
+/** Explicit, bounded local executable discovery. It never sends workspace evidence. */
+export const useDiscoverInferenceProfiles = () => {
+    const api = useApi();
+    return useMutation<ReadonlyArray<InferenceProfileDiscovery>, unknown, void>(
+        {
+            mutationFn: () => api.inferenceProfilesDiscover(),
+        },
+    );
+};
+
+/** Explicit remote profile check; it sends no workspace graph/evidence. */
+export const useDiscoverInferenceModels = () => {
+    const api = useApi();
+    return useMutation<InferenceModelDiscovery, unknown, string>({
+        mutationFn: profileId => api.inferenceModelsDiscover(profileId),
+    });
+};
+
+/** Replaces validated local provider metadata and named secret references only. */
+export const useSetInferenceProfiles = () => {
+    const api = useApi();
+    const qc = useQueryClient();
+    return useMutation<
+        ReadonlyArray<InferenceProfile>,
+        unknown,
+        ReadonlyArray<InferenceProfile>
+    >({
+        mutationFn: profiles => api.inferenceProfilesSet(profiles),
+        onSuccess: () => {
+            void qc.invalidateQueries({
+                queryKey: queryKeys.inferenceProfiles(),
+            });
+            void qc.invalidateQueries({
+                queryKey: ['workspaceInferenceDefaults'],
+            });
+        },
+    });
+};
+
+export const useWorkspaceInferenceDefaults = (
+    engagementId: EngagementId | null,
+): UseQueryResult<WorkspaceInferenceDefaults> => {
+    const api = useApi();
+    return useQuery({
+        queryKey: queryKeys.workspaceInferenceDefaults(engagementId ?? 'none'),
+        queryFn: () => {
+            if (engagementId === null)
+                throw new Error(
+                    'Select a workspace to configure inference defaults.',
+                );
+            return api.workspaceInferenceDefaultsGet(engagementId);
+        },
+        enabled: engagementId !== null,
+    });
+};
+
+export const useSetWorkspaceInferenceDefaults = (
+    engagementId: EngagementId | null,
+) => {
+    const api = useApi();
+    const qc = useQueryClient();
+    return useMutation<
+        WorkspaceInferenceDefaults,
+        unknown,
+        WorkspaceInferenceDefaults
+    >({
+        mutationFn: defaults => {
+            if (engagementId === null)
+                return Promise.reject(
+                    new Error(
+                        'Select a workspace to configure inference defaults.',
+                    ),
+                );
+            return api.workspaceInferenceDefaultsSet(engagementId, defaults);
+        },
+        onSuccess: () => {
+            if (engagementId !== null)
+                void qc.invalidateQueries({
+                    queryKey:
+                        queryKeys.workspaceInferenceDefaults(engagementId),
+                });
         },
     });
 };

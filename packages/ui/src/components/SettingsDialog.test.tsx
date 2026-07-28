@@ -2,8 +2,12 @@
 import {
     AppSettings,
     HistoryColumnVisibility,
+    InferenceProfile,
+    InferenceProfileDiscovery,
+    InferenceModelDiscovery,
     KeyBinding,
     RepoId,
+    WorkspaceInferenceDefaults,
 } from '@cbranch/rpc-contract';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
@@ -56,6 +60,17 @@ const entries = [
     },
 ];
 
+const inferenceProfile = new InferenceProfile({
+    id: 'codex-local',
+    label: 'Codex local',
+    provider: 'codex',
+    enabled: true,
+    capabilities: ['generation'],
+    executable: '/usr/local/bin/codex',
+    modelId: 'gpt-5.6',
+    secretReference: { kind: 'environment', name: 'CODEX_TEST_KEY' },
+});
+
 const makeApi = (overrides: Partial<CbranchApi> = {}): CbranchApi =>
     ({
         configList: vi.fn(async () => entries),
@@ -89,6 +104,17 @@ const makeApi = (overrides: Partial<CbranchApi> = {}): CbranchApi =>
                     }),
                 }),
         ),
+        inferenceProfilesGet: vi.fn(async () => [inferenceProfile]),
+        inferenceProfilesDiscover: vi.fn(async () => []),
+        inferenceModelsDiscover: vi.fn(
+            async profileId =>
+                new InferenceModelDiscovery({ profileId, modelIds: [] }),
+        ),
+        inferenceProfilesSet: vi.fn(async profiles => profiles),
+        workspaceInferenceDefaultsGet: vi.fn(
+            async () => new WorkspaceInferenceDefaults({}),
+        ),
+        workspaceInferenceDefaultsSet: vi.fn(async defaults => defaults),
         recentList: vi.fn(async () => []),
         subscribe: vi.fn(() => () => undefined),
         ...overrides,
@@ -351,6 +377,124 @@ describe('SettingsDialog', () => {
                 b => b.commandId === 'history.find' && b.chord === '',
             ),
         ).toBe(true);
+    });
+
+    test('Inference tab edits safe profile metadata without a credential-value field', async () => {
+        const api = makeApi();
+        renderDialog(api);
+        open();
+        fireEvent.click(screen.getByRole('tab', { name: 'Inference' }));
+        expect(await screen.findByText('Codex local')).toBeTruthy();
+        expect(screen.queryByLabelText(/API key/i)).toBeNull();
+
+        fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
+        fireEvent.change(screen.getByLabelText('Inference profile label'), {
+            target: { value: 'Local Codex' },
+        });
+        fireEvent.click(screen.getByRole('button', { name: 'Save provider' }));
+
+        await waitFor(() => {
+            expect(api.inferenceProfilesSet).toHaveBeenCalled();
+        });
+        const saved = (
+            api.inferenceProfilesSet as ReturnType<typeof vi.fn>
+        ).mock.calls.at(-1)?.[0] as InferenceProfile[];
+        expect(saved[0]).toMatchObject({
+            id: 'codex-local',
+            label: 'Local Codex',
+            executable: '/usr/local/bin/codex',
+            modelId: 'gpt-5.6',
+        });
+        expect(JSON.stringify(saved)).not.toMatch(/api.?key|password|token/i);
+    });
+
+    test('Inference tab turns an explicit local discovery into a draft profile', async () => {
+        const discovery = new InferenceProfileDiscovery({
+            provider: 'codex',
+            executable: '/usr/local/bin/codex',
+            version: 'codex 1.0.0',
+        });
+        const api = makeApi({
+            inferenceProfilesGet: vi.fn(async () => []),
+            inferenceProfilesDiscover: vi.fn(async () => [discovery]),
+        });
+        renderDialog(api);
+        open();
+        fireEvent.click(screen.getByRole('tab', { name: 'Inference' }));
+        fireEvent.click(
+            await screen.findByRole('button', { name: 'Detect local tools' }),
+        );
+        expect(await screen.findByText('codex 1.0.0')).toBeTruthy();
+        fireEvent.click(screen.getByRole('button', { name: 'Use' }));
+        expect(
+            (screen.getByLabelText('Inference executable') as HTMLInputElement)
+                .value,
+        ).toBe('/usr/local/bin/codex');
+    });
+
+    test('Inference tab makes a discovered Ollama profile embeddings-only', async () => {
+        const discovery = new InferenceProfileDiscovery({
+            provider: 'local-embeddings',
+            executable: '/usr/bin/ollama',
+            version: 'ollama 0.23.2',
+        });
+        const api = makeApi({
+            inferenceProfilesGet: vi.fn(async () => []),
+            inferenceProfilesDiscover: vi.fn(async () => [discovery]),
+        });
+        renderDialog(api);
+        open();
+        fireEvent.click(screen.getByRole('tab', { name: 'Inference' }));
+        fireEvent.click(
+            await screen.findByRole('button', { name: 'Detect local tools' }),
+        );
+        await screen.findByText('ollama 0.23.2');
+        fireEvent.click(screen.getByRole('button', { name: 'Use' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Save provider' }));
+        await waitFor(() =>
+            expect(api.inferenceProfilesSet).toHaveBeenCalledWith([
+                expect.objectContaining({
+                    provider: 'local-embeddings',
+                    capabilities: ['embeddings'],
+                }),
+            ]),
+        );
+    });
+
+    test('Inference tab discovers remote model IDs without workspace evidence', async () => {
+        const remote = new InferenceProfile({
+            id: 'remote',
+            label: 'Remote',
+            provider: 'openai-compatible',
+            enabled: false,
+            capabilities: ['generation', 'embeddings'],
+            endpoint: 'https://provider.example/v1',
+            secretReference: { kind: 'environment', name: 'PROVIDER_KEY' },
+        });
+        const api = makeApi({
+            inferenceProfilesGet: vi.fn(async () => [remote]),
+            inferenceModelsDiscover: vi.fn(
+                async profileId =>
+                    new InferenceModelDiscovery({
+                        profileId,
+                        modelIds: ['model-b', 'model-a'],
+                    }),
+            ),
+        });
+        renderDialog(api);
+        open();
+        fireEvent.click(screen.getByRole('tab', { name: 'Inference' }));
+        fireEvent.click(
+            await screen.findByRole('button', { name: 'Discover models' }),
+        );
+        expect(await screen.findByText('model-a')).toBeTruthy();
+        expect(api.inferenceModelsDiscover).toHaveBeenCalledWith('remote');
+        fireEvent.click(screen.getByRole('button', { name: 'model-b' }));
+        await waitFor(() =>
+            expect(api.inferenceProfilesSet).toHaveBeenCalledWith([
+                expect.objectContaining({ id: 'remote', modelId: 'model-b' }),
+            ]),
+        );
     });
 
     test('recording a chord does not also fire the global action it is bound to', async () => {

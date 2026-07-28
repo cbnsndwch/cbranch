@@ -9,6 +9,16 @@ import { type RouteConfig, index, route } from '@react-router/dev/routes';
 export default [
     index('routes/landing.tsx'),
     route('w/:workspaceSlug', 'routes/engagement.tsx'),
+    route('w/:workspaceSlug/intelligence', 'routes/engagement.tsx', {
+        id: 'engagement-intelligence',
+    }),
+    route(
+        'w/:workspaceSlug/intelligence/runs/:runId',
+        'routes/engagement.tsx',
+        {
+            id: 'engagement-intelligence-run',
+        },
+    ),
     route('w/:workspaceSlug/r/:repoId', 'routes/repo.tsx', {
         id: 'engagement-repo',
     }),

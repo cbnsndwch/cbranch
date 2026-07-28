@@ -14,6 +14,7 @@ import {
     Square,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router';
 import { toast } from 'sonner';
 
 import { cn } from '../lib/cn';
@@ -50,6 +51,7 @@ import {
 import { EngagementPullRequests } from './EngagementPullRequests';
 import { EngagementBranchMatrix } from './EngagementBranchMatrix';
 import { EngagementChangeSets } from './EngagementChangeSets';
+import { WorkspaceIntelligencePanel } from './WorkspaceIntelligencePanel';
 
 const errorMessage = (error: unknown): string =>
     typeof error === 'object' && error !== null && 'message' in error
@@ -195,6 +197,8 @@ function RepoSummaryRow({
 
 export function EngagementOverview() {
     const activeEngagementId = useUiStore(s => s.activeEngagementId);
+    const location = useLocation();
+    const navigate = useNavigate();
     const openSwitcher = useUiStore(s => s.setRepoSwitcherOpen);
     const workspace = useEngagementWorkspace();
     const engagement = workspace.data?.engagements.find(
@@ -203,7 +207,11 @@ export function EngagementOverview() {
     const api = useApi();
     const [selected, setSelected] = useState<ReadonlySet<RepoId>>(new Set());
     const [view, setView] = useState<
-        'repositories' | 'branches' | 'pullRequests' | 'changeSets'
+        | 'repositories'
+        | 'branches'
+        | 'pullRequests'
+        | 'changeSets'
+        | 'intelligence'
     >('repositories');
     const [fetching, setFetching] = useState(false);
     const [fetchProgress, setFetchProgress] = useState({ done: 0, total: 0 });
@@ -234,6 +242,11 @@ export function EngagementOverview() {
         },
         [],
     );
+
+    useEffect(() => {
+        if (location.pathname.includes('/intelligence'))
+            setView('intelligence');
+    }, [location.pathname]);
 
     if (workspace.isLoading)
         return (
@@ -501,6 +514,22 @@ export function EngagementOverview() {
                     >
                         Change sets
                     </button>
+                    <button
+                        type="button"
+                        aria-pressed={view === 'intelligence'}
+                        onClick={() => {
+                            setView('intelligence');
+                            navigate(`/w/${engagement.slug}/intelligence`);
+                        }}
+                        className={cn(
+                            'border-l px-2 text-xs',
+                            view === 'intelligence'
+                                ? 'bg-accent font-medium'
+                                : 'text-muted-foreground hover:bg-accent/50',
+                        )}
+                    >
+                        Intelligence
+                    </button>
                 </div>
                 {view === 'repositories' ? (
                     <>
@@ -562,7 +591,9 @@ export function EngagementOverview() {
                 ) : null}
             </div>
 
-            {view === 'pullRequests' ? (
+            {view === 'intelligence' ? (
+                <WorkspaceIntelligencePanel engagement={engagement} />
+            ) : view === 'pullRequests' ? (
                 <EngagementPullRequests engagement={engagement} />
             ) : view === 'changeSets' ? (
                 <EngagementChangeSets

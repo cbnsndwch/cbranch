@@ -122,6 +122,98 @@ export const queryKeys = {
     gitConfig: (repoId: RepoId) => [repoId, 'config', 'gitConfig'] as const,
     /** `config.appGet` — cbranch app settings (NOT repo-scoped; never domain-invalidated, like `recentList`). */
     appSettings: () => ['appSettings'] as const,
+    /** Host-local inference profiles; profile metadata contains no credential values. */
+    inferenceProfiles: () => ['inferenceProfiles'] as const,
+    /** Per-workspace generation and embedding profile selections. */
+    workspaceInferenceDefaults: (engagementId: string) =>
+        ['workspaceInferenceDefaults', engagementId] as const,
+    /** Durable, host-owned Workspace Intelligence run history. */
+    workspaceIntelligenceRuns: (engagementId: string) =>
+        ['workspaceIntelligence', engagementId, 'runs'] as const,
+    workspaceIntelligenceAnalysisSettings: (engagementId: string) =>
+        ['workspaceIntelligence', engagementId, 'analysisSettings'] as const,
+    workspaceIntelligencePresentation: (engagementId: string, runId: string) =>
+        [
+            'workspaceIntelligence',
+            engagementId,
+            'runs',
+            runId,
+            'presentation',
+        ] as const,
+    workspaceIntelligenceReport: (engagementId: string, runId: string) =>
+        [
+            'workspaceIntelligence',
+            engagementId,
+            'runs',
+            runId,
+            'report',
+        ] as const,
+    workspaceIntelligenceSearch: (
+        engagementId: string,
+        runId: string,
+        query: string,
+        mode: 'lexical' | 'semantic',
+        profileId?: string,
+    ) =>
+        [
+            'workspaceIntelligence',
+            engagementId,
+            'runs',
+            runId,
+            'search',
+            mode,
+            profileId ?? 'default',
+            query,
+        ] as const,
+    workspaceIntelligenceNeighborhood: (
+        engagementId: string,
+        runId: string,
+        nodeId: string,
+    ) =>
+        [
+            'workspaceIntelligence',
+            engagementId,
+            'runs',
+            runId,
+            'neighborhood',
+            nodeId,
+        ] as const,
+    workspaceIntelligenceDiff: (
+        engagementId: string,
+        fromRunId: string,
+        toRunId: string,
+    ) =>
+        [
+            'workspaceIntelligence',
+            engagementId,
+            'runs',
+            fromRunId,
+            'diff',
+            toRunId,
+        ] as const,
+    workspaceIntelligenceComponentOverrides: (engagementId: string) =>
+        ['workspaceIntelligence', engagementId, 'componentOverrides'] as const,
+    workspaceIntelligenceCurationActions: (engagementId: string) =>
+        ['workspaceIntelligence', engagementId, 'curationActions'] as const,
+    workspaceIntelligenceEnrichments: (engagementId: string, runId: string) =>
+        [
+            'workspaceIntelligence',
+            engagementId,
+            'runs',
+            runId,
+            'enrichments',
+        ] as const,
+    workspaceIntelligencePreferredEnrichment: (
+        engagementId: string,
+        runId: string,
+    ) =>
+        [
+            'workspaceIntelligence',
+            engagementId,
+            'runs',
+            runId,
+            'preferredEnrichment',
+        ] as const,
     /** `worktree.list` (domain: `worktrees`). */
     worktrees: (repoId: RepoId) => [repoId, 'worktrees', 'list'] as const,
     /**
