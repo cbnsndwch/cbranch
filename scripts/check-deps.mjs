@@ -28,12 +28,16 @@ const ALLOWED_INTERNAL = {
     '@cbranch/plugin-runtime': new Set(['@cbranch/plugin-contract']),
     '@cbranch/rpc-contract': new Set(['@cbranch/plugin-contract']),
     '@cbranch/core': new Set(['@cbranch/rpc-contract']),
+    '@cbranch/workspace-intelligence': new Set(['@cbranch/rpc-contract']),
+    '@cbranch/inference': new Set([]),
     '@cbranch/ui': new Set(['@cbranch/rpc-contract']),
     '@cbranch/web-server': new Set([
         '@cbranch/core',
+        '@cbranch/inference',
         '@cbranch/plugin-contract',
         '@cbranch/plugin-runtime',
         '@cbranch/rpc-contract',
+        '@cbranch/workspace-intelligence',
     ]),
     '@cbranch/vscode-ext': new Set([
         '@cbranch/ui',

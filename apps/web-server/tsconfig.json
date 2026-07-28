@@ -9,7 +9,8 @@
         { "path": "../../packages/plugin-contract" },
         { "path": "../../packages/plugin-runtime" },
         { "path": "../../packages/rpc-contract" },
-        { "path": "../../packages/core" }
+        { "path": "../../packages/core" },
+        { "path": "../../packages/workspace-intelligence" }
     ],
     "include": ["src/**/*"],
     "exclude": ["src/**/*.test.ts", "dist", "node_modules"]

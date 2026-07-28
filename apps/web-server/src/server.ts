@@ -30,6 +30,8 @@ import { patchChannelRoute, patchUploadRoute } from './patch-channel';
 import { trustedPluginManagerLayer } from './plugin-manager';
 import { handlersLayer } from './rpc-handlers';
 import { sideChannelRoute } from './side-channel';
+import { workspaceIntelligenceArchiveChannelRoute } from './workspace-intelligence-archive-channel';
+import { workspaceIntelligenceLayer } from './workspace-intelligence-service';
 import {
     workspaceAvatarDeleteRoute,
     workspaceAvatarRoute,
@@ -76,6 +78,7 @@ export const buildServerLive = (
         workspaceAvatarUploadRoute(configStore),
         workspaceAvatarRoute(configStore),
         workspaceAvatarDeleteRoute(configStore),
+        workspaceIntelligenceArchiveChannelRoute,
     ).pipe(
         Layer.provide(handlersLayer),
         Layer.provide(trustedPluginManagerLayer),
@@ -106,6 +109,7 @@ export const buildServerLive = (
             ),
         disableListenLog: true,
     }).pipe(
+        Layer.provide(workspaceIntelligenceLayer),
         Layer.provideMerge(
             NodeHttpServer.layer(() => http.createServer(), {
                 port: config.port,

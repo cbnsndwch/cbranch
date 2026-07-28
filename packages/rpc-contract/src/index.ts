@@ -51,6 +51,12 @@ export * from './schemas/phase6';
 // Multi-repository consulting workspaces: engagement partitions + open-repo sessions.
 export * from './schemas/engagements';
 
+// Workspace Intelligence run lifecycle, status, coverage, and event schemas.
+export * from './schemas/workspace-intelligence';
+
+// Inference profile and workspace-default configuration (no secret values).
+export * from './schemas/inference';
+
 // Host-bounded filesystem exploration for repository/folder pickers.
 export * from './schemas/filesystem';
 

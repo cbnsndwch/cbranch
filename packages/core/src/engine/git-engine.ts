@@ -67,6 +67,7 @@ import {
     type PullRequestListState,
     type ReflogPage,
     type InvalidationEvent,
+    type InferenceProfile,
     type LogQuery,
     type MergeMode,
     type MergeResult,
@@ -91,6 +92,7 @@ import {
     type TagType,
     type WorkingTreeStatus,
     type WorktreeInfo,
+    type WorkspaceInferenceDefaults,
 } from '@cbranch/rpc-contract';
 import { Context, type Effect, type Stream } from 'effect';
 
@@ -822,6 +824,20 @@ export interface GitEngineApi {
         keybindings?: ReadonlyArray<KeyBinding>;
         columns?: AppSettings['columns'];
     }) => Effect.Effect<AppSettings, GitError>;
+    readonly inferenceProfilesGet: () => Effect.Effect<
+        ReadonlyArray<InferenceProfile>,
+        GitError
+    >;
+    readonly inferenceProfilesSet: (
+        profiles: ReadonlyArray<InferenceProfile>,
+    ) => Effect.Effect<ReadonlyArray<InferenceProfile>, GitError>;
+    readonly workspaceInferenceDefaultsGet: (
+        engagementId: EngagementId,
+    ) => Effect.Effect<WorkspaceInferenceDefaults, GitError>;
+    readonly workspaceInferenceDefaultsSet: (
+        engagementId: EngagementId,
+        defaults: WorkspaceInferenceDefaults,
+    ) => Effect.Effect<WorkspaceInferenceDefaults, GitError>;
 
     // ── interactive rebase (P5, S8) ─────────────────────────────────────────────
     /** rebase.plan — the `<upstream>..branch` range (or `HEAD` by default), oldest-first. READ. REQ-P5-IR-001/002. */

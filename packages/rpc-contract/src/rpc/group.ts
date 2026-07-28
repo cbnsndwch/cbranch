@@ -73,6 +73,16 @@ import {
 } from '../schemas/forge';
 import { InvalidationEvent } from '../schemas/live';
 import {
+    InferenceModelDiscovery,
+    InferenceModelsDiscoverInput,
+    InferenceProfile,
+    InferenceProfileDiscovery,
+    InferenceProfilesSetInput,
+    WorkspaceInferenceDefaults,
+    WorkspaceInferenceDefaultsInput,
+    WorkspaceInferenceDefaultsSetInput,
+} from '../schemas/inference';
+import {
     BlameResult,
     ConflictListing,
     ConflictResolution,
@@ -126,6 +136,39 @@ import {
     PatchSelection,
     WorkingTreeStatus,
 } from '../schemas/working-tree';
+import {
+    WorkspaceIntelligenceRun,
+    WorkspaceIntelligenceRunEvent,
+    WorkspaceIntelligenceArchiveDescriptor,
+    WorkspaceIntelligenceArchiveRequestInput,
+    WorkspaceIntelligenceGraphSearchInput,
+    WorkspaceIntelligenceGraphSearchResult,
+    WorkspaceIntelligenceSemanticSearchInput,
+    WorkspaceIntelligenceSemanticSearchResult,
+    WorkspaceIntelligenceGraphNeighborhoodInput,
+    WorkspaceIntelligenceGraphNeighborhood,
+    WorkspaceIntelligenceGraphDiff,
+    WorkspaceIntelligenceGraphDiffInput,
+    WorkspaceIntelligenceComponentOverride,
+    WorkspaceIntelligenceComponentOverridesInput,
+    WorkspaceIntelligenceComponentOverridesSetInput,
+    WorkspaceIntelligenceCurationAction,
+    WorkspaceIntelligenceCurationActionAppendInput,
+    WorkspaceIntelligenceCurationActionsInput,
+    WorkspaceIntelligenceEnrichmentAttempt,
+    WorkspaceIntelligenceEnrichmentPreferredSetInput,
+    WorkspaceIntelligenceEnrichmentStartInput,
+    WorkspaceIntelligenceReport,
+    WorkspaceIntelligenceRunInput,
+    WorkspaceIntelligenceRunListInput,
+    WorkspaceIntelligenceRunSubscribeInput,
+    WorkspaceIntelligenceStartInput,
+    WorkspaceIntelligenceAnalysisSettings,
+    WorkspaceIntelligenceAnalysisSettingsInput,
+    WorkspaceIntelligenceAnalysisSettingsSetInput,
+    WorkspaceIntelligencePresentation,
+    WorkspaceIntelligencePresentationSetInput,
+} from '../schemas/workspace-intelligence';
 
 export const CbranchRpcs = RpcGroup.make(
     // system.info — compatibility/capability handshake before the UI mounts.
@@ -327,6 +370,185 @@ export const CbranchRpcs = RpcGroup.make(
     Rpc.make('EngagementActivate', {
         payload: { engagementId: EngagementId },
         success: EngagementWorkspace,
+        error: GitError,
+    }),
+    // workspaceIntelligence.* — durable, host-side background analysis.
+    Rpc.make('WorkspaceIntelligenceStart', {
+        payload: WorkspaceIntelligenceStartInput,
+        success: WorkspaceIntelligenceRun,
+        error: GitError,
+    }),
+    Rpc.make('WorkspaceIntelligenceAnalysisSettings', {
+        payload: WorkspaceIntelligenceAnalysisSettingsInput,
+        success: WorkspaceIntelligenceAnalysisSettings,
+        error: GitError,
+    }),
+    Rpc.make('WorkspaceIntelligenceAnalysisSettingsSet', {
+        payload: WorkspaceIntelligenceAnalysisSettingsSetInput,
+        success: WorkspaceIntelligenceAnalysisSettings,
+        error: GitError,
+    }),
+    Rpc.make('WorkspaceIntelligencePresentationGet', {
+        payload: WorkspaceIntelligenceRunInput,
+        success: WorkspaceIntelligencePresentation,
+        error: GitError,
+    }),
+    Rpc.make('WorkspaceIntelligencePresentationSet', {
+        payload: WorkspaceIntelligencePresentationSetInput,
+        success: WorkspaceIntelligencePresentation,
+        error: GitError,
+    }),
+    Rpc.make('WorkspaceIntelligenceRunGet', {
+        payload: WorkspaceIntelligenceRunInput,
+        success: WorkspaceIntelligenceRun,
+        error: GitError,
+    }),
+    Rpc.make('WorkspaceIntelligenceRunReport', {
+        payload: WorkspaceIntelligenceRunInput,
+        success: WorkspaceIntelligenceReport,
+        error: GitError,
+    }),
+    Rpc.make('WorkspaceIntelligenceGraphSearch', {
+        payload: WorkspaceIntelligenceGraphSearchInput,
+        success: WorkspaceIntelligenceGraphSearchResult,
+        error: GitError,
+    }),
+    Rpc.make('WorkspaceIntelligenceSemanticSearch', {
+        payload: WorkspaceIntelligenceSemanticSearchInput,
+        success: WorkspaceIntelligenceSemanticSearchResult,
+        error: GitError,
+    }),
+    Rpc.make('WorkspaceIntelligenceGraphNeighborhood', {
+        payload: WorkspaceIntelligenceGraphNeighborhoodInput,
+        success: WorkspaceIntelligenceGraphNeighborhood,
+        error: GitError,
+    }),
+    Rpc.make('WorkspaceIntelligenceGraphDiff', {
+        payload: WorkspaceIntelligenceGraphDiffInput,
+        success: WorkspaceIntelligenceGraphDiff,
+        error: GitError,
+    }),
+    Rpc.make('WorkspaceIntelligenceComponentOverrides', {
+        payload: WorkspaceIntelligenceComponentOverridesInput,
+        success: Schema.Array(WorkspaceIntelligenceComponentOverride),
+        error: GitError,
+    }),
+    Rpc.make('WorkspaceIntelligenceComponentOverridesSet', {
+        payload: WorkspaceIntelligenceComponentOverridesSetInput,
+        success: Schema.Array(WorkspaceIntelligenceComponentOverride),
+        error: GitError,
+    }),
+    Rpc.make('WorkspaceIntelligenceCurationActions', {
+        payload: WorkspaceIntelligenceCurationActionsInput,
+        success: Schema.Array(WorkspaceIntelligenceCurationAction),
+        error: GitError,
+    }),
+    Rpc.make('WorkspaceIntelligenceCurationActionAppend', {
+        payload: WorkspaceIntelligenceCurationActionAppendInput,
+        success: WorkspaceIntelligenceCurationAction,
+        error: GitError,
+    }),
+    Rpc.make('WorkspaceIntelligenceCurationActionsClear', {
+        payload: WorkspaceIntelligenceCurationActionsInput,
+        success: Schema.Void,
+        error: GitError,
+    }),
+    Rpc.make('WorkspaceIntelligenceRunList', {
+        payload: WorkspaceIntelligenceRunListInput,
+        success: Schema.Array(WorkspaceIntelligenceRun),
+        error: GitError,
+    }),
+    Rpc.make('WorkspaceIntelligenceRunCancel', {
+        payload: WorkspaceIntelligenceRunInput,
+        success: WorkspaceIntelligenceRun,
+        error: GitError,
+    }),
+    Rpc.make('WorkspaceIntelligenceRunDelete', {
+        payload: WorkspaceIntelligenceRunInput,
+        success: Schema.Void,
+        error: GitError,
+    }),
+    Rpc.make('WorkspaceIntelligenceCurrentSet', {
+        payload: WorkspaceIntelligenceRunInput,
+        success: Schema.Void,
+        error: GitError,
+    }),
+    Rpc.make('WorkspaceIntelligenceCurrentClear', {
+        payload: WorkspaceIntelligenceRunListInput,
+        success: Schema.Void,
+        error: GitError,
+    }),
+    Rpc.make('WorkspaceIntelligenceRunHistoryClear', {
+        payload: WorkspaceIntelligenceRunListInput,
+        success: Schema.Void,
+        error: GitError,
+    }),
+    Rpc.make('WorkspaceIntelligenceArchiveRequest', {
+        payload: WorkspaceIntelligenceArchiveRequestInput,
+        success: WorkspaceIntelligenceArchiveDescriptor,
+        error: GitError,
+    }),
+    Rpc.make('WorkspaceIntelligenceRunSubscribe', {
+        payload: WorkspaceIntelligenceRunSubscribeInput,
+        success: WorkspaceIntelligenceRunEvent,
+        error: GitError,
+        stream: true,
+    }),
+    // Optional enrichment cannot change deterministic artifacts or reports.
+    Rpc.make('WorkspaceIntelligenceEnrichmentStart', {
+        payload: WorkspaceIntelligenceEnrichmentStartInput,
+        success: WorkspaceIntelligenceEnrichmentAttempt,
+        error: GitError,
+    }),
+    Rpc.make('WorkspaceIntelligenceEnrichmentCancel', {
+        payload: WorkspaceIntelligenceRunInput,
+        success: Schema.Void,
+        error: GitError,
+    }),
+    Rpc.make('WorkspaceIntelligenceEnrichmentList', {
+        payload: WorkspaceIntelligenceRunInput,
+        success: Schema.Array(WorkspaceIntelligenceEnrichmentAttempt),
+        error: GitError,
+    }),
+    Rpc.make('WorkspaceIntelligenceEnrichmentPreferredGet', {
+        payload: WorkspaceIntelligenceRunInput,
+        success: Schema.optional(WorkspaceIntelligenceEnrichmentAttempt),
+        error: GitError,
+    }),
+    Rpc.make('WorkspaceIntelligenceEnrichmentPreferredSet', {
+        payload: WorkspaceIntelligenceEnrichmentPreferredSetInput,
+        success: Schema.optional(WorkspaceIntelligenceEnrichmentAttempt),
+        error: GitError,
+    }),
+    // inference profile settings — host configuration only; values never include secrets.
+    Rpc.make('InferenceProfilesGet', {
+        payload: {},
+        success: Schema.Array(InferenceProfile),
+        error: GitError,
+    }),
+    Rpc.make('InferenceProfilesDiscover', {
+        payload: {},
+        success: Schema.Array(InferenceProfileDiscovery),
+        error: GitError,
+    }),
+    Rpc.make('InferenceModelsDiscover', {
+        payload: InferenceModelsDiscoverInput,
+        success: InferenceModelDiscovery,
+        error: GitError,
+    }),
+    Rpc.make('InferenceProfilesSet', {
+        payload: InferenceProfilesSetInput,
+        success: Schema.Array(InferenceProfile),
+        error: GitError,
+    }),
+    Rpc.make('WorkspaceInferenceDefaultsGet', {
+        payload: WorkspaceInferenceDefaultsInput,
+        success: WorkspaceInferenceDefaults,
+        error: GitError,
+    }),
+    Rpc.make('WorkspaceInferenceDefaultsSet', {
+        payload: WorkspaceInferenceDefaultsSetInput,
+        success: WorkspaceInferenceDefaults,
         error: GitError,
     }),
     // changeSet.* — engagement-scoped ordered PR coordination records.

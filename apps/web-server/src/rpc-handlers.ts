@@ -9,16 +9,64 @@
 // handler context the server runtime consumes.
 
 import { GitEngine } from '@cbranch/core';
+import { InferenceProfile } from '@cbranch/inference';
 import {
     CBRANCH_PROTOCOL_VERSION,
     CbranchRpcs,
     SystemInfo,
+    WorkspaceIntelligenceEnrichmentAttempt as RpcWorkspaceIntelligenceEnrichmentAttempt,
+    WorkspaceIntelligenceEnrichmentFailure,
+    WorkspaceIntelligenceEnrichmentUsage,
+    WorkspaceIntelligenceInferredEdge,
+    WorkspaceIntelligenceRunId,
+    WorkspaceIntelligenceSemanticSearchResult,
+    InferenceModelDiscovery as RpcInferenceModelDiscovery,
 } from '@cbranch/rpc-contract';
+import type { WorkspaceIntelligenceEnrichmentAttempt } from '@cbranch/workspace-intelligence';
 import { Effect, Stream } from 'effect';
 
 import { getUpload } from './patch-channel';
 import { PluginManager } from './plugin-manager';
 import { serverVersion } from './server-version';
+import {
+    discoverInferenceProfiles,
+    validateEnabledLocalInferenceProfiles,
+} from './inference-profile-discovery';
+import { environmentInferenceSecretResolver } from './openai-compatible-inference';
+import { discoverOpenAICompatibleModels } from './openai-compatible-model-discovery';
+import {
+    mintWorkspaceIntelligenceArchiveToken,
+    WORKSPACE_INTELLIGENCE_ARCHIVE_CHANNEL_PATH,
+} from './workspace-intelligence-archive-channel';
+import {
+    WorkspaceIntelligenceService,
+    workspaceIntelligenceError,
+} from './workspace-intelligence-service';
+
+const rpcEnrichmentAttempt = (
+    attempt: WorkspaceIntelligenceEnrichmentAttempt,
+): RpcWorkspaceIntelligenceEnrichmentAttempt =>
+    new RpcWorkspaceIntelligenceEnrichmentAttempt({
+        ...attempt,
+        runId: WorkspaceIntelligenceRunId.make(attempt.runId),
+        inferredEdges: attempt.inferredEdges.map(
+            edge => new WorkspaceIntelligenceInferredEdge(edge),
+        ),
+        ...(attempt.usage === undefined
+            ? {}
+            : {
+                  usage: new WorkspaceIntelligenceEnrichmentUsage(
+                      attempt.usage,
+                  ),
+              }),
+        ...(attempt.failure === undefined
+            ? {}
+            : {
+                  failure: new WorkspaceIntelligenceEnrichmentFailure(
+                      attempt.failure,
+                  ),
+              }),
+    });
 
 /** Layer providing the P1 RPC handlers; requires `GitEngine` (supplied by `gitEngineLayer`). */
 export const handlersLayer = CbranchRpcs.toLayer({
@@ -132,6 +180,367 @@ export const handlersLayer = CbranchRpcs.toLayer({
     EngagementActivate: ({ engagementId }) =>
         Effect.flatMap(GitEngine, engine =>
             engine.engagementActivate(engagementId),
+        ),
+    WorkspaceIntelligenceStart: ({ engagementId, repoIds, analysisSettings }) =>
+        Effect.flatMap(WorkspaceIntelligenceService, service =>
+            Effect.tryPromise({
+                try: () =>
+                    service.manager.start(
+                        engagementId,
+                        repoIds,
+                        analysisSettings,
+                    ),
+                catch: workspaceIntelligenceError,
+            }),
+        ),
+    WorkspaceIntelligenceAnalysisSettings: ({ engagementId }) =>
+        Effect.flatMap(WorkspaceIntelligenceService, service =>
+            Effect.tryPromise({
+                try: () => service.manager.analysisSettings(engagementId),
+                catch: workspaceIntelligenceError,
+            }),
+        ),
+    WorkspaceIntelligenceAnalysisSettingsSet: ({ engagementId, settings }) =>
+        Effect.flatMap(WorkspaceIntelligenceService, service =>
+            Effect.tryPromise({
+                try: () =>
+                    service.manager.setAnalysisSettings(engagementId, settings),
+                catch: workspaceIntelligenceError,
+            }),
+        ),
+    WorkspaceIntelligencePresentationGet: ({ engagementId, runId }) =>
+        Effect.flatMap(WorkspaceIntelligenceService, service =>
+            Effect.tryPromise({
+                try: () => service.manager.presentation(engagementId, runId),
+                catch: workspaceIntelligenceError,
+            }),
+        ),
+    WorkspaceIntelligencePresentationSet: ({ engagementId, presentation }) =>
+        Effect.flatMap(WorkspaceIntelligenceService, service =>
+            Effect.tryPromise({
+                try: () =>
+                    service.manager.setPresentation(engagementId, presentation),
+                catch: workspaceIntelligenceError,
+            }),
+        ),
+    WorkspaceIntelligenceRunGet: ({ engagementId, runId }) =>
+        Effect.flatMap(WorkspaceIntelligenceService, service =>
+            Effect.tryPromise({
+                try: () => service.manager.get(engagementId, runId),
+                catch: workspaceIntelligenceError,
+            }),
+        ),
+    WorkspaceIntelligenceRunReport: ({ engagementId, runId }) =>
+        Effect.flatMap(WorkspaceIntelligenceService, service =>
+            Effect.tryPromise({
+                try: () => service.manager.report(engagementId, runId),
+                catch: workspaceIntelligenceError,
+            }),
+        ),
+    WorkspaceIntelligenceGraphSearch: ({ engagementId, runId, query, limit }) =>
+        Effect.flatMap(WorkspaceIntelligenceService, service =>
+            Effect.tryPromise({
+                try: () =>
+                    service.manager.search(engagementId, runId, query, limit),
+                catch: workspaceIntelligenceError,
+            }),
+        ),
+    WorkspaceIntelligenceSemanticSearch: ({
+        engagementId,
+        runId,
+        query,
+        limit,
+        profileId,
+    }) =>
+        Effect.flatMap(WorkspaceIntelligenceService, service =>
+            Effect.tryPromise({
+                try: async () => {
+                    const result = await service.semanticSearch(
+                        engagementId,
+                        runId,
+                        query,
+                        limit,
+                        profileId,
+                    );
+                    return new WorkspaceIntelligenceSemanticSearchResult(
+                        result,
+                    );
+                },
+                catch: workspaceIntelligenceError,
+            }),
+        ),
+    WorkspaceIntelligenceGraphNeighborhood: ({
+        engagementId,
+        runId,
+        nodeId,
+        limit,
+    }) =>
+        Effect.flatMap(WorkspaceIntelligenceService, service =>
+            Effect.tryPromise({
+                try: () =>
+                    service.manager.neighborhood(
+                        engagementId,
+                        runId,
+                        nodeId,
+                        limit,
+                    ),
+                catch: workspaceIntelligenceError,
+            }),
+        ),
+    WorkspaceIntelligenceGraphDiff: ({ engagementId, fromRunId, toRunId }) =>
+        Effect.flatMap(WorkspaceIntelligenceService, service =>
+            Effect.tryPromise({
+                try: () =>
+                    service.manager.diff(engagementId, fromRunId, toRunId),
+                catch: workspaceIntelligenceError,
+            }),
+        ),
+    WorkspaceIntelligenceComponentOverrides: ({ engagementId }) =>
+        Effect.flatMap(WorkspaceIntelligenceService, service =>
+            Effect.tryPromise({
+                try: () => service.manager.componentOverrides(engagementId),
+                catch: workspaceIntelligenceError,
+            }),
+        ),
+    WorkspaceIntelligenceComponentOverridesSet: ({ engagementId, overrides }) =>
+        Effect.flatMap(WorkspaceIntelligenceService, service =>
+            Effect.tryPromise({
+                try: () =>
+                    service.manager.setComponentOverrides(
+                        engagementId,
+                        overrides,
+                    ),
+                catch: workspaceIntelligenceError,
+            }),
+        ),
+    WorkspaceIntelligenceCurationActions: ({ engagementId }) =>
+        Effect.flatMap(WorkspaceIntelligenceService, service =>
+            Effect.tryPromise({
+                try: () => service.manager.curationActions(engagementId),
+                catch: workspaceIntelligenceError,
+            }),
+        ),
+    WorkspaceIntelligenceCurationActionAppend: ({ engagementId, action }) =>
+        Effect.flatMap(WorkspaceIntelligenceService, service =>
+            Effect.tryPromise({
+                try: () =>
+                    service.manager.appendCurationAction(engagementId, action),
+                catch: workspaceIntelligenceError,
+            }),
+        ),
+    WorkspaceIntelligenceCurationActionsClear: ({ engagementId }) =>
+        Effect.flatMap(WorkspaceIntelligenceService, service =>
+            Effect.tryPromise({
+                try: () => service.manager.clearCurationActions(engagementId),
+                catch: workspaceIntelligenceError,
+            }),
+        ),
+    WorkspaceIntelligenceRunList: ({ engagementId }) =>
+        Effect.flatMap(WorkspaceIntelligenceService, service =>
+            Effect.tryPromise({
+                try: () => service.manager.list(engagementId),
+                catch: workspaceIntelligenceError,
+            }),
+        ),
+    WorkspaceIntelligenceRunCancel: ({ engagementId, runId }) =>
+        Effect.flatMap(WorkspaceIntelligenceService, service =>
+            Effect.tryPromise({
+                try: () => service.manager.cancel(engagementId, runId),
+                catch: workspaceIntelligenceError,
+            }),
+        ),
+    WorkspaceIntelligenceRunDelete: ({ engagementId, runId }) =>
+        Effect.flatMap(WorkspaceIntelligenceService, service =>
+            Effect.tryPromise({
+                try: () => service.manager.deleteRun(engagementId, runId),
+                catch: workspaceIntelligenceError,
+            }),
+        ),
+    WorkspaceIntelligenceCurrentSet: ({ engagementId, runId }) =>
+        Effect.flatMap(WorkspaceIntelligenceService, service =>
+            Effect.tryPromise({
+                try: () => service.manager.setCurrent(engagementId, runId),
+                catch: workspaceIntelligenceError,
+            }),
+        ),
+    WorkspaceIntelligenceCurrentClear: ({ engagementId }) =>
+        Effect.flatMap(WorkspaceIntelligenceService, service =>
+            Effect.tryPromise({
+                try: () => service.manager.clearCurrent(engagementId),
+                catch: workspaceIntelligenceError,
+            }),
+        ),
+    WorkspaceIntelligenceRunHistoryClear: ({ engagementId }) =>
+        Effect.flatMap(WorkspaceIntelligenceService, service =>
+            Effect.tryPromise({
+                try: () => service.manager.clearRunHistory(engagementId),
+                catch: workspaceIntelligenceError,
+            }),
+        ),
+    WorkspaceIntelligenceArchiveRequest: ({ engagementId, runId }) =>
+        Effect.flatMap(WorkspaceIntelligenceService, service =>
+            Effect.tryPromise({
+                try: async () => {
+                    await service.manager.prepareArchive(engagementId, runId);
+                    const token = mintWorkspaceIntelligenceArchiveToken(
+                        engagementId,
+                        runId,
+                    );
+                    return {
+                        url: `${WORKSPACE_INTELLIGENCE_ARCHIVE_CHANNEL_PATH}?token=${encodeURIComponent(token)}`,
+                        filename: `workspace-intelligence-${runId}.tar`,
+                        contentType: 'application/x-tar',
+                    };
+                },
+                catch: workspaceIntelligenceError,
+            }),
+        ),
+    WorkspaceIntelligenceRunSubscribe: ({
+        engagementId,
+        runId,
+        afterSequence,
+    }) =>
+        Stream.unwrap(
+            Effect.map(WorkspaceIntelligenceService, service =>
+                Stream.fromAsyncIterable(
+                    service.manager.subscribe(
+                        engagementId,
+                        runId,
+                        afterSequence,
+                    ),
+                    workspaceIntelligenceError,
+                ),
+            ),
+        ),
+    WorkspaceIntelligenceEnrichmentStart: ({
+        engagementId,
+        runId,
+        profileId,
+        evidenceLimit,
+    }) =>
+        Effect.flatMap(WorkspaceIntelligenceService, service =>
+            Effect.tryPromise({
+                try: async () =>
+                    rpcEnrichmentAttempt(
+                        await service.enrich(
+                            engagementId,
+                            runId,
+                            profileId,
+                            evidenceLimit,
+                        ),
+                    ),
+                catch: workspaceIntelligenceError,
+            }),
+        ),
+    WorkspaceIntelligenceEnrichmentCancel: ({ engagementId, runId }) =>
+        Effect.flatMap(WorkspaceIntelligenceService, service =>
+            Effect.tryPromise({
+                try: () => service.cancelEnrichment(engagementId, runId),
+                catch: workspaceIntelligenceError,
+            }),
+        ),
+    WorkspaceIntelligenceEnrichmentList: ({ engagementId, runId }) =>
+        Effect.flatMap(WorkspaceIntelligenceService, service =>
+            Effect.tryPromise({
+                try: async () =>
+                    (await service.listEnrichments(engagementId, runId)).map(
+                        rpcEnrichmentAttempt,
+                    ),
+                catch: workspaceIntelligenceError,
+            }),
+        ),
+    WorkspaceIntelligenceEnrichmentPreferredGet: ({ engagementId, runId }) =>
+        Effect.flatMap(WorkspaceIntelligenceService, service =>
+            Effect.tryPromise({
+                try: async () => {
+                    const attempt = await service.preferredEnrichment(
+                        engagementId,
+                        runId,
+                    );
+                    return attempt === undefined
+                        ? undefined
+                        : rpcEnrichmentAttempt(attempt);
+                },
+                catch: workspaceIntelligenceError,
+            }),
+        ),
+    WorkspaceIntelligenceEnrichmentPreferredSet: ({
+        engagementId,
+        runId,
+        attemptId,
+    }) =>
+        Effect.flatMap(WorkspaceIntelligenceService, service =>
+            Effect.tryPromise({
+                try: async () => {
+                    const attempt = await service.setPreferredEnrichment(
+                        engagementId,
+                        runId,
+                        attemptId,
+                    );
+                    return attempt === undefined
+                        ? undefined
+                        : rpcEnrichmentAttempt(attempt);
+                },
+                catch: workspaceIntelligenceError,
+            }),
+        ),
+    // ── inference profile settings ─────────────────────────────────────────────
+    // Profiles contain only host-local configuration and credential references.
+    // The engine/config store rejects credential values and does not invoke providers.
+    InferenceProfilesGet: () =>
+        Effect.flatMap(GitEngine, engine => engine.inferenceProfilesGet()),
+    InferenceProfilesDiscover: () =>
+        Effect.promise(() => discoverInferenceProfiles()),
+    InferenceModelsDiscover: ({ profileId }) =>
+        Effect.flatMap(GitEngine, engine =>
+            Effect.tryPromise({
+                try: async () => {
+                    const profiles = await Effect.runPromise(
+                        engine.inferenceProfilesGet(),
+                    );
+                    const profile = profiles.find(
+                        candidate => candidate.id === profileId,
+                    );
+                    if (profile === undefined)
+                        throw new Error(
+                            'The selected inference profile no longer exists.',
+                        );
+                    return new RpcInferenceModelDiscovery(
+                        await discoverOpenAICompatibleModels({
+                            profile: InferenceProfile.parse(profile),
+                            secrets: environmentInferenceSecretResolver(),
+                        }),
+                    );
+                },
+                catch: workspaceIntelligenceError,
+            }),
+        ),
+    InferenceProfilesSet: ({ profiles }) =>
+        Effect.flatMap(
+            Effect.tryPromise({
+                try: async () => {
+                    const normalized = profiles.map(profile =>
+                        InferenceProfile.parse(profile),
+                    );
+                    validateEnabledLocalInferenceProfiles(
+                        normalized,
+                        await discoverInferenceProfiles(),
+                    );
+                },
+                catch: workspaceIntelligenceError,
+            }),
+            () =>
+                Effect.flatMap(GitEngine, engine =>
+                    engine.inferenceProfilesSet(profiles),
+                ),
+        ),
+    WorkspaceInferenceDefaultsGet: ({ engagementId }) =>
+        Effect.flatMap(GitEngine, engine =>
+            engine.workspaceInferenceDefaultsGet(engagementId),
+        ),
+    WorkspaceInferenceDefaultsSet: ({ engagementId, defaults }) =>
+        Effect.flatMap(GitEngine, engine =>
+            engine.workspaceInferenceDefaultsSet(engagementId, defaults),
         ),
     ChangeSetCreate: ({ engagementId, name, description }) =>
         Effect.flatMap(GitEngine, engine =>
