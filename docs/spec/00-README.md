@@ -69,6 +69,7 @@ Read the documents in the following order. Documents 01–04 are foundational an
 - **[../../LICENSES.md](../../LICENSES.md)** — license inventory and obligations for every named dependency.
 - **[../../BRANDING.md](../../BRANDING.md)** — product naming, marks, and asset guidelines for `cbranch`.
 - **[../workspace-intelligence-inference-profiles.md](../workspace-intelligence-inference-profiles.md)** — operator guide for optional, host-local inference profile configuration and discovery.
+- **[../workspace-intelligence-first-analysis.md](../workspace-intelligence-first-analysis.md)** — first-use guide for deterministic analysis, optional AI enrichment, data boundaries, and common issues.
 
 ---
 
