@@ -32,6 +32,8 @@ import { applyTheme, readThemePref, type ThemePref } from '../theme/theme';
 
 export type DetailTab = 'changes' | 'commit' | 'diff' | 'filetree' | 'gpg';
 
+export type SettingsDialogTab = 'git' | 'app' | 'inference';
+
 export type ActiveView =
     | 'history'
     | 'branches'
@@ -347,6 +349,9 @@ export interface UiState {
     /** Whether the settings modal (git config + app settings) is open (REQ-P5-CFG-001). App-global. */
     readonly settingsDialogOpen: boolean;
     readonly setSettingsDialogOpen: (open: boolean) => void;
+    /** Ephemeral tab target so contextual setup can open the relevant settings surface. */
+    readonly settingsDialogTab: SettingsDialogTab;
+    readonly setSettingsDialogTab: (tab: SettingsDialogTab) => void;
     /** Whether the Help → About modal is open. */
     readonly aboutDialogOpen: boolean;
     readonly setAboutDialogOpen: (open: boolean) => void;
@@ -438,6 +443,7 @@ export const useUiStore = create<UiState>(set => ({
     gotoRequest: null,
     logLimit: DEFAULT_LOG_LIMIT,
     settingsDialogOpen: false,
+    settingsDialogTab: 'git',
     aboutDialogOpen: false,
     lastUpdateCheckAt: null,
     findOpen: false,
@@ -522,6 +528,7 @@ export const useUiStore = create<UiState>(set => ({
     setGotoRequest: gotoRequest => set({ gotoRequest }),
     setLogLimit: logLimit => set({ logLimit }),
     setSettingsDialogOpen: settingsDialogOpen => set({ settingsDialogOpen }),
+    setSettingsDialogTab: settingsDialogTab => set({ settingsDialogTab }),
     setAboutDialogOpen: aboutDialogOpen => set({ aboutDialogOpen }),
     setLastUpdateCheckAt: lastUpdateCheckAt => set({ lastUpdateCheckAt }),
     setFindOpen: findOpen => set({ findOpen }),

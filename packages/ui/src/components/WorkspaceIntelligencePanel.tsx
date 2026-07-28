@@ -16,11 +16,17 @@ import { toast } from 'sonner';
 
 import { useApi } from '../rpc/ApiProvider';
 import { queryKeys } from '../rpc/query-keys';
+import { useUiStore } from '../state/store';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { Checkbox } from './ui/checkbox';
 import { Input } from './ui/input';
 import { WorkspaceIntelligenceGraph } from './WorkspaceIntelligenceGraph';
+import { workspaceIntelligenceReportPreview } from './workspace-intelligence-report';
+import {
+    startWorkspaceIntelligenceTour,
+    workspaceIntelligenceTourProgress,
+} from './workspace-intelligence-tour';
 
 const activeStates = new Set([
     'queued',
@@ -62,6 +68,11 @@ const parsePatterns = (value: string): ReadonlyArray<string> =>
         .map(pattern => pattern.trim())
         .filter(pattern => pattern !== '');
 
+const inspectArchitectureGraph = () =>
+    document
+        .getElementById('workspace-intelligence-search')
+        ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
 /** M1 workspace view: durable run history and truthful foundation coverage only. */
 export function WorkspaceIntelligencePanel({
     engagement,
@@ -71,6 +82,8 @@ export function WorkspaceIntelligencePanel({
     const api = useApi();
     const queryClient = useQueryClient();
     const navigate = useNavigate();
+    const setSettingsDialogOpen = useUiStore(s => s.setSettingsDialogOpen);
+    const setSettingsDialogTab = useUiStore(s => s.setSettingsDialogTab);
     const { runId: routeRunId } = useParams();
     const [searchParams, setSearchParams] = useSearchParams();
     const routeNodeId = searchParams.get('node') ?? undefined;
@@ -124,6 +137,9 @@ export function WorkspaceIntelligencePanel({
     const [semanticProfileId, setSemanticProfileId] = useState<
         string | undefined
     >();
+    const [tourProgress, setTourProgress] = useState(
+        workspaceIntelligenceTourProgress,
+    );
 
     const runsQuery = useQuery({
         queryKey: queryKeys.workspaceIntelligenceRuns(engagement.id),
@@ -182,6 +198,10 @@ export function WorkspaceIntelligencePanel({
             ),
         [profiles],
     );
+    const needsGenerationSetup =
+        api.inferenceProfilesGet !== undefined &&
+        !inferenceProfilesQuery.isLoading &&
+        generationProfiles.length === 0;
 
     useEffect(() => {
         setSelectedRepoIds(
@@ -219,6 +239,13 @@ export function WorkspaceIntelligencePanel({
             api.workspaceIntelligenceRunReport !== undefined,
     });
     const report = reportQuery.data;
+    const reportPreview = useMemo(
+        () =>
+            report === undefined
+                ? undefined
+                : workspaceIntelligenceReportPreview(report.markdown),
+        [report],
+    );
     const presentationQuery = useQuery({
         queryKey: queryKeys.workspaceIntelligencePresentation(
             engagement.id,
@@ -673,6 +700,19 @@ export function WorkspaceIntelligencePanel({
         }
     };
 
+    const openInferenceSettings = () => {
+        setSettingsDialogTab('inference');
+        setSettingsDialogOpen(true);
+    };
+
+    const startGuide = () => {
+        startWorkspaceIntelligenceTour({
+            hasReport: report !== undefined,
+            hasGenerationProfile: generationProfiles.length > 0,
+            onProgressChange: setTourProgress,
+        });
+    };
+
     const startEnrichment = async () => {
         if (
             selected === undefined ||
@@ -1069,7 +1109,10 @@ export function WorkspaceIntelligencePanel({
     return (
         <div className="min-h-0 flex-1 overflow-auto p-4">
             <div className="flex max-w-3xl flex-col gap-5">
-                <section className="rounded-lg border p-4">
+                <section
+                    id="workspace-intelligence-analysis"
+                    className="rounded-lg border p-4"
+                >
                     <div className="flex flex-wrap items-start justify-between gap-3">
                         <div>
                             <h2 className="text-sm font-semibold">
@@ -1080,33 +1123,45 @@ export function WorkspaceIntelligencePanel({
                                 for selected workspace repositories.
                             </p>
                         </div>
-                        {active === undefined ? (
+                        <div className="flex flex-wrap gap-2">
                             <Button
-                                onClick={() => void start()}
-                                disabled={
-                                    starting || selectedRepoIds.size === 0
-                                }
+                                size="sm"
+                                variant="ghost"
+                                onClick={startGuide}
                             >
-                                {starting ? (
-                                    <Loader2 className="size-4 animate-spin" />
-                                ) : (
-                                    <Sparkles className="size-4" />
-                                )}
-                                Analyze workspace
+                                {tourProgress === undefined
+                                    ? 'Take a quick tour'
+                                    : 'Continue guide'}
                             </Button>
-                        ) : (
-                            <Button
-                                variant="outline"
-                                onClick={() => void cancel()}
-                            >
-                                <Square className="size-4" />
-                                Cancel run
-                            </Button>
-                        )}
+                            {active === undefined ? (
+                                <Button
+                                    onClick={() => void start()}
+                                    disabled={
+                                        starting || selectedRepoIds.size === 0
+                                    }
+                                >
+                                    {starting ? (
+                                        <Loader2 className="size-4 animate-spin" />
+                                    ) : (
+                                        <Sparkles className="size-4" />
+                                    )}
+                                    Analyze workspace
+                                </Button>
+                            ) : (
+                                <Button
+                                    variant="outline"
+                                    onClick={() => void cancel()}
+                                >
+                                    <Square className="size-4" />
+                                    Cancel run
+                                </Button>
+                            )}
+                        </div>
                     </div>
                     <p className="text-muted-foreground mt-4 text-xs">
-                        The deterministic source pilot records architecture
-                        relationships and explicit capability gaps.
+                        This creates a deterministic, read-only architecture
+                        report. It does not call an AI provider or send source
+                        data anywhere.
                     </p>
                     {analysisSettings !== undefined && (
                         <details className="mt-4 rounded-md border p-3">
@@ -1537,25 +1592,183 @@ export function WorkspaceIntelligencePanel({
                     )}
                 </section>
                 {report ? (
-                    <section>
-                        <h2 className="mb-2 text-sm font-semibold">
-                            Architecture report
-                        </h2>
-                        <p className="text-muted-foreground mb-2 text-xs">
-                            {report.nodeCount} nodes · {report.edgeCount} edges
-                            · {report.findingCount ?? 0} architecture findings ·{' '}
-                            {report.unknownCount} explicit unknowns
+                    <section
+                        id="workspace-intelligence-report"
+                        className="rounded-lg border p-4"
+                    >
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div>
+                                <h2 className="text-sm font-semibold">
+                                    Architecture report
+                                </h2>
+                                <p className="text-muted-foreground mt-1 text-sm">
+                                    Deterministic analysis completed. These
+                                    results are based on the selected
+                                    repositories and remain the authoritative
+                                    report.
+                                </p>
+                            </div>
+                            <Badge>Deterministic</Badge>
+                        </div>
+                        <p className="text-muted-foreground mt-3 text-sm">
+                            {selected?.coverage.summary}
                         </p>
-                        <pre className="bg-muted max-h-96 overflow-auto whitespace-pre-wrap rounded-lg p-4 text-xs">
-                            {report.markdown}
-                        </pre>
+                        <dl className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                            <div className="rounded-md border p-3">
+                                <dt className="text-muted-foreground text-xs">
+                                    Graph nodes
+                                </dt>
+                                <dd className="mt-1 text-lg font-semibold">
+                                    {report.nodeCount}
+                                </dd>
+                            </div>
+                            <div className="rounded-md border p-3">
+                                <dt className="text-muted-foreground text-xs">
+                                    Relationships
+                                </dt>
+                                <dd className="mt-1 text-lg font-semibold">
+                                    {report.edgeCount}
+                                </dd>
+                            </div>
+                            <div className="rounded-md border p-3">
+                                <dt className="text-muted-foreground text-xs">
+                                    Findings
+                                </dt>
+                                <dd className="mt-1 text-lg font-semibold">
+                                    {report.findingCount ?? 0}
+                                </dd>
+                            </div>
+                            <div className="rounded-md border p-3">
+                                <dt className="text-muted-foreground text-xs">
+                                    Explicit unknowns
+                                </dt>
+                                <dd className="mt-1 text-lg font-semibold">
+                                    {report.unknownCount}
+                                </dd>
+                            </div>
+                        </dl>
+                        <div className="mt-4 grid gap-3 lg:grid-cols-2">
+                            <section className="rounded-md border p-3">
+                                <h3 className="text-sm font-medium">
+                                    Architecture findings
+                                </h3>
+                                {reportPreview?.findings.length ? (
+                                    <ul className="mt-2 space-y-2 text-sm">
+                                        {reportPreview.findings.map(finding => (
+                                            <li
+                                                key={`${finding.kind}:${finding.message}`}
+                                                className="rounded border p-2"
+                                            >
+                                                <div className="flex flex-wrap items-center gap-2">
+                                                    <Badge
+                                                        tone={
+                                                            finding.severity ===
+                                                            'warning'
+                                                                ? 'warn'
+                                                                : 'muted'
+                                                        }
+                                                    >
+                                                        {finding.severity ===
+                                                        'warning'
+                                                            ? 'Needs review'
+                                                            : 'Info'}
+                                                    </Badge>
+                                                    <span className="font-medium">
+                                                        {finding.kind}
+                                                    </span>
+                                                </div>
+                                                <p className="text-muted-foreground mt-1 text-xs">
+                                                    {finding.message}
+                                                </p>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                ) : (
+                                    <p className="text-muted-foreground mt-2 text-sm">
+                                        No architecture-integrity findings were
+                                        recorded for this run.
+                                    </p>
+                                )}
+                            </section>
+                            <section className="rounded-md border p-3">
+                                <h3 className="text-sm font-medium">
+                                    Graph preview
+                                </h3>
+                                <p className="text-muted-foreground mt-1 text-xs">
+                                    {reportPreview?.graph.labels.length ?? 0}{' '}
+                                    representative nodes ·{' '}
+                                    {reportPreview?.graph.edgeCount ?? 0}{' '}
+                                    preview relationships
+                                </p>
+                                {reportPreview?.graph.labels.length ? (
+                                    <ul className="mt-2 flex flex-wrap gap-1.5 text-xs">
+                                        {reportPreview.graph.labels.map(
+                                            label => (
+                                                <li
+                                                    key={label}
+                                                    className="bg-muted rounded px-2 py-1"
+                                                >
+                                                    {label}
+                                                </li>
+                                            ),
+                                        )}
+                                    </ul>
+                                ) : (
+                                    <p className="text-muted-foreground mt-2 text-sm">
+                                        This report has no renderable graph
+                                        preview. Search its architecture to
+                                        inspect available records.
+                                    </p>
+                                )}
+                                {reportPreview?.graph.isBounded ? (
+                                    <p className="text-muted-foreground mt-3 text-xs">
+                                        This preview is bounded to keep the
+                                        report readable. It is not a coverage
+                                        warning; inspect the graph or full
+                                        artifacts for every record.
+                                    </p>
+                                ) : null}
+                                <div className="mt-3 flex flex-wrap gap-2">
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={inspectArchitectureGraph}
+                                    >
+                                        Inspect graph
+                                    </Button>
+                                    {selected?.isValid &&
+                                    api.workspaceIntelligenceArchiveRequest ? (
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={() =>
+                                                void downloadArchive(selected)
+                                            }
+                                        >
+                                            Download full artifacts
+                                        </Button>
+                                    ) : null}
+                                </div>
+                            </section>
+                        </div>
+                        <details className="mt-4">
+                            <summary className="cursor-pointer text-xs font-medium">
+                                View raw report source
+                            </summary>
+                            <pre className="bg-muted mt-2 max-h-72 overflow-auto whitespace-pre-wrap rounded-md p-3 text-xs">
+                                {report.markdown}
+                            </pre>
+                        </details>
                     </section>
                 ) : null}
                 {selected?.isValid &&
                 api.workspaceIntelligenceEnrichmentStart &&
                 api.workspaceIntelligenceEnrichmentList &&
                 api.workspaceIntelligenceEnrichmentPreferredSet ? (
-                    <section className="rounded-lg border p-4">
+                    <section
+                        id="workspace-intelligence-enrichment"
+                        className="rounded-lg border p-4"
+                    >
                         <div className="flex flex-wrap items-start justify-between gap-3">
                             <div>
                                 <h2 className="text-sm font-semibold">
@@ -1568,25 +1781,40 @@ export function WorkspaceIntelligencePanel({
                                 </p>
                             </div>
                             <div className="flex gap-2">
-                                <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => void startEnrichment()}
-                                    disabled={
-                                        enriching ||
-                                        (api.inferenceProfilesGet !==
-                                            undefined &&
-                                            !inferenceProfilesQuery.isLoading &&
-                                            generationProfiles.length === 0)
-                                    }
-                                >
-                                    {enriching ? (
-                                        <Loader2 className="size-4 animate-spin" />
-                                    ) : (
-                                        <Sparkles className="size-4" />
-                                    )}
-                                    Run enrichment
-                                </Button>
+                                {inferenceProfilesQuery.isLoading &&
+                                api.inferenceProfilesGet !== undefined ? (
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        disabled
+                                    >
+                                        Loading inference profiles
+                                    </Button>
+                                ) : needsGenerationSetup ? (
+                                    <Button
+                                        id="workspace-intelligence-setup-inference"
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={openInferenceSettings}
+                                    >
+                                        Set up AI enrichment
+                                    </Button>
+                                ) : (
+                                    <Button
+                                        id="workspace-intelligence-run-enrichment"
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => void startEnrichment()}
+                                        disabled={enriching}
+                                    >
+                                        {enriching ? (
+                                            <Loader2 className="size-4 animate-spin" />
+                                        ) : (
+                                            <Sparkles className="size-4" />
+                                        )}
+                                        Run enrichment
+                                    </Button>
+                                )}
                                 {enriching &&
                                 api.workspaceIntelligenceEnrichmentCancel ? (
                                     <Button
@@ -1601,9 +1829,13 @@ export function WorkspaceIntelligencePanel({
                             </div>
                         </div>
                         <p className="text-muted-foreground mt-3 text-xs">
-                            {preferredEnrichment === undefined
-                                ? 'Deterministic relationships remain the active presentation.'
-                                : `Using preferred attempt ${preferredEnrichment.id}.`}
+                            {enriching
+                                ? 'AI enrichment is running. The deterministic report remains available while it completes.'
+                                : enrichments.length === 0
+                                  ? 'AI enrichment has not run. The deterministic report and relationships are the active presentation.'
+                                  : preferredEnrichment === undefined
+                                    ? 'AI enrichment has completed, but deterministic relationships remain the active presentation until you prefer an attempt.'
+                                    : `AI enrichment has completed. Using preferred attempt ${preferredEnrichment.id}.`}
                         </p>
                         {generationProfiles.length > 0 ? (
                             <label className="mt-3 flex max-w-sm flex-col gap-1 text-sm">
@@ -1645,9 +1877,8 @@ export function WorkspaceIntelligencePanel({
                         ) : null}
                         {enrichments.length === 0 ? (
                             <p className="text-muted-foreground mt-3 text-sm">
-                                {generationProfiles.length === 0 &&
-                                api.inferenceProfilesGet !== undefined
-                                    ? 'Configure an enabled generation profile in Settings to begin enrichment.'
+                                {needsGenerationSetup
+                                    ? 'Choose Set up AI enrichment to detect or configure an enabled generation profile. Nothing has been sent to an AI provider.'
                                     : 'No enrichment attempts for this run.'}
                             </p>
                         ) : (
@@ -1938,7 +2169,10 @@ export function WorkspaceIntelligencePanel({
                     </section>
                 ) : null}
                 {selected && api.workspaceIntelligenceGraphSearch ? (
-                    <section className="rounded-lg border p-4">
+                    <section
+                        id="workspace-intelligence-search"
+                        className="rounded-lg border p-4"
+                    >
                         <h2 className="text-sm font-semibold">
                             Search architecture
                         </h2>

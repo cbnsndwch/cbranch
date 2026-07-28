@@ -12,6 +12,7 @@ import {
     StatusEntry,
     WorkingTreeStatus,
     WorkspaceIntelligenceCoverage,
+    WorkspaceIntelligenceArchiveDescriptor,
     WorkspaceIntelligenceCurationAction,
     WorkspaceIntelligenceEnrichmentAttempt,
     WorkspaceIntelligenceEnrichmentFailure,
@@ -168,6 +169,8 @@ beforeEach(() => {
     useUiStore.setState({
         activeEngagementId: engagementId,
         activeRepoId: null,
+        settingsDialogOpen: false,
+        settingsDialogTab: 'git',
     });
 });
 afterEach(() => cleanup());
@@ -301,7 +304,9 @@ describe('EngagementOverview', () => {
             await screen.findByRole('button', { name: 'Analyze workspace' }),
         ).toBeTruthy();
         expect(
-            screen.getByText(/deterministic source pilot records architecture/),
+            screen.getByText(
+                /does not call an AI provider or send source data/i,
+            ),
         ).toBeTruthy();
         fireEvent.click(screen.getByRole('checkbox', { name: 'Analyze web' }));
         fireEvent.click(
@@ -313,6 +318,171 @@ describe('EngagementOverview', () => {
                 [apiRepoId],
             ),
         );
+    });
+
+    test('shows a guided inference setup action instead of a disabled enrichment button', async () => {
+        const run = new WorkspaceIntelligenceRun({
+            id: WorkspaceIntelligenceRunId.make('run-inference-setup'),
+            engagementId,
+            workspaceRepoIds: [apiRepoId, webRepoId],
+            repoIds: [apiRepoId, webRepoId],
+            state: 'completed',
+            createdAt: 1,
+            eventSequence: 1,
+            isCurrent: true,
+            isValid: true,
+            coverage: new WorkspaceIntelligenceCoverage({
+                repositoryCount: 2,
+                completedRepositoryCount: 2,
+                analyzerCount: 2,
+                isPartial: false,
+                summary: 'Complete.',
+            }),
+        });
+        const api = makeApi();
+        api.workspaceIntelligenceRunList = vi.fn(async () => [run]);
+        api.inferenceProfilesGet = vi.fn(async () => []);
+        api.workspaceIntelligenceEnrichmentStart = vi.fn();
+        api.workspaceIntelligenceEnrichmentList = vi.fn(async () => []);
+        api.workspaceIntelligenceEnrichmentPreferredSet = vi.fn(
+            async () => undefined,
+        );
+        renderOverview(
+            api,
+            '/w/client-a/intelligence/runs/run-inference-setup',
+        );
+
+        fireEvent.click(
+            await screen.findByRole('button', { name: 'Intelligence' }),
+        );
+        fireEvent.click(
+            await screen.findByRole('button', {
+                name: 'Set up AI enrichment',
+            }),
+        );
+
+        expect(useUiStore.getState().settingsDialogOpen).toBe(true);
+        expect(useUiStore.getState().settingsDialogTab).toBe('inference');
+    });
+
+    test('presents deterministic findings and a bounded graph preview without leading with raw Mermaid', async () => {
+        const run = new WorkspaceIntelligenceRun({
+            id: WorkspaceIntelligenceRunId.make('run-report-preview'),
+            engagementId,
+            workspaceRepoIds: [apiRepoId, webRepoId],
+            repoIds: [apiRepoId, webRepoId],
+            state: 'completed',
+            createdAt: 1,
+            eventSequence: 1,
+            isCurrent: true,
+            isValid: true,
+            coverage: new WorkspaceIntelligenceCoverage({
+                repositoryCount: 2,
+                completedRepositoryCount: 2,
+                analyzerCount: 2,
+                isPartial: false,
+                summary: 'Complete.',
+            }),
+        });
+        const api = makeApi();
+        api.workspaceIntelligenceRunList = vi.fn(async () => [run]);
+        api.workspaceIntelligenceRunReport = vi.fn(
+            async () =>
+                new WorkspaceIntelligenceReport({
+                    runId: run.id,
+                    markdown: `## Architecture integrity
+
+- **warning** \`architecture.cycle\`: Verified dependency cycle involving 3 graph nodes.
+
+## Architecture sketch
+
+\`\`\`mermaid
+flowchart LR
+N1["API"]
+N2["Web"]
+N1 -->|depends-on| N2
+TRUNCATED["Architecture sketch is bounded; inspect graph artifacts for all records."]
+\`\`\``,
+                    nodeCount: 2,
+                    edgeCount: 1,
+                    findingCount: 1,
+                    unknownCount: 0,
+                }),
+        );
+        renderOverview(api, '/w/client-a/intelligence/runs/run-report-preview');
+
+        fireEvent.click(
+            await screen.findByRole('button', { name: 'Intelligence' }),
+        );
+        expect(await screen.findByText('Graph preview')).toBeTruthy();
+        expect(screen.getByText('Needs review')).toBeTruthy();
+        expect(screen.getByText('API')).toBeTruthy();
+        expect(
+            screen.getByText(
+                /This preview is bounded to keep the report readable/i,
+            ),
+        ).toBeTruthy();
+        expect(screen.getByText('View raw report source')).toBeTruthy();
+    });
+
+    test('requests an archive descriptor and triggers a download for a valid run', async () => {
+        const run = new WorkspaceIntelligenceRun({
+            id: WorkspaceIntelligenceRunId.make('run-archive-download'),
+            engagementId,
+            workspaceRepoIds: [apiRepoId],
+            repoIds: [apiRepoId],
+            state: 'completed',
+            createdAt: 1,
+            eventSequence: 1,
+            isCurrent: true,
+            isValid: true,
+            coverage: new WorkspaceIntelligenceCoverage({
+                repositoryCount: 1,
+                completedRepositoryCount: 1,
+                analyzerCount: 1,
+                isPartial: false,
+                summary: 'Complete.',
+            }),
+        });
+        const api = makeApi();
+        api.workspaceIntelligenceRunList = vi.fn(async () => [run]);
+        api.workspaceIntelligenceArchiveRequest = vi.fn(
+            async () =>
+                new WorkspaceIntelligenceArchiveDescriptor({
+                    url: '/sidechannel/workspace-intelligence-archive?token=test',
+                    filename: 'workspace-intelligence-run-archive-download.tar',
+                    contentType: 'application/x-tar',
+                }),
+        );
+        const click = vi
+            .spyOn(HTMLAnchorElement.prototype, 'click')
+            .mockImplementation(() => undefined);
+        renderOverview(
+            api,
+            '/w/client-a/intelligence/runs/run-archive-download',
+        );
+
+        fireEvent.click(
+            await screen.findByRole('button', { name: 'Intelligence' }),
+        );
+        fireEvent.click(
+            await screen.findByRole('button', { name: 'Download archive' }),
+        );
+
+        await waitFor(() =>
+            expect(
+                api.workspaceIntelligenceArchiveRequest,
+            ).toHaveBeenCalledWith(engagementId, run.id),
+        );
+        expect(click).toHaveBeenCalledTimes(1);
+        const link = click.mock.instances[0]!;
+        expect(link.download).toBe(
+            'workspace-intelligence-run-archive-download.tar',
+        );
+        expect(link.href).toContain(
+            '/sidechannel/workspace-intelligence-archive?token=test',
+        );
+        click.mockRestore();
     });
 
     test('saves workspace analysis scope and budget defaults', async () => {

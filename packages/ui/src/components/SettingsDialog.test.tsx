@@ -18,6 +18,7 @@ import {
     screen,
     waitFor,
 } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { toast } from 'sonner';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
@@ -153,6 +154,7 @@ beforeEach(() => {
     useUiStore.setState({
         activeRepoId: null,
         settingsDialogOpen: false,
+        settingsDialogTab: 'git',
         theme: 'system',
     });
     vi.clearAllMocks();
@@ -458,6 +460,53 @@ describe('SettingsDialog', () => {
                     capabilities: ['embeddings'],
                 }),
             ]),
+        );
+    });
+
+    test('Inference tab clears incompatible hidden fields when switching providers', async () => {
+        const user = userEvent.setup();
+        const api = makeApi({
+            inferenceProfilesGet: vi.fn(async () => []),
+        });
+        renderDialog(api);
+        open();
+        fireEvent.click(screen.getByRole('tab', { name: 'Inference' }));
+
+        await screen.findByText('Add provider');
+        fireEvent.change(screen.getByLabelText('Inference profile ID'), {
+            target: { value: 'provider' },
+        });
+        fireEvent.change(screen.getByLabelText('Inference profile label'), {
+            target: { value: 'Provider' },
+        });
+        const provider = await screen.findByLabelText('Inference provider');
+        await user.click(provider);
+        await user.click(
+            await screen.findByRole('option', {
+                name: 'OpenAI-compatible endpoint',
+            }),
+        );
+        await waitFor(() =>
+            expect(screen.queryByLabelText('Inference executable')).toBeNull(),
+        );
+        expect(screen.getByLabelText('Inference endpoint')).toBeTruthy();
+        fireEvent.change(screen.getByLabelText('Inference endpoint'), {
+            target: { value: 'https://provider.example/v1' },
+        });
+
+        await user.click(screen.getByLabelText('Inference provider'));
+        await user.click(
+            await screen.findByRole('option', { name: 'Codex (local)' }),
+        );
+        await waitFor(() =>
+            expect(screen.queryByLabelText('Inference endpoint')).toBeNull(),
+        );
+        expect(
+            (screen.getByLabelText('Inference executable') as HTMLInputElement)
+                .value,
+        ).toBe('');
+        expect(screen.getByRole('status').textContent).toContain(
+            'Detect local tools',
         );
     });
 

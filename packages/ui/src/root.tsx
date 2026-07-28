@@ -30,6 +30,7 @@ import { ConnectionProvider, useConnection } from './rpc/connection-provider';
 import { defaultHostEndpoint } from './rpc/client';
 import { SyncRouteToStore } from './state/SyncRouteToStore';
 
+import driverStyles from 'driver.js/dist/driver.css?url';
 import appStyles from './styles.css?url';
 import diffStyles from 'react-diff-view/style/index.css?url';
 
@@ -37,6 +38,7 @@ import diffStyles from 'react-diff-view/style/index.css?url';
 // document `<head>` via `<Links />` and code-split them per route in the future.
 export const links: Route.LinksFunction = () => [
     { rel: 'stylesheet', href: diffStyles },
+    { rel: 'stylesheet', href: driverStyles },
     { rel: 'stylesheet', href: appStyles },
 
     // Favicon / PWA icon pack (realfavicongenerator) — lives in `public/`, served at the root.

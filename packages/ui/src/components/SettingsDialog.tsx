@@ -136,6 +136,54 @@ const inferenceProfileDraft = (
     secretName: profile.secretReference?.name ?? '',
 });
 
+/**
+ * Changing providers must not leave incompatible endpoint/executable/capability
+ * values invisibly attached to the draft. A model and credential are deliberately
+ * cleared too: they are provider-specific choices, not portable defaults.
+ */
+const inferenceProfileDraftForProvider = (
+    current: InferenceProfileDraft,
+    provider: InferenceProvider,
+): InferenceProfileDraft =>
+    provider === current.provider
+        ? current
+        : {
+              ...current,
+              provider,
+              generation: supportsGeneration(provider),
+              embeddings: supportsEmbeddings(provider),
+              modelId: '',
+              endpoint: '',
+              executable: '',
+              secretKind: 'environment',
+              secretName: '',
+          };
+
+const inferenceProfileReadinessMessage = (
+    draft: InferenceProfileDraft,
+): string | undefined => {
+    if (draft.id.trim() === '' || draft.label.trim() === '')
+        return 'Give this provider a profile ID and label.';
+    if (!draft.generation && !draft.embeddings)
+        return 'Choose at least one capability for this provider.';
+    if (
+        localInferenceProviders.has(draft.provider) &&
+        draft.executable.trim() === ''
+    )
+        return 'Use Detect local tools, then choose the discovered executable.';
+    if (draft.provider === 'openai-compatible' && draft.endpoint.trim() === '')
+        return 'Enter the OpenAI-compatible endpoint URL.';
+    if (draft.enabled && draft.modelId.trim() === '')
+        return 'Choose a model ID before enabling this provider.';
+    if (
+        draft.enabled &&
+        draft.provider !== 'local-embeddings' &&
+        draft.secretName.trim() === ''
+    )
+        return 'Name the environment variable or secret-store entry that holds this provider credential before enabling it.';
+    return undefined;
+};
+
 // Effective value of a key = the highest-precedence on-disk entry (command > worktree >
 // local > global > system); used to prefill the guided editors (REQ-P5-CFG-001). A
 // per-worktree config (extensions.worktreeConfig) overrides the repo-local one in git, so
@@ -179,6 +227,8 @@ export function SettingsDialog() {
 
 function SettingsDialogBody() {
     const setOpen = useUiStore(s => s.setSettingsDialogOpen);
+    const tab = useUiStore(s => s.settingsDialogTab);
+    const setTab = useUiStore(s => s.setSettingsDialogTab);
     const repoId = useUiStore(s => s.activeRepoId);
     const engagementId = useUiStore(s => s.activeEngagementId);
     return (
@@ -195,11 +245,26 @@ function SettingsDialogBody() {
                         Git config is written to git config files; app settings
                         stay in cbranch and never touch your git config.
                     </DialogDescription>
-                    <Tabs defaultValue="git">
+                    <Tabs
+                        value={tab}
+                        onValueChange={value => {
+                            if (
+                                value === 'git' ||
+                                value === 'app' ||
+                                value === 'inference'
+                            )
+                                setTab(value);
+                        }}
+                    >
                         <TabsList>
                             <TabsTab value="git">Git config</TabsTab>
                             <TabsTab value="app">App settings</TabsTab>
-                            <TabsTab value="inference">Inference</TabsTab>
+                            <TabsTab
+                                id="settings-inference-tab"
+                                value="inference"
+                            >
+                                Inference
+                            </TabsTab>
                         </TabsList>
                         <TabsPanel value="git">
                             {repoId === null ? (
@@ -920,9 +985,29 @@ function InferenceSettingsTab({
         saveProfiles.isPending ||
         discover.isPending ||
         discoverModels.isPending;
+    const draftReadiness = inferenceProfileReadinessMessage(draft);
 
     return (
         <div className="flex max-h-[60vh] flex-col gap-4 overflow-auto py-2">
+            <section className="rounded-md border p-3 text-sm">
+                <h3 className="font-medium">Set up optional AI enrichment</h3>
+                <ol className="text-muted-foreground mt-2 list-decimal space-y-1 pl-4 text-xs">
+                    <li>Detect a local tool or add a compatible endpoint.</li>
+                    <li>
+                        Choose its model and name the credential location; never
+                        paste a secret here.
+                    </li>
+                    <li>
+                        Enable the provider, then select it as this workspace's
+                        generation or embedding default below.
+                    </li>
+                </ol>
+                <p className="text-muted-foreground mt-2 text-xs">
+                    Saving or enabling a profile does not send workspace data.
+                    Inference runs only when you explicitly choose Run
+                    enrichment or Search semantically.
+                </p>
+            </section>
             <section className="rounded-md border p-3 text-sm">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                     <div>
@@ -934,6 +1019,7 @@ function InferenceSettingsTab({
                         </p>
                     </div>
                     <Button
+                        id="workspace-intelligence-detect-local-tools"
                         size="sm"
                         variant="outline"
                         disabled={busy}
@@ -977,7 +1063,10 @@ function InferenceSettingsTab({
                 <h3 className="font-medium">
                     {editingId === null ? 'Add provider' : 'Edit provider'}
                 </h3>
-                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                <div
+                    id="workspace-intelligence-inference-provider-form"
+                    className="mt-3 grid gap-3 sm:grid-cols-2"
+                >
                     <label className="flex flex-col gap-1 text-xs">
                         Profile ID
                         <Input
@@ -1012,26 +1101,12 @@ function InferenceSettingsTab({
                             value={draft.provider}
                             onValueChange={value => {
                                 if (value === null) return;
-                                setDraft(current => ({
-                                    ...current,
-                                    provider: value as InferenceProvider,
-                                    generation:
-                                        value === 'local-embeddings'
-                                            ? false
-                                            : supportsEmbeddings(
-                                                    value as InferenceProvider,
-                                                )
-                                              ? current.generation
-                                              : true,
-                                    embeddings:
-                                        value === 'local-embeddings'
-                                            ? true
-                                            : supportsEmbeddings(
-                                                    value as InferenceProvider,
-                                                )
-                                              ? current.embeddings
-                                              : false,
-                                }));
+                                setDraft(current =>
+                                    inferenceProfileDraftForProvider(
+                                        current,
+                                        value as InferenceProvider,
+                                    ),
+                                );
                             }}
                         >
                             <SelectTrigger aria-label="Inference provider">
@@ -1055,9 +1130,10 @@ function InferenceSettingsTab({
                         </Select>
                     </div>
                     <label className="flex flex-col gap-1 text-xs">
-                        Model ID
+                        Model ID{draft.enabled ? ' (required)' : ''}
                         <Input
                             aria-label="Inference model ID"
+                            aria-describedby="inference-model-help"
                             value={draft.modelId}
                             onChange={event =>
                                 setDraft(current => ({
@@ -1067,6 +1143,12 @@ function InferenceSettingsTab({
                             }
                             placeholder="Provider default"
                         />
+                        <span
+                            id="inference-model-help"
+                            className="text-muted-foreground"
+                        >
+                            Use the exact model ID supported by this provider.
+                        </span>
                     </label>
                     {localInferenceProviders.has(draft.provider) ? (
                         <label className="flex flex-col gap-1 text-xs sm:col-span-2">
@@ -1099,49 +1181,63 @@ function InferenceSettingsTab({
                             />
                         </label>
                     )}
-                    <div className="flex flex-col gap-1 text-xs">
-                        Credential reference kind
-                        <Select
-                            value={draft.secretKind}
-                            onValueChange={value => {
-                                if (
-                                    value !== 'environment' &&
-                                    value !== 'secret-store'
-                                )
-                                    return;
-                                setDraft(current => ({
-                                    ...current,
-                                    secretKind: value,
-                                }));
-                            }}
-                        >
-                            <SelectTrigger aria-label="Credential reference kind">
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="environment">
-                                    Environment variable
-                                </SelectItem>
-                                <SelectItem value="secret-store">
-                                    Secret-store name
-                                </SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
-                    <label className="flex flex-col gap-1 text-xs">
-                        Credential reference (optional)
-                        <Input
-                            aria-label="Credential reference"
-                            value={draft.secretName}
-                            onChange={event =>
-                                setDraft(current => ({
-                                    ...current,
-                                    secretName: event.target.value,
-                                }))
-                            }
-                            placeholder="OPENAI_API_KEY"
-                        />
-                    </label>
+                    {draft.provider !== 'local-embeddings' ? (
+                        <>
+                            <div className="flex flex-col gap-1 text-xs">
+                                Credential reference kind
+                                <Select
+                                    value={draft.secretKind}
+                                    onValueChange={value => {
+                                        if (
+                                            value !== 'environment' &&
+                                            value !== 'secret-store'
+                                        )
+                                            return;
+                                        setDraft(current => ({
+                                            ...current,
+                                            secretKind: value,
+                                        }));
+                                    }}
+                                >
+                                    <SelectTrigger aria-label="Credential reference kind">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="environment">
+                                            Environment variable
+                                        </SelectItem>
+                                        <SelectItem value="secret-store">
+                                            Secret-store name
+                                        </SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <label className="flex flex-col gap-1 text-xs">
+                                Credential reference
+                                <Input
+                                    aria-label="Credential reference"
+                                    value={draft.secretName}
+                                    onChange={event =>
+                                        setDraft(current => ({
+                                            ...current,
+                                            secretName: event.target.value,
+                                        }))
+                                    }
+                                    placeholder="OPENAI_API_KEY"
+                                />
+                                <span className="text-muted-foreground">
+                                    Required to enable generation. This is a
+                                    variable or secret-store name, never its
+                                    value.
+                                </span>
+                            </label>
+                        </>
+                    ) : (
+                        <p className="text-muted-foreground self-end text-xs sm:col-span-2">
+                            Local Ollama embeddings use its local loopback API;
+                            no credential reference is needed.
+                        </p>
+                    )}
                 </div>
                 <div className="mt-3 flex flex-wrap items-center gap-4 text-xs">
                     <label className="flex items-center gap-1.5">
@@ -1200,11 +1296,23 @@ function InferenceSettingsTab({
                                 Cancel
                             </Button>
                         )}
-                        <Button size="sm" disabled={busy} onClick={saveDraft}>
+                        <Button
+                            size="sm"
+                            disabled={busy || draftReadiness !== undefined}
+                            onClick={saveDraft}
+                        >
                             Save provider
                         </Button>
                     </div>
                 </div>
+                {draftReadiness !== undefined ? (
+                    <p
+                        role="status"
+                        className="text-muted-foreground mt-3 text-xs"
+                    >
+                        Next step: {draftReadiness}
+                    </p>
+                ) : null}
             </section>
 
             <section className="rounded-md border p-3 text-sm">
