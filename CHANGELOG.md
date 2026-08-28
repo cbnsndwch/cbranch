@@ -1,5 +1,26 @@
 # Changelog
 
+## v0.2.5
+
+### Features
+
+- Add Workspace Intelligence host analysis and inference by @cbnsndwch
+- Add the Workspace Intelligence view and first-use guide by @cbnsndwch
+- Add Workspace Intelligence section navigation by @cbnsndwch
+- Close the Phase 9 plugin trust baseline with host-issued install review
+  tokens by @cbnsndwch
+- Add the architecture system map app by @cbnsndwch
+- Add a fail-closed goal-supervisor host qualification entrypoint by @cbnsndwch
+
+### Bug Fixes
+
+- Bind goal-supervisor daemon ownership to verified process identity by
+  @cbnsndwch
+- Serialize the Workspace Intelligence archive in the web server by @cbnsndwch
+- Default tooltips below their trigger by @cbnsndwch
+
+**Full commit history:** https://github.com/cbnsndwch/cbranch/compare/v0.2.4...v0.2.5
+
 ## v0.2.4
 
 ### Bug Fixes
