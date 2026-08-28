@@ -29,7 +29,7 @@ export class PluginPolicyError extends Error {
 const pluginIdPattern =
     /^[a-z0-9]+(?:[a-z0-9-]*[a-z0-9]+)?(?:\.[a-z0-9]+(?:[a-z0-9-]*[a-z0-9]+)?)+$/;
 const semverPattern =
-    /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
+    /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
 const shellNames = new Set([
     'bash',
     'cmd',
@@ -75,7 +75,10 @@ export const validateRepositoryUrl = (
 };
 
 /** Validate manifest data after schema decoding and before an artifact can activate. */
-export const validateManifest = (manifest: PluginManifest): void => {
+export const validateManifest = (
+    manifest: PluginManifest,
+    hostVersion: string,
+): void => {
     if (manifest.schemaVersion !== PLUGIN_CONTRACT_VERSION) {
         throw new PluginPolicyError(
             'pluginIncompatible',
@@ -95,6 +98,12 @@ export const validateManifest = (manifest: PluginManifest): void => {
         throw new PluginPolicyError(
             'pluginIncompatible',
             'Plugin requires an unsupported plugin contract version.',
+        );
+    }
+    if (!satisfiesCbranchRange(hostVersion, manifest.engines.cbranch)) {
+        throw new PluginPolicyError(
+            'pluginIncompatible',
+            `Plugin requires cbranch ${manifest.engines.cbranch}; this host is ${hostVersion}.`,
         );
     }
     if (
@@ -175,8 +184,9 @@ export const validateAutomationAction = (
 export const validateGrant = (
     manifest: PluginManifest,
     grant: PluginGrant,
+    hostVersion: string,
 ): void => {
-    validateManifest(manifest);
+    validateManifest(manifest, hostVersion);
     requireUnique(grant.capabilities, 'granted capabilities');
     requireUnique(grant.repositoryIds, 'granted repository ids');
     requireUnique(grant.networkOrigins, 'granted network origins');
@@ -298,10 +308,36 @@ export const validateManifestTargetConsistency = async (
         | 'publisherFingerprint'
         | 'pluginContractVersion'
         | 'capabilityDigest'
-    >,
+    > & { readonly minimumCbranchVersion?: string },
+    hostVersion: string,
 ): Promise<void> => {
-    validateManifest(manifest);
+    validateManifest(manifest, hostVersion);
     const manifestCapabilityDigest = await digestManifestCapabilities(manifest);
+    if (target.minimumCbranchVersion !== undefined) {
+        if (!parseSemver(target.minimumCbranchVersion)) {
+            throw new PluginPolicyError(
+                'pluginMetadataInvalid',
+                'Signed target metadata has an invalid minimum cbranch version.',
+            );
+        }
+        if (!hostSupportsMinimum(target.minimumCbranchVersion, hostVersion)) {
+            throw new PluginPolicyError(
+                'pluginIncompatible',
+                `Plugin requires cbranch ${target.minimumCbranchVersion} or newer; this host is ${hostVersion}.`,
+            );
+        }
+        if (
+            !satisfiesCbranchRange(
+                target.minimumCbranchVersion,
+                manifest.engines.cbranch,
+            )
+        ) {
+            throw new PluginPolicyError(
+                'pluginArtifactInvalid',
+                'Plugin manifest compatibility does not match its signed target metadata.',
+            );
+        }
+    }
     if (
         manifest.id !== target.pluginId ||
         manifest.version !== target.version ||
@@ -314,6 +350,58 @@ export const validateManifestTargetConsistency = async (
             'Plugin manifest does not match its signed target metadata.',
         );
     }
+};
+
+const hostSupportsMinimum = (minimum: string, hostVersion: string): boolean => {
+    const host = parseSemver(hostVersion);
+    const required = parseSemver(minimum);
+    return Boolean(host && required && compareSemver(host, required) >= 0);
+};
+
+/** Supports the intentionally narrow >=x.y.z [<x.y.z] range grammar used by P9. */
+export const satisfiesCbranchRange = (
+    version: string,
+    range: string,
+): boolean => {
+    const current = parseSemver(version);
+    if (!current) return false;
+    const terms = range.trim().split(/\s+/).filter(Boolean);
+    if (terms.length === 0) return false;
+    const parsedTerms = terms.map(term => {
+        const match = /^(>=|>|<=|<|=)?(.+)$/.exec(term);
+        const bound = match && parseSemver(match[2]);
+        return match && bound
+            ? { operator: match[1] ?? '=', bound }
+            : undefined;
+    });
+    if (parsedTerms.some(term => !term)) return false;
+    if (
+        current.prerelease.length > 0 &&
+        !parsedTerms.some(
+            term =>
+                term!.bound.prerelease.length > 0 &&
+                term!.bound.major === current.major &&
+                term!.bound.minor === current.minor &&
+                term!.bound.patch === current.patch,
+        )
+    ) {
+        return false;
+    }
+    return parsedTerms.every(term => {
+        const comparison = compareSemver(current, term!.bound);
+        switch (term!.operator) {
+            case '>=':
+                return comparison >= 0;
+            case '>':
+                return comparison > 0;
+            case '<=':
+                return comparison <= 0;
+            case '<':
+                return comparison < 0;
+            default:
+                return comparison === 0;
+        }
+    });
 };
 
 /** Hash authority-bearing capability declarations in a canonical order. */
@@ -506,22 +594,62 @@ type ParsedSemver = {
     readonly major: number;
     readonly minor: number;
     readonly patch: number;
+    readonly prerelease: readonly string[];
 };
 
 const parseSemver = (value: string): ParsedSemver | undefined => {
     const match = semverPattern.exec(value);
     if (!match) return undefined;
+    const core = [match[1], match[2], match[3]].map(Number);
+    if (core.some(part => !Number.isSafeInteger(part))) return undefined;
+    const prerelease = match[4]?.split('.') ?? [];
+    if (
+        prerelease.some(
+            identifier =>
+                /^\d+$/u.test(identifier) && /^0\d+/u.test(identifier),
+        )
+    ) {
+        return undefined;
+    }
     return {
-        major: Number(match[1]),
-        minor: Number(match[2]),
-        patch: Number(match[3]),
+        major: core[0]!,
+        minor: core[1]!,
+        patch: core[2]!,
+        prerelease,
     };
 };
 
-const compareSemver = (left: ParsedSemver, right: ParsedSemver): number =>
-    left.major - right.major ||
-    left.minor - right.minor ||
-    left.patch - right.patch;
+const compareSemver = (left: ParsedSemver, right: ParsedSemver): number => {
+    const core =
+        left.major - right.major ||
+        left.minor - right.minor ||
+        left.patch - right.patch;
+    if (core !== 0) return core;
+    if (left.prerelease.length === 0) {
+        return right.prerelease.length === 0 ? 0 : 1;
+    }
+    if (right.prerelease.length === 0) return -1;
+    const length = Math.max(left.prerelease.length, right.prerelease.length);
+    for (let index = 0; index < length; index++) {
+        const leftIdentifier = left.prerelease[index];
+        const rightIdentifier = right.prerelease[index];
+        if (leftIdentifier === undefined) return -1;
+        if (rightIdentifier === undefined) return 1;
+        if (leftIdentifier === rightIdentifier) continue;
+        const leftNumeric = /^\d+$/u.test(leftIdentifier);
+        const rightNumeric = /^\d+$/u.test(rightIdentifier);
+        if (leftNumeric && rightNumeric) {
+            return (
+                leftIdentifier.length - rightIdentifier.length ||
+                leftIdentifier.localeCompare(rightIdentifier)
+            );
+        }
+        if (leftNumeric) return -1;
+        if (rightNumeric) return 1;
+        return leftIdentifier.localeCompare(rightIdentifier);
+    }
+    return 0;
+};
 
 const requireUnique = (values: readonly string[], label: string): void => {
     if (new Set(values).size !== values.length) {

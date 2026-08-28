@@ -85,7 +85,7 @@ describe('plugin artifact store', () => {
             version: '1.2.3',
             displayName: 'Release',
             publisherFingerprint: 'sha256:publisher',
-            engines: { cbranch: '>=0.2.0 <1.0.0', pluginContract: 1 },
+            engines: { cbranch: '>=0.2.4 <1.0.0', pluginContract: 1 },
             runtime: 'trusted-esm',
             entrypoint: 'plugin.mjs',
             capabilities: [],
@@ -105,7 +105,7 @@ describe('plugin artifact store', () => {
             artifactPath: 'release.cbranch-plugin',
             artifactSha256: `sha256:${createHash('sha256').update(archive).digest('hex')}`,
             artifactLength: archive.byteLength,
-            minimumCbranchVersion: '0.2.0',
+            minimumCbranchVersion: '0.2.4',
             pluginContractVersion: 1,
             capabilityDigest: await digestManifestCapabilities(manifest),
             releaseNotes: '',
@@ -119,6 +119,12 @@ describe('plugin artifact store', () => {
             capabilities: [],
             contributes: { commands: [], panels: [] },
         });
+        await expect(
+            makePluginArtifactStore({
+                dataDirectory: directory,
+                env: { CBRANCH_RELEASE_VERSION: '0.2.4-rc.1' },
+            }).review(activationTarget),
+        ).rejects.toMatchObject({ code: 'pluginIncompatible' });
         const activated = await store.activate(activationTarget, {
             capabilities: [],
             repositoryIds: [],

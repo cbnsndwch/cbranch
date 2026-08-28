@@ -13,6 +13,7 @@ import {
     isEligibleSecurityUpdate,
     isSafeArchiveEntry,
     redactSecrets,
+    satisfiesCbranchRange,
     validateArtifact,
     validateGrant,
     validateManifest,
@@ -23,6 +24,7 @@ import {
 } from './policy';
 
 const pluginId = PluginId.make('com.example.release');
+const hostVersion = '0.2.4';
 
 const manifest: PluginManifest = {
     schemaVersion: 1,
@@ -72,25 +74,81 @@ describe('plugin runtime policy', () => {
 
     test('rejects shell automation and broad grants', () => {
         expect(() =>
-            validateManifest({
-                ...manifest,
-                automation: [
-                    { ...manifest.automation[0]!, executable: '/bin/sh' },
-                ],
-            }),
+            validateManifest(
+                {
+                    ...manifest,
+                    automation: [
+                        { ...manifest.automation[0]!, executable: '/bin/sh' },
+                    ],
+                },
+                hostVersion,
+            ),
         ).toThrow('non-shell');
         expect(() =>
-            validateGrant(manifest, {
-                ...grant,
-                capabilities: ['automation.exec', 'workspace.write'],
-            }),
+            validateGrant(
+                manifest,
+                {
+                    ...grant,
+                    capabilities: ['automation.exec', 'workspace.write'],
+                },
+                hostVersion,
+            ),
         ).toThrow('not requested');
         expect(() =>
-            validateGrant(manifest, {
-                ...grant,
-                hostAutomationApproved: true,
-            }),
+            validateGrant(
+                manifest,
+                {
+                    ...grant,
+                    hostAutomationApproved: true,
+                },
+                hostVersion,
+            ),
         ).toThrow('separate explicit approval');
+    });
+
+    test('compares SemVer prereleases without treating them as stable releases', () => {
+        expect(satisfiesCbranchRange('0.2.4', '0.2.4-beta.1')).toBe(false);
+        expect(satisfiesCbranchRange('0.2.4-beta.2', '>0.2.4-beta.1')).toBe(
+            true,
+        );
+        expect(satisfiesCbranchRange('0.2.4-beta.1', '<0.2.4')).toBe(false);
+        expect(
+            satisfiesCbranchRange('0.2.4-beta.2', '>=0.2.4-beta.1 <0.2.4'),
+        ).toBe(true);
+        expect(satisfiesCbranchRange('0.2.5-rc.1', '>=0.2.4 <1.0.0')).toBe(
+            false,
+        );
+        expect(satisfiesCbranchRange('0.2.4-01', '>=0.2.0')).toBe(false);
+    });
+
+    test('rejects incompatible or malformed cbranch host ranges', () => {
+        expect(() =>
+            validateManifest(
+                {
+                    ...manifest,
+                    engines: { ...manifest.engines, cbranch: '>=1.0.0 <2.0.0' },
+                },
+                hostVersion,
+            ),
+        ).toThrow('requires cbranch');
+        expect(() =>
+            validateManifest(
+                {
+                    ...manifest,
+                    engines: { ...manifest.engines, cbranch: 'not-a-range' },
+                },
+                hostVersion,
+            ),
+        ).toThrow('requires cbranch');
+        expect(() =>
+            validateManifest(
+                {
+                    ...manifest,
+                    engines: { ...manifest.engines, cbranch: '>=0.2.4' },
+                },
+                '0.2.4-rc.1',
+            ),
+        ).toThrow('this host is 0.2.4-rc.1');
     });
 
     test('rejects extraction escapes and redacts every token occurrence', () => {
@@ -191,23 +249,58 @@ describe('plugin runtime policy', () => {
             version: manifest.version,
             publisherFingerprint: manifest.publisherFingerprint,
             pluginContractVersion: 1,
+            minimumCbranchVersion: '0.2.0',
             capabilityDigest,
             artifactLength: 4,
             artifactSha256,
         };
         await expect(
-            validateManifestTargetConsistency(manifest, target),
+            validateManifestTargetConsistency(manifest, target, hostVersion),
         ).resolves.toBeUndefined();
         expect(() => validateArtifact(target, 4, artifactSha256)).not.toThrow();
         expect(() => validateArtifact(target, 5, artifactSha256)).toThrow(
             'digest',
         );
         await expect(
-            validateManifestTargetConsistency(manifest, {
-                ...target,
-                version: '1.2.4',
-            }),
+            validateManifestTargetConsistency(
+                manifest,
+                {
+                    ...target,
+                    version: '1.2.4',
+                },
+                hostVersion,
+            ),
         ).rejects.toThrow('does not match');
+        await expect(
+            validateManifestTargetConsistency(
+                manifest,
+                {
+                    ...target,
+                    minimumCbranchVersion: '9.0.0',
+                },
+                hostVersion,
+            ),
+        ).rejects.toMatchObject({ code: 'pluginIncompatible' });
+        await expect(
+            validateManifestTargetConsistency(
+                manifest,
+                {
+                    ...target,
+                    minimumCbranchVersion: 'invalid',
+                },
+                hostVersion,
+            ),
+        ).rejects.toMatchObject({ code: 'pluginMetadataInvalid' });
+        await expect(
+            validateManifestTargetConsistency(
+                manifest,
+                {
+                    ...target,
+                    minimumCbranchVersion: '0.1.0',
+                },
+                hostVersion,
+            ),
+        ).rejects.toMatchObject({ code: 'pluginArtifactInvalid' });
     });
 
     test('rejects unsafe or oversized plugin archives before extraction', () => {

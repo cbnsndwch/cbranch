@@ -295,6 +295,7 @@ export const PluginInstallInput = Schema.Struct({
     pluginId: PluginId,
     version: Schema.String,
     artifactSha256: Schema.String,
+    reviewToken: Schema.String,
     grant: PluginGrant,
 });
 export type PluginInstallInput = typeof PluginInstallInput.Type;
@@ -305,6 +306,7 @@ export class PluginInstallReview extends Schema.Class<PluginInstallReview>(
 )({
     target: PluginCatalogEntry,
     manifest: PluginManifest,
+    reviewToken: Schema.String,
 }) {}
 
 export const PluginInstallReviewInput = Schema.Struct({

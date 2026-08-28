@@ -1,6 +1,9 @@
 import { describe, expect, test, vi } from 'vitest';
 
-import { makeHttpsPluginRepositoryTransport } from './plugin-repository-transport';
+import {
+    makeHttpsPluginRepositoryTransport,
+    PluginRepositoryTransportError,
+} from './plugin-repository-transport';
 
 describe('HTTPS plugin repository transport', () => {
     test('pins requests to the configured origin and bounds target bytes', async () => {
@@ -35,7 +38,18 @@ describe('HTTPS plugin repository transport', () => {
         ).rejects.toThrow('redirects');
         await expect(
             redirecting.fetchMetadata('../timestamp.json'),
-        ).rejects.toThrow('unsafe');
+        ).rejects.toMatchObject({
+            code: 'pluginMetadataInvalid',
+            message: expect.stringContaining('unsafe'),
+        });
+        await Promise.all(
+            ['targets\\..\\secret', '%2e%2e/secret', 'targets/%2fsecret'].map(
+                async path =>
+                    await expect(
+                        redirecting.fetchMetadata(path),
+                    ).rejects.toMatchObject({ code: 'pluginMetadataInvalid' }),
+            ),
+        );
 
         const oversized = makeHttpsPluginRepositoryTransport({
             url: 'https://plugins.example.test',
@@ -46,6 +60,44 @@ describe('HTTPS plugin repository transport', () => {
         });
         await expect(oversized.fetchMetadata('timestamp.json')).rejects.toThrow(
             'size limit',
+        );
+    });
+
+    test('bounds chunked bodies while reading and types fetch failures', async () => {
+        const chunk = new Uint8Array(3 * 1024 * 1024);
+        const chunked = makeHttpsPluginRepositoryTransport({
+            url: 'https://plugins.example.test',
+            fetch: async () =>
+                new Response(
+                    new ReadableStream({
+                        start(controller) {
+                            controller.enqueue(chunk);
+                            controller.enqueue(chunk);
+                            controller.close();
+                        },
+                    }),
+                ),
+        });
+        await expect(
+            chunked.fetchMetadata('timestamp.json'),
+        ).rejects.toMatchObject({
+            code: 'pluginMetadataInvalid',
+            message: expect.stringContaining('size limit'),
+        });
+
+        const unavailable = makeHttpsPluginRepositoryTransport({
+            url: 'https://plugins.example.test',
+            fetch: async () => {
+                throw new Error('secret network detail');
+            },
+        });
+        await expect(
+            unavailable.fetchMetadata('timestamp.json'),
+        ).rejects.toEqual(
+            expect.objectContaining<Partial<PluginRepositoryTransportError>>({
+                code: 'networkError',
+                message: 'Plugin repository request failed.',
+            }),
         );
     });
 
@@ -90,5 +142,60 @@ describe('HTTPS plugin repository transport', () => {
             { authorization: 'Bearer first-token' },
             { authorization: 'Bearer second-token' },
         ]);
+    });
+
+    test('types credential and response stream failures', async () => {
+        const credentialFailure = makeHttpsPluginRepositoryTransport({
+            url: 'https://plugins.example.test',
+            getCredential: async () => {
+                throw new Error('credential helper detail');
+            },
+        });
+        await expect(
+            credentialFailure.fetchMetadata('timestamp.json'),
+        ).rejects.toMatchObject({
+            code: 'networkError',
+            message: 'Plugin repository credential lookup failed.',
+        });
+
+        const streamFailure = makeHttpsPluginRepositoryTransport({
+            url: 'https://plugins.example.test',
+            fetch: async () =>
+                new Response(
+                    new ReadableStream({
+                        start(controller) {
+                            controller.error(new Error('stream detail'));
+                        },
+                    }),
+                ),
+        });
+        await expect(
+            streamFailure.fetchMetadata('timestamp.json'),
+        ).rejects.toMatchObject({
+            code: 'networkError',
+            message: 'Plugin repository request failed.',
+        });
+    });
+
+    test('aborts a stalled repository request at the configured deadline', async () => {
+        const transport = makeHttpsPluginRepositoryTransport({
+            url: 'https://plugins.example.test',
+            requestTimeoutMs: 5,
+            fetch: async (_url, init) =>
+                await new Promise<Response>((_resolve, reject) => {
+                    init?.signal?.addEventListener(
+                        'abort',
+                        () => reject(new Error('aborted')),
+                        { once: true },
+                    );
+                }),
+        });
+
+        await expect(
+            transport.fetchMetadata('timestamp.json'),
+        ).rejects.toMatchObject({
+            code: 'networkError',
+            message: 'Plugin repository request timed out.',
+        });
     });
 });

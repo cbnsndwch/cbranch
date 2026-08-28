@@ -36,6 +36,7 @@ export type TufRepositoryMetadata = {
 export type VerifiedTufCatalog = {
     readonly entries: readonly PluginCatalogEntry[];
     readonly targetsVersion: number;
+    readonly expiresAt: number;
 };
 
 /** Verify the root/timestamp/snapshot/targets chain and decode signed plugin targets. */
@@ -46,10 +47,11 @@ export const verifyTufCatalog = async (
 ): Promise<VerifiedTufCatalog> => {
     const root = parseEnvelope(metadata.root, 'root');
     const rootSigned = object(root.signed, 'root signed metadata');
+    validateRoleType(rootSigned, 'root');
     const keys = object(rootSigned.keys, 'root keys');
     const roles = object(rootSigned.roles, 'root roles');
     await verifyRole(root, role(roles, 'root'), keys, verifySignature);
-    validateVersionAndExpiry(rootSigned, 'root', now);
+    const rootExpiresAt = validateVersionAndExpiry(rootSigned, 'root', now);
 
     const timestamp = parseEnvelope(metadata.timestamp, 'timestamp');
     await verifyRole(
@@ -62,8 +64,13 @@ export const verifyTufCatalog = async (
         timestamp.signed,
         'timestamp signed metadata',
     );
-    validateVersionAndExpiry(timestampSigned, 'timestamp', now);
-    await verifyMeta(
+    validateRoleType(timestampSigned, 'timestamp');
+    const timestampExpiresAt = validateVersionAndExpiry(
+        timestampSigned,
+        'timestamp',
+        now,
+    );
+    const snapshotVersion = await verifyMeta(
         metadata.snapshot,
         object(timestampSigned.meta, 'timestamp metadata')['snapshot.json'],
     );
@@ -71,8 +78,16 @@ export const verifyTufCatalog = async (
     const snapshot = parseEnvelope(metadata.snapshot, 'snapshot');
     await verifyRole(snapshot, role(roles, 'snapshot'), keys, verifySignature);
     const snapshotSigned = object(snapshot.signed, 'snapshot signed metadata');
-    validateVersionAndExpiry(snapshotSigned, 'snapshot', now);
-    await verifyMeta(
+    validateRoleType(snapshotSigned, 'snapshot');
+    const snapshotExpiresAt = validateVersionAndExpiry(
+        snapshotSigned,
+        'snapshot',
+        now,
+    );
+    if (snapshotSigned.version !== snapshotVersion) {
+        throw invalid('Plugin repository snapshot version does not match.');
+    }
+    const targetsVersion = await verifyMeta(
         metadata.targets,
         object(snapshotSigned.meta, 'snapshot metadata')['targets.json'],
     );
@@ -80,12 +95,26 @@ export const verifyTufCatalog = async (
     const targets = parseEnvelope(metadata.targets, 'targets');
     await verifyRole(targets, role(roles, 'targets'), keys, verifySignature);
     const targetsSigned = object(targets.signed, 'targets signed metadata');
-    validateVersionAndExpiry(targetsSigned, 'targets', now);
+    validateRoleType(targetsSigned, 'targets');
+    const targetsExpiresAt = validateVersionAndExpiry(
+        targetsSigned,
+        'targets',
+        now,
+    );
+    if (targetsSigned.version !== targetsVersion) {
+        throw invalid('Plugin repository targets version does not match.');
+    }
     return {
         entries: decodeCatalog(
             object(targetsSigned.targets, 'targets metadata'),
         ),
         targetsVersion: number(targetsSigned.version, 'targets version'),
+        expiresAt: Math.min(
+            rootExpiresAt,
+            timestampExpiresAt,
+            snapshotExpiresAt,
+            targetsExpiresAt,
+        ),
     };
 };
 
@@ -120,23 +149,25 @@ const verifyRole = async (
     verifySignature: TufSignatureVerifier,
 ): Promise<void> => {
     const signed = new TextEncoder().encode(canonicalJson(envelope.signed));
-    const accepted = new Set<string>();
-    const candidates = envelope.signatures.filter(signature => {
-        if (
-            !roleDefinition.keyids.includes(signature.keyid) ||
-            accepted.has(signature.keyid)
-        )
-            return false;
-        accepted.add(signature.keyid);
-        return true;
-    });
+    const candidates = roleDefinition.keyids.map(keyId => ({
+        keyId,
+        signatures: envelope.signatures.filter(
+            signature => signature.keyid === keyId,
+        ),
+    }));
     const results = await Promise.all(
-        candidates.map(signature =>
-            verifySignature(
-                decodeKey(keys[signature.keyid]),
-                signed,
-                signature.sig,
-            ),
+        candidates.map(async candidate =>
+            (
+                await Promise.all(
+                    candidate.signatures.map(signature =>
+                        verifySignature(
+                            decodeKey(keys[candidate.keyId]),
+                            signed,
+                            signature.sig,
+                        ),
+                    ),
+                )
+            ).some(Boolean),
         ),
     );
     const valid = results.filter(Boolean).length;
@@ -150,8 +181,12 @@ const verifyRole = async (
 const verifyMeta = async (
     bytes: Uint8Array,
     metadata: unknown,
-): Promise<void> => {
+): Promise<number> => {
     const target = object(metadata, 'repository metadata reference');
+    const version = positiveInteger(
+        target.version,
+        'repository metadata version',
+    );
     const length = number(target.length, 'repository metadata length');
     const sha256 = string(
         object(target.hashes, 'repository metadata hashes').sha256,
@@ -169,12 +204,17 @@ const verifyMeta = async (
     if (length !== bytes.byteLength || sha256 !== digest) {
         throw invalid('Plugin repository metadata digest does not match.');
     }
+    return version;
 };
 
 const decodeCatalog = (
     targets: Record<string, unknown>,
-): readonly PluginCatalogEntry[] =>
-    Object.entries(targets).map(([artifactPath, target]) => {
+): readonly PluginCatalogEntry[] => {
+    const entries = Object.entries(targets);
+    if (entries.length > 1_000) {
+        throw invalid('Plugin repository catalog has too many targets.');
+    }
+    return entries.map(([artifactPath, target]) => {
         const value = object(target, 'plugin target');
         const custom = object(value.custom, 'plugin target custom metadata');
         const hashes = object(value.hashes, 'plugin target hashes');
@@ -183,40 +223,59 @@ const decodeCatalog = (
                 custom.pluginId,
                 'plugin id',
             ) as PluginCatalogEntry['pluginId'],
-            version: string(custom.version, 'plugin version'),
-            publisherFingerprint: string(
+            version: boundedString(custom.version, 'plugin version', 128),
+            publisherFingerprint: boundedString(
                 custom.publisherFingerprint,
                 'publisher fingerprint',
+                128,
             ),
-            artifactPath,
+            artifactPath: boundedString(artifactPath, 'artifact path', 1_024),
             artifactSha256: `sha256:${string(hashes.sha256, 'artifact sha256')}`,
             artifactLength: number(value.length, 'artifact length'),
-            minimumCbranchVersion: string(
+            minimumCbranchVersion: boundedString(
                 custom.minimumCbranchVersion,
                 'minimum cbranch version',
+                128,
             ),
             pluginContractVersion: number(
                 custom.pluginContractVersion,
                 'plugin contract version',
             ),
-            capabilityDigest: string(
+            capabilityDigest: boundedString(
                 custom.capabilityDigest,
                 'capability digest',
+                128,
             ),
-            releaseNotes: string(custom.releaseNotes, 'release notes'),
-            advisoryIds: array(custom.advisoryIds, 'advisory ids').map(
-                advisory => string(advisory, 'advisory id'),
+            releaseNotes: boundedString(
+                custom.releaseNotes,
+                'release notes',
+                16_384,
             ),
+            advisoryIds: boundedArray(
+                custom.advisoryIds,
+                'advisory ids',
+                100,
+            ).map(advisory => boundedString(advisory, 'advisory id', 128)),
         });
     });
+};
 
 const role = (roles: Record<string, unknown>, name: string): TufRole => {
     const roleValue = object(roles[name], `${name} role`);
+    const keyids = array(roleValue.keyids, `${name} key ids`).map(keyId =>
+        string(keyId, `${name} key id`),
+    );
+    const threshold = positiveInteger(roleValue.threshold, `${name} threshold`);
+    if (
+        keyids.length === 0 ||
+        new Set(keyids).size !== keyids.length ||
+        threshold > keyids.length
+    ) {
+        throw invalid(`Plugin repository ${name} role is malformed.`);
+    }
     return {
-        keyids: array(roleValue.keyids, `${name} key ids`).map(keyId =>
-            string(keyId, `${name} key id`),
-        ),
-        threshold: number(roleValue.threshold, `${name} threshold`),
+        keyids,
+        threshold,
     };
 };
 
@@ -236,15 +295,25 @@ const validateVersionAndExpiry = (
     signed: Record<string, unknown>,
     roleName: string,
     now: number,
-): void => {
-    if (!Number.isSafeInteger(number(signed.version, `${roleName} version`))) {
-        throw invalid('Plugin repository metadata has an invalid version.');
-    }
+): number => {
+    positiveInteger(signed.version, `${roleName} version`);
     const expiry = Date.parse(string(signed.expires, `${roleName} expiry`));
     if (!Number.isFinite(expiry) || expiry <= now) {
         throw new PluginPolicyError(
             'pluginMetadataExpired',
             `Plugin repository ${roleName} metadata has expired.`,
+        );
+    }
+    return expiry;
+};
+
+const validateRoleType = (
+    signed: Record<string, unknown>,
+    roleName: string,
+): void => {
+    if (signed._type !== roleName) {
+        throw invalid(
+            `Plugin repository ${roleName} metadata has an invalid role type.`,
         );
     }
 };
@@ -259,15 +328,44 @@ const array = (value: unknown, label: string): readonly unknown[] => {
         throw invalid(`Plugin repository ${label} is malformed.`);
     return value;
 };
+const boundedArray = (
+    value: unknown,
+    label: string,
+    maximumLength: number,
+): readonly unknown[] => {
+    const parsed = array(value, label);
+    if (parsed.length > maximumLength) {
+        throw invalid(`Plugin repository ${label} is too large.`);
+    }
+    return parsed;
+};
 const string = (value: unknown, label: string): string => {
     if (typeof value !== 'string')
         throw invalid(`Plugin repository ${label} is malformed.`);
     return value;
 };
+const boundedString = (
+    value: unknown,
+    label: string,
+    maximumLength: number,
+): string => {
+    const parsed = string(value, label);
+    if (parsed.length > maximumLength) {
+        throw invalid(`Plugin repository ${label} is too large.`);
+    }
+    return parsed;
+};
 const number = (value: unknown, label: string): number => {
     if (typeof value !== 'number')
         throw invalid(`Plugin repository ${label} is malformed.`);
     return value;
+};
+const positiveInteger = (value: unknown, label: string): number => {
+    const parsed = number(value, label);
+    if (!Number.isSafeInteger(parsed) || parsed <= 0) {
+        throw invalid(`Plugin repository ${label} is malformed.`);
+    }
+    return parsed;
 };
 const invalid = (message: string): PluginPolicyError =>
     new PluginPolicyError('pluginMetadataInvalid', message);

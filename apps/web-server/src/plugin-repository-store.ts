@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import {
     chmod,
     mkdir,
@@ -66,13 +66,8 @@ const initialRepositoryFile = (): PluginRepositoryFile =>
         ],
     });
 
-const isUntrustedFirstPartyRepository = (entry: StoredRepository): boolean =>
-    entry.repository.id === 'cbranch-official' &&
-    entry.repository.url === FIRST_PARTY_PLUGIN_REGISTRY_URL &&
-    entry.repository.trustState === 'untrusted';
-
-const firstPartyRepository = (): StoredRepository =>
-    initialRepositoryFile().repositories[0]!;
+const rootFingerprint = (root: Uint8Array): string =>
+    `sha256:${createHash('sha256').update(root).digest('hex')}`;
 
 export interface PluginRepositoryStore {
     readonly list: () => Promise<readonly StoredRepository[]>;
@@ -87,7 +82,7 @@ export interface PluginRepositoryStore {
     readonly trust: (
         repositoryId: PluginRepositoryId,
         fingerprint: string,
-        root: Uint8Array,
+        root?: Uint8Array,
     ) => Promise<PluginRepository>;
     readonly setRoot: (
         repositoryId: PluginRepositoryId,
@@ -97,6 +92,11 @@ export interface PluginRepositoryStore {
     readonly setCredentialState: (
         repositoryId: PluginRepositoryId,
         credentialState: PluginRepository['credentialState'],
+    ) => Promise<PluginRepository>;
+    readonly setRefreshState: (
+        repositoryId: PluginRepositoryId,
+        freshness: PluginRepository['freshness'],
+        lastSuccessfulRefreshAt?: number,
     ) => Promise<PluginRepository>;
     readonly remove: (repositoryId: PluginRepositoryId) => Promise<void>;
 }
@@ -117,13 +117,8 @@ export const makePluginRepositoryStore = (
             const stored = Schema.decodeUnknownSync(PluginRepositoryFile)(
                 JSON.parse(await readFile(file, 'utf8')),
             );
-            const repositories = stored.repositories.map(entry =>
-                isUntrustedFirstPartyRepository(entry)
-                    ? firstPartyRepository()
-                    : entry,
-            );
             if (stored.defaultsInitialized) {
-                return new PluginRepositoryFile({ ...stored, repositories });
+                return stored;
             }
             // One-time migration for installations that had a registry file before the
             // first-party source shipped. Future writes retain the marker, including an
@@ -131,15 +126,15 @@ export const makePluginRepositoryStore = (
             return new PluginRepositoryFile({
                 ...stored,
                 defaultsInitialized: true,
-                repositories: repositories.some(
+                repositories: stored.repositories.some(
                     entry =>
                         entry.repository.url ===
                         FIRST_PARTY_PLUGIN_REGISTRY_URL,
                 )
-                    ? repositories
+                    ? stored.repositories
                     : [
                           ...initialRepositoryFile().repositories,
-                          ...repositories,
+                          ...stored.repositories,
                       ],
             });
         } catch (error) {
@@ -224,6 +219,21 @@ export const makePluginRepositoryStore = (
                 );
                 if (!existing)
                     throw new Error('Plugin repository was not found.');
+                // Compare inside the serialized update so a newly fetched root cannot
+                // be approved with a fingerprint rendered for an older root.
+                const trustedRoot = existing.root
+                    ? Buffer.from(existing.root, 'base64')
+                    : root;
+                if (
+                    !trustedRoot ||
+                    rootFingerprint(trustedRoot) !== fingerprint ||
+                    (existing.root &&
+                        existing.repository.publisherFingerprint !==
+                            fingerprint)
+                )
+                    throw new Error(
+                        'The supplied publisher fingerprint does not match fetched root metadata.',
+                    );
                 const repository = new PluginRepository({
                     ...existing.repository,
                     publisherFingerprint: fingerprint,
@@ -235,7 +245,9 @@ export const makePluginRepositoryStore = (
                         entry.repository.id === repositoryId
                             ? new StoredRepository({
                                   repository,
-                                  root: Buffer.from(root).toString('base64'),
+                                  root:
+                                      existing.root ??
+                                      Buffer.from(root!).toString('base64'),
                               })
                             : entry,
                     ),
@@ -248,9 +260,21 @@ export const makePluginRepositoryStore = (
                 );
                 if (!existing)
                     throw new Error('Plugin repository was not found.');
+                if (rootFingerprint(root) !== fingerprint) {
+                    throw new Error(
+                        'The supplied publisher fingerprint does not match fetched root metadata.',
+                    );
+                }
+                const encodedRoot = Buffer.from(root).toString('base64');
+                const rootUnchanged =
+                    existing.root === encodedRoot &&
+                    existing.repository.publisherFingerprint === fingerprint;
                 const repository = new PluginRepository({
                     ...existing.repository,
                     publisherFingerprint: fingerprint,
+                    trustState: rootUnchanged
+                        ? existing.repository.trustState
+                        : 'untrusted',
                     freshness: 'fresh',
                 });
                 return [
@@ -259,7 +283,7 @@ export const makePluginRepositoryStore = (
                         entry.repository.id === repositoryId
                             ? new StoredRepository({
                                   repository,
-                                  root: Buffer.from(root).toString('base64'),
+                                  root: encodedRoot,
                               })
                             : entry,
                     ),
@@ -275,6 +299,32 @@ export const makePluginRepositoryStore = (
                 const repository = new PluginRepository({
                     ...existing.repository,
                     credentialState,
+                });
+                return [
+                    repository,
+                    current.map(entry =>
+                        entry.repository.id === repositoryId
+                            ? new StoredRepository({
+                                  ...entry,
+                                  repository,
+                              })
+                            : entry,
+                    ),
+                ];
+            }),
+        setRefreshState: (repositoryId, freshness, lastSuccessfulRefreshAt) =>
+            update(current => {
+                const existing = current.find(
+                    entry => entry.repository.id === repositoryId,
+                );
+                if (!existing)
+                    throw new Error('Plugin repository was not found.');
+                const repository = new PluginRepository({
+                    ...existing.repository,
+                    freshness,
+                    ...(lastSuccessfulRefreshAt === undefined
+                        ? {}
+                        : { lastSuccessfulRefreshAt }),
                 });
                 return [
                     repository,

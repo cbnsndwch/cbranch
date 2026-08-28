@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { mkdtemp, readFile, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -11,6 +12,9 @@ import {
     makePluginRepositoryStore,
     PLUGIN_REPOSITORY_FILE_NAME,
 } from './plugin-repository-store';
+
+const fingerprint = (root: Uint8Array): string =>
+    `sha256:${createHash('sha256').update(root).digest('hex')}`;
 
 describe('plugin repository store', () => {
     test('includes the first-party registry for a new installation', async () => {
@@ -35,7 +39,7 @@ describe('plugin repository store', () => {
         ]);
     });
 
-    test('migrates an untrusted first-party registry to the bundled root', async () => {
+    test('does not restore trust for an explicitly untrusted first-party registry', async () => {
         const dataDirectory = await mkdtemp(
             join(tmpdir(), 'cbranch-plugin-repository-'),
         );
@@ -64,11 +68,8 @@ describe('plugin repository store', () => {
         ).resolves.toMatchObject([
             {
                 repository: {
-                    trustState: 'trusted',
-                    publisherFingerprint:
-                        FIRST_PARTY_PLUGIN_REGISTRY_FINGERPRINT,
+                    trustState: 'untrusted',
                 },
-                root: FIRST_PARTY_PLUGIN_REGISTRY_ROOT,
             },
         ]);
     });
@@ -112,10 +113,11 @@ describe('plugin repository store', () => {
             'https',
             'https://plugins.example.test',
         );
+        const root = new TextEncoder().encode('root metadata');
         const trusted = await store.trust(
             repository.id,
-            'sha256:publisher',
-            new TextEncoder().encode('root metadata'),
+            fingerprint(root),
+            root,
         );
 
         expect(trusted.trustState).toBe('trusted');
@@ -134,5 +136,31 @@ describe('plugin repository store', () => {
                 'utf8',
             ),
         ).not.toContain('plugin-secret:');
+    });
+
+    test('revokes trust when a fetched publisher root changes', async () => {
+        const dataDirectory = await mkdtemp(
+            join(tmpdir(), 'cbranch-plugin-repository-'),
+        );
+        const store = makePluginRepositoryStore({ dataDirectory });
+        const repository = await store.add(
+            'https',
+            'https://plugins.example.test',
+        );
+        const firstRoot = new TextEncoder().encode('first root');
+        const secondRoot = new TextEncoder().encode('second root');
+
+        const firstFingerprint = fingerprint(firstRoot);
+        const secondFingerprint = fingerprint(secondRoot);
+        await store.setRoot(repository.id, firstFingerprint, firstRoot);
+        await store.trust(repository.id, firstFingerprint);
+        await expect(
+            store.setRoot(repository.id, secondFingerprint, secondRoot),
+        ).resolves.toMatchObject({ trustState: 'untrusted' });
+
+        await store.trust(repository.id, secondFingerprint);
+        await expect(
+            store.setRoot(repository.id, secondFingerprint, secondRoot),
+        ).resolves.toMatchObject({ trustState: 'trusted' });
     });
 });

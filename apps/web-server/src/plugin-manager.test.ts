@@ -21,6 +21,7 @@ import {
     activatedPluginDirectory,
     makeTrustedPluginManager,
 } from './plugin-manager';
+import { makePluginRepositoryStore } from './plugin-repository-store';
 
 vi.mock('./tuf-signature-verifier', () => ({
     verifyTufEd25519Signature: async () => true,
@@ -255,9 +256,138 @@ describe('trusted plugin manager', () => {
             throw new Error('network unavailable');
         });
 
-        await expect(manager.repositoryRefresh(repository.id)).rejects.toThrow(
-            'Could not fetch publisher metadata: network unavailable',
+        await expect(
+            manager.repositoryRefresh(repository.id),
+        ).rejects.toMatchObject({
+            code: 'networkError',
+            message: 'Plugin repository request failed.',
+        });
+    });
+
+    test('audits publisher trust and repository removal', async () => {
+        const dataDirectory = await mkdtemp(
+            join(tmpdir(), 'cbranch-plugin-manager-'),
         );
+        vi.stubGlobal(
+            'fetch',
+            async () =>
+                new Response('root metadata', {
+                    headers: { 'content-length': '13' },
+                }),
+        );
+        const manager = makeTrustedPluginManager({ dataDirectory });
+        const repository = await manager.repositoryAdd(
+            'https',
+            'https://plugins.example.test/registry',
+        );
+        const refreshed = await manager.repositoryRefresh(repository.id);
+
+        await manager.publisherTrust(
+            repository.id,
+            refreshed.repository.publisherFingerprint!,
+            true,
+        );
+        await manager.repositoryRemove(repository.id);
+
+        expect(
+            (await manager.auditList({})).events.map(event => [
+                event.action,
+                event.outcome,
+                event.repositoryId,
+            ]),
+        ).toEqual([
+            ['publisher.rootFetchRequested', 'allowed', repository.id],
+            ['publisher.rootFetched', 'allowed', repository.id],
+            ['publisher.trustRequested', 'allowed', repository.id],
+            ['publisher.trust', 'allowed', repository.id],
+            ['repository.removeRequested', 'allowed', repository.id],
+            ['repository.remove', 'allowed', repository.id],
+        ]);
+    });
+
+    test('records a root-fetch request before root persistence', async () => {
+        const dataDirectory = await mkdtemp(
+            join(tmpdir(), 'cbranch-plugin-manager-'),
+        );
+        vi.stubGlobal(
+            'fetch',
+            async () =>
+                new Response('root metadata', {
+                    headers: { 'content-length': '13' },
+                }),
+        );
+        const repositoryStore = makePluginRepositoryStore({ dataDirectory });
+        const manager = makeTrustedPluginManager({
+            dataDirectory,
+            repositoryStore,
+        });
+        const repository = await manager.repositoryAdd(
+            'https',
+            'https://plugins.example.test/registry',
+        );
+        vi.spyOn(repositoryStore, 'setRoot').mockRejectedValueOnce(
+            new Error('persistence failed'),
+        );
+
+        await expect(manager.repositoryRefresh(repository.id)).rejects.toThrow(
+            'persistence failed',
+        );
+        await expect(manager.auditList({})).resolves.toMatchObject({
+            events: [
+                {
+                    action: 'publisher.rootFetchRequested',
+                    outcome: 'allowed',
+                    repositoryId: repository.id,
+                },
+            ],
+        });
+    });
+
+    test('does not transfer publisher trust to a concurrently fetched root', async () => {
+        const dataDirectory = await mkdtemp(
+            join(tmpdir(), 'cbranch-plugin-manager-'),
+        );
+        let releaseSecond!: () => void;
+        const secondResponse = new Promise<void>(resolve => {
+            releaseSecond = resolve;
+        });
+        let requests = 0;
+        vi.stubGlobal('fetch', async () => {
+            requests++;
+            if (requests === 2) await secondResponse;
+            const root = requests === 1 ? 'first root' : 'second root';
+            return new Response(root, {
+                headers: { 'content-length': String(root.length) },
+            });
+        });
+        const manager = makeTrustedPluginManager({ dataDirectory });
+        const repository = await manager.repositoryAdd(
+            'https',
+            'https://plugins.example.test/registry',
+        );
+        const first = await manager.repositoryRefresh(repository.id);
+        const refreshing = manager.repositoryRefresh(repository.id);
+        await vi.waitFor(() => expect(requests).toBe(2));
+
+        const trusting = manager.publisherTrust(
+            repository.id,
+            first.repository.publisherFingerprint!,
+            true,
+        );
+        releaseSecond();
+
+        await expect(refreshing).resolves.toMatchObject({
+            repository: {
+                trustState: 'untrusted',
+                publisherFingerprint: `sha256:${createHash('sha256').update('second root').digest('hex')}`,
+            },
+        });
+        await expect(trusting).rejects.toMatchObject({
+            code: 'pluginMetadataInvalid',
+        });
+        await expect(manager.catalogList(repository.id)).rejects.toMatchObject({
+            code: 'pluginRepositoryUntrusted',
+        });
     });
 
     test('does not add a repository when credential approval fails', async () => {
@@ -360,12 +490,14 @@ describe('trusted plugin manager', () => {
         const dataDirectory = await mkdtemp(
             join(tmpdir(), 'cbranch-plugin-manager-'),
         );
+        const expires = new Date(Date.now() + 60_000).toISOString();
+        const root = tufRoot(expires);
         const manifest: PluginManifest = {
             schemaVersion: 1,
             id: PluginId.make('com.example.release'),
             version: '1.2.3',
             displayName: 'Release',
-            publisherFingerprint: 'sha256:publisher',
+            publisherFingerprint: `sha256:${metadataDigest(root)}`,
             engines: { cbranch: '>=0.2.0 <1.0.0', pluginContract: 1 },
             runtime: 'trusted-esm',
             entrypoint: 'plugin.mjs',
@@ -395,6 +527,8 @@ describe('trusted plugin manager', () => {
             artifact,
             targetPath,
             manifest,
+            expires,
+            root,
         });
         let unauthorized = false;
         vi.stubGlobal('fetch', async (url: URL | string) => {
@@ -404,7 +538,7 @@ describe('trusted plugin manager', () => {
                 path === targetPath
                     ? artifact
                     : metadata[path as keyof typeof metadata];
-            return new Response(body, {
+            return new Response(Buffer.from(body), {
                 headers: { 'content-length': String(body.byteLength) },
             });
         });
@@ -444,7 +578,7 @@ describe('trusted plugin manager', () => {
                 pluginId: manifest.id,
                 version: manifest.version,
             }),
-        ).rejects.toThrow('Refresh the trusted plugin repository');
+        ).rejects.toThrow('current verified catalog');
         unauthorized = false;
         await expect(manager.catalogList(trusted.id)).resolves.not.toHaveLength(
             0,
@@ -454,19 +588,72 @@ describe('trusted plugin manager', () => {
             pluginId: manifest.id,
             version: manifest.version,
         });
-        const installed = await manager.install({
-            repositoryId: trusted.id,
+        const secondRepository = await manager.repositoryAdd(
+            'https',
+            'https://plugins.example.test/catalog',
+        );
+        const secondUntrusted = await manager.repositoryRefresh(
+            secondRepository.id,
+        );
+        const secondTrusted = await manager.publisherTrust(
+            secondRepository.id,
+            secondUntrusted.repository.publisherFingerprint!,
+            true,
+        );
+        await manager.repositoryRefresh(secondTrusted.id);
+        const secondReview = await manager.installReview({
+            repositoryId: secondTrusted.id,
             pluginId: manifest.id,
             version: manifest.version,
-            artifactSha256: review.target.artifactSha256,
-            grant: {
-                capabilities: [],
-                repositoryIds: [],
-                networkOrigins: [],
-                automationActionIds: [],
-                hostAutomationApproved: false,
-            },
         });
+        const grant = {
+            capabilities: [],
+            repositoryIds: [],
+            networkOrigins: [],
+            automationActionIds: [],
+            hostAutomationApproved: false,
+        } as const;
+        await expect(
+            manager.install({
+                repositoryId: trusted.id,
+                pluginId: manifest.id,
+                version: manifest.version,
+                artifactSha256: review.target.artifactSha256,
+                reviewToken: `sha256:${'0'.repeat(64)}`,
+                grant,
+            }),
+        ).rejects.toThrow('changed');
+        const attempts = await Promise.allSettled([
+            manager.install({
+                repositoryId: trusted.id,
+                pluginId: manifest.id,
+                version: manifest.version,
+                artifactSha256: review.target.artifactSha256,
+                reviewToken: review.reviewToken,
+                grant,
+            }),
+            manager.install({
+                repositoryId: secondTrusted.id,
+                pluginId: manifest.id,
+                version: manifest.version,
+                artifactSha256: secondReview.target.artifactSha256,
+                reviewToken: secondReview.reviewToken,
+                grant,
+            }),
+        ]);
+        const installed = attempts.find(
+            attempt => attempt.status === 'fulfilled',
+        )?.value;
+        expect(
+            attempts.filter(attempt => attempt.status === 'fulfilled'),
+        ).toHaveLength(1);
+        expect(
+            attempts.filter(attempt => attempt.status === 'rejected'),
+        ).toHaveLength(1);
+        expect(
+            attempts.find(attempt => attempt.status === 'rejected')?.reason,
+        ).toMatchObject({ code: 'pluginPolicyDenied' });
+        expect(installed).toBeDefined();
 
         expect(review.manifest.contributes.commands).toEqual([
             {
@@ -475,8 +662,8 @@ describe('trusted plugin manager', () => {
                 placement: 'plugins',
             },
         ]);
-        expect(installed.enabled).toBe(false);
-        expect(installed.lock.tufTargetVersion).toBe(7);
+        expect(installed!.enabled).toBe(false);
+        expect(installed!.lock.tufTargetVersion).toBe(7);
         await expect(manager.enable(manifest.id)).resolves.toMatchObject({
             enabled: true,
         });
@@ -499,6 +686,22 @@ describe('trusted plugin manager', () => {
                               })()
                             : input === 'dialog'
                             ? { _tag: 'dialog', title: 'Release', body: 'Ready' }
+                            : input === 'exact-limit'
+                            ? 'a'.repeat(1024 * 1024)
+                            : input === 'escaped-exact-limit'
+                            ? '\\n'.repeat(1024 * 1024)
+                            : input === 'unicode-over'
+                            ? 'é'.repeat(524289)
+                            : input === 'structured-exact-limit'
+                            ? (() => {
+                                  const empty = JSON.stringify({ _tag: 'notice', message: '' });
+                                  return { _tag: 'notice', message: 'a'.repeat(1024 * 1024 - empty.length) };
+                              })()
+                            : input === 'structured-over-limit'
+                            ? (() => {
+                                  const empty = JSON.stringify({ _tag: 'notice', message: '' });
+                                  return { _tag: 'notice', message: 'a'.repeat(1024 * 1024 - empty.length + 1) };
+                              })()
                             : 'ran:' + input,
                 },
                 commandExecuted: command => log('info', command),
@@ -540,6 +743,46 @@ describe('trusted plugin manager', () => {
             state: 'completed',
             result: { _tag: 'dialog', title: 'Release', body: 'Ready' },
         });
+        await expect(
+            manager.invoke({
+                pluginId: record.pluginId,
+                commandId: 'com.example.release.run',
+                repoId: 'repo-1',
+                input: 'exact-limit',
+            }),
+        ).resolves.toMatchObject({ state: 'completed' });
+        await expect(
+            manager.invoke({
+                pluginId: record.pluginId,
+                commandId: 'com.example.release.run',
+                repoId: 'repo-1',
+                input: 'escaped-exact-limit',
+            }),
+        ).resolves.toMatchObject({ state: 'completed' });
+        await expect(
+            manager.invoke({
+                pluginId: record.pluginId,
+                commandId: 'com.example.release.run',
+                repoId: 'repo-1',
+                input: 'unicode-over',
+            }),
+        ).rejects.toMatchObject({ code: 'resultTooLarge' });
+        await expect(
+            manager.invoke({
+                pluginId: record.pluginId,
+                commandId: 'com.example.release.run',
+                repoId: 'repo-1',
+                input: 'structured-exact-limit',
+            }),
+        ).resolves.toMatchObject({ state: 'completed' });
+        await expect(
+            manager.invoke({
+                pluginId: record.pluginId,
+                commandId: 'com.example.release.run',
+                repoId: 'repo-1',
+                input: 'structured-over-limit',
+            }),
+        ).rejects.toMatchObject({ code: 'resultTooLarge' });
         expect(
             (await manager.auditList({})).events.map(event => event.action),
         ).toEqual(
@@ -658,14 +901,18 @@ const tufMetadata = async ({
     artifact,
     targetPath,
     manifest,
+    expires,
+    root,
 }: {
     readonly artifact: Uint8Array;
     readonly targetPath: string;
     readonly manifest: PluginManifest;
+    readonly expires: string;
+    readonly root: Uint8Array;
 }) => {
-    const expires = new Date(Date.now() + 60_000).toISOString();
     const targets = metadataBytes(
         metadataEnvelope({
+            _type: 'targets',
             version: 7,
             expires,
             targets: {
@@ -689,10 +936,12 @@ const tufMetadata = async ({
     );
     const snapshot = metadataBytes(
         metadataEnvelope({
+            _type: 'snapshot',
             version: 1,
             expires,
             meta: {
                 'targets.json': {
+                    version: 7,
                     length: targets.byteLength,
                     hashes: { sha256: metadataDigest(targets) },
                 },
@@ -701,18 +950,30 @@ const tufMetadata = async ({
     );
     const timestamp = metadataBytes(
         metadataEnvelope({
+            _type: 'timestamp',
             version: 1,
             expires,
             meta: {
                 'snapshot.json': {
+                    version: 1,
                     length: snapshot.byteLength,
                     hashes: { sha256: metadataDigest(snapshot) },
                 },
             },
         }),
     );
-    const root = metadataBytes(
+    return {
+        'metadata/root.json': root,
+        'metadata/timestamp.json': timestamp,
+        'metadata/snapshot.json': snapshot,
+        'metadata/targets.json': targets,
+    };
+};
+
+const tufRoot = (expires: string): Uint8Array =>
+    metadataBytes(
         metadataEnvelope({
+            _type: 'root',
             version: 1,
             expires,
             keys: {
@@ -729,13 +990,6 @@ const tufMetadata = async ({
             },
         }),
     );
-    return {
-        'metadata/root.json': root,
-        'metadata/timestamp.json': timestamp,
-        'metadata/snapshot.json': snapshot,
-        'metadata/targets.json': targets,
-    };
-};
 
 const makeTar = (files: Readonly<Record<string, string>>): Uint8Array => {
     const entries = Object.entries(files).flatMap(([path, contents]) => {

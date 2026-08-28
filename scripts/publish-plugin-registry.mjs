@@ -27,7 +27,7 @@ const canonical = value =>
         : Array.isArray(value)
           ? `[${value.map(canonical).join(',')}]`
           : `{${Object.keys(value)
-                .sort()
+                .toSorted()
                 .map(key => `${JSON.stringify(key)}:${canonical(value[key])}`)
                 .join(',')}}`;
 const envelope = signed => ({
@@ -44,7 +44,8 @@ const envelope = signed => ({
     ],
 });
 const bytes = value => Buffer.from(`${JSON.stringify(value)}\n`);
-const meta = value => ({
+const meta = (value, version) => ({
+    version,
     length: value.length,
     hashes: { sha256: sha256(value) },
 });
@@ -111,7 +112,7 @@ const snapshot = bytes(
         _type: 'snapshot',
         version: 1,
         expires,
-        meta: { 'targets.json': meta(targets) },
+        meta: { 'targets.json': meta(targets, 1) },
     }),
 );
 const timestamp = bytes(
@@ -119,7 +120,7 @@ const timestamp = bytes(
         _type: 'timestamp',
         version: 1,
         expires,
-        meta: { 'snapshot.json': meta(snapshot) },
+        meta: { 'snapshot.json': meta(snapshot, 1) },
     }),
 );
 await mkdir(resolve(output, 'metadata'), { recursive: true });

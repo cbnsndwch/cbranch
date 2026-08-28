@@ -5,7 +5,7 @@
     "displayName": "Hello World",
     "publisherFingerprint": "sha256:development-only",
     "engines": {
-        "cbranch": ">=0.3.0 <1.0.0",
+        "cbranch": ">=0.2.0 <1.0.0",
         "pluginContract": 1
     },
     "runtime": "trusted-esm",

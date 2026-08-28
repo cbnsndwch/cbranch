@@ -29,6 +29,7 @@ import {
 import {
     digestGrant,
     isSafeRelativePath,
+    PluginPolicyError,
     validateRepositoryUrl,
 } from '@cbranch/plugin-runtime';
 import { Context, Effect, Layer, Schema } from 'effect';
@@ -57,6 +58,7 @@ import {
     type PluginCredentialStore,
 } from './plugin-credentials';
 import { makeHttpsPluginRepositoryTransport } from './plugin-repository-transport';
+import { PluginRepositoryTransportError } from './plugin-repository-transport';
 import { verifyTufEd25519Signature } from './tuf-signature-verifier';
 import { makeTufPluginRepository } from './tuf-plugin-repository';
 import {
@@ -172,6 +174,25 @@ export const activatedPluginDirectory = (
     );
 };
 
+const pluginReviewToken = (target: PluginCatalogEntry): string =>
+    `sha256:${createHash('sha256')
+        .update(
+            JSON.stringify({
+                pluginId: String(target.pluginId),
+                version: target.version,
+                publisherFingerprint: target.publisherFingerprint,
+                artifactPath: target.artifactPath,
+                artifactSha256: target.artifactSha256,
+                artifactLength: target.artifactLength,
+                minimumCbranchVersion: target.minimumCbranchVersion,
+                pluginContractVersion: target.pluginContractVersion,
+                capabilityDigest: target.capabilityDigest,
+                releaseNotes: target.releaseNotes,
+                advisoryIds: [...target.advisoryIds],
+            }),
+        )
+        .digest('hex')}`;
+
 /**
  * Create the practical first trusted-extension lifecycle. Network installation is not
  * enabled here: only the future verified artifact installer may add lock records.
@@ -221,6 +242,24 @@ export const makeTrustedPluginManager = (
                 capability,
                 repoId,
                 engagementId,
+            }),
+        );
+    };
+
+    const recordRepositoryAudit = async (
+        action: string,
+        outcome: PluginAuditEvent['outcome'],
+        repository: PluginRepository,
+        auditErrorCode?: string,
+    ): Promise<void> => {
+        await auditStore.record(
+            new PluginAuditEvent({
+                at: Date.now(),
+                publisherFingerprint: repository.publisherFingerprint,
+                repositoryId: repository.id,
+                action,
+                outcome,
+                errorCode: auditErrorCode,
             }),
         );
     };
@@ -293,6 +332,50 @@ export const makeTrustedPluginManager = (
         if (startupFailure) throw startupFailure;
     };
 
+    const repositoryOperationTails = new Map<string, Promise<void>>();
+    const serializeRepositoryOperation = async <Result>(
+        repositoryId: PluginRepositoryIdInput['repositoryId'],
+        operation: () => Promise<Result>,
+    ): Promise<Result> => {
+        const key = String(repositoryId);
+        const previous = repositoryOperationTails.get(key) ?? Promise.resolve();
+        const result = previous.then(operation, operation);
+        const tail = result.then(
+            () => undefined,
+            () => undefined,
+        );
+        repositoryOperationTails.set(key, tail);
+        try {
+            return await result;
+        } finally {
+            if (repositoryOperationTails.get(key) === tail) {
+                repositoryOperationTails.delete(key);
+            }
+        }
+    };
+
+    const pluginOperationTails = new Map<string, Promise<void>>();
+    const serializePluginOperation = async <Result>(
+        pluginId: string,
+        operation: () => Promise<Result>,
+    ): Promise<Result> => {
+        const previous =
+            pluginOperationTails.get(pluginId) ?? Promise.resolve();
+        const result = previous.then(operation, operation);
+        const tail = result.then(
+            () => undefined,
+            () => undefined,
+        );
+        pluginOperationTails.set(pluginId, tail);
+        try {
+            return await result;
+        } finally {
+            if (pluginOperationTails.get(pluginId) === tail) {
+                pluginOperationTails.delete(pluginId);
+            }
+        }
+    };
+
     const persist = async (): Promise<void> => {
         await lockStore.write([...records.values()]);
     };
@@ -321,16 +404,17 @@ export const makeTrustedPluginManager = (
     const trustedRepository = async (
         repositoryId: PluginRepositoryIdInput['repositoryId'],
     ): Promise<ReturnType<typeof makeTufPluginRepository>> => {
-        const existing = repositories.get(String(repositoryId));
-        if (existing) return existing;
         const stored = await repositoryStore.get(repositoryId);
         if (!stored?.root || stored.repository.trustState !== 'trusted')
             throw new PluginManagerError(
                 'pluginRepositoryUntrusted',
                 'Approve the publisher before browsing its catalog.',
             );
+        const existing = repositories.get(String(repositoryId));
+        if (existing) return existing;
         const repository = makeTufPluginRepository({
             root: Buffer.from(stored.root, 'base64'),
+            publisherFingerprint: stored.repository.publisherFingerprint!,
             transport: makeHttpsPluginRepositoryTransport({
                 url: stored.repository.url,
                 getCredential: async () => {
@@ -392,6 +476,15 @@ export const makeTrustedPluginManager = (
                 },
             }).fetchMetadata('metadata/root.json');
         } catch (error) {
+            if (error instanceof PluginRepositoryTransportError) {
+                throw new PluginManagerError(error.code, error.message);
+            }
+            if (error instanceof PluginPolicyError) {
+                throw new PluginManagerError(
+                    rpcPluginPolicyCode(error.code),
+                    error.message,
+                );
+            }
             const detail =
                 error instanceof Error && error.message
                     ? error.message.slice(0, 500)
@@ -400,6 +493,32 @@ export const makeTrustedPluginManager = (
                 'pluginMetadataInvalid',
                 `Could not fetch publisher metadata: ${detail}`,
             );
+        }
+    };
+
+    const refreshTrustedCatalog = async (
+        repositoryId: PluginRepositoryIdInput['repositoryId'],
+        repository: ReturnType<typeof makeTufPluginRepository>,
+    ): Promise<readonly PluginCatalogEntry[]> => {
+        try {
+            const catalog = await repository.refresh();
+            await repositoryStore.setRefreshState(
+                repositoryId,
+                'fresh',
+                Date.now(),
+            );
+            return catalog;
+        } catch (error) {
+            const freshness =
+                error instanceof PluginPolicyError
+                    ? error.code === 'pluginMetadataExpired'
+                        ? 'expired'
+                        : 'invalid'
+                    : 'stale';
+            await repositoryStore
+                .setRefreshState(repositoryId, freshness)
+                .catch(() => undefined);
+            throw error;
         }
     };
 
@@ -441,118 +560,288 @@ export const makeTrustedPluginManager = (
         repositoryRemove: async (
             repositoryId: PluginRepositoryIdInput['repositoryId'],
         ): Promise<void> => {
-            await repositoryStore.remove(repositoryId);
-            repositories.delete(String(repositoryId));
+            return await serializeRepositoryOperation(
+                repositoryId,
+                async () => {
+                    const stored = await repositoryStore.get(repositoryId);
+                    if (stored) {
+                        await recordRepositoryAudit(
+                            'repository.removeRequested',
+                            'allowed',
+                            stored.repository,
+                        );
+                    }
+                    try {
+                        await repositoryStore.remove(repositoryId);
+                        if (stored) {
+                            await recordRepositoryAudit(
+                                'repository.remove',
+                                'allowed',
+                                stored.repository,
+                            );
+                        }
+                    } catch (error) {
+                        if (stored) {
+                            await recordRepositoryAudit(
+                                'repository.remove',
+                                'failed',
+                                stored.repository,
+                                errorCode(error),
+                            );
+                        }
+                        throw error;
+                    }
+                    repositories.delete(String(repositoryId));
+                },
+            );
         },
         publisherTrust: async (
             repositoryId: PluginPublisherTrustInput['repositoryId'],
             fingerprint: string,
             approved: boolean,
         ): Promise<PluginRepository> => {
-            const stored = await repositoryStore.get(repositoryId);
-            if (
-                !stored?.root ||
-                stored.repository.publisherFingerprint !== fingerprint
-            )
-                throw new PluginManagerError(
-                    'pluginMetadataInvalid',
-                    'The supplied publisher fingerprint does not match fetched root metadata.',
-                );
-            if (!approved)
-                throw new PluginManagerError(
-                    'pluginRepositoryUntrusted',
-                    'Publisher trust was not approved.',
-                );
-            return repositoryStore.trust(
+            return await serializeRepositoryOperation(
                 repositoryId,
-                fingerprint,
-                Buffer.from(stored.root, 'base64'),
+                async () => {
+                    const stored = await repositoryStore.get(repositoryId);
+                    if (!stored?.root) {
+                        throw new PluginManagerError(
+                            'pluginMetadataInvalid',
+                            'Publisher root metadata has not been fetched.',
+                        );
+                    }
+                    if (
+                        stored.repository.publisherFingerprint !== fingerprint
+                    ) {
+                        await recordRepositoryAudit(
+                            'publisher.trust',
+                            'failed',
+                            stored.repository,
+                            'pluginMetadataInvalid',
+                        );
+                        throw new PluginManagerError(
+                            'pluginMetadataInvalid',
+                            'The supplied publisher fingerprint does not match fetched root metadata.',
+                        );
+                    }
+                    if (!approved) {
+                        await recordRepositoryAudit(
+                            'publisher.trust',
+                            'denied',
+                            stored.repository,
+                            'pluginRepositoryUntrusted',
+                        );
+                        throw new PluginManagerError(
+                            'pluginRepositoryUntrusted',
+                            'Publisher trust was not approved.',
+                        );
+                    }
+                    await recordRepositoryAudit(
+                        'publisher.trustRequested',
+                        'allowed',
+                        stored.repository,
+                    );
+                    try {
+                        const trusted = await repositoryStore.trust(
+                            repositoryId,
+                            fingerprint,
+                        );
+                        await recordRepositoryAudit(
+                            'publisher.trust',
+                            'allowed',
+                            trusted,
+                        );
+                        return trusted;
+                    } catch (error) {
+                        await recordRepositoryAudit(
+                            'publisher.trust',
+                            'failed',
+                            stored.repository,
+                            errorCode(error),
+                        );
+                        if (
+                            error instanceof Error &&
+                            error.message.includes('fingerprint does not match')
+                        )
+                            throw new PluginManagerError(
+                                'pluginMetadataInvalid',
+                                error.message,
+                            );
+                        throw error;
+                    }
+                },
             );
         },
         repositoryRefresh: async (
             repositoryId: PluginRepositoryIdInput['repositoryId'],
         ): Promise<PluginRepositoryRefresh> => {
-            const stored = await repositoryStore.get(repositoryId);
-            if (!stored)
-                throw new PluginManagerError(
-                    'pluginArtifactInvalid',
-                    'Plugin repository was not found.',
-                );
-            if (stored.repository.kind !== 'https')
-                throw new PluginManagerError(
-                    'pluginPolicyDenied',
-                    'Git-backed plugin repositories are not implemented yet.',
-                );
-            if (stored.repository.trustState !== 'trusted') {
-                const root = await fetchPublisherRoot(
-                    repositoryId,
-                    stored.repository.url,
-                    stored.repository.credentialState,
-                );
-                const repository = await repositoryStore.setRoot(
-                    repositoryId,
-                    `sha256:${createHash('sha256').update(root).digest('hex')}`,
-                    root,
-                );
-                return new PluginRepositoryRefresh({
-                    repository,
-                    catalogEntryCount: 0,
-                });
-            }
-            const repository = await trustedRepository(repositoryId);
-            const catalog = await repository.refresh();
-            return new PluginRepositoryRefresh({
-                repository: stored.repository,
-                catalogEntryCount: catalog.length,
-            });
+            return await serializeRepositoryOperation(
+                repositoryId,
+                async () => {
+                    const stored = await repositoryStore.get(repositoryId);
+                    if (!stored)
+                        throw new PluginManagerError(
+                            'pluginArtifactInvalid',
+                            'Plugin repository was not found.',
+                        );
+                    if (stored.repository.kind !== 'https')
+                        throw new PluginManagerError(
+                            'pluginPolicyDenied',
+                            'Git-backed plugin repositories are not implemented yet.',
+                        );
+                    if (stored.repository.trustState !== 'trusted') {
+                        const root = await fetchPublisherRoot(
+                            repositoryId,
+                            stored.repository.url,
+                            stored.repository.credentialState,
+                        );
+                        const nextFingerprint = `sha256:${createHash('sha256').update(root).digest('hex')}`;
+                        const proposedRepository = new PluginRepository({
+                            ...stored.repository,
+                            publisherFingerprint: nextFingerprint,
+                            trustState: 'untrusted',
+                            freshness: 'fresh',
+                        });
+                        await recordRepositoryAudit(
+                            stored.repository.publisherFingerprint
+                                ? 'publisher.rootChangeRequested'
+                                : 'publisher.rootFetchRequested',
+                            'allowed',
+                            proposedRepository,
+                        );
+                        const repository = await repositoryStore.setRoot(
+                            repositoryId,
+                            nextFingerprint,
+                            root,
+                        );
+                        repositories.delete(String(repositoryId));
+                        await recordRepositoryAudit(
+                            stored.repository.publisherFingerprint
+                                ? 'publisher.rootChanged'
+                                : 'publisher.rootFetched',
+                            'allowed',
+                            repository,
+                        );
+                        return new PluginRepositoryRefresh({
+                            repository,
+                            catalogEntryCount: 0,
+                        });
+                    }
+                    const repository = await trustedRepository(repositoryId);
+                    const catalog = await refreshTrustedCatalog(
+                        repositoryId,
+                        repository,
+                    );
+                    const currentRepository =
+                        await trustedRepository(repositoryId);
+                    if (currentRepository !== repository) {
+                        throw new PluginManagerError(
+                            'pluginRepositoryUntrusted',
+                            'Plugin repository trust changed during refresh.',
+                        );
+                    }
+                    const current = await repositoryStore.get(repositoryId);
+                    return new PluginRepositoryRefresh({
+                        repository: current!.repository,
+                        catalogEntryCount: catalog.length,
+                    });
+                },
+            );
         },
         catalogList: async (
             repositoryId: PluginRepositoryIdInput['repositoryId'],
         ): Promise<readonly PluginCatalogEntry[]> => {
-            const repository = await trustedRepository(repositoryId);
-            return repository.refresh();
+            return await serializeRepositoryOperation(
+                repositoryId,
+                async () => {
+                    const repository = await trustedRepository(repositoryId);
+                    const catalog = await refreshTrustedCatalog(
+                        repositoryId,
+                        repository,
+                    );
+                    if (
+                        (await trustedRepository(repositoryId)) !== repository
+                    ) {
+                        throw new PluginManagerError(
+                            'pluginRepositoryUntrusted',
+                            'Plugin repository trust changed during catalog refresh.',
+                        );
+                    }
+                    return catalog;
+                },
+            );
         },
         install: async (
             input: PluginInstallInput,
         ): Promise<InstalledPlugin> => {
-            const repository = repositories.get(String(input.repositoryId));
-            if (!repository)
-                throw new PluginManagerError(
-                    'pluginMetadataInvalid',
-                    'Refresh the trusted plugin repository before installing.',
-                );
-            const verifiedTarget = await repository.stage(
-                input.pluginId,
-                input.version,
+            return await serializeRepositoryOperation(
+                input.repositoryId,
+                async () =>
+                    await serializePluginOperation(input.pluginId, async () => {
+                        const repository = await trustedRepository(
+                            input.repositoryId,
+                        );
+                        const verifiedTarget = await repository.stage(
+                            input.pluginId,
+                            input.version,
+                        );
+                        if (
+                            verifiedTarget.target.artifactSha256 !==
+                                input.artifactSha256 ||
+                            pluginReviewToken(verifiedTarget.target) !==
+                                input.reviewToken
+                        ) {
+                            throw new PluginManagerError(
+                                'pluginMetadataInvalid',
+                                'The reviewed plugin artifact changed. Review it again before installing.',
+                            );
+                        }
+                        if (
+                            (await trustedRepository(input.repositoryId)) !==
+                            repository
+                        ) {
+                            throw new PluginManagerError(
+                                'pluginRepositoryUntrusted',
+                                'Plugin repository trust changed during installation.',
+                            );
+                        }
+                        return manager.installVerified({
+                            target: verifiedTarget.target,
+                            repositoryId: input.repositoryId,
+                            tufTargetVersion: verifiedTarget.tufTargetVersion,
+                            grant: input.grant,
+                        });
+                    }),
             );
-            if (verifiedTarget.target.artifactSha256 !== input.artifactSha256) {
-                throw new PluginManagerError(
-                    'pluginMetadataInvalid',
-                    'The reviewed plugin artifact changed. Review it again before installing.',
-                );
-            }
-            return manager.installVerified({
-                target: verifiedTarget.target,
-                repositoryId: input.repositoryId,
-                tufTargetVersion: verifiedTarget.tufTargetVersion,
-                grant: input.grant,
-            });
         },
         installReview: async (
             input: PluginInstallReviewInput,
         ): Promise<PluginInstallReview> => {
-            const repository = repositories.get(String(input.repositoryId));
-            if (!repository) {
-                throw new PluginManagerError(
-                    'pluginMetadataInvalid',
-                    'Refresh the trusted plugin repository before reviewing an install.',
-                );
-            }
-            const review = await repository.review(
-                input.pluginId,
-                input.version,
+            return await serializeRepositoryOperation(
+                input.repositoryId,
+                async () => {
+                    const repository = await trustedRepository(
+                        input.repositoryId,
+                    );
+                    const review = await repository.review(
+                        input.pluginId,
+                        input.version,
+                    );
+                    if (
+                        (await trustedRepository(input.repositoryId)) !==
+                        repository
+                    ) {
+                        throw new PluginManagerError(
+                            'pluginRepositoryUntrusted',
+                            'Plugin repository trust changed during install review.',
+                        );
+                    }
+                    return new PluginInstallReview({
+                        ...review,
+                        reviewToken: pluginReviewToken(review.target),
+                    });
+                },
             );
-            return new PluginInstallReview(review);
         },
         list: async (): Promise<readonly InstalledPlugin[]> => {
             await requireReady();
@@ -810,10 +1099,7 @@ export const makeTrustedPluginManager = (
                     operationId,
                 );
                 await dispatchToolHooks('after', 'failed');
-                throw new PluginManagerError(
-                    'pluginWorkerFailed',
-                    `Plugin command ${input.commandId} failed.`,
-                );
+                throw classifiedPluginError(error);
             }
 
             await dispatchToolHooks('after', 'completed');
@@ -882,10 +1168,17 @@ export const makeTrustedPluginManager = (
 const toGitError = (error: unknown): GitError =>
     error instanceof PluginManagerError
         ? new GitError({ code: error.code, message: error.message })
-        : new GitError({
-              code: 'pluginWorkerFailed',
-              message: 'Trusted plugin operation failed.',
-          });
+        : error instanceof PluginPolicyError
+          ? new GitError({
+                code: rpcPluginPolicyCode(error.code),
+                message: error.message,
+            })
+          : error instanceof PluginRepositoryTransportError
+            ? new GitError({ code: error.code, message: error.message })
+            : new GitError({
+                  code: 'pluginWorkerFailed',
+                  message: 'Trusted plugin operation failed.',
+              });
 
 const effectFrom = <A>(
     operation: () => Promise<A>,
@@ -939,7 +1232,25 @@ const isSafePathComponent = (value: string): boolean =>
     value !== '..';
 
 const errorCode = (error: unknown): string =>
-    error instanceof PluginManagerError ? error.code : 'pluginWorkerFailed';
+    error instanceof PluginManagerError || error instanceof PluginPolicyError
+        ? error.code
+        : 'pluginWorkerFailed';
+
+const classifiedPluginError = (error: unknown): PluginManagerError => {
+    if (error instanceof PluginManagerError) return error;
+    if (error instanceof PluginPolicyError)
+        return new PluginManagerError(
+            rpcPluginPolicyCode(error.code),
+            error.message,
+        );
+    return new PluginManagerError(
+        'pluginWorkerFailed',
+        'Plugin command failed.',
+    );
+};
+
+const rpcPluginPolicyCode = (code: PluginPolicyError['code']): GitErrorCode =>
+    code === 'pluginRepositoryInvalid' ? 'pluginMetadataInvalid' : code;
 
 const serializePluginOutput = (
     value: unknown,
@@ -947,16 +1258,19 @@ const serializePluginOutput = (
     if (value === undefined) return {};
     const result = Schema.decodeUnknownOption(PluginCommandResult)(value);
     if (result._tag === 'Some') {
+        // Structured results are serialized as JSON on the RPC boundary.
         assertOutputLimit(JSON.stringify(result.value));
         return { result: result.value };
     }
     const output = typeof value === 'string' ? value : JSON.stringify(value);
+    // Legacy output is carried as a string, so measure its UTF-8 payload rather
+    // than JSON escaping that happens only during the enclosing RPC encoding.
     assertOutputLimit(output);
     return { output };
 };
 
 const assertOutputLimit = (output: string): void => {
-    if (output.length > 1024 * 1024) {
+    if (new TextEncoder().encode(output).byteLength > 1024 * 1024) {
         throw new PluginManagerError(
             'resultTooLarge',
             'Plugin command output exceeds the 1 MiB limit.',

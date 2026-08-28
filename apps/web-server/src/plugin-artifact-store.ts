@@ -33,6 +33,7 @@ import {
 import { Schema } from 'effect';
 
 import { resolvePluginDataDirectory } from './plugin-lock-store';
+import { serverVersion } from './server-version';
 
 export interface PluginArtifactStore {
     readonly stage: (
@@ -67,6 +68,7 @@ export const makePluginArtifactStore = (
 ): PluginArtifactStore => {
     const dataDirectory =
         options.dataDirectory ?? resolvePluginDataDirectory(options.env);
+    const hostVersion = serverVersion(options.env);
 
     return {
         stage: async (target, artifact) => {
@@ -124,8 +126,12 @@ export const makePluginArtifactStore = (
             const artifact = await readFile(staged);
             const actualSha256 = `sha256:${createHash('sha256').update(artifact).digest('hex')}`;
             validateArtifact(target, artifact.byteLength, actualSha256);
-            const { files, manifest } = await inspectArtifact(target, artifact);
-            validateGrant(manifest, grant);
+            const { files, manifest } = await inspectArtifact(
+                target,
+                artifact,
+                hostVersion,
+            );
+            validateGrant(manifest, grant, hostVersion);
             if (!files.has(manifest.entrypoint)) {
                 throw invalidArchive(
                     'Plugin archive does not contain its entrypoint.',
@@ -200,7 +206,8 @@ export const makePluginArtifactStore = (
                 artifact.byteLength,
                 `sha256:${createHash('sha256').update(artifact).digest('hex')}`,
             );
-            return (await inspectArtifact(target, artifact)).manifest;
+            return (await inspectArtifact(target, artifact, hostVersion))
+                .manifest;
         },
         remove: async pluginId => {
             if (!isSafePathComponent(pluginId)) {
@@ -226,6 +233,7 @@ export const makePluginArtifactStore = (
 const inspectArtifact = async (
     target: PluginCatalogEntry,
     artifact: Uint8Array,
+    hostVersion: string,
 ): Promise<{
     readonly files: Map<string, Uint8Array>;
     readonly manifest: PluginManifest;
@@ -234,10 +242,15 @@ const inspectArtifact = async (
         await decompressZstd(artifact),
         artifact.byteLength,
     );
-    const manifest = Schema.decodeUnknownSync(PluginManifest)(
-        JSON.parse(new TextDecoder().decode(files.get('plugin.json')!)),
-    );
-    await validateManifestTargetConsistency(manifest, target);
+    let manifest: PluginManifest;
+    try {
+        manifest = Schema.decodeUnknownSync(PluginManifest)(
+            JSON.parse(new TextDecoder().decode(files.get('plugin.json')!)),
+        );
+    } catch {
+        throw invalidArchive('Plugin archive has an invalid plugin manifest.');
+    }
+    await validateManifestTargetConsistency(manifest, target, hostVersion);
     return { files, manifest };
 };
 
