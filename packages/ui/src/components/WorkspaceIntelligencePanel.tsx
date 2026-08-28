@@ -68,10 +68,21 @@ const parsePatterns = (value: string): ReadonlyArray<string> =>
         .map(pattern => pattern.trim())
         .filter(pattern => pattern !== '');
 
-const inspectArchitectureGraph = () =>
+const scrollToWorkspaceIntelligenceSection = (id: string) =>
     document
-        .getElementById('workspace-intelligence-search')
+        .getElementById(id)
         ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+const intelligenceNavigation = [
+    {
+        id: 'workspace-intelligence-analysis',
+        label: 'Overview',
+    },
+    {
+        id: 'workspace-intelligence-runs',
+        label: 'Runs',
+    },
+] as const;
 
 /** M1 workspace view: durable run history and truthful foundation coverage only. */
 export function WorkspaceIntelligencePanel({
@@ -1108,10 +1119,77 @@ export function WorkspaceIntelligencePanel({
 
     return (
         <div className="min-h-0 flex-1 overflow-auto p-4">
-            <div className="flex max-w-3xl flex-col gap-5">
+            <div className="flex w-full min-w-0 flex-col gap-5">
+                <nav
+                    aria-label="Intelligence sections"
+                    className="bg-background/95 sticky top-0 z-10 -mx-4 flex overflow-x-auto border-y px-4 py-2 backdrop-blur"
+                >
+                    <div className="flex min-w-max items-center gap-1">
+                        {intelligenceNavigation.map(item => (
+                            <a
+                                key={item.id}
+                                href={`#${item.id}`}
+                                className="text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:ring-ring rounded-md px-3 py-1.5 text-xs font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none"
+                                onClick={event => {
+                                    event.preventDefault();
+                                    scrollToWorkspaceIntelligenceSection(
+                                        item.id,
+                                    );
+                                }}
+                            >
+                                {item.label}
+                            </a>
+                        ))}
+                        {report ? (
+                            <a
+                                href="#workspace-intelligence-report"
+                                className="text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:ring-ring rounded-md px-3 py-1.5 text-xs font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none"
+                                onClick={event => {
+                                    event.preventDefault();
+                                    scrollToWorkspaceIntelligenceSection(
+                                        'workspace-intelligence-report',
+                                    );
+                                }}
+                            >
+                                Report
+                            </a>
+                        ) : null}
+                        {selected && api.workspaceIntelligenceGraphSearch ? (
+                            <a
+                                href="#workspace-intelligence-search"
+                                className="text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:ring-ring rounded-md px-3 py-1.5 text-xs font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none"
+                                onClick={event => {
+                                    event.preventDefault();
+                                    scrollToWorkspaceIntelligenceSection(
+                                        'workspace-intelligence-search',
+                                    );
+                                }}
+                            >
+                                Explore graph
+                            </a>
+                        ) : null}
+                        {selected?.isValid &&
+                        api.workspaceIntelligenceEnrichmentStart &&
+                        api.workspaceIntelligenceEnrichmentList &&
+                        api.workspaceIntelligenceEnrichmentPreferredSet ? (
+                            <a
+                                href="#workspace-intelligence-enrichment"
+                                className="text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:ring-ring rounded-md px-3 py-1.5 text-xs font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none"
+                                onClick={event => {
+                                    event.preventDefault();
+                                    scrollToWorkspaceIntelligenceSection(
+                                        'workspace-intelligence-enrichment',
+                                    );
+                                }}
+                            >
+                                AI enrichment
+                            </a>
+                        ) : null}
+                    </div>
+                </nav>
                 <section
                     id="workspace-intelligence-analysis"
-                    className="rounded-lg border p-4"
+                    className="scroll-mt-14 rounded-lg border p-4"
                 >
                     <div className="flex flex-wrap items-start justify-between gap-3">
                         <div>
@@ -1366,7 +1444,11 @@ export function WorkspaceIntelligencePanel({
                     </div>
                 </section>
 
-                <section aria-live="polite">
+                <section
+                    id="workspace-intelligence-runs"
+                    aria-live="polite"
+                    className="scroll-mt-14"
+                >
                     <div className="mb-2 flex items-center justify-between">
                         <h2 className="text-sm font-semibold">Run history</h2>
                         <div className="flex items-center gap-2">
@@ -1594,7 +1676,7 @@ export function WorkspaceIntelligencePanel({
                 {report ? (
                     <section
                         id="workspace-intelligence-report"
-                        className="rounded-lg border p-4"
+                        className="scroll-mt-14 rounded-lg border p-4"
                     >
                         <div className="flex flex-wrap items-start justify-between gap-3">
                             <div>
@@ -1732,7 +1814,11 @@ export function WorkspaceIntelligencePanel({
                                     <Button
                                         size="sm"
                                         variant="outline"
-                                        onClick={inspectArchitectureGraph}
+                                        onClick={() =>
+                                            scrollToWorkspaceIntelligenceSection(
+                                                'workspace-intelligence-search',
+                                            )
+                                        }
                                     >
                                         Inspect graph
                                     </Button>
@@ -1767,7 +1853,7 @@ export function WorkspaceIntelligencePanel({
                 api.workspaceIntelligenceEnrichmentPreferredSet ? (
                     <section
                         id="workspace-intelligence-enrichment"
-                        className="rounded-lg border p-4"
+                        className="scroll-mt-14 rounded-lg border p-4"
                     >
                         <div className="flex flex-wrap items-start justify-between gap-3">
                             <div>
@@ -2171,7 +2257,7 @@ export function WorkspaceIntelligencePanel({
                 {selected && api.workspaceIntelligenceGraphSearch ? (
                     <section
                         id="workspace-intelligence-search"
-                        className="rounded-lg border p-4"
+                        className="scroll-mt-14 rounded-lg border p-4"
                     >
                         <h2 className="text-sm font-semibold">
                             Search architecture

@@ -303,6 +303,13 @@ describe('EngagementOverview', () => {
         expect(
             await screen.findByRole('button', { name: 'Analyze workspace' }),
         ).toBeTruthy();
+        const intelligenceNavigation = screen.getByRole('navigation', {
+            name: 'Intelligence sections',
+        });
+        expect(
+            screen.getByRole('link', { name: 'Overview' }).getAttribute('href'),
+        ).toBe('#workspace-intelligence-analysis');
+        expect(intelligenceNavigation.textContent).toContain('Runs');
         expect(
             screen.getByText(
                 /does not call an AI provider or send source data/i,
