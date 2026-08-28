@@ -41,6 +41,7 @@ const ALLOWED_INTERNAL = {
         '@cbranch/core',
     ]),
     '@cbranch/tauri': new Set(['@cbranch/ui']),
+    '@cbranch/system-map': new Set([]),
 };
 
 // Server / listening-socket libraries. Only @cbranch/web-server may declare these.

@@ -21,7 +21,10 @@ export default defineConfig({
         },
     },
     test: {
-        include: ['packages/ui/src/**/*.browser.test.tsx'],
+        include: [
+            'packages/ui/src/**/*.browser.test.tsx',
+            'apps/system-map/src/**/*.browser.test.tsx',
+        ],
         testTimeout: 15_000,
         // Serialize browser specs: parallel Chromium contexts race over shared
         // portals/resources and flake (a file passes alone but fails in the pack).

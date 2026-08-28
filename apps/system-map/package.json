@@ -1,0 +1,28 @@
+{
+    "name": "@cbranch/system-map",
+    "version": "0.0.0",
+    "private": true,
+    "description": "Interactive source-backed architecture map for cbranch",
+    "license": "MIT",
+    "type": "module",
+    "scripts": {
+        "dev": "vite --host 127.0.0.1 --port 5174 --strictPort --open",
+        "build": "tsc -p tsconfig.json --noEmit && vite build",
+        "typecheck": "tsc -p tsconfig.json --noEmit",
+        "verify:sources": "node scripts/verify-citations.mjs"
+    },
+    "dependencies": {
+        "lucide-react": "^1.22.0",
+        "react": "^19.2.7",
+        "react-dom": "^19.2.7"
+    },
+    "devDependencies": {
+        "@testing-library/react": "^16.3.2",
+        "@testing-library/user-event": "^14.6.1",
+        "@types/react": "^19.2.17",
+        "@types/react-dom": "^19.2.3",
+        "jsdom": "^29.1.1",
+        "typescript": "^6.0.3",
+        "vite": "^8.1.2"
+    }
+}
