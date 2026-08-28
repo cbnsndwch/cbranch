@@ -142,8 +142,14 @@ describe('PluginsDialog', () => {
         );
 
         fireEvent.click(screen.getByRole('tab', { name: 'Repositories' }));
+        expect(await screen.findByText('sha256:publisher')).toBeTruthy();
+        expect(
+            screen.getByText(/Compare this fingerprint through an independent/),
+        ).toBeTruthy();
         fireEvent.click(
-            await screen.findByRole('button', { name: 'Trust publisher' }),
+            screen.getByRole('button', {
+                name: 'I compared it, trust publisher',
+            }),
         );
         await waitFor(() =>
             expect(trust).toHaveBeenCalledWith(
@@ -246,5 +252,54 @@ describe('PluginsDialog', () => {
                 .getByRole('tab', { name: 'Installed' })
                 .getAttribute('aria-selected'),
         ).toBe('true');
+    });
+
+    test('appends audit pages when loading more', async () => {
+        const auditList = vi
+            .fn()
+            .mockResolvedValueOnce({
+                events: [
+                    {
+                        at: 1,
+                        action: 'publisher.trust',
+                        outcome: 'allowed',
+                    },
+                ],
+                nextCursor: '1',
+            })
+            .mockResolvedValueOnce({
+                events: [
+                    {
+                        at: 2,
+                        action: 'repository.remove',
+                        outcome: 'allowed',
+                    },
+                ],
+            });
+        const api = {
+            pluginRepositoryList: vi.fn(async () => []),
+            pluginList: vi.fn(async () => []),
+            pluginRuntimeStatus: vi.fn(async () => ({ available: true })),
+            pluginAuditList: auditList,
+        } as unknown as CbranchApi;
+        const queryClient = new QueryClient({
+            defaultOptions: { queries: { retry: false } },
+        });
+        useUiStore.setState({ pluginsDialogOpen: true });
+        render(
+            <QueryClientProvider client={queryClient}>
+                <ApiProvider api={api}>
+                    <PluginsDialog />
+                </ApiProvider>
+            </QueryClientProvider>,
+        );
+
+        fireEvent.click(screen.getByRole('tab', { name: 'Audit' }));
+        expect(await screen.findByText(/publisher\.trust/)).toBeTruthy();
+        fireEvent.click(screen.getByRole('button', { name: 'Load more' }));
+        expect(await screen.findByText(/repository\.remove/)).toBeTruthy();
+        expect(screen.getByText(/publisher\.trust/)).toBeTruthy();
+        expect(auditList).toHaveBeenNthCalledWith(1, { cursor: undefined });
+        expect(auditList).toHaveBeenNthCalledWith(2, { cursor: '1' });
     });
 });

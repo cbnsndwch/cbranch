@@ -71,6 +71,7 @@ import {
     type PatchSelection,
     type PullRequestListState,
     type InstalledPlugin,
+    type PluginAuditPage,
     type PluginCatalogEntry,
     type PluginGrant,
     type PluginId,
@@ -139,6 +140,7 @@ export interface CbranchApi {
         readonly pluginId: PluginId;
         readonly version: string;
         readonly artifactSha256: string;
+        readonly reviewToken: string;
         readonly grant: PluginGrant;
     }): Promise<InstalledPlugin>;
     pluginInstallReview(input: {
@@ -150,6 +152,10 @@ export interface CbranchApi {
     pluginEnable(pluginId: PluginId): Promise<InstalledPlugin>;
     pluginDisable(pluginId: PluginId): Promise<InstalledPlugin>;
     pluginUninstall(pluginId: PluginId): Promise<void>;
+    pluginAuditList(input?: {
+        readonly pluginId?: PluginId;
+        readonly cursor?: string;
+    }): Promise<PluginAuditPage>;
     pluginInvoke(input: {
         readonly pluginId: PluginId;
         readonly commandId: string;
@@ -729,6 +735,8 @@ export const makeApi = (runtime: AppRuntime): CbranchApi => {
             runtime.runPromise(
                 withClient(c => c.PluginUninstall({ pluginId })),
             ),
+        pluginAuditList: input =>
+            runtime.runPromise(withClient(c => c.PluginAuditList(input ?? {}))),
         pluginInvoke: input =>
             runtime.runPromise(withClient(c => c.PluginInvoke(input))),
         repoOpen: path =>

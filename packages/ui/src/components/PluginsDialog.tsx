@@ -1,4 +1,8 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+    useInfiniteQuery,
+    useQuery,
+    useQueryClient,
+} from '@tanstack/react-query';
 import {
     type PluginInstallReview,
     type PluginRepositoryId,
@@ -27,7 +31,7 @@ const EMPTY_GRANT = {
     hostAutomationApproved: false,
 } as const;
 
-type PluginManagerTab = 'installed' | 'discover' | 'repositories';
+type PluginManagerTab = 'installed' | 'discover' | 'repositories' | 'audit';
 
 const errorMessage = (error: unknown): string =>
     error instanceof Error ? error.message : String(error);
@@ -83,6 +87,18 @@ function PluginsDialogBody({ onClose }: { readonly onClose: () => void }) {
         queryFn: () => api.pluginCatalogList(selectedRepositoryId!),
         enabled: selectedRepositoryId !== undefined,
     });
+    const runtime = useQuery({
+        queryKey: ['plugins', 'runtime'],
+        queryFn: () => api.pluginRuntimeStatus(),
+    });
+    const audit = useInfiniteQuery({
+        queryKey: ['plugins', 'audit'],
+        queryFn: ({ pageParam }) =>
+            api.pluginAuditList({ cursor: pageParam || undefined }),
+        initialPageParam: '',
+        getNextPageParam: page => page.nextCursor,
+        enabled: tab === 'audit',
+    });
     const selectedRepository = repositories.data?.find(
         repository => repository.id === selectedRepositoryId,
     );
@@ -121,6 +137,7 @@ function PluginsDialogBody({ onClose }: { readonly onClose: () => void }) {
                                 ['installed', 'Installed'],
                                 ['discover', 'Discover'],
                                 ['repositories', 'Repositories'],
+                                ['audit', 'Audit'],
                             ] as const
                         ).map(([id, label]) => (
                             <Button
@@ -191,6 +208,14 @@ function PluginsDialogBody({ onClose }: { readonly onClose: () => void }) {
                                         </span>
                                         <span>{repository.trustState}</span>
                                     </div>
+                                    <p className="text-muted-foreground">
+                                        Metadata: {repository.freshness} |
+                                        Credentials:{' '}
+                                        {repository.credentialState}
+                                        {repository.lastSuccessfulRefreshAt
+                                            ? ` | Refreshed ${new Date(repository.lastSuccessfulRefreshAt).toLocaleString()}`
+                                            : ''}
+                                    </p>
                                     {repository.trustState === 'untrusted' &&
                                         !repository.publisherFingerprint && (
                                             <p className="text-muted-foreground">
@@ -221,20 +246,34 @@ function PluginsDialogBody({ onClose }: { readonly onClose: () => void }) {
                                         {repository.trustState ===
                                             'untrusted' &&
                                             repository.publisherFingerprint && (
-                                                <Button
-                                                    size="sm"
-                                                    onClick={() =>
-                                                        run(
-                                                            api.pluginPublisherTrust(
-                                                                repository.id,
-                                                                repository.publisherFingerprint!,
-                                                            ),
-                                                            'Publisher trusted.',
-                                                        )
-                                                    }
-                                                >
-                                                    Trust publisher
-                                                </Button>
+                                                <div className="grid gap-2">
+                                                    <p className="break-all font-mono select-all">
+                                                        {
+                                                            repository.publisherFingerprint
+                                                        }
+                                                    </p>
+                                                    <p className="text-muted-foreground">
+                                                        Compare this fingerprint
+                                                        through an independent
+                                                        publisher channel before
+                                                        approving it.
+                                                    </p>
+                                                    <Button
+                                                        size="sm"
+                                                        onClick={() =>
+                                                            run(
+                                                                api.pluginPublisherTrust(
+                                                                    repository.id,
+                                                                    repository.publisherFingerprint!,
+                                                                ),
+                                                                'Publisher trusted.',
+                                                            )
+                                                        }
+                                                    >
+                                                        I compared it, trust
+                                                        publisher
+                                                    </Button>
+                                                </div>
                                             )}
                                         <Button
                                             size="sm"
@@ -352,8 +391,37 @@ function PluginsDialogBody({ onClose }: { readonly onClose: () => void }) {
                                     className="flex items-center gap-2 border p-2 text-xs"
                                 >
                                     <span className="flex-1">
-                                        {plugin.lock.pluginId}{' '}
-                                        {plugin.lock.version}
+                                        <span className="block">
+                                            {plugin.lock.pluginId}{' '}
+                                            {plugin.lock.version}
+                                        </span>
+                                        <span className="block break-all text-muted-foreground">
+                                            Publisher:{' '}
+                                            {plugin.lock.publisherFingerprint}
+                                        </span>
+                                        <span className="block text-muted-foreground">
+                                            Grant:{' '}
+                                            {plugin.grant.capabilities.join(
+                                                ', ',
+                                            ) || 'None'}
+                                            ; commands:{' '}
+                                            {plugin.contributions.commands
+                                                .map(command => command.title)
+                                                .join(', ') || 'None'}
+                                            ; panels:{' '}
+                                            {plugin.contributions.panels
+                                                .map(panel => panel.title)
+                                                .join(', ') || 'None'}
+                                        </span>
+                                        <span className="block text-muted-foreground">
+                                            {plugin.enabled
+                                                ? 'Enabled'
+                                                : 'Disabled'}
+                                            ; runtime{' '}
+                                            {runtime.data?.available
+                                                ? 'available'
+                                                : 'unavailable'}
+                                        </span>
                                     </span>
                                     <Button
                                         size="sm"
@@ -390,6 +458,38 @@ function PluginsDialogBody({ onClose }: { readonly onClose: () => void }) {
                                     </Button>
                                 </div>
                             ))}
+                        </section>
+                    )}
+                    {tab === 'audit' && (
+                        <section className="grid gap-2 text-xs">
+                            <strong>Plugin audit history</strong>
+                            {audit.data?.pages
+                                .flatMap(page => page.events)
+                                .map(event => (
+                                    <p
+                                        key={`${event.at}-${event.action}-${event.operationId ?? ''}`}
+                                        className="border p-2"
+                                    >
+                                        {new Date(event.at).toLocaleString()}:{' '}
+                                        {event.pluginId ?? 'repository'}{' '}
+                                        {event.action} {event.outcome}
+                                        {event.errorCode
+                                            ? ` (${event.errorCode})`
+                                            : ''}
+                                    </p>
+                                ))}
+                            {audit.hasNextPage && (
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    disabled={audit.isFetchingNextPage}
+                                    onClick={() => void audit.fetchNextPage()}
+                                >
+                                    {audit.isFetchingNextPage
+                                        ? 'Loading…'
+                                        : 'Load more'}
+                                </Button>
+                            )}
                         </section>
                     )}
                     {installReview && selectedRepositoryId && (
@@ -489,6 +589,8 @@ function PluginsDialogBody({ onClose }: { readonly onClose: () => void }) {
                                                         artifactSha256:
                                                             installReview.target
                                                                 .artifactSha256,
+                                                        reviewToken:
+                                                            installReview.reviewToken,
                                                         grant: EMPTY_GRANT,
                                                     }),
                                                     'Plugin installed. Enable it to use it.',
