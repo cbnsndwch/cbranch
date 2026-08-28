@@ -63,6 +63,12 @@ import {
 } from '../schemas/forge';
 import { InvalidationEvent } from '../schemas/live';
 import {
+    InferenceModelDiscovery,
+    InferenceProfile,
+    InferenceProfileDiscovery,
+    WorkspaceInferenceDefaults,
+} from '../schemas/inference';
+import {
     BlameCommit,
     BlameData,
     BlameLine,
@@ -121,6 +127,23 @@ import {
     CommitMessage,
     WorkingTreeStatus,
 } from '../schemas/working-tree';
+import {
+    type WorkspaceIntelligenceAnalysisSettings,
+    WorkspaceIntelligenceCoverage,
+    WorkspaceIntelligenceRun,
+    WorkspaceIntelligenceRunEvent,
+    WorkspaceIntelligenceRunId,
+    WorkspaceIntelligenceReport,
+    WorkspaceIntelligenceGraphSearchResult,
+    WorkspaceIntelligenceSemanticSearchResult,
+    WorkspaceIntelligenceGraphNeighborhood,
+    WorkspaceIntelligenceGraphDiff,
+    WorkspaceIntelligencePresentation,
+    WorkspaceIntelligenceComponentOverride,
+    WorkspaceIntelligenceCurationAction,
+    WorkspaceIntelligenceEnrichmentAttempt,
+    WorkspaceIntelligenceInferredEdge,
+} from '../schemas/workspace-intelligence';
 import { CbranchRpcs } from './group';
 
 // --- schema-valid sample data (branded ids + one instance per success type) ---
@@ -180,6 +203,163 @@ const engagementDirectoryPreview = new EngagementDirectoryPreview({
 });
 
 const engagementId = EngagementId.make('client-acme');
+const workspaceIntelligenceRunId = WorkspaceIntelligenceRunId.make('run-acme');
+const workspaceIntelligenceCoverage = new WorkspaceIntelligenceCoverage({
+    repositoryCount: 1,
+    completedRepositoryCount: 1,
+    analyzerCount: 0,
+    isPartial: false,
+    summary: 'Foundational report complete.',
+});
+const workspaceIntelligenceAnalysisSettings: WorkspaceIntelligenceAnalysisSettings =
+    {
+        includePatterns: [],
+        excludePatterns: [],
+        maxSourceFiles: 25_000,
+        maxSourceFileBytes: 512_000,
+        maxRepositorySourceBytes: 100_000_000,
+        maxRepositoryDurationMs: 120_000,
+        maxGraphNodes: 100_000,
+        maxGraphEdges: 200_000,
+    };
+const workspaceIntelligenceRun = new WorkspaceIntelligenceRun({
+    id: workspaceIntelligenceRunId,
+    engagementId,
+    workspaceRepoIds: [repoId],
+    repoIds: [repoId],
+    state: 'completed',
+    createdAt: 1_700_000_000_000,
+    startedAt: 1_700_000_000_001,
+    finishedAt: 1_700_000_000_002,
+    eventSequence: 1,
+    isCurrent: true,
+    isValid: true,
+    coverage: workspaceIntelligenceCoverage,
+});
+const workspaceIntelligenceEvent = new WorkspaceIntelligenceRunEvent({
+    runId: workspaceIntelligenceRunId,
+    engagementId,
+    sequence: 1,
+    kind: 'completed',
+    state: 'completed',
+    at: 1_700_000_000_002,
+    message: 'Foundational report complete.',
+    coverage: workspaceIntelligenceCoverage,
+});
+const workspaceIntelligenceReport = new WorkspaceIntelligenceReport({
+    runId: workspaceIntelligenceRunId,
+    markdown: '# Workspace Intelligence\n',
+    nodeCount: 1,
+    edgeCount: 1,
+    unknownCount: 1,
+});
+const workspaceIntelligenceSearch = new WorkspaceIntelligenceGraphSearchResult({
+    nodes: [
+        {
+            id: 'repo:component:package.json',
+            kind: 'component',
+            label: 'cbranch',
+            repoId,
+            evidence: [],
+        },
+    ],
+});
+const workspaceIntelligenceSemanticSearch =
+    new WorkspaceIntelligenceSemanticSearchResult({
+        mode: 'semantic',
+        nodes: workspaceIntelligenceSearch.nodes,
+    });
+const workspaceIntelligenceNeighborhood =
+    new WorkspaceIntelligenceGraphNeighborhood({
+        nodes: [],
+        edges: [],
+    });
+const workspaceIntelligenceDiff = new WorkspaceIntelligenceGraphDiff({
+    addedNodeIds: [],
+    removedNodeIds: [],
+});
+const workspaceIntelligencePresentation = new WorkspaceIntelligencePresentation(
+    {
+        schemaVersion: 1,
+        runId: workspaceIntelligenceRunId,
+        selectedNodeId: 'repo:component:package.json',
+        expandedNodeIds: ['repo:component:package.json'],
+        nodePositions: [
+            {
+                nodeId: 'repo:component:package.json',
+                x: 10,
+                y: 20,
+            },
+        ],
+        showInferredEdges: false,
+        minimumConfidenceTier: 'low',
+    },
+);
+const workspaceIntelligenceOverrides = [
+    new WorkspaceIntelligenceComponentOverride({
+        componentId: 'repo:component:package.json',
+        displayName: 'API',
+    }),
+];
+const workspaceIntelligenceCurationAction =
+    new WorkspaceIntelligenceCurationAction({
+        id: 'curation-1',
+        at: 1_700_000_000_003,
+        actor: 'local-user',
+        kind: 'edge.annotate',
+        targetId: 'edge:api-to-users',
+        evidence: [],
+    });
+const workspaceIntelligenceEnrichmentAttempt =
+    new WorkspaceIntelligenceEnrichmentAttempt({
+        id: 'attempt-1',
+        runId: workspaceIntelligenceRunId,
+        profileId: 'hosted-default',
+        modelId: 'example-model',
+        promptSchemaVersion: 'workspace-intelligence.enrichment@1',
+        createdAt: 1_700_000_000_003,
+        completedAt: 1_700_000_000_004,
+        evidenceIds: ['repo:component:package.json'],
+        state: 'completed',
+        repairAttempted: false,
+        inferredEdges: [
+            new WorkspaceIntelligenceInferredEdge({
+                from: 'repo:component:package.json',
+                to: 'contract:api',
+                kind: 'exposes',
+                confidence: 0.9,
+                confidenceTier: 'high',
+                evidenceIds: ['repo:component:package.json'],
+                rationale: 'The selected component exposes the contract.',
+            }),
+        ],
+        summary: 'Optional provider enrichment.',
+        durationMs: 12,
+    });
+const inferenceProfiles = [
+    new InferenceProfile({
+        id: 'codex-local',
+        label: 'Codex local',
+        provider: 'codex',
+        enabled: true,
+        capabilities: ['generation'],
+        executable: '/usr/local/bin/codex',
+    }),
+];
+const workspaceInferenceDefaults = new WorkspaceInferenceDefaults({
+    generationProfileId: 'codex-local',
+});
+const inferenceDiscoveries = [
+    new InferenceProfileDiscovery({
+        provider: 'codex',
+        executable: '/usr/local/bin/codex',
+        version: 'codex 1.0.0',
+    }),
+];
+const inferenceModelDiscovery = new InferenceModelDiscovery({
+    profileId: 'remote',
+    modelIds: ['example-model'],
+});
 const changeSetId = ChangeSetId.make('release-set');
 const changeSetPullRequest = new ChangeSetPullRequest({
     repoId,
@@ -666,6 +846,68 @@ const handlers = CbranchRpcs.toLayer({
     EngagementRepoRemove: () => Effect.succeed(engagementWorkspace),
     EngagementSessionSet: () => Effect.succeed(engagementWorkspace),
     EngagementActivate: () => Effect.succeed(engagementWorkspace),
+    WorkspaceIntelligenceStart: () => Effect.succeed(workspaceIntelligenceRun),
+    WorkspaceIntelligenceAnalysisSettings: () =>
+        Effect.succeed(workspaceIntelligenceAnalysisSettings),
+    WorkspaceIntelligenceAnalysisSettingsSet: () =>
+        Effect.succeed(workspaceIntelligenceAnalysisSettings),
+    WorkspaceIntelligencePresentationGet: () =>
+        Effect.succeed(workspaceIntelligencePresentation),
+    WorkspaceIntelligencePresentationSet: () =>
+        Effect.succeed(workspaceIntelligencePresentation),
+    WorkspaceIntelligenceRunGet: () => Effect.succeed(workspaceIntelligenceRun),
+    WorkspaceIntelligenceRunReport: () =>
+        Effect.succeed(workspaceIntelligenceReport),
+    WorkspaceIntelligenceGraphSearch: () =>
+        Effect.succeed(workspaceIntelligenceSearch),
+    WorkspaceIntelligenceSemanticSearch: () =>
+        Effect.succeed(workspaceIntelligenceSemanticSearch),
+    WorkspaceIntelligenceGraphNeighborhood: () =>
+        Effect.succeed(workspaceIntelligenceNeighborhood),
+    WorkspaceIntelligenceGraphDiff: () =>
+        Effect.succeed(workspaceIntelligenceDiff),
+    WorkspaceIntelligenceComponentOverrides: () =>
+        Effect.succeed(workspaceIntelligenceOverrides),
+    WorkspaceIntelligenceComponentOverridesSet: () =>
+        Effect.succeed(workspaceIntelligenceOverrides),
+    WorkspaceIntelligenceCurationActions: () =>
+        Effect.succeed([workspaceIntelligenceCurationAction]),
+    WorkspaceIntelligenceCurationActionAppend: () =>
+        Effect.succeed(workspaceIntelligenceCurationAction),
+    WorkspaceIntelligenceCurationActionsClear: () => Effect.void,
+    WorkspaceIntelligenceRunList: () =>
+        Effect.succeed([workspaceIntelligenceRun]),
+    WorkspaceIntelligenceRunCancel: () =>
+        Effect.succeed(workspaceIntelligenceRun),
+    WorkspaceIntelligenceRunDelete: () => Effect.void,
+    WorkspaceIntelligenceCurrentSet: () => Effect.void,
+    WorkspaceIntelligenceCurrentClear: () => Effect.void,
+    WorkspaceIntelligenceRunHistoryClear: () => Effect.void,
+    WorkspaceIntelligenceArchiveRequest: () =>
+        Effect.succeed({
+            url: '/sidechannel/workspace-intelligence-archive?token=test',
+            filename: 'workspace-intelligence-run-acme.tar',
+            contentType: 'application/x-tar',
+        }),
+    WorkspaceIntelligenceRunSubscribe: () =>
+        Stream.make(workspaceIntelligenceEvent),
+    WorkspaceIntelligenceEnrichmentStart: () =>
+        Effect.succeed(workspaceIntelligenceEnrichmentAttempt),
+    WorkspaceIntelligenceEnrichmentCancel: () => Effect.void,
+    WorkspaceIntelligenceEnrichmentList: () =>
+        Effect.succeed([workspaceIntelligenceEnrichmentAttempt]),
+    WorkspaceIntelligenceEnrichmentPreferredGet: () =>
+        Effect.succeed(workspaceIntelligenceEnrichmentAttempt),
+    WorkspaceIntelligenceEnrichmentPreferredSet: () =>
+        Effect.succeed(workspaceIntelligenceEnrichmentAttempt),
+    InferenceProfilesGet: () => Effect.succeed(inferenceProfiles),
+    InferenceProfilesDiscover: () => Effect.succeed(inferenceDiscoveries),
+    InferenceModelsDiscover: () => Effect.succeed(inferenceModelDiscovery),
+    InferenceProfilesSet: () => Effect.succeed(inferenceProfiles),
+    WorkspaceInferenceDefaultsGet: () =>
+        Effect.succeed(workspaceInferenceDefaults),
+    WorkspaceInferenceDefaultsSet: () =>
+        Effect.succeed(workspaceInferenceDefaults),
     ChangeSetCreate: () => Effect.succeed(engagementWorkspace),
     ChangeSetUpdate: () => Effect.succeed(engagementWorkspace),
     ChangeSetDelete: () => Effect.succeed(engagementWorkspace),
@@ -988,6 +1230,186 @@ describe('CbranchRpcs engagement workspace contract', () => {
                 }),
             ),
         ).toBe(true);
+    });
+
+    test('Workspace Intelligence lifecycle operations and events round-trip', async () => {
+        const program = Effect.gen(function* () {
+            const client = yield* RpcTest.makeClient(CbranchRpcs);
+            const started = yield* client.WorkspaceIntelligenceStart({
+                engagementId,
+                repoIds: [repoId],
+            });
+            const analysisSettings =
+                yield* client.WorkspaceIntelligenceAnalysisSettings({
+                    engagementId,
+                });
+            const savedAnalysisSettings =
+                yield* client.WorkspaceIntelligenceAnalysisSettingsSet({
+                    engagementId,
+                    settings: analysisSettings,
+                });
+            const presentation =
+                yield* client.WorkspaceIntelligencePresentationGet({
+                    engagementId,
+                    runId: started.id,
+                });
+            const savedPresentation =
+                yield* client.WorkspaceIntelligencePresentationSet({
+                    engagementId,
+                    presentation,
+                });
+            const fetched = yield* client.WorkspaceIntelligenceRunGet({
+                engagementId,
+                runId: started.id,
+            });
+            const report = yield* client.WorkspaceIntelligenceRunReport({
+                engagementId,
+                runId: started.id,
+            });
+            const search = yield* client.WorkspaceIntelligenceGraphSearch({
+                engagementId,
+                runId: started.id,
+                query: 'cbranch',
+            });
+            const semanticSearch =
+                yield* client.WorkspaceIntelligenceSemanticSearch({
+                    engagementId,
+                    runId: started.id,
+                    query: 'cbranch architecture',
+                });
+            const neighborhood =
+                yield* client.WorkspaceIntelligenceGraphNeighborhood({
+                    engagementId,
+                    runId: started.id,
+                    nodeId: search.nodes[0]?.id ?? '',
+                });
+            const listed = yield* client.WorkspaceIntelligenceRunList({
+                engagementId,
+            });
+            const cancelled = yield* client.WorkspaceIntelligenceRunCancel({
+                engagementId,
+                runId: started.id,
+            });
+            yield* client.WorkspaceIntelligenceRunDelete({
+                engagementId,
+                runId: started.id,
+            });
+            yield* client.WorkspaceIntelligenceCurrentSet({
+                engagementId,
+                runId: started.id,
+            });
+            yield* client.WorkspaceIntelligenceCurrentClear({ engagementId });
+            yield* client.WorkspaceIntelligenceRunHistoryClear({
+                engagementId,
+            });
+            const archive = yield* client.WorkspaceIntelligenceArchiveRequest({
+                engagementId,
+                runId: started.id,
+            });
+            const events = yield* Stream.runCollect(
+                client.WorkspaceIntelligenceRunSubscribe({
+                    engagementId,
+                    runId: started.id,
+                    afterSequence: 0,
+                }),
+            );
+            const enrichment =
+                yield* client.WorkspaceIntelligenceEnrichmentStart({
+                    engagementId,
+                    runId: started.id,
+                });
+            yield* client.WorkspaceIntelligenceEnrichmentCancel({
+                engagementId,
+                runId: started.id,
+            });
+            const enrichments =
+                yield* client.WorkspaceIntelligenceEnrichmentList({
+                    engagementId,
+                    runId: started.id,
+                });
+            const preferred =
+                yield* client.WorkspaceIntelligenceEnrichmentPreferredSet({
+                    engagementId,
+                    runId: started.id,
+                    attemptId: enrichment.id,
+                });
+            return {
+                fetched,
+                analysisSettings,
+                savedAnalysisSettings,
+                presentation,
+                savedPresentation,
+                report,
+                search,
+                semanticSearch,
+                neighborhood,
+                listed,
+                cancelled,
+                archive,
+                events,
+                enrichment,
+                enrichments,
+                preferred,
+            };
+        }).pipe(Effect.provide(handlers), Effect.scoped);
+
+        const result = await Effect.runPromise(program);
+        expect(result.fetched.id).toBe(workspaceIntelligenceRunId);
+        expect(result.analysisSettings.maxSourceFiles).toBe(25_000);
+        expect(result.savedAnalysisSettings.maxGraphEdges).toBe(200_000);
+        expect(result.presentation.selectedNodeId).toBe(
+            'repo:component:package.json',
+        );
+        expect(result.savedPresentation.nodePositions).toHaveLength(1);
+        expect(result.report.nodeCount).toBe(1);
+        expect(result.search.nodes[0]?.label).toBe('cbranch');
+        expect(result.semanticSearch.mode).toBe('semantic');
+        expect(result.neighborhood.nodes).toEqual([]);
+        expect(result.listed).toHaveLength(1);
+        expect(result.cancelled.coverage.analyzerCount).toBe(0);
+        expect(result.archive.contentType).toBe('application/x-tar');
+        expect(result.events).toHaveLength(1);
+        expect(result.enrichment.inferredEdges[0]?.confidenceTier).toBe('high');
+        expect(result.enrichments).toHaveLength(1);
+        expect(result.preferred?.id).toBe('attempt-1');
+    });
+
+    test('inference profiles round-trip without credential values', async () => {
+        const program = Effect.gen(function* () {
+            const client = yield* RpcTest.makeClient(CbranchRpcs);
+            const profiles = yield* client.InferenceProfilesSet({
+                profiles: inferenceProfiles,
+            });
+            const discoveries = yield* client.InferenceProfilesDiscover({});
+            const models = yield* client.InferenceModelsDiscover({
+                profileId: 'remote',
+            });
+            const defaults = yield* client.WorkspaceInferenceDefaultsSet({
+                engagementId,
+                defaults: workspaceInferenceDefaults,
+            });
+            return {
+                profiles: yield* client.InferenceProfilesGet({}),
+                discoveries,
+                models,
+                defaults: yield* client.WorkspaceInferenceDefaultsGet({
+                    engagementId,
+                }),
+                savedProfiles: profiles,
+                savedDefaults: defaults,
+            };
+        }).pipe(Effect.provide(handlers), Effect.scoped);
+
+        const result = await Effect.runPromise(program);
+        expect(result.profiles[0]?.id).toBe('codex-local');
+        expect(result.discoveries[0]?.provider).toBe('codex');
+        expect(result.models.modelIds).toEqual(['example-model']);
+        expect(result.savedProfiles[0]?.executable).toBe(
+            '/usr/local/bin/codex',
+        );
+        expect(result.defaults.generationProfileId).toBe('codex-local');
+        expect(result.savedDefaults.embeddingProfileId).toBeUndefined();
+        expect(JSON.stringify(result)).not.toMatch(/api.?key|token|password/i);
     });
 
     test('GitHub PR metadata round-trips without credential fields', async () => {

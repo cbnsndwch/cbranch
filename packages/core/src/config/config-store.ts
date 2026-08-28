@@ -38,7 +38,7 @@ import { Effect, Semaphore } from 'effect';
 import { classifyNodeError, gitError } from '../git/errors';
 
 /** Current settings schema version (top-level integer for migration — NF-CFG-7). */
-export const CONFIG_VERSION = 4;
+export const CONFIG_VERSION = 5;
 
 /** Local host URL prefix for workspace images stored alongside cbranch's config. */
 export const WORKSPACE_AVATAR_PATH_PREFIX = '/sidechannel/workspace-avatar/';
@@ -124,6 +124,39 @@ export const DEFAULT_COLUMNS: HistoryColumns = {
     sha: true,
 };
 
+export type InferenceProviderKindData =
+    | 'claude-code'
+    | 'codex'
+    | 'opencode'
+    | 'openai-compatible'
+    | 'local-embeddings';
+export type InferenceCapabilityData = 'generation' | 'embeddings';
+
+/** A config-safe reference; credential values never enter cbranch config.json. */
+export interface InferenceSecretReferenceData {
+    readonly kind: 'environment' | 'secret-store';
+    readonly name: string;
+}
+
+/** Durable non-secret provider metadata, shared by all workspaces on this host. */
+export interface InferenceProfileData {
+    readonly id: string;
+    readonly label: string;
+    readonly provider: InferenceProviderKindData;
+    readonly enabled: boolean;
+    readonly capabilities: ReadonlyArray<InferenceCapabilityData>;
+    readonly modelId?: string;
+    readonly endpoint?: string;
+    readonly executable?: string;
+    readonly secretReference?: InferenceSecretReferenceData;
+}
+
+/** An engagement's separate generation and embedding profile selections. */
+export interface WorkspaceInferenceDefaultsData {
+    readonly generationProfileId?: string;
+    readonly embeddingProfileId?: string;
+}
+
 export interface Config {
     readonly version: number;
     readonly recentRepos: ReadonlyArray<RecentRepoEntry>;
@@ -136,6 +169,10 @@ export interface Config {
     readonly thresholds: Record<string, number>;
     readonly keybindings: Record<string, string>;
     readonly columns: HistoryColumns;
+    readonly inferenceProfiles: ReadonlyArray<InferenceProfileData>;
+    readonly workspaceInferenceDefaults: Readonly<
+        Record<string, WorkspaceInferenceDefaultsData>
+    >;
 }
 
 export const defaultConfig = (): Config => ({
@@ -150,6 +187,8 @@ export const defaultConfig = (): Config => ({
     thresholds: { ...DEFAULT_THRESHOLDS },
     keybindings: {},
     columns: { ...DEFAULT_COLUMNS },
+    inferenceProfiles: [],
+    workspaceInferenceDefaults: {},
 });
 
 /** Resolve the config file path with the documented precedence (NF-CFG-7 / NF-PKG-9). */
@@ -286,6 +325,23 @@ export interface ConfigStore {
     readonly setAppSettings: (
         patch: Partial<AppSettingsData>,
     ) => Effect.Effect<AppSettingsData, GitError>;
+    /** Read the host's non-secret inference provider profiles. */
+    readonly getInferenceProfiles: () => Effect.Effect<
+        ReadonlyArray<InferenceProfileData>
+    >;
+    /** Atomically replace host profiles, clearing incompatible workspace defaults. */
+    readonly setInferenceProfiles: (
+        profiles: ReadonlyArray<InferenceProfileData>,
+    ) => Effect.Effect<ReadonlyArray<InferenceProfileData>, GitError>;
+    /** Read an engagement's optional inference defaults. */
+    readonly getWorkspaceInferenceDefaults: (
+        engagementId: EngagementId,
+    ) => Effect.Effect<WorkspaceInferenceDefaultsData, GitError>;
+    /** Persist only enabled, capability-compatible profile selections. */
+    readonly setWorkspaceInferenceDefaults: (
+        engagementId: EngagementId,
+        defaults: WorkspaceInferenceDefaultsData,
+    ) => Effect.Effect<WorkspaceInferenceDefaultsData, GitError>;
 }
 
 /**
@@ -1324,6 +1380,74 @@ export const makeConfigStore = (opts?: {
                     return Effect.as(save({ ...config, ...next }), next);
                 }),
             ),
+        getInferenceProfiles: () =>
+            Effect.map(load(), config => config.inferenceProfiles),
+        setInferenceProfiles: profiles =>
+            writeLock.withPermits(1)(
+                Effect.flatMap(load(), config => {
+                    const normalized = normalizeInferenceProfiles(profiles);
+                    if (normalized.length !== profiles.length)
+                        return Effect.fail(
+                            gitError(
+                                'gitFailed',
+                                'Inference profiles must be valid, non-secret provider metadata with unique IDs.',
+                            ),
+                        );
+                    const workspaceInferenceDefaults =
+                        sanitizeWorkspaceInferenceDefaults(
+                            config.workspaceInferenceDefaults,
+                            normalized,
+                        );
+                    return Effect.as(
+                        save({
+                            ...config,
+                            inferenceProfiles: normalized,
+                            workspaceInferenceDefaults,
+                        }),
+                        normalized,
+                    );
+                }),
+            ),
+        getWorkspaceInferenceDefaults: engagementId =>
+            Effect.flatMap(load(), config =>
+                config.engagements.some(
+                    engagement => engagement.id === engagementId,
+                )
+                    ? Effect.succeed(
+                          config.workspaceInferenceDefaults[engagementId] ?? {},
+                      )
+                    : Effect.fail(missingEngagement(engagementId)),
+            ),
+        setWorkspaceInferenceDefaults: (engagementId, defaults) =>
+            writeLock.withPermits(1)(
+                Effect.flatMap(load(), config => {
+                    if (
+                        !config.engagements.some(
+                            engagement => engagement.id === engagementId,
+                        )
+                    )
+                        return Effect.fail(missingEngagement(engagementId));
+                    const normalized = normalizeWorkspaceInferenceDefault(
+                        defaults,
+                        config.inferenceProfiles,
+                    );
+                    if (normalized === undefined)
+                        return Effect.fail(
+                            gitError(
+                                'gitFailed',
+                                'Workspace inference defaults must select enabled profiles with matching capabilities.',
+                            ),
+                        );
+                    const workspaceInferenceDefaults = {
+                        ...config.workspaceInferenceDefaults,
+                        [engagementId]: normalized,
+                    };
+                    return Effect.as(
+                        save({ ...config, workspaceInferenceDefaults }),
+                        normalized,
+                    );
+                }),
+            ),
     };
 };
 
@@ -1358,7 +1482,224 @@ const normalizeConfig = (raw: string): Config => {
         thresholds: { ...base.thresholds, ...pickNumbers(obj.thresholds) },
         keybindings: pickStrings(obj.keybindings),
         columns: normalizeColumns(obj.columns),
+        inferenceProfiles: normalizeInferenceProfiles(obj.inferenceProfiles),
+        workspaceInferenceDefaults: sanitizeWorkspaceInferenceDefaults(
+            obj.workspaceInferenceDefaults,
+            normalizeInferenceProfiles(obj.inferenceProfiles),
+        ),
     };
+};
+
+const INFERENCE_PROFILE_ID = /^[a-z0-9]+(?:[._-][a-z0-9]+)*$/;
+const INFERENCE_REFERENCE_NAME = /^[A-Za-z_][A-Za-z0-9_./-]*$/;
+const INFERENCE_ENDPOINT = /^https?:\/\/[^/?#@]+(?:\/[^?#]*)?$/i;
+
+const inferenceProviderKinds = new Set<InferenceProviderKindData>([
+    'claude-code',
+    'codex',
+    'opencode',
+    'openai-compatible',
+    'local-embeddings',
+]);
+const inferenceCapabilities = new Set<InferenceCapabilityData>([
+    'generation',
+    'embeddings',
+]);
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+    typeof value === 'object' && value !== null && !Array.isArray(value);
+
+const normalizeInferenceSecretReference = (
+    value: unknown,
+): InferenceSecretReferenceData | undefined => {
+    if (!isRecord(value)) return undefined;
+    const kind = value.kind;
+    const name = value.name;
+    if (
+        (kind !== 'environment' && kind !== 'secret-store') ||
+        typeof name !== 'string' ||
+        name.length === 0 ||
+        name.length > 128 ||
+        !INFERENCE_REFERENCE_NAME.test(name)
+    )
+        return undefined;
+    return { kind, name };
+};
+
+const normalizeInferenceProfile = (
+    value: unknown,
+): InferenceProfileData | undefined => {
+    if (!isRecord(value)) return undefined;
+    const { id, label, provider, enabled, capabilities } = value;
+    if (
+        typeof id !== 'string' ||
+        id.length === 0 ||
+        id.length > 96 ||
+        !INFERENCE_PROFILE_ID.test(id) ||
+        typeof label !== 'string' ||
+        label.length === 0 ||
+        label.length > 160 ||
+        typeof provider !== 'string' ||
+        !inferenceProviderKinds.has(provider as InferenceProviderKindData) ||
+        typeof enabled !== 'boolean' ||
+        !Array.isArray(capabilities) ||
+        capabilities.length === 0 ||
+        capabilities.length > 2 ||
+        capabilities.some(
+            capability =>
+                typeof capability !== 'string' ||
+                !inferenceCapabilities.has(
+                    capability as InferenceCapabilityData,
+                ),
+        ) ||
+        new Set(capabilities).size !== capabilities.length
+    )
+        return undefined;
+    const modelId = value.modelId;
+    if (
+        modelId !== undefined &&
+        (typeof modelId !== 'string' ||
+            modelId.length === 0 ||
+            modelId.length > 200)
+    )
+        return undefined;
+    const endpoint = value.endpoint;
+    const executable = value.executable;
+    const isRemote = provider === 'openai-compatible';
+    if (
+        (isRemote &&
+            (typeof endpoint !== 'string' ||
+                !INFERENCE_ENDPOINT.test(endpoint) ||
+                executable !== undefined)) ||
+        (!isRemote &&
+            (endpoint !== undefined ||
+                typeof executable !== 'string' ||
+                executable.length === 0 ||
+                executable.length > 1_024))
+    )
+        return undefined;
+    const secretReference =
+        value.secretReference === undefined
+            ? undefined
+            : normalizeInferenceSecretReference(value.secretReference);
+    if (value.secretReference !== undefined && secretReference === undefined)
+        return undefined;
+    const normalizedEndpoint =
+        typeof endpoint === 'string' ? endpoint : undefined;
+    const normalizedExecutable =
+        typeof executable === 'string' ? executable : undefined;
+    const normalizedCapabilities = capabilities as InferenceCapabilityData[];
+    const isLocalEmbeddings = provider === 'local-embeddings';
+    const isConstrainedLocalGeneration = !isRemote && !isLocalEmbeddings;
+    if (
+        (isLocalEmbeddings && normalizedCapabilities.includes('generation')) ||
+        (isConstrainedLocalGeneration &&
+            normalizedCapabilities.includes('embeddings')) ||
+        (enabled &&
+            (modelId === undefined ||
+                (!isLocalEmbeddings && secretReference === undefined)))
+    )
+        return undefined;
+    return {
+        id,
+        label,
+        provider: provider as InferenceProviderKindData,
+        enabled,
+        capabilities: normalizedCapabilities,
+        ...(modelId === undefined ? {} : { modelId }),
+        ...(normalizedEndpoint === undefined
+            ? {}
+            : { endpoint: normalizedEndpoint }),
+        ...(normalizedExecutable === undefined
+            ? {}
+            : { executable: normalizedExecutable }),
+        ...(secretReference === undefined ? {} : { secretReference }),
+    };
+};
+
+const normalizeInferenceProfiles = (value: unknown): InferenceProfileData[] => {
+    if (!Array.isArray(value) || value.length > 32) return [];
+    const profiles: InferenceProfileData[] = [];
+    const ids = new Set<string>();
+    for (const item of value) {
+        const profile = normalizeInferenceProfile(item);
+        if (profile === undefined || ids.has(profile.id)) return [];
+        ids.add(profile.id);
+        profiles.push(profile);
+    }
+    return profiles;
+};
+
+const normalizeWorkspaceInferenceDefault = (
+    value: unknown,
+    profiles: ReadonlyArray<InferenceProfileData>,
+): WorkspaceInferenceDefaultsData | undefined => {
+    if (!isRecord(value)) return undefined;
+    const profile = (id: unknown, capability: InferenceCapabilityData) => {
+        if (id === undefined) return undefined;
+        if (typeof id !== 'string') return null;
+        return (
+            profiles.find(
+                candidate =>
+                    candidate.id === id &&
+                    candidate.enabled &&
+                    candidate.capabilities.includes(capability),
+            ) ?? null
+        );
+    };
+    const generation = profile(value.generationProfileId, 'generation');
+    const embedding = profile(value.embeddingProfileId, 'embeddings');
+    if (generation === null || embedding === null) return undefined;
+    return {
+        ...(generation === undefined
+            ? {}
+            : { generationProfileId: generation.id }),
+        ...(embedding === undefined
+            ? {}
+            : { embeddingProfileId: embedding.id }),
+    };
+};
+
+const sanitizeWorkspaceInferenceDefault = (
+    value: unknown,
+    profiles: ReadonlyArray<InferenceProfileData>,
+): WorkspaceInferenceDefaultsData | undefined => {
+    if (!isRecord(value)) return undefined;
+    const selected = (id: unknown, capability: InferenceCapabilityData) =>
+        typeof id === 'string'
+            ? profiles.find(
+                  profile =>
+                      profile.id === id &&
+                      profile.enabled &&
+                      profile.capabilities.includes(capability),
+              )
+            : undefined;
+    const generation = selected(value.generationProfileId, 'generation');
+    const embedding = selected(value.embeddingProfileId, 'embeddings');
+    return {
+        ...(generation === undefined
+            ? {}
+            : { generationProfileId: generation.id }),
+        ...(embedding === undefined
+            ? {}
+            : { embeddingProfileId: embedding.id }),
+    };
+};
+
+const sanitizeWorkspaceInferenceDefaults = (
+    value: unknown,
+    profiles: ReadonlyArray<InferenceProfileData>,
+): Record<string, WorkspaceInferenceDefaultsData> => {
+    if (!isRecord(value)) return {};
+    return Object.fromEntries(
+        Object.entries(value).flatMap(([engagementId, defaults]) => {
+            const normalized = sanitizeWorkspaceInferenceDefault(
+                defaults,
+                profiles,
+            );
+            return normalized === undefined ? [] : [[engagementId, normalized]];
+        }),
+    );
 };
 
 const toRecentRepo = (entry: RecentRepoEntry): RecentRepo =>

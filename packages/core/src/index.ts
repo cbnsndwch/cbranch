@@ -119,8 +119,13 @@ export {
     makeConfigStore,
     type EngagementDirectoryImportRepository,
     type EngagementEntry,
+    type InferenceCapabilityData,
+    type InferenceProfileData,
+    type InferenceProviderKindData,
+    type InferenceSecretReferenceData,
     type RecentRepoEntry,
     resolveConfigPath,
+    type WorkspaceInferenceDefaultsData,
     WORKSPACE_AVATAR_PATH_PREFIX,
 } from './config/config-store';
 

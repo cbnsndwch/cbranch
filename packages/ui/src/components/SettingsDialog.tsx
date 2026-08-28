@@ -5,9 +5,13 @@
 // host config.json. App-global: opens with no repo (the git tab then prompts to open one).
 
 import {
+    type EngagementId,
     type GitConfigEntry,
+    InferenceProfile,
+    type InferenceProfileDiscovery,
     KeyBinding,
     type RepoId,
+    WorkspaceInferenceDefaults,
 } from '@cbranch/rpc-contract';
 import { type KeyboardEvent, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -25,8 +29,14 @@ import {
     useAppSettings,
     useConfigSet,
     useConfigUnset,
+    useDiscoverInferenceProfiles,
+    useDiscoverInferenceModels,
     useGitConfig,
+    useInferenceProfiles,
     useSetAppSettings,
+    useSetInferenceProfiles,
+    useSetWorkspaceInferenceDefaults,
+    useWorkspaceInferenceDefaults,
 } from '../rpc/hooks';
 import { useUiStore } from '../state/store';
 import type { ThemePref } from '../theme/theme';
@@ -58,6 +68,121 @@ import {
 import { Tabs, TabsList, TabsPanel, TabsTab } from './ui/tabs';
 
 type WritableScope = 'global' | 'local';
+
+type InferenceProvider = InferenceProfile['provider'];
+
+interface InferenceProfileDraft {
+    readonly id: string;
+    readonly label: string;
+    readonly provider: InferenceProvider;
+    readonly enabled: boolean;
+    readonly generation: boolean;
+    readonly embeddings: boolean;
+    readonly modelId: string;
+    readonly endpoint: string;
+    readonly executable: string;
+    readonly secretKind: 'environment' | 'secret-store';
+    readonly secretName: string;
+}
+
+const localInferenceProviders = new Set<InferenceProvider>([
+    'claude-code',
+    'codex',
+    'opencode',
+    'local-embeddings',
+]);
+
+const supportsGeneration = (provider: InferenceProvider): boolean =>
+    provider !== 'local-embeddings';
+
+const supportsEmbeddings = (provider: InferenceProvider): boolean =>
+    provider === 'openai-compatible' || provider === 'local-embeddings';
+
+const inferenceProviderLabels: Readonly<Record<InferenceProvider, string>> = {
+    'claude-code': 'Claude Code (local)',
+    codex: 'Codex (local)',
+    opencode: 'OpenCode (local)',
+    'openai-compatible': 'OpenAI-compatible endpoint',
+    'local-embeddings': 'Local embeddings',
+};
+
+const emptyInferenceProfileDraft = (): InferenceProfileDraft => ({
+    id: '',
+    label: '',
+    provider: 'codex',
+    enabled: false,
+    generation: true,
+    embeddings: false,
+    modelId: '',
+    endpoint: '',
+    executable: '',
+    secretKind: 'environment',
+    secretName: '',
+});
+
+const inferenceProfileDraft = (
+    profile: InferenceProfile,
+): InferenceProfileDraft => ({
+    id: profile.id,
+    label: profile.label,
+    provider: profile.provider,
+    enabled: profile.enabled,
+    generation: profile.capabilities.includes('generation'),
+    embeddings: profile.capabilities.includes('embeddings'),
+    modelId: profile.modelId ?? '',
+    endpoint: profile.endpoint ?? '',
+    executable: profile.executable ?? '',
+    secretKind: profile.secretReference?.kind ?? 'environment',
+    secretName: profile.secretReference?.name ?? '',
+});
+
+/**
+ * Changing providers must not leave incompatible endpoint/executable/capability
+ * values invisibly attached to the draft. A model and credential are deliberately
+ * cleared too: they are provider-specific choices, not portable defaults.
+ */
+const inferenceProfileDraftForProvider = (
+    current: InferenceProfileDraft,
+    provider: InferenceProvider,
+): InferenceProfileDraft =>
+    provider === current.provider
+        ? current
+        : {
+              ...current,
+              provider,
+              generation: supportsGeneration(provider),
+              embeddings: supportsEmbeddings(provider),
+              modelId: '',
+              endpoint: '',
+              executable: '',
+              secretKind: 'environment',
+              secretName: '',
+          };
+
+const inferenceProfileReadinessMessage = (
+    draft: InferenceProfileDraft,
+): string | undefined => {
+    if (draft.id.trim() === '' || draft.label.trim() === '')
+        return 'Give this provider a profile ID and label.';
+    if (!draft.generation && !draft.embeddings)
+        return 'Choose at least one capability for this provider.';
+    if (
+        localInferenceProviders.has(draft.provider) &&
+        draft.executable.trim() === ''
+    )
+        return 'Use Detect local tools, then choose the discovered executable.';
+    if (draft.provider === 'openai-compatible' && draft.endpoint.trim() === '')
+        return 'Enter the OpenAI-compatible endpoint URL.';
+    if (draft.enabled && draft.modelId.trim() === '')
+        return 'Choose a model ID before enabling this provider.';
+    if (
+        draft.enabled &&
+        draft.provider !== 'local-embeddings' &&
+        draft.secretName.trim() === ''
+    )
+        return 'Name the environment variable or secret-store entry that holds this provider credential before enabling it.';
+    return undefined;
+};
 
 // Effective value of a key = the highest-precedence on-disk entry (command > worktree >
 // local > global > system); used to prefill the guided editors (REQ-P5-CFG-001). A
@@ -102,7 +227,10 @@ export function SettingsDialog() {
 
 function SettingsDialogBody() {
     const setOpen = useUiStore(s => s.setSettingsDialogOpen);
+    const tab = useUiStore(s => s.settingsDialogTab);
+    const setTab = useUiStore(s => s.setSettingsDialogTab);
     const repoId = useUiStore(s => s.activeRepoId);
+    const engagementId = useUiStore(s => s.activeEngagementId);
     return (
         <Dialog
             open={true}
@@ -117,10 +245,26 @@ function SettingsDialogBody() {
                         Git config is written to git config files; app settings
                         stay in cbranch and never touch your git config.
                     </DialogDescription>
-                    <Tabs defaultValue="git">
+                    <Tabs
+                        value={tab}
+                        onValueChange={value => {
+                            if (
+                                value === 'git' ||
+                                value === 'app' ||
+                                value === 'inference'
+                            )
+                                setTab(value);
+                        }}
+                    >
                         <TabsList>
                             <TabsTab value="git">Git config</TabsTab>
                             <TabsTab value="app">App settings</TabsTab>
+                            <TabsTab
+                                id="settings-inference-tab"
+                                value="inference"
+                            >
+                                Inference
+                            </TabsTab>
                         </TabsList>
                         <TabsPanel value="git">
                             {repoId === null ? (
@@ -134,6 +278,9 @@ function SettingsDialogBody() {
                         </TabsPanel>
                         <TabsPanel value="app">
                             <AppSettingsTab />
+                        </TabsPanel>
+                        <TabsPanel value="inference">
+                            <InferenceSettingsTab engagementId={engagementId} />
                         </TabsPanel>
                     </Tabs>
                     <div className="flex justify-end pt-1">
@@ -690,6 +837,767 @@ function AppSettingsTab() {
                     </Button>
                 </div>
             </section>
+        </div>
+    );
+}
+
+function InferenceSettingsTab({
+    engagementId,
+}: {
+    readonly engagementId: EngagementId | null;
+}) {
+    const profilesQuery = useInferenceProfiles();
+    const discover = useDiscoverInferenceProfiles();
+    const discoverModels = useDiscoverInferenceModels();
+    const saveProfiles = useSetInferenceProfiles();
+    const profiles = profilesQuery.data ?? [];
+    const [draft, setDraft] = useState<InferenceProfileDraft>(
+        emptyInferenceProfileDraft,
+    );
+    const [editingId, setEditingId] = useState<string | null>(null);
+    const [discoveredModels, setDiscoveredModels] = useState<
+        Readonly<Record<string, ReadonlyArray<string>>>
+    >({});
+
+    const persist = (
+        next: ReadonlyArray<InferenceProfile>,
+        message: string,
+    ) => {
+        saveProfiles.mutate(next, {
+            onSuccess: () => toast.success(message),
+            onError: () => toast.error('Could not save inference profiles.'),
+        });
+    };
+
+    const saveDraft = () => {
+        const capabilities: Array<'generation' | 'embeddings'> = [];
+        if (draft.generation) capabilities.push('generation');
+        if (draft.embeddings) capabilities.push('embeddings');
+        const id = draft.id.trim();
+        const label = draft.label.trim();
+        const isLocal = localInferenceProviders.has(draft.provider);
+        if (id === '' || label === '') {
+            toast.error('A profile ID and label are required.');
+            return;
+        }
+        if (capabilities.length === 0) {
+            toast.error('Choose at least one profile capability.');
+            return;
+        }
+        if (isLocal && draft.executable.trim() === '') {
+            toast.error(
+                'A local profile requires a discovered executable path.',
+            );
+            return;
+        }
+        if (
+            (!supportsGeneration(draft.provider) && draft.generation) ||
+            (!supportsEmbeddings(draft.provider) && draft.embeddings)
+        ) {
+            toast.error(
+                `${inferenceProviderLabels[draft.provider]} does not support the selected capability.`,
+            );
+            return;
+        }
+        if (!isLocal && draft.endpoint.trim() === '') {
+            toast.error('An OpenAI-compatible profile requires an endpoint.');
+            return;
+        }
+
+        const secretReference =
+            draft.secretName.trim() === ''
+                ? undefined
+                : draft.secretKind === 'environment'
+                  ? {
+                        kind: 'environment' as const,
+                        name: draft.secretName.trim(),
+                    }
+                  : {
+                        kind: 'secret-store' as const,
+                        name: draft.secretName.trim(),
+                    };
+        if (draft.enabled && draft.modelId.trim() === '') {
+            toast.error(
+                `An enabled ${inferenceProviderLabels[draft.provider]} profile requires an explicit model ID.`,
+            );
+            return;
+        }
+        if (
+            draft.enabled &&
+            draft.provider !== 'local-embeddings' &&
+            secretReference === undefined
+        ) {
+            toast.error(
+                `An enabled ${inferenceProviderLabels[draft.provider]} profile requires a credential reference.`,
+            );
+            return;
+        }
+        const profile = new InferenceProfile({
+            id,
+            label,
+            provider: draft.provider,
+            enabled: draft.enabled,
+            capabilities,
+            modelId: draft.modelId.trim() || undefined,
+            endpoint: isLocal ? undefined : draft.endpoint.trim(),
+            executable: isLocal ? draft.executable.trim() : undefined,
+            secretReference,
+        });
+        const next =
+            editingId === null
+                ? [...profiles, profile]
+                : profiles.map(item =>
+                      item.id === editingId ? profile : item,
+                  );
+        if (
+            editingId === null &&
+            profiles.some(item => item.id === profile.id)
+        ) {
+            toast.error('Profile IDs must be unique.');
+            return;
+        }
+        persist(next, `Saved ${profile.label}`);
+        setDraft(emptyInferenceProfileDraft());
+        setEditingId(null);
+    };
+
+    const startDraftFromDiscovery = (discovery: InferenceProfileDiscovery) => {
+        const ordinal = profiles.filter(
+            profile => profile.id === discovery.provider,
+        ).length;
+        setDraft({
+            ...emptyInferenceProfileDraft(),
+            id:
+                ordinal === 0
+                    ? discovery.provider
+                    : `${discovery.provider}-${ordinal + 1}`,
+            label: inferenceProviderLabels[discovery.provider],
+            provider: discovery.provider,
+            executable: discovery.executable,
+            generation: discovery.provider !== 'local-embeddings',
+            embeddings: discovery.provider === 'local-embeddings',
+        });
+        setEditingId(null);
+    };
+
+    const discovery = discover.data ?? [];
+    const busy =
+        saveProfiles.isPending ||
+        discover.isPending ||
+        discoverModels.isPending;
+    const draftReadiness = inferenceProfileReadinessMessage(draft);
+
+    return (
+        <div className="flex max-h-[60vh] flex-col gap-4 overflow-auto py-2">
+            <section className="rounded-md border p-3 text-sm">
+                <h3 className="font-medium">Set up optional AI enrichment</h3>
+                <ol className="text-muted-foreground mt-2 list-decimal space-y-1 pl-4 text-xs">
+                    <li>Detect a local tool or add a compatible endpoint.</li>
+                    <li>
+                        Choose its model and name the credential location; never
+                        paste a secret here.
+                    </li>
+                    <li>
+                        Enable the provider, then select it as this workspace's
+                        generation or embedding default below.
+                    </li>
+                </ol>
+                <p className="text-muted-foreground mt-2 text-xs">
+                    Saving or enabling a profile does not send workspace data.
+                    Inference runs only when you explicitly choose Run
+                    enrichment or Search semantically.
+                </p>
+            </section>
+            <section className="rounded-md border p-3 text-sm">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                        <h3 className="font-medium">Inference providers</h3>
+                        <p className="text-muted-foreground mt-1 text-xs">
+                            Profiles contain metadata and a named credential
+                            reference only. cbranch never accepts an API key
+                            here.
+                        </p>
+                    </div>
+                    <Button
+                        id="workspace-intelligence-detect-local-tools"
+                        size="sm"
+                        variant="outline"
+                        disabled={busy}
+                        onClick={() => discover.mutate()}
+                    >
+                        Detect local tools
+                    </Button>
+                </div>
+                {discovery.length > 0 && (
+                    <div className="mt-3 flex flex-col gap-2">
+                        {discovery.map(item => (
+                            <div
+                                key={`${item.provider}:${item.executable}`}
+                                className="bg-muted/40 flex flex-wrap items-center gap-2 rounded p-2 text-xs"
+                            >
+                                <span className="font-medium">
+                                    {inferenceProviderLabels[item.provider]}
+                                </span>
+                                <code className="flex-1 break-all">
+                                    {item.executable}
+                                </code>
+                                <span className="text-muted-foreground">
+                                    {item.version}
+                                </span>
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() =>
+                                        startDraftFromDiscovery(item)
+                                    }
+                                >
+                                    Use
+                                </Button>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </section>
+
+            <section className="rounded-md border p-3 text-sm">
+                <h3 className="font-medium">
+                    {editingId === null ? 'Add provider' : 'Edit provider'}
+                </h3>
+                <div
+                    id="workspace-intelligence-inference-provider-form"
+                    className="mt-3 grid gap-3 sm:grid-cols-2"
+                >
+                    <label className="flex flex-col gap-1 text-xs">
+                        Profile ID
+                        <Input
+                            aria-label="Inference profile ID"
+                            value={draft.id}
+                            onChange={event =>
+                                setDraft(current => ({
+                                    ...current,
+                                    id: event.target.value,
+                                }))
+                            }
+                            placeholder="codex-local"
+                        />
+                    </label>
+                    <label className="flex flex-col gap-1 text-xs">
+                        Label
+                        <Input
+                            aria-label="Inference profile label"
+                            value={draft.label}
+                            onChange={event =>
+                                setDraft(current => ({
+                                    ...current,
+                                    label: event.target.value,
+                                }))
+                            }
+                            placeholder="My local Codex"
+                        />
+                    </label>
+                    <div className="flex flex-col gap-1 text-xs">
+                        Provider
+                        <Select
+                            value={draft.provider}
+                            onValueChange={value => {
+                                if (value === null) return;
+                                setDraft(current =>
+                                    inferenceProfileDraftForProvider(
+                                        current,
+                                        value as InferenceProvider,
+                                    ),
+                                );
+                            }}
+                        >
+                            <SelectTrigger aria-label="Inference provider">
+                                <SelectValue>
+                                    {(value: string) =>
+                                        inferenceProviderLabels[
+                                            value as InferenceProvider
+                                        ] ?? value
+                                    }
+                                </SelectValue>
+                            </SelectTrigger>
+                            <SelectContent>
+                                {Object.entries(inferenceProviderLabels).map(
+                                    ([value, label]) => (
+                                        <SelectItem key={value} value={value}>
+                                            {label}
+                                        </SelectItem>
+                                    ),
+                                )}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <label className="flex flex-col gap-1 text-xs">
+                        Model ID{draft.enabled ? ' (required)' : ''}
+                        <Input
+                            aria-label="Inference model ID"
+                            aria-describedby="inference-model-help"
+                            value={draft.modelId}
+                            onChange={event =>
+                                setDraft(current => ({
+                                    ...current,
+                                    modelId: event.target.value,
+                                }))
+                            }
+                            placeholder="Provider default"
+                        />
+                        <span
+                            id="inference-model-help"
+                            className="text-muted-foreground"
+                        >
+                            Use the exact model ID supported by this provider.
+                        </span>
+                    </label>
+                    {localInferenceProviders.has(draft.provider) ? (
+                        <label className="flex flex-col gap-1 text-xs sm:col-span-2">
+                            Discovered executable
+                            <Input
+                                aria-label="Inference executable"
+                                value={draft.executable}
+                                onChange={event =>
+                                    setDraft(current => ({
+                                        ...current,
+                                        executable: event.target.value,
+                                    }))
+                                }
+                                placeholder="/usr/local/bin/codex"
+                            />
+                        </label>
+                    ) : (
+                        <label className="flex flex-col gap-1 text-xs sm:col-span-2">
+                            OpenAI-compatible endpoint
+                            <Input
+                                aria-label="Inference endpoint"
+                                value={draft.endpoint}
+                                onChange={event =>
+                                    setDraft(current => ({
+                                        ...current,
+                                        endpoint: event.target.value,
+                                    }))
+                                }
+                                placeholder="https://provider.example/v1"
+                            />
+                        </label>
+                    )}
+                    {draft.provider !== 'local-embeddings' ? (
+                        <>
+                            <div className="flex flex-col gap-1 text-xs">
+                                Credential reference kind
+                                <Select
+                                    value={draft.secretKind}
+                                    onValueChange={value => {
+                                        if (
+                                            value !== 'environment' &&
+                                            value !== 'secret-store'
+                                        )
+                                            return;
+                                        setDraft(current => ({
+                                            ...current,
+                                            secretKind: value,
+                                        }));
+                                    }}
+                                >
+                                    <SelectTrigger aria-label="Credential reference kind">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="environment">
+                                            Environment variable
+                                        </SelectItem>
+                                        <SelectItem value="secret-store">
+                                            Secret-store name
+                                        </SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <label className="flex flex-col gap-1 text-xs">
+                                Credential reference
+                                <Input
+                                    aria-label="Credential reference"
+                                    value={draft.secretName}
+                                    onChange={event =>
+                                        setDraft(current => ({
+                                            ...current,
+                                            secretName: event.target.value,
+                                        }))
+                                    }
+                                    placeholder="OPENAI_API_KEY"
+                                />
+                                <span className="text-muted-foreground">
+                                    Required to enable generation. This is a
+                                    variable or secret-store name, never its
+                                    value.
+                                </span>
+                            </label>
+                        </>
+                    ) : (
+                        <p className="text-muted-foreground self-end text-xs sm:col-span-2">
+                            Local Ollama embeddings use its local loopback API;
+                            no credential reference is needed.
+                        </p>
+                    )}
+                </div>
+                <div className="mt-3 flex flex-wrap items-center gap-4 text-xs">
+                    <label className="flex items-center gap-1.5">
+                        <input
+                            type="checkbox"
+                            checked={draft.enabled}
+                            onChange={event =>
+                                setDraft(current => ({
+                                    ...current,
+                                    enabled: event.target.checked,
+                                }))
+                            }
+                        />
+                        Enabled
+                    </label>
+                    {supportsGeneration(draft.provider) ? (
+                        <label className="flex items-center gap-1.5">
+                            <input
+                                type="checkbox"
+                                checked={draft.generation}
+                                onChange={event =>
+                                    setDraft(current => ({
+                                        ...current,
+                                        generation: event.target.checked,
+                                    }))
+                                }
+                            />
+                            Generation
+                        </label>
+                    ) : null}
+                    {supportsEmbeddings(draft.provider) ? (
+                        <label className="flex items-center gap-1.5">
+                            <input
+                                type="checkbox"
+                                checked={draft.embeddings}
+                                onChange={event =>
+                                    setDraft(current => ({
+                                        ...current,
+                                        embeddings: event.target.checked,
+                                    }))
+                                }
+                            />
+                            Embeddings
+                        </label>
+                    ) : null}
+                    <div className="ml-auto flex gap-2">
+                        {editingId !== null && (
+                            <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => {
+                                    setEditingId(null);
+                                    setDraft(emptyInferenceProfileDraft());
+                                }}
+                            >
+                                Cancel
+                            </Button>
+                        )}
+                        <Button
+                            size="sm"
+                            disabled={busy || draftReadiness !== undefined}
+                            onClick={saveDraft}
+                        >
+                            Save provider
+                        </Button>
+                    </div>
+                </div>
+                {draftReadiness !== undefined ? (
+                    <p
+                        role="status"
+                        className="text-muted-foreground mt-3 text-xs"
+                    >
+                        Next step: {draftReadiness}
+                    </p>
+                ) : null}
+            </section>
+
+            <section className="rounded-md border p-3 text-sm">
+                <h3 className="font-medium">Configured profiles</h3>
+                {profilesQuery.isError ? (
+                    <p className="text-destructive mt-2 text-xs">
+                        Could not load inference profiles.
+                    </p>
+                ) : profiles.length === 0 ? (
+                    <p className="text-muted-foreground mt-2 text-xs">
+                        No providers are configured. Enrichment remains
+                        disabled.
+                    </p>
+                ) : (
+                    <div className="mt-2 flex flex-col gap-2">
+                        {profiles.map(profile => (
+                            <div
+                                key={profile.id}
+                                className="flex flex-wrap items-center gap-2 rounded border p-2 text-xs"
+                            >
+                                <div className="min-w-0 flex-1">
+                                    <div className="font-medium">
+                                        {profile.label}
+                                    </div>
+                                    <div className="text-muted-foreground">
+                                        {
+                                            inferenceProviderLabels[
+                                                profile.provider
+                                            ]
+                                        }
+                                        {' · '}
+                                        {profile.capabilities.join(', ')}
+                                    </div>
+                                </div>
+                                <label className="flex items-center gap-1">
+                                    <input
+                                        type="checkbox"
+                                        checked={profile.enabled}
+                                        disabled={busy}
+                                        onChange={event =>
+                                            persist(
+                                                profiles.map(item =>
+                                                    item.id === profile.id
+                                                        ? new InferenceProfile({
+                                                              ...item,
+                                                              enabled:
+                                                                  event.target
+                                                                      .checked,
+                                                          })
+                                                        : item,
+                                                ),
+                                                `${event.target.checked ? 'Enabled' : 'Disabled'} ${profile.label}`,
+                                            )
+                                        }
+                                    />
+                                    Enabled
+                                </label>
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    disabled={busy}
+                                    onClick={() => {
+                                        setDraft(
+                                            inferenceProfileDraft(profile),
+                                        );
+                                        setEditingId(profile.id);
+                                    }}
+                                >
+                                    Edit
+                                </Button>
+                                {profile.provider === 'openai-compatible' ? (
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        disabled={busy}
+                                        onClick={() =>
+                                            discoverModels.mutate(profile.id, {
+                                                onSuccess: result => {
+                                                    setDiscoveredModels(
+                                                        current => ({
+                                                            ...current,
+                                                            [result.profileId]:
+                                                                result.modelIds,
+                                                        }),
+                                                    );
+                                                    toast.success(
+                                                        `Found ${result.modelIds.length} model${result.modelIds.length === 1 ? '' : 's'}.`,
+                                                    );
+                                                },
+                                                onError: () =>
+                                                    toast.error(
+                                                        'Could not discover remote models.',
+                                                    ),
+                                            })
+                                        }
+                                    >
+                                        Discover models
+                                    </Button>
+                                ) : null}
+                                <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    disabled={busy}
+                                    onClick={() =>
+                                        persist(
+                                            profiles.filter(
+                                                item => item.id !== profile.id,
+                                            ),
+                                            `Removed ${profile.label}`,
+                                        )
+                                    }
+                                >
+                                    Remove
+                                </Button>
+                                {discoveredModels[profile.id]?.length ? (
+                                    <div className="w-full border-t pt-2">
+                                        <p className="text-muted-foreground mb-1">
+                                            Discovered model IDs (select to save
+                                            as this profile’s manual override):
+                                        </p>
+                                        <div className="flex flex-wrap gap-1">
+                                            {discoveredModels[profile.id]!.map(
+                                                modelId => (
+                                                    <Button
+                                                        key={modelId}
+                                                        size="sm"
+                                                        variant={
+                                                            profile.modelId ===
+                                                            modelId
+                                                                ? 'default'
+                                                                : 'outline'
+                                                        }
+                                                        disabled={busy}
+                                                        onClick={() =>
+                                                            persist(
+                                                                profiles.map(
+                                                                    item =>
+                                                                        item.id ===
+                                                                        profile.id
+                                                                            ? new InferenceProfile(
+                                                                                  {
+                                                                                      ...item,
+                                                                                      modelId,
+                                                                                  },
+                                                                              )
+                                                                            : item,
+                                                                ),
+                                                                `Selected ${modelId} for ${profile.label}`,
+                                                            )
+                                                        }
+                                                    >
+                                                        {modelId}
+                                                    </Button>
+                                                ),
+                                            )}
+                                        </div>
+                                    </div>
+                                ) : null}
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </section>
+
+            <WorkspaceInferenceDefaultsSection
+                engagementId={engagementId}
+                profiles={profiles}
+            />
+        </div>
+    );
+}
+
+function WorkspaceInferenceDefaultsSection({
+    engagementId,
+    profiles,
+}: {
+    readonly engagementId: EngagementId | null;
+    readonly profiles: ReadonlyArray<InferenceProfile>;
+}) {
+    const defaultsQuery = useWorkspaceInferenceDefaults(engagementId);
+    const saveDefaults = useSetWorkspaceInferenceDefaults(engagementId);
+    const defaults = defaultsQuery.data ?? new WorkspaceInferenceDefaults({});
+    const optionsFor = (capability: 'generation' | 'embeddings') =>
+        profiles.filter(
+            profile =>
+                profile.enabled && profile.capabilities.includes(capability),
+        );
+    const update = (
+        key: 'generationProfileId' | 'embeddingProfileId',
+        value: string | null,
+    ) => {
+        saveDefaults.mutate(
+            new WorkspaceInferenceDefaults({
+                ...defaults,
+                [key]:
+                    value === null || value === 'disabled' ? undefined : value,
+            }),
+            {
+                onSuccess: () =>
+                    toast.success('Saved workspace inference default.'),
+                onError: () =>
+                    toast.error('Could not save workspace inference default.'),
+            },
+        );
+    };
+
+    return (
+        <section className="rounded-md border p-3 text-sm">
+            <h3 className="font-medium">Workspace defaults</h3>
+            {engagementId === null ? (
+                <p className="text-muted-foreground mt-2 text-xs">
+                    Open a workspace to choose optional generation and embedding
+                    defaults. Both remain disabled until selected.
+                </p>
+            ) : (
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                    <DefaultProfileSelect
+                        label="Generation profile"
+                        value={defaults.generationProfileId ?? 'disabled'}
+                        profiles={optionsFor('generation')}
+                        disabled={
+                            saveDefaults.isPending || defaultsQuery.isLoading
+                        }
+                        onValueChange={value =>
+                            update('generationProfileId', value)
+                        }
+                    />
+                    <DefaultProfileSelect
+                        label="Embedding profile"
+                        value={defaults.embeddingProfileId ?? 'disabled'}
+                        profiles={optionsFor('embeddings')}
+                        disabled={
+                            saveDefaults.isPending || defaultsQuery.isLoading
+                        }
+                        onValueChange={value =>
+                            update('embeddingProfileId', value)
+                        }
+                    />
+                </div>
+            )}
+        </section>
+    );
+}
+
+function DefaultProfileSelect({
+    label,
+    value,
+    profiles,
+    disabled,
+    onValueChange,
+}: {
+    readonly label: string;
+    readonly value: string;
+    readonly profiles: ReadonlyArray<InferenceProfile>;
+    readonly disabled: boolean;
+    readonly onValueChange: (value: string | null) => void;
+}) {
+    return (
+        <div className="flex flex-col gap-1 text-xs">
+            <span>{label}</span>
+            <Select
+                value={value}
+                onValueChange={onValueChange}
+                disabled={disabled}
+            >
+                <SelectTrigger aria-label={label}>
+                    <SelectValue>
+                        {(selected: string) =>
+                            selected === 'disabled'
+                                ? 'Disabled'
+                                : (profiles.find(
+                                      profile => profile.id === selected,
+                                  )?.label ?? selected)
+                        }
+                    </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="disabled">Disabled</SelectItem>
+                    {profiles.map(profile => (
+                        <SelectItem key={profile.id} value={profile.id}>
+                            {profile.label}
+                        </SelectItem>
+                    ))}
+                </SelectContent>
+            </Select>
         </div>
     );
 }

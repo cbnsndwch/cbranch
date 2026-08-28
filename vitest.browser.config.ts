@@ -19,6 +19,9 @@ export default defineConfig({
         alias: {
             '@': fileURLToPath(new URL('./packages/ui/src', import.meta.url)),
         },
+        // React Flow is prebundled for real-browser tests; force it to share the
+        // renderer's React singleton rather than loading a second copy.
+        dedupe: ['react', 'react-dom'],
     },
     test: {
         include: [

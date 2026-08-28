@@ -7,6 +7,8 @@
         { "path": "packages/plugin-runtime" },
         { "path": "packages/rpc-contract" },
         { "path": "packages/core" },
+        { "path": "packages/workspace-intelligence" },
+        { "path": "packages/inference" },
         { "path": "apps/web-server" },
         { "path": "apps/vscode-ext" },
         { "path": "plugins/hello-world" }

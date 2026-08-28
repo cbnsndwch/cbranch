@@ -52,6 +52,9 @@ import {
     type GitHubPullRequestCreated,
     type GitHubPullRequestPreview,
     type HistoryColumnVisibility,
+    type InferenceProfile,
+    type InferenceProfileDiscovery,
+    type InferenceModelDiscovery,
     type InvalidationEvent,
     type KeyBinding,
     type MetaFile,
@@ -98,6 +101,22 @@ import {
     type TagType,
     type WorkingTreeStatus,
     type WorktreeInfo,
+    type WorkspaceInferenceDefaults,
+    type WorkspaceIntelligenceAnalysisSettings,
+    type WorkspaceIntelligencePresentation,
+    type WorkspaceIntelligenceRun,
+    type WorkspaceIntelligenceRunEvent,
+    type WorkspaceIntelligenceRunId,
+    type WorkspaceIntelligenceReport,
+    type WorkspaceIntelligenceGraphSearchResult,
+    type WorkspaceIntelligenceSemanticSearchResult,
+    type WorkspaceIntelligenceGraphNeighborhood,
+    type WorkspaceIntelligenceGraphDiff,
+    type WorkspaceIntelligenceComponentOverride,
+    type WorkspaceIntelligenceCurationAction,
+    type WorkspaceIntelligenceCurationActionRequest,
+    type WorkspaceIntelligenceArchiveDescriptor,
+    type WorkspaceIntelligenceEnrichmentAttempt,
 } from '@cbranch/rpc-contract';
 import { Effect, Fiber, Stream } from 'effect';
 
@@ -219,6 +238,129 @@ export interface CbranchApi {
     engagementActivate(
         engagementId: EngagementId,
     ): Promise<EngagementWorkspace>;
+    workspaceIntelligenceStart?(
+        engagementId: EngagementId,
+        repoIds?: ReadonlyArray<RepoId>,
+        analysisSettings?: WorkspaceIntelligenceAnalysisSettings,
+    ): Promise<WorkspaceIntelligenceRun>;
+    workspaceIntelligenceAnalysisSettings?(
+        engagementId: EngagementId,
+    ): Promise<WorkspaceIntelligenceAnalysisSettings>;
+    workspaceIntelligenceAnalysisSettingsSet?(
+        engagementId: EngagementId,
+        settings: WorkspaceIntelligenceAnalysisSettings,
+    ): Promise<WorkspaceIntelligenceAnalysisSettings>;
+    workspaceIntelligencePresentationGet?(
+        engagementId: EngagementId,
+        runId: WorkspaceIntelligenceRunId,
+    ): Promise<WorkspaceIntelligencePresentation>;
+    workspaceIntelligencePresentationSet?(
+        engagementId: EngagementId,
+        presentation: WorkspaceIntelligencePresentation,
+    ): Promise<WorkspaceIntelligencePresentation>;
+    workspaceIntelligenceRunGet?(
+        engagementId: EngagementId,
+        runId: WorkspaceIntelligenceRunId,
+    ): Promise<WorkspaceIntelligenceRun>;
+    workspaceIntelligenceRunReport?(
+        engagementId: EngagementId,
+        runId: WorkspaceIntelligenceRunId,
+    ): Promise<WorkspaceIntelligenceReport>;
+    workspaceIntelligenceGraphSearch?(
+        engagementId: EngagementId,
+        runId: WorkspaceIntelligenceRunId,
+        query: string,
+        limit?: number,
+    ): Promise<WorkspaceIntelligenceGraphSearchResult>;
+    workspaceIntelligenceSemanticSearch?(
+        engagementId: EngagementId,
+        runId: WorkspaceIntelligenceRunId,
+        query: string,
+        limit?: number,
+        profileId?: string,
+    ): Promise<WorkspaceIntelligenceSemanticSearchResult>;
+    workspaceIntelligenceGraphNeighborhood?(
+        engagementId: EngagementId,
+        runId: WorkspaceIntelligenceRunId,
+        nodeId: string,
+        limit?: number,
+    ): Promise<WorkspaceIntelligenceGraphNeighborhood>;
+    workspaceIntelligenceGraphDiff?(
+        engagementId: EngagementId,
+        fromRunId: WorkspaceIntelligenceRunId,
+        toRunId: WorkspaceIntelligenceRunId,
+    ): Promise<WorkspaceIntelligenceGraphDiff>;
+    workspaceIntelligenceComponentOverrides?(
+        engagementId: EngagementId,
+    ): Promise<ReadonlyArray<WorkspaceIntelligenceComponentOverride>>;
+    workspaceIntelligenceComponentOverridesSet?(
+        engagementId: EngagementId,
+        overrides: ReadonlyArray<WorkspaceIntelligenceComponentOverride>,
+    ): Promise<ReadonlyArray<WorkspaceIntelligenceComponentOverride>>;
+    workspaceIntelligenceCurationActions?(
+        engagementId: EngagementId,
+    ): Promise<ReadonlyArray<WorkspaceIntelligenceCurationAction>>;
+    workspaceIntelligenceCurationActionAppend?(
+        engagementId: EngagementId,
+        action: WorkspaceIntelligenceCurationActionRequest,
+    ): Promise<WorkspaceIntelligenceCurationAction>;
+    workspaceIntelligenceCurationActionsClear?(
+        engagementId: EngagementId,
+    ): Promise<void>;
+    workspaceIntelligenceRunList?(
+        engagementId: EngagementId,
+    ): Promise<ReadonlyArray<WorkspaceIntelligenceRun>>;
+    workspaceIntelligenceRunCancel?(
+        engagementId: EngagementId,
+        runId: WorkspaceIntelligenceRunId,
+    ): Promise<WorkspaceIntelligenceRun>;
+    workspaceIntelligenceRunDelete?(
+        engagementId: EngagementId,
+        runId: WorkspaceIntelligenceRunId,
+    ): Promise<void>;
+    workspaceIntelligenceCurrentSet?(
+        engagementId: EngagementId,
+        runId: WorkspaceIntelligenceRunId,
+    ): Promise<void>;
+    workspaceIntelligenceCurrentClear?(
+        engagementId: EngagementId,
+    ): Promise<void>;
+    workspaceIntelligenceRunHistoryClear?(
+        engagementId: EngagementId,
+    ): Promise<void>;
+    workspaceIntelligenceArchiveRequest?(
+        engagementId: EngagementId,
+        runId: WorkspaceIntelligenceRunId,
+    ): Promise<WorkspaceIntelligenceArchiveDescriptor>;
+    workspaceIntelligenceRunSubscribe?(
+        engagementId: EngagementId,
+        runId: WorkspaceIntelligenceRunId,
+        afterSequence: number | undefined,
+        handlers: StreamHandlers<WorkspaceIntelligenceRunEvent>,
+    ): Unsubscribe;
+    workspaceIntelligenceEnrichmentStart?(
+        engagementId: EngagementId,
+        runId: WorkspaceIntelligenceRunId,
+        profileId?: string,
+        evidenceLimit?: number,
+    ): Promise<WorkspaceIntelligenceEnrichmentAttempt>;
+    workspaceIntelligenceEnrichmentCancel?(
+        engagementId: EngagementId,
+        runId: WorkspaceIntelligenceRunId,
+    ): Promise<void>;
+    workspaceIntelligenceEnrichmentList?(
+        engagementId: EngagementId,
+        runId: WorkspaceIntelligenceRunId,
+    ): Promise<ReadonlyArray<WorkspaceIntelligenceEnrichmentAttempt>>;
+    workspaceIntelligenceEnrichmentPreferredGet?(
+        engagementId: EngagementId,
+        runId: WorkspaceIntelligenceRunId,
+    ): Promise<WorkspaceIntelligenceEnrichmentAttempt | undefined>;
+    workspaceIntelligenceEnrichmentPreferredSet?(
+        engagementId: EngagementId,
+        runId: WorkspaceIntelligenceRunId,
+        attemptId?: string,
+    ): Promise<WorkspaceIntelligenceEnrichmentAttempt | undefined>;
     changeSetCreate(
         engagementId: EngagementId,
         name: string,
@@ -646,6 +788,23 @@ export interface CbranchApi {
         keybindings?: ReadonlyArray<KeyBinding>;
         columns?: HistoryColumnVisibility;
     }): Promise<AppSettings>;
+    inferenceProfilesGet(): Promise<ReadonlyArray<InferenceProfile>>;
+    inferenceProfilesDiscover(): Promise<
+        ReadonlyArray<InferenceProfileDiscovery>
+    >;
+    inferenceModelsDiscover(
+        profileId: string,
+    ): Promise<InferenceModelDiscovery>;
+    inferenceProfilesSet(
+        profiles: ReadonlyArray<InferenceProfile>,
+    ): Promise<ReadonlyArray<InferenceProfile>>;
+    workspaceInferenceDefaultsGet(
+        engagementId: EngagementId,
+    ): Promise<WorkspaceInferenceDefaults>;
+    workspaceInferenceDefaultsSet(
+        engagementId: EngagementId,
+        defaults: WorkspaceInferenceDefaults,
+    ): Promise<WorkspaceInferenceDefaults>;
     // ── interactive rebase (P5) ─────────────────────────────────────────────────
     rebasePlan(
         repoId: RepoId,
@@ -802,6 +961,272 @@ export const makeApi = (runtime: AppRuntime): CbranchApi => {
         engagementActivate: engagementId =>
             runtime.runPromise(
                 withClient(c => c.EngagementActivate({ engagementId })),
+            ),
+        workspaceIntelligenceStart: (engagementId, repoIds, analysisSettings) =>
+            runtime.runPromise(
+                withClient(c =>
+                    c.WorkspaceIntelligenceStart({
+                        engagementId,
+                        repoIds,
+                        analysisSettings,
+                    }),
+                ),
+            ),
+        workspaceIntelligenceAnalysisSettings: engagementId =>
+            runtime.runPromise(
+                withClient(c =>
+                    c.WorkspaceIntelligenceAnalysisSettings({ engagementId }),
+                ),
+            ),
+        workspaceIntelligenceAnalysisSettingsSet: (engagementId, settings) =>
+            runtime.runPromise(
+                withClient(c =>
+                    c.WorkspaceIntelligenceAnalysisSettingsSet({
+                        engagementId,
+                        settings,
+                    }),
+                ),
+            ),
+        workspaceIntelligencePresentationGet: (engagementId, runId) =>
+            runtime.runPromise(
+                withClient(c =>
+                    c.WorkspaceIntelligencePresentationGet({
+                        engagementId,
+                        runId,
+                    }),
+                ),
+            ),
+        workspaceIntelligencePresentationSet: (engagementId, presentation) =>
+            runtime.runPromise(
+                withClient(c =>
+                    c.WorkspaceIntelligencePresentationSet({
+                        engagementId,
+                        presentation,
+                    }),
+                ),
+            ),
+        workspaceIntelligenceRunGet: (engagementId, runId) =>
+            runtime.runPromise(
+                withClient(c =>
+                    c.WorkspaceIntelligenceRunGet({ engagementId, runId }),
+                ),
+            ),
+        workspaceIntelligenceRunReport: (engagementId, runId) =>
+            runtime.runPromise(
+                withClient(c =>
+                    c.WorkspaceIntelligenceRunReport({ engagementId, runId }),
+                ),
+            ),
+        workspaceIntelligenceGraphSearch: (engagementId, runId, query, limit) =>
+            runtime.runPromise(
+                withClient(c =>
+                    c.WorkspaceIntelligenceGraphSearch({
+                        engagementId,
+                        runId,
+                        query,
+                        limit,
+                    }),
+                ),
+            ),
+        workspaceIntelligenceSemanticSearch: (
+            engagementId,
+            runId,
+            query,
+            limit,
+            profileId,
+        ) =>
+            runtime.runPromise(
+                withClient(c =>
+                    c.WorkspaceIntelligenceSemanticSearch({
+                        engagementId,
+                        runId,
+                        query,
+                        limit,
+                        profileId,
+                    }),
+                ),
+            ),
+        workspaceIntelligenceGraphNeighborhood: (
+            engagementId,
+            runId,
+            nodeId,
+            limit,
+        ) =>
+            runtime.runPromise(
+                withClient(c =>
+                    c.WorkspaceIntelligenceGraphNeighborhood({
+                        engagementId,
+                        runId,
+                        nodeId,
+                        limit,
+                    }),
+                ),
+            ),
+        workspaceIntelligenceGraphDiff: (engagementId, fromRunId, toRunId) =>
+            runtime.runPromise(
+                withClient(c =>
+                    c.WorkspaceIntelligenceGraphDiff({
+                        engagementId,
+                        fromRunId,
+                        toRunId,
+                    }),
+                ),
+            ),
+        workspaceIntelligenceComponentOverrides: engagementId =>
+            runtime.runPromise(
+                withClient(c =>
+                    c.WorkspaceIntelligenceComponentOverrides({ engagementId }),
+                ),
+            ),
+        workspaceIntelligenceComponentOverridesSet: (engagementId, overrides) =>
+            runtime.runPromise(
+                withClient(c =>
+                    c.WorkspaceIntelligenceComponentOverridesSet({
+                        engagementId,
+                        overrides,
+                    }),
+                ),
+            ),
+        workspaceIntelligenceCurationActions: engagementId =>
+            runtime.runPromise(
+                withClient(c =>
+                    c.WorkspaceIntelligenceCurationActions({ engagementId }),
+                ),
+            ),
+        workspaceIntelligenceCurationActionAppend: (engagementId, action) =>
+            runtime.runPromise(
+                withClient(c =>
+                    c.WorkspaceIntelligenceCurationActionAppend({
+                        engagementId,
+                        action,
+                    }),
+                ),
+            ),
+        workspaceIntelligenceCurationActionsClear: engagementId =>
+            runtime.runPromise(
+                withClient(c =>
+                    c.WorkspaceIntelligenceCurationActionsClear({
+                        engagementId,
+                    }),
+                ),
+            ),
+        workspaceIntelligenceRunList: engagementId =>
+            runtime.runPromise(
+                withClient(c =>
+                    c.WorkspaceIntelligenceRunList({ engagementId }),
+                ),
+            ),
+        workspaceIntelligenceRunCancel: (engagementId, runId) =>
+            runtime.runPromise(
+                withClient(c =>
+                    c.WorkspaceIntelligenceRunCancel({ engagementId, runId }),
+                ),
+            ),
+        workspaceIntelligenceRunDelete: (engagementId, runId) =>
+            runtime.runPromise(
+                withClient(c =>
+                    c.WorkspaceIntelligenceRunDelete({ engagementId, runId }),
+                ),
+            ),
+        workspaceIntelligenceCurrentSet: (engagementId, runId) =>
+            runtime.runPromise(
+                withClient(c =>
+                    c.WorkspaceIntelligenceCurrentSet({ engagementId, runId }),
+                ),
+            ),
+        workspaceIntelligenceCurrentClear: engagementId =>
+            runtime.runPromise(
+                withClient(c =>
+                    c.WorkspaceIntelligenceCurrentClear({ engagementId }),
+                ),
+            ),
+        workspaceIntelligenceRunHistoryClear: engagementId =>
+            runtime.runPromise(
+                withClient(c =>
+                    c.WorkspaceIntelligenceRunHistoryClear({ engagementId }),
+                ),
+            ),
+        workspaceIntelligenceArchiveRequest: (engagementId, runId) =>
+            runtime.runPromise(
+                withClient(c =>
+                    c.WorkspaceIntelligenceArchiveRequest({
+                        engagementId,
+                        runId,
+                    }),
+                ),
+            ),
+        workspaceIntelligenceRunSubscribe: (
+            engagementId,
+            runId,
+            afterSequence,
+            handlers,
+        ) =>
+            runStream(
+                streamWithClient(c =>
+                    c.WorkspaceIntelligenceRunSubscribe({
+                        engagementId,
+                        runId,
+                        afterSequence,
+                    }),
+                ),
+                handlers,
+            ),
+        workspaceIntelligenceEnrichmentStart: (
+            engagementId,
+            runId,
+            profileId,
+            evidenceLimit,
+        ) =>
+            runtime.runPromise(
+                withClient(c =>
+                    c.WorkspaceIntelligenceEnrichmentStart({
+                        engagementId,
+                        runId,
+                        profileId,
+                        evidenceLimit,
+                    }),
+                ),
+            ),
+        workspaceIntelligenceEnrichmentCancel: (engagementId, runId) =>
+            runtime.runPromise(
+                withClient(c =>
+                    c.WorkspaceIntelligenceEnrichmentCancel({
+                        engagementId,
+                        runId,
+                    }),
+                ),
+            ),
+        workspaceIntelligenceEnrichmentList: (engagementId, runId) =>
+            runtime.runPromise(
+                withClient(c =>
+                    c.WorkspaceIntelligenceEnrichmentList({
+                        engagementId,
+                        runId,
+                    }),
+                ),
+            ),
+        workspaceIntelligenceEnrichmentPreferredGet: (engagementId, runId) =>
+            runtime.runPromise(
+                withClient(c =>
+                    c.WorkspaceIntelligenceEnrichmentPreferredGet({
+                        engagementId,
+                        runId,
+                    }),
+                ),
+            ),
+        workspaceIntelligenceEnrichmentPreferredSet: (
+            engagementId,
+            runId,
+            attemptId,
+        ) =>
+            runtime.runPromise(
+                withClient(c =>
+                    c.WorkspaceIntelligenceEnrichmentPreferredSet({
+                        engagementId,
+                        runId,
+                        attemptId,
+                    }),
+                ),
             ),
         changeSetCreate: (engagementId, name, description) =>
             runtime.runPromise(
@@ -1231,6 +1656,35 @@ export const makeApi = (runtime: AppRuntime): CbranchApi => {
             runtime.runPromise(withClient(c => c.ConfigAppGet({}))),
         appSettingsSet: patch =>
             runtime.runPromise(withClient(c => c.ConfigAppSet(patch))),
+        inferenceProfilesGet: () =>
+            runtime.runPromise(withClient(c => c.InferenceProfilesGet({}))),
+        inferenceProfilesDiscover: () =>
+            runtime.runPromise(
+                withClient(c => c.InferenceProfilesDiscover({})),
+            ),
+        inferenceModelsDiscover: profileId =>
+            runtime.runPromise(
+                withClient(c => c.InferenceModelsDiscover({ profileId })),
+            ),
+        inferenceProfilesSet: profiles =>
+            runtime.runPromise(
+                withClient(c => c.InferenceProfilesSet({ profiles })),
+            ),
+        workspaceInferenceDefaultsGet: engagementId =>
+            runtime.runPromise(
+                withClient(c =>
+                    c.WorkspaceInferenceDefaultsGet({ engagementId }),
+                ),
+            ),
+        workspaceInferenceDefaultsSet: (engagementId, defaults) =>
+            runtime.runPromise(
+                withClient(c =>
+                    c.WorkspaceInferenceDefaultsSet({
+                        engagementId,
+                        defaults,
+                    }),
+                ),
+            ),
         // ── interactive rebase (P5) ─────────────────────────────────────────────────
         rebasePlan: (repoId, upstream, opts) =>
             runtime.runPromise(

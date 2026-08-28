@@ -20,11 +20,13 @@ import {
     type EngagementWorkspace,
     type GitError,
     HistoryColumnVisibility,
+    InferenceProfile,
     type InvalidationEvent,
     KeyBinding,
     RepoHandle,
     type RepoId,
     RepoInitResult,
+    WorkspaceInferenceDefaults,
 } from '@cbranch/rpc-contract';
 import { type Cause, Effect, Layer, Queue, Scope, Stream } from 'effect';
 
@@ -36,6 +38,8 @@ import {
 import {
     type AppSettingsData,
     type ConfigStore,
+    type InferenceProfileData,
+    type WorkspaceInferenceDefaultsData,
     makeConfigStore,
 } from '../config/config-store';
 import {
@@ -255,6 +259,21 @@ const fromKeyBindings = (
     for (const b of bindings) out[b.commandId] = b.chord;
     return out;
 };
+
+const toInferenceProfile = (data: InferenceProfileData): InferenceProfile =>
+    new InferenceProfile(data);
+
+const fromInferenceProfile = (
+    profile: InferenceProfile,
+): InferenceProfileData => ({ ...profile });
+
+const toWorkspaceInferenceDefaults = (
+    data: WorkspaceInferenceDefaultsData,
+): WorkspaceInferenceDefaults => new WorkspaceInferenceDefaults(data);
+
+const fromWorkspaceInferenceDefaults = (
+    defaults: WorkspaceInferenceDefaults,
+): WorkspaceInferenceDefaultsData => ({ ...defaults });
 
 /**
  * Build a live {@link GitEngineApi}. Requires a `Scope`: the version probe runs once,
@@ -1459,6 +1478,30 @@ export const makeGitEngine = (
                                   },
                     }),
                     toAppSettings,
+                ),
+            inferenceProfilesGet: () =>
+                Effect.map(configStore.getInferenceProfiles(), profiles =>
+                    profiles.map(toInferenceProfile),
+                ),
+            inferenceProfilesSet: profiles =>
+                Effect.map(
+                    configStore.setInferenceProfiles(
+                        profiles.map(fromInferenceProfile),
+                    ),
+                    stored => stored.map(toInferenceProfile),
+                ),
+            workspaceInferenceDefaultsGet: engagementId =>
+                Effect.map(
+                    configStore.getWorkspaceInferenceDefaults(engagementId),
+                    toWorkspaceInferenceDefaults,
+                ),
+            workspaceInferenceDefaultsSet: (engagementId, defaults) =>
+                Effect.map(
+                    configStore.setWorkspaceInferenceDefaults(
+                        engagementId,
+                        fromWorkspaceInferenceDefaults(defaults),
+                    ),
+                    toWorkspaceInferenceDefaults,
                 ),
 
             // ── interactive rebase (P5) ───────────────────────────────────────────

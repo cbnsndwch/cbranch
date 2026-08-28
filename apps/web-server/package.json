@@ -26,10 +26,14 @@
     },
     "dependencies": {
         "@cbranch/core": "workspace:*",
+        "@cbranch/inference": "workspace:*",
         "@cbranch/plugin-contract": "workspace:*",
         "@cbranch/plugin-runtime": "workspace:*",
         "@cbranch/rpc-contract": "workspace:*",
+        "@cbranch/workspace-intelligence": "workspace:*",
         "@effect/platform-node": "4.0.0-beta.92",
+        "@tanstack/ai": "0.42.0",
+        "@tanstack/ai-openai": "0.16.0",
         "effect": "4.0.0-beta.92"
     },
     "devDependencies": {

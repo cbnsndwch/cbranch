@@ -677,6 +677,133 @@ describe('app settings (REQ-P5-CFG-006; NEVER git config, REQ-P5-CFG-005)', () =
     });
 });
 
+describe('inference profile settings', () => {
+    test('persists secret references only and validates independent workspace defaults', async () => {
+        const path = newPath();
+        const store = makeConfigStore({ configPath: path });
+        const workspace = await run(
+            store.createEngagement('Inference workspace', 'teal'),
+        );
+        const engagementId = workspace.engagements[0]!.id;
+        const profiles = await run(
+            store.setInferenceProfiles([
+                {
+                    id: 'generation',
+                    label: 'Hosted generation',
+                    provider: 'openai-compatible',
+                    enabled: true,
+                    capabilities: ['generation'],
+                    modelId: 'hosted-model',
+                    endpoint: 'https://inference.example.test/v1',
+                    secretReference: {
+                        kind: 'environment',
+                        name: 'CBRANCH_INFERENCE_TOKEN',
+                    },
+                },
+                {
+                    id: 'embedding',
+                    label: 'Local embeddings',
+                    provider: 'local-embeddings',
+                    enabled: true,
+                    capabilities: ['embeddings'],
+                    modelId: 'local-embedding-model',
+                    executable: 'local-embed',
+                },
+            ]),
+        );
+
+        expect(profiles).toHaveLength(2);
+        await expect(
+            run(
+                store.setWorkspaceInferenceDefaults(engagementId, {
+                    generationProfileId: 'generation',
+                    embeddingProfileId: 'embedding',
+                }),
+            ),
+        ).resolves.toEqual({
+            generationProfileId: 'generation',
+            embeddingProfileId: 'embedding',
+        });
+        expect(readFileSync(path, 'utf8')).toContain('CBRANCH_INFERENCE_TOKEN');
+        expect(readFileSync(path, 'utf8')).not.toContain('sk-secret-value');
+
+        await run(
+            store.setInferenceProfiles([
+                { ...profiles[0]!, enabled: false },
+                profiles[1]!,
+            ]),
+        );
+        await expect(
+            run(store.getWorkspaceInferenceDefaults(engagementId)),
+        ).resolves.toEqual({ embeddingProfileId: 'embedding' });
+    });
+
+    test('rejects raw-secret-shaped profile metadata and incompatible defaults', async () => {
+        const store = makeConfigStore({ configPath: newPath() });
+        const workspace = await run(
+            store.createEngagement('Inference workspace', 'teal'),
+        );
+        const engagementId = workspace.engagements[0]!.id;
+
+        await expect(
+            run(
+                store.setInferenceProfiles([
+                    {
+                        id: 'unsafe',
+                        label: 'Unsafe',
+                        provider: 'openai-compatible',
+                        enabled: true,
+                        capabilities: ['generation'],
+                        endpoint:
+                            'https://token@inference.example.test/v1?api_key=value',
+                        secretReference: 'sk-secret-value',
+                    } as never,
+                ]),
+            ),
+        ).rejects.toThrow('Inference profiles must be valid');
+
+        await expect(
+            run(
+                store.setInferenceProfiles([
+                    {
+                        id: 'unready',
+                        label: 'Unready remote',
+                        provider: 'openai-compatible',
+                        enabled: true,
+                        capabilities: ['generation'],
+                        endpoint: 'https://inference.example.test/v1',
+                        secretReference: {
+                            kind: 'environment',
+                            name: 'CBRANCH_INFERENCE_TOKEN',
+                        },
+                    },
+                ]),
+            ),
+        ).rejects.toThrow('Inference profiles must be valid');
+
+        await run(
+            store.setInferenceProfiles([
+                {
+                    id: 'embedding',
+                    label: 'Embedding',
+                    provider: 'local-embeddings',
+                    enabled: true,
+                    capabilities: ['embeddings'],
+                    modelId: 'local-embedding-model',
+                    executable: 'local-embed',
+                },
+            ]),
+        );
+        await expect(
+            run(
+                store.setWorkspaceInferenceDefaults(engagementId, {
+                    generationProfileId: 'embedding',
+                }),
+            ),
+        ).rejects.toThrow('must select enabled profiles');
+    });
+});
+
 describe('concurrent writes are serialized (no lost update)', () => {
     test('a theme save racing an upsertRecent: both persist', async () => {
         const store = makeConfigStore({ configPath: newPath() });
