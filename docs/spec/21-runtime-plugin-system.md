@@ -48,8 +48,9 @@ The following decisions are fixed for the first release of this phase:
   configured Git credential helper. Private Git repositories use the host's SSH
   configuration, keys, and agent; cbranch does not collect or store SSH keys.
 - Only artifacts signed by an explicitly trusted publisher are installable.
-  Untrusted repositories may be added and browsed, but cannot install or update
-  plugins.
+  Untrusted repositories may be added and their fetched root fingerprint may be
+  inspected, but their signed catalog cannot be browsed and they cannot install
+  or update plugins.
 - Ordinary updates require review. A security update may install automatically
   only when it is publisher-signed, carries a signed advisory reference, remains
   within the installed major version, and requests no new or broader permission.
@@ -120,6 +121,9 @@ The following decisions are fixed for the first release of this phase:
   metadata, not from its display name or repository URL.
 - **Trust root.** The locally approved TUF root metadata and threshold keys for
   a publisher. Adding or rotating one always requires an explicit user action.
+  The bundled `cbranch-official` registry is the sole baseline exception: its
+  exact root ships as trusted application data. Once removed or replaced, its
+  trust is never restored silently.
 - **Plugin artifact.** A self-contained, immutable `.cbranch-plugin` archive
   selected by signed target metadata and verified by SHA-256 and length before
   extraction. It contains no runtime-downloaded dependencies.
@@ -244,9 +248,10 @@ metadata/delegated/<role>.json
 targets/<plugin-id>/<version>/<artifact>.cbranch-plugin
 ```
 
-Repositories MAY delegate targets by namespace or role using standard TUF
-delegations. They MUST publish at least `root`, `timestamp`, `snapshot`, and
-`targets` metadata. The repository's targets metadata supplies the artifact
+The Phase 9 baseline supports only the fixed trusted root and the top-level
+`timestamp`, `snapshot`, and `targets` chain over HTTPS. Delegations, Git/SSH
+repositories, and root rotation are deferred to M5. Repositories MUST publish
+at least `root`, `timestamp`, `snapshot`, and `targets` metadata. The repository's targets metadata supplies the artifact
 hash, byte length, plugin id, version, minimum cbranch/plugin-contract version,
 publisher fingerprint, release notes, permission declaration digest, and optional
 security advisory IDs. Artifact paths and any custom target fields are data under
@@ -254,16 +259,17 @@ the signed targets role and are not trusted before verification.
 
 ### TUF trust and freshness
 
-- Cbranch verifies TUF metadata according to its role threshold, expiry,
-  version, hash, length, delegation, and rollback rules before showing a target
-  as verified or downloading it.
+- Cbranch verifies the fixed root and top-level timestamp, snapshot, and targets
+  role thresholds and expiry. It verifies timestamp-to-snapshot and
+  snapshot-to-targets hashes and lengths before showing a target as verified or
+  downloading it. This baseline does not claim persisted rollback protection.
 - The initial root is accepted only after the user verifies and approves its
   publisher fingerprint out of band. A repository URL alone is never a trust
   decision.
-- Root rotation follows the TUF root-update procedure: the new root must be
-  authorized by both the previously trusted root and its own threshold keys.
-- A timestamp or targets role that is expired, rolled back, malformed, or signed
-  by insufficient keys blocks new installation and update. The installed,
+- An expired, malformed, or insufficiently signed top-level role blocks new
+  installation. Root rotation and rollback protection require the deferred M5
+  retained trust-state design.
+- The installed,
   previously verified version remains runnable offline.
 - Repository mirrors, Git hosts, and artifact CDNs are untrusted transport. A
   successful TLS or SSH connection is not proof that an artifact is trusted.
@@ -326,7 +332,7 @@ schema. At minimum it contains:
   "version": "1.4.2",
   "displayName": "Release Automation",
   "publisherFingerprint": "sha256:...",
-   "engines": { "cbranch": ">=0.3.0 <1.0.0", "pluginContract": 1 },
+    "engines": { "cbranch": ">=0.2.0 <1.0.0", "pluginContract": 1 },
    "runtime": "trusted-esm",
    "entrypoint": "plugin.mjs",
   "capabilities": ["git.read", "git.write", "automation.exec"],
@@ -423,7 +429,8 @@ publisher fingerprints, plugin enablement, and opaque secret references.
 `plugins.lock.json` is an atomically written, machine-managed record of every
 active plugin's id, version, artifact SHA-256, repository id, TUF target version,
 publisher fingerprint, manifest capability digest, and grant digest. It allows a
-reinstall to select the same verified targets and makes rollback deterministic.
+reinstall to select the same verified target. The baseline does not retain prior
+artifacts or offer rollback; those semantics remain deferred to M5.
 
 ## Functional requirements
 
@@ -451,7 +458,8 @@ reinstall to select the same verified targets and makes rollback deterministic.
 
 > HTTPS repositories, explicit root trust, signed TUF catalog refresh, artifact
 > validation, reviewed installation, enablement, disablement, and uninstall are
-> implemented. Git-backed repositories, private credentials, root rotation,
+> implemented. Private HTTPS credentials use the configured Git credential
+> helper. Git-backed repositories, root rotation,
 > update/rollback, and broker capabilities remain deferred. See the P9 delivery
 > ledger and test matrix in [`22-phase9-implementation-plan.md`](22-phase9-implementation-plan.md).
 
@@ -461,15 +469,17 @@ reinstall to select the same verified targets and makes rollback deterministic.
 - **REQ-PLG-REP-002.** Cbranch SHALL reject plain HTTP, local paths, URL
   userinfo, custom transport helpers, and cross-origin redirects for plugin
   repository or artifact access.
-- **REQ-PLG-REP-003.** Before installing or updating a plugin, cbranch SHALL
-  verify TUF role thresholds, hashes, lengths, versions, delegations, expiry,
-  rollback protection, target digest, and manifest-to-target consistency.
+- **REQ-PLG-REP-003.** Before installing a plugin, the Phase 9 baseline SHALL
+  verify the fixed root and top-level timestamp, snapshot, and targets role
+  thresholds, hashes, lengths, versions, expiry, target digest, and
+  manifest-to-target consistency. Delegations and persisted rollback protection
+  remain M5 requirements.
 - **REQ-PLG-REP-004.** A publisher SHALL become trusted only after an explicit
   user approval of its root fingerprint. A repository URL, TLS certificate, SSH
   host key, display name, or successful metadata fetch is insufficient.
-- **REQ-PLG-REP-005.** Trust-root addition, removal, and root-key rotation SHALL
-  be explicit auditable actions. Rotation must satisfy the TUF old-and-new root
-  authorization rules.
+- **REQ-PLG-REP-005.** Trust-root addition and removal SHALL be explicit
+  auditable actions. M5 root-key rotation SHALL also be explicit and auditable
+  and must satisfy the TUF old-and-new root authorization rules.
 - **REQ-PLG-REP-006.** Expired, malformed, unavailable, or rollback-suspect
   metadata SHALL block installation and update while leaving an already installed
   verified version runnable. The UI SHALL identify the repository and failure
@@ -512,6 +522,8 @@ reinstall to select the same verified targets and makes rollback deterministic.
   advisory identifiers.
 - **REQ-PLG-INST-004.** Cbranch SHALL not install a plugin from an untrusted
   publisher or a target whose signature or digest verification fails.
+  Installation approval SHALL be bound to the complete reviewed signed target,
+  not only its artifact digest.
 - **REQ-PLG-UPD-001.** Cbranch SHALL check configured repositories for updates on
   an explicit refresh and no more frequently than once every 24 hours while the
   service is running. Checks make no browser-originated network request.
@@ -566,6 +578,8 @@ reinstall to select the same verified targets and makes rollback deterministic.
 - **REQ-PLG-UX-001.** The Plugins settings surface SHALL show configured
   repositories, trust/freshness/credential states, installed plugins, enabled
   state, version, publisher, grants, updates, and rollback actions.
+  The baseline currently renders repository URL/trust/freshness/credential and
+  installed identity; update/rollback presentation remains M5 work.
 - **REQ-PLG-UX-002.** Every permission and update review SHALL be keyboard
   operable, focus-trapped where modal, accessible, localized, and specific about
   the action's authority. Approval and cancel controls shall be unambiguous.
@@ -596,11 +610,11 @@ the canonical `GitError` union extended only when no existing code applies.
 | `plugin.repositoryRemove` | `{ repositoryId }` | `void` | Removes source configuration, not installed artifacts. |
 | `plugin.publisherTrust` | `{ repositoryId, rootFingerprint, approved }` | `PluginRepository` | Explicit root trust decision. |
 | `plugin.catalogList` | `{ repositoryId }` | `PluginCatalogEntry[]` | Only verified signed targets are returned. |
-| `plugin.install` | `{ repositoryId, pluginId, version, grant }` | `InstalledPlugin` | Mutating, atomic install. |
+| `plugin.install` | `{ repositoryId, pluginId, version, artifactSha256, reviewToken, grant }` | `InstalledPlugin` | Mutating install bound to the complete reviewed target. |
 | `plugin.list` | `{}` | `InstalledPlugin[]` | Grants are descriptive, never secrets. |
 | `plugin.enable` / `plugin.disable` | `{ pluginId }` | `InstalledPlugin` | Loads/disposes a reviewed local ESM module. |
-| `plugin.update` | `{ pluginId, version, grant? }` | `InstalledPlugin` | Mutating, explicit ordinary update. |
-| `plugin.rollback` | `{ pluginId, version }` | `InstalledPlugin` | Retained verified target only. |
+| `plugin.update` | `{ pluginId, version, grant? }` | `InstalledPlugin` | M5 end-state method; not exposed by the baseline. |
+| `plugin.rollback` | `{ pluginId, version }` | `InstalledPlugin` | M5 end-state method; not exposed by the baseline. |
 | `plugin.auditList` | `{ pluginId?, cursor? }` | `PluginAuditPage` | Redacted, paged audit records. |
 | `plugin.invoke` | `{ pluginId, commandId, repoId, input }` | `PluginInvocation` | Routes a declared command to an enabled trusted module. |
 
@@ -642,9 +656,11 @@ unredacted source URL secret, or plugin private data.
 - Plugin repository verification, artifact extraction, manifest validation,
   permission comparison, path containment, process-declaration validation, and
   secret redaction MUST have automated tests.
-- TUF tests MUST cover insufficient signature threshold, expired metadata,
-  rollback/replay, delegated targets, root rotation, artifact substitution, and
-  a valid private-repository refresh using fixture transport adapters.
+- Phase 9 baseline TUF tests MUST cover insufficient signature threshold,
+  expired top-level metadata, artifact substitution, and a valid HTTPS refresh
+  using fixture transport adapters. M5 tests MUST add persisted rollback/replay,
+  delegated targets, root rotation, and private-repository coverage when those
+  capabilities land.
 - Runtime tests MUST prove activation-root containment, invalid module/export
   rejection, command ownership, hook ordering/failure isolation, reload/unload,
   output caps, and audit logging. Ambient Node authority is a disclosed trusted
@@ -652,24 +668,29 @@ unredacted source URL secret, or plugin private data.
 - Broker tests MUST prove that an ungranted request, symlink escape, shell path,
   dynamic executable, broadened update, or missing destructive confirmation is
   rejected without changing the target repository.
-- End-to-end tests MUST cover public HTTPS, private token HTTPS, private Git over
-  SSH fixture repositories, trust approval, install, disable, workspace-scoped
-  invocation, ordinary update review, eligible security auto-update, ineligible
-  permission-expanding update, rollback, and credential redaction.
+- Phase 9 baseline end-to-end tests MUST cover public HTTPS, trust approval,
+  install, disable, and workspace-scoped invocation. M5 end-to-end tests MUST add
+  private token HTTPS, private Git over SSH, update review, security auto-update,
+  rollback, and credential-redaction scenarios as those capabilities land.
 - Plugin activity MUST not block normal cbranch operation. The trusted module
   command output cap is 1 MiB; process time/memory controls are deferred until
   a separate execution boundary exists.
-- The UI MUST expose progress and cancellation for repository refresh, download,
-  install, update, and long-running plugin invocations.
+- M5 UI work MUST expose progress and cancellation for repository refresh,
+  download, install, update, and long-running plugin invocations. Baseline
+  repository requests use a bounded host timeout.
 - Telemetry remains opt-in under `NF-TELEM-1..4`; repository refreshes are
   user-configured software-update traffic, not telemetry, and must be documented
   with their source URLs and scheduling behavior.
 
 ## Acceptance criteria
 
+The first, second, and disablement criteria are baseline acceptance criteria.
+SSH, persisted replay protection, broker denials, automatic updates, and rollback
+criteria below are M5 end-state acceptance criteria and are not baseline claims.
+
 - A user can add a public HTTPS repository, approve its displayed publisher root
   fingerprint, install a verified artifact, approve its workspace grant, enable
-  it, and run a declared automation command against an engagement repository.
+  it, and run a declared plugin command.
 - A user can add a private HTTPS repository with a token, restart cbranch, and
   refresh it successfully while the token is absent from config, lockfiles, UI,
   logs, audit exports, and browser storage.
@@ -713,13 +734,11 @@ unredacted source URL secret, or plugin private data.
 - **Interrupted install or update:** staging is deleted on recovery and the last
   atomically active lock record remains authoritative.
 - **Repository verification unavailable:** plugin controls explain that remote
-  installation is unavailable until the TUF repository client exists; cbranch
-  never treats an arbitrary local path as an install.
+  installation is unavailable until a configured trusted repository verifies;
+  cbranch never treats an arbitrary local path as an install.
 
-## Open decisions before implementation
+## Open M5 decisions
 
-- Implement the TUF repository client and bind its verified targets to the
-  completed archive extraction/materialization path for `.mjs`/`.js` modules.
 - Decide whether team-managed trust roots can be preprovisioned by a host policy
   file and how that policy interacts with an individual user's ability to remove
   trust.

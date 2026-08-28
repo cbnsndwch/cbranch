@@ -59,7 +59,7 @@ for a declared future panel surface; do not rely on it for private-plugin UI yet
   "version": "1.0.0",
   "displayName": "Release Tools",
   "publisherFingerprint": "sha256:...",
-  "engines": { "cbranch": ">=0.2.2 <1.0.0", "pluginContract": 1 },
+  "engines": { "cbranch": ">=0.2.0 <1.0.0", "pluginContract": 1 },
   "runtime": "trusted-esm",
   "entrypoint": "plugin.mjs",
   "capabilities": ["ui.contribute"],

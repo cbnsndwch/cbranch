@@ -26,21 +26,19 @@ plugin and turns remaining work into independently verifiable goal loops.
 | Trusted ESM lifecycle | done for v1 commands | `apps/web-server/src/plugin-manager.ts` validates, loads, enables, disables, disposes, invokes, contains entrypoints, caps output, and records audits. |
 | HTTPS repository and signed artifacts | done for demonstrated path | TUF repository transport, root approval, catalog refresh, staging, archive validation, activation, and lock persistence exist in `apps/web-server/src/`. The hello-world artifact was browsed, installed, enabled, and invoked from a canary workspace. |
 | Repository source support | partial | HTTPS repositories, including private registries through Git's configured credential helper, work through the Plugins UI. Git-backed repositories and SSH remain explicitly refused by `repositoryRefresh`. |
-| Install and uninstall | done for demonstrated path | The Plugins dialog supports add, refresh, root trust, catalog browse, install, enable/disable, and uninstall. Installation currently applies an empty grant without a review flow. |
+| Install and uninstall | done for demonstrated path | The Plugins dialog supports add, refresh, root trust, catalog browse, signed-target-bound install review, install, enable/disable, and uninstall. The baseline review applies an explicit empty broker grant because broker capabilities remain deferred. |
 | Update and rollback | not started | The RPC contract advertises both operations, but the manager and UI do not implement them. |
 | Permission review and broker APIs | not started | Grants are persisted and descriptive, but there is no install/update review or cbranch broker for Git, workspace, network, or host automation. |
 | Declarative command UI | partial | Command titles are rendered under `Plugins`; command output is shown in a host modal. The optional manifest `menu` field is ignored. |
 | Declarative panels, forms, status items | not started | `PluginPanelContribution` is only `{ id, title }` and no UI consumes it. Forms and status items are described by the specification but absent from the v1 schema. |
 | Result-dialog presentation | done | RC21 ships the wrapping fix; the user verified the hello-world result has no overflow. |
-| P9 planning and progress tracking | in progress | M1 reconciles shipped HTTPS/TUF behavior, contract exposure, and the progress ledger. |
+| P9 planning and progress tracking | current | M1 reconciled shipped HTTPS/TUF behavior, contract exposure, and the progress ledger; M2 remains the active design track. |
 
-## Reconciliation Required
+## Reconciliation State
 
-Before declaring P9 complete, update `docs/spec/21-runtime-plugin-system.md` to
-separate implemented HTTPS/TUF installation from still-deferred features. In
-particular, the deferred-distribution preface at lines 446-451 no longer
-describes current behavior. Do not weaken its requirements while reconciling;
-mark each one implemented, partial, or deferred with a linked test.
+`docs/spec/21-runtime-plugin-system.md` now separates implemented HTTPS/TUF
+installation from M5 end-state requirements. Future milestones must retain that
+distinction and link new implementation claims to tests.
 
 ## Milestones
 
@@ -189,12 +187,13 @@ model is stable.
 **Exit:** the applicable P9 requirements have implementation and test evidence;
 remaining non-goals are explicitly retained as non-goals.
 
-## Next Approved Sequence
+## Current Sequence
 
-1. Review and approve this document.
-2. Commit and publish M0 only, including the pending result-dialog overflow fix.
-3. Confirm M0 manually in the canary client.
-4. Start a new dedicated session at M1, then stop for review before M2.
+1. Keep the reconciled M1 lifecycle and trust baseline green.
+2. Complete and review M2 contract decisions before expanding shell rendering.
+3. Deliver M3 and M4 as separately verified UI slices.
+4. Keep broker authority, Git/SSH, replay protection, root rotation, update, and
+   rollback in M5 until their retained-state and approval semantics are approved.
 
 The dedicated plugin-UI implementation session must not begin from M2 until M1
 has reconciled the currently exposed lifecycle contract and implementation

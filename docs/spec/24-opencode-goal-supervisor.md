@@ -39,6 +39,14 @@ GS-ARCH-6: Durable state MUST be workspace-local SQLite. The daemon is the sole
 execution owner; CLI, MCP, and plugin are authenticated control surfaces that
 open the same workspace state rather than contacting a daemon control socket.
 
+GS-ARCH-7: When the OpenCode TUI exposes only its in-process
+`http://opencode.internal/` client, the TUI-managed systemd service MAY spawn the
+exact verified OpenCode executable as an external child. That child MUST bind a
+private loopback HTTP listener on an OS-selected port, and the supervisor MUST
+remain an outbound client of that listener. The child lifetime MUST be bounded by
+the service wrapper and MUST end when the workspace daemon exits. This does not
+permit the supervisor package itself to implement an HTTP listener.
+
 ## Components
 
 | Component | Implemented responsibility | Forbidden responsibility |
@@ -55,6 +63,7 @@ open the same workspace state rather than contacting a daemon control socket.
 | `tui-protocol.ts` | Bun-safe strict request/response schemas and deterministic confirmed-launch identity. | SQLite, tokens, and control mutation. |
 | `tui.ts` | Bun-safe TUI-only operator commands, confined plan-file dialog, local confirmation, and persistent service control. | SQLite imports, model prompts, model tools, or inline/HTTP approval input. |
 | `tui-daemon.ts` | Per-workspace systemd user-service status, bootstrap, readiness, and stop operations for the TUI. | Killing or replacing independently managed daemons. |
+| `managed-opencode.ts` | Bounded startup and shutdown of a verified loopback OpenCode child for a self-contained TUI-managed service. | Implementing an OpenCode server or exposing a non-loopback listener. |
 | `cli.ts` | Operator command parsing, output, process lifecycle, daemon and MCP entrypoints. | Direct transition bypass. |
 | `systemd.ts` | Safe user-unit generation, atomic write, lifecycle command rendering, lock inspection. | Running `systemctl`. |
 
@@ -381,14 +390,18 @@ matching session deterministically, create one only if absent, and send the work
 prompt only if no user message exists. Prompt requests MUST use deterministic
 message ID `msg_goal_<first-32-hex-of-sha256(idempotency-key)>`.
 
-GS-OC-3: Probe MUST inspect both session messages and status. A valid structured
-outcome means completed; busy or retry means active; no matching session or a
-matching session with no user prompt means absent; an ended assistant response
-without a valid outcome means unknown.
+GS-OC-3: Probe MUST inspect both session messages and status. Busy or retry takes
+precedence and means active. No matching session or a matching session with no
+user prompt means absent. Completed requires a valid structured outcome in an
+ended, non-tool-call assistant response while the session is not active; an
+ended assistant response without a valid outcome means unknown.
 
-GS-OC-4: Outcome read MUST accept only the latest assistant message whose whole
-text parses as `AgentOutcome`. It MUST return active or unknown otherwise. The
-supervisor MUST additionally verify attempt and lease equality.
+GS-OC-4: Outcome read MUST accept only the latest completed, non-tool-call
+assistant message whose whole text parses as `AgentOutcome`, and only when the
+sampled session status is neither busy nor retry. If such an outcome exists
+while the session remains active, the adapter MUST first confirm abort of the
+residual cycle and MAY then accept that outcome. It MUST return active or unknown
+otherwise. The supervisor MUST additionally verify attempt and lease equality.
 
 GS-OC-5: Event observation MAY normalize session status, idle, error, message
 updates, and permission changes for linked sessions. It MUST assign stable
@@ -399,16 +412,23 @@ observations and MUST NOT schedule from `session.idle`.
 
 GS-DAEMON-1: The daemon MUST acquire
 `.opencode/goal-supervisor/daemon.lock` atomically before opening execution
-ownership. The record MUST contain PID, random owner token, canonical workspace,
-and creation time. The lock path MUST be published from a fully written candidate
-inode. Release MUST delete only the unchanged matching owner token.
+ownership. The record and token-bound readiness marker MUST contain PID, random
+owner token, canonical workspace, and creation time. On Linux they MUST also
+contain a boot-and-start-time process identity; portable standalone daemons MAY
+fall back to PID liveness where that identity source does not exist. The lock
+path MUST be published from a fully written candidate inode. Release MUST delete
+only the unchanged matching owner token.
 
-GS-DAEMON-2: A live owner PID MUST reject another daemon. A stale or invalid
-owner MAY be replaced only through the implemented compare-before-delete path;
-status inspection MUST NOT delete a lock. Stale replacement MUST be serialized
-by `daemon.lock.recovery`. An interrupted recovery guard MUST fail closed and be
-reported as invalid for operator inspection; it MUST NOT be reclaimed
-automatically.
+GS-DAEMON-2: A matching live owner process identity MUST reject another daemon.
+A PID mismatch is stale and MAY be replaced only through the implemented
+compare-before-delete path. An identity-less legacy record or a record whose live
+identity cannot be read MUST fail closed and MUST NOT be deleted while its PID is
+live; status inspection MUST NOT delete a lock. Stale replacement MUST be
+serialized by `daemon.lock.recovery`. An interrupted recovery guard MUST fail
+closed and be reported as invalid for operator inspection; it MUST NOT be
+reclaimed automatically.
+An identity-less record whose PID is dead MUST be reported stale rather than
+invalid so normal stale-lock recovery remains reachable.
 
 GS-DAEMON-3: Startup MUST reconcile expired attempt and outbox leases, process
 durable cancellation, and reconcile linked active sessions before normal claim
@@ -464,6 +484,9 @@ GS-CTRL-3: The public operator CLI MUST implement only `init`, `serve`, `status`
 `mcp`. Legacy direct `create`, `list`, and `transition` CLI commands MUST remain
 absent. The private TUI bridge entrypoint in GS-TUI-9 MUST remain hidden from
 public usage and accept only its versioned stdin protocol.
+The private managed-OpenCode `serve` option generated by GS-TUI-6 MUST likewise
+remain absent from public usage text, require an absolute executable path, and
+MUST NOT be accepted together with a public `--opencode-url` option.
 
 GS-CTRL-4: CLI `init --systemd` MUST write the manual unit and print lifecycle
 commands. It MUST NOT run `systemctl`, enable the unit, start it, or enable login
@@ -503,7 +526,8 @@ GS-TUI-3: One `/goal` submission MUST read exactly one file. The selected file
 MUST resolve within the canonical workspace without symlink traversal, MUST be a
 regular non-symlink file, MUST contain valid UTF-8, and MUST be no larger than
 1,048,576 raw bytes. The read MUST reject replacement or mutation detected while
-the file is opened or read.
+the file is opened or read. The raw file cap and bounded bridge request cap MUST
+allow every accepted file after worst-case UTF-8 JSON escaping.
 
 GS-TUI-4: The Markdown document MUST contain exactly one fenced block whose info
 string is exactly `goal-plan`. Its content MUST be one JSON value accepted by the
@@ -511,9 +535,11 @@ strict plan schema. Parsing MUST reject duplicate object keys, unknown schema
 fields, malformed JSON, invalid dependencies, duplicate IDs, and a cyclic plan
 DAG before confirmation.
 
-GS-TUI-5: Before launch, the local `DialogConfirm` MUST show the validated plan
-objective, unit count, canonical file path, and SHA-256 digest of the raw file
-bytes. Only its local confirm action MAY initiate atomic creation through the
+GS-TUI-5: Before launch, the local `DialogConfirm` MUST show the complete
+validated plan objective, unit count, canonical file path, and SHA-256 digest of
+the raw file bytes in a bounded local review surface. Terminal/control-character
+rendering MAY be sanitized but MUST NOT alter the approved value. Only its local
+confirm action MAY initiate atomic creation through the
 supported TUI flow. That transaction MAY create the goal, propose the plan,
 approve the plan, and authorize unattended start; it MUST be all-or-nothing and
 MUST enter execution without a separate start token. This confirmation is the
@@ -531,8 +557,19 @@ can continue after an OpenCode restart. Initialization MUST NOT start a service
 when no executing goal exists. Service readiness MUST require a token-bound
 marker published only after daemon startup reconciliation and loop
 initialization; lock ownership alone is not readiness. A managed readiness
-marker MUST also match the deterministic identity of the executable, CLI,
-workspace, OpenCode URL, and generated service configuration.
+marker MUST also match the deterministic identity of the executable and CLI
+files, workspace, OpenCode URL or managed OpenCode executable file, and generated
+service configuration. The generated unit MUST pass the expected program-file
+identity to `serve`, which MUST recompute it before opening workspace state.
+Persistent success MUST require the expected verified
+per-workspace unit to own that ready daemon; an independently owned daemon MUST
+be left running, may cause only the exact verified unit to be disabled, and MUST
+produce an actionable bootstrap failure that preserves the committed goal for
+idempotent retry. When the TUI client URL is `http://opencode.internal/`, the
+service MUST verify a compatible OpenCode executable and start a private
+loopback headless OpenCode child as specified by GS-ARCH-7; a confirmed `/goal`
+MUST NOT require the operator to start `opencode serve` separately. A reachable
+explicit HTTP or HTTPS URL MUST remain usable without starting that child.
 
 GS-TUI-7: `/goal-status` MUST be read-only. `/goal-daemon-stop` MUST act through
 systemd and MUST target only the exact per-workspace unit managed by this TUI
@@ -573,16 +610,27 @@ directory. A unit MUST be written through an owner-only temporary file and
 atomic rename. Standard owner-controlled `0755` systemd user directories are
 valid.
 
-GS-SD-3: Generated arguments MUST use systemd quoting that escapes backslash,
-double quote, dollar, and percent. Inputs MUST be absolute and free of control
-characters; the OpenCode URL MUST be credential-free HTTP or HTTPS.
+GS-SD-3: Generated command arguments MUST use systemd quoting that escapes
+backslash, double quote, dollar, and percent. Scalar path directives MUST use
+unquoted systemd byte escapes so the leading slash remains recognizable as an
+absolute path. Inputs MUST be absolute and free of control characters; the
+OpenCode URL MUST be credential-free HTTP or HTTPS.
 
 GS-SD-4: Every generated unit MUST include `Type=simple`, absolute Node and CLI
 paths, workspace `WorkingDirectory`, `Restart=on-failure`, `RestartSec=5s`,
-`UMask=0077`, `NoNewPrivileges=true`, private temporary/device settings,
-strict system protection, kernel/control-group/namespace/SUID/personality and
-capability restrictions, address families `AF_UNIX AF_INET AF_INET6`, and the
-workspace as `ReadWritePaths`.
+`UMask=0077`, `NoNewPrivileges=true`, private temporary storage,
+strict system protection, kernel-tunable/control-group/namespace/SUID/personality and
+privilege-escalation restrictions, address families `AF_UNIX AF_INET AF_INET6`,
+and the workspace as `ReadWritePaths`. The generated unprivileged user unit MUST
+NOT request capabilities or use a capability directive that prevents startup on
+a standard systemd user manager. A managed OpenCode child MUST receive a bounded
+`PATH` containing the verified Node and OpenCode directories plus valid inherited
+program directories. Strict protection MUST pass the resolved `XDG_CONFIG_HOME`,
+`XDG_DATA_HOME`, `XDG_CACHE_HOME`, and `XDG_STATE_HOME` values to the child and
+add only their OpenCode subdirectories as optional writable paths needed for
+configuration, session, credential-refresh, log, package-cache, and lock state.
+Those subdirectories MUST be created as owner-only directories before the unit
+starts under strict system protection.
 
 GS-SD-5: TUI bootstrap MUST install or verify its per-workspace unit, reload the
 user manager when required, enable the unit, and start or confirm it. The service
@@ -604,7 +652,12 @@ restarted, and readiness MUST match the desired service identity before rollout
 is complete. Serialization MUST use an owner-token interprocess lock with
 bounded waiting and stale-owner recovery in addition to in-process ordering.
 Node and `systemctl` discovery MAY use only verified absolute candidates, and
-the user unit path MUST honor an absolute `XDG_CONFIG_HOME`.
+the user unit path MUST honor an absolute `XDG_CONFIG_HOME`. Rejected discovery
+results MUST NOT be cached; a successful program cache MUST be revalidated when
+its executable identity changes.
+A live lock carrying a managed service identity and the exact loaded unit
+fragment MUST remain classified as managed-starting while systemd transitions
+`MainPID`; that transient snapshot MUST NOT disable the unit as independent.
 
 ## Security and data layout
 
