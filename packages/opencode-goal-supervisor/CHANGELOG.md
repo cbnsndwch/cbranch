@@ -33,6 +33,22 @@ provenance by the release operator.
 - Bind readiness to the exact generated service identity and serialize systemd
   changes across OpenCode processes so failed reload/restart rollouts retry
   safely.
+- Make confirmed TUI launches self-contained when OpenCode exposes only its
+  in-process client: verify the OpenCode executable, supervise a private loopback
+  headless server in the workspace service, and stop it with the daemon.
+- Emit scalar systemd path directives with systemd path escapes instead of
+  quotes that make `WorkingDirectory` invalid on systemd 255.
+- Avoid the system-service-only empty capability directive that makes an
+  otherwise unprivileged systemd user unit exit with `218/CAPABILITIES`.
+- Avoid `PrivateDevices=true`, which also requires unsupported capability
+  changes in a standard unprivileged systemd user manager.
+- Avoid `ProtectKernelModules=true`, which is redundant for the unprivileged
+  process and fails on user managers that cannot alter capability bounds.
+- Bind daemon locks and readiness markers to Linux process identity so PID reuse
+  cannot impersonate an owner, fail closed for unverifiable legacy ownership,
+  and require verified managed ownership for TUI persistence success.
+- Size the bounded TUI bridge for worst-case JSON escaping, retain complete
+  canonical confirmation details, and retry rejected systemd/program discovery.
 - Keep model-facing approval tools request-only, inject MCP transport credentials
   outside model arguments, and persist OpenCode permission correlation across
   plugin restarts.

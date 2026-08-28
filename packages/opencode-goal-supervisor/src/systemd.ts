@@ -11,7 +11,20 @@ import {
     unlink,
 } from 'node:fs/promises';
 import { homedir } from 'node:os';
-import { basename, dirname, isAbsolute, join, resolve } from 'node:path';
+import {
+    basename,
+    delimiter,
+    dirname,
+    isAbsolute,
+    join,
+    resolve,
+} from 'node:path';
+
+import {
+    isProcessIdentity,
+    processIdentity,
+    type ProcessIdentity,
+} from './process-identity.js';
 
 export const DEFAULT_SYSTEMD_UNIT_NAME =
     'cbranch-goal-supervisor.service' as const;
@@ -81,6 +94,25 @@ export const quoteSystemdArgument = (value: string): string => {
         .replaceAll('%', '%%')}"`;
 };
 
+const quoteSystemdEnvironment = (value: string): string => {
+    safeText(value, 'systemd environment');
+    return `"${value
+        .replaceAll('\\', '\\\\')
+        .replaceAll('"', '\\"')
+        .replaceAll('%', '%%')}"`;
+};
+
+/** Escape one absolute path for a scalar systemd directive without quotes. */
+export const escapeSystemdPathDirective = (value: string): string => {
+    const path = absolutePath(value, 'systemd path');
+    return Array.from(Buffer.from(path, 'utf8'), byte => {
+        const character = String.fromCharCode(byte);
+        if (character === '%') return '%%';
+        if (/^[A-Za-z0-9/._:+,@=-]$/u.test(character)) return character;
+        return `\\x${byte.toString(16).padStart(2, '0')}`;
+    }).join('');
+};
+
 const unitName = (value: string): string => {
     if (!unitNamePattern.test(value)) {
         throw new Error('Systemd unit name must be a simple .service name.');
@@ -106,25 +138,104 @@ export interface GenerateSystemdUserServiceOptions {
     readonly cliPath: string;
     readonly workspace: string;
     readonly openCodeUrl: string;
+    readonly managedOpenCodePath?: string;
+    readonly programFileIdentity?: string;
     readonly restartSec?: number;
 }
 
 export type SystemdServiceIdentity = `sha256:${string}`;
 
+const servicePath = (
+    executablePath: string,
+    managedOpenCodePath?: string,
+): string =>
+    [
+        dirname(executablePath),
+        ...(managedOpenCodePath ? [dirname(managedOpenCodePath)] : []),
+        ...(process.env.PATH ?? '').split(delimiter),
+        '/usr/local/sbin',
+        '/usr/local/bin',
+        '/usr/sbin',
+        '/usr/bin',
+        '/sbin',
+        '/bin',
+    ]
+        .filter(
+            path =>
+                isAbsolute(path) &&
+                !Array.from(path).some(character => {
+                    const code = character.charCodeAt(0);
+                    return code <= 0x1f || (code >= 0x7f && code <= 0x9f);
+                }),
+        )
+        .map(path => resolve(path))
+        .filter((path, index, paths) => paths.indexOf(path) === index)
+        .join(delimiter);
+
+const xdgDirectory = (variable: string, fallback: string): string => {
+    const configured = process.env[variable];
+    return configured &&
+        isAbsolute(configured) &&
+        !hasControlCharacters(configured)
+        ? resolve(configured)
+        : resolve(homedir(), fallback);
+};
+
+const managedOpenCodeWritablePaths = (): readonly string[] => [
+    join(xdgDirectory('XDG_CONFIG_HOME', '.config'), 'opencode'),
+    join(xdgDirectory('XDG_DATA_HOME', '.local/share'), 'opencode'),
+    join(xdgDirectory('XDG_CACHE_HOME', '.cache'), 'opencode'),
+    join(xdgDirectory('XDG_STATE_HOME', '.local/state'), 'opencode'),
+];
+
+const managedOpenCodeEnvironment = (): Readonly<Record<string, string>> => ({
+    XDG_CONFIG_HOME: xdgDirectory('XDG_CONFIG_HOME', '.config'),
+    XDG_DATA_HOME: xdgDirectory('XDG_DATA_HOME', '.local/share'),
+    XDG_CACHE_HOME: xdgDirectory('XDG_CACHE_HOME', '.cache'),
+    XDG_STATE_HOME: xdgDirectory('XDG_STATE_HOME', '.local/state'),
+});
+
 /** Identity of the exact service configuration expected to publish readiness. */
 export const systemdServiceIdentity = (
     options: GenerateSystemdUserServiceOptions,
 ): SystemdServiceIdentity => {
+    const executablePath = absolutePath(
+        options.executablePath,
+        'Executable path',
+    );
+    const managedOpenCodePath =
+        options.managedOpenCodePath === undefined
+            ? undefined
+            : absolutePath(
+                  options.managedOpenCodePath,
+                  'Managed OpenCode path',
+              );
+    const programFileIdentity =
+        options.programFileIdentity === undefined
+            ? undefined
+            : safeText(options.programFileIdentity, 'Program file identity');
+    if (programFileIdentity && programFileIdentity.length > 16_384) {
+        throw new Error('Program file identity is too long.');
+    }
     const input = JSON.stringify({
         cliPath: absolutePath(options.cliPath, 'CLI path'),
-        executablePath: absolutePath(options.executablePath, 'Executable path'),
+        executablePath,
+        managedOpenCodePath,
+        managedOpenCodeEnvironment: managedOpenCodePath
+            ? managedOpenCodeEnvironment()
+            : {},
+        managedOpenCodeWritablePaths: managedOpenCodePath
+            ? managedOpenCodeWritablePaths()
+            : [],
         openCodeUrl: openCodeUrl(options.openCodeUrl),
+        path: servicePath(executablePath, managedOpenCodePath),
+        programFileIdentity,
         restartSec: positiveInteger(
             options.restartSec ?? 5,
             'RestartSec',
             3_600,
         ),
-        serviceConfigurationVersion: 1,
+        serviceConfigurationVersion: 9,
         workspace: absolutePath(options.workspace, 'Workspace path'),
     });
     return `sha256:${createHash('sha256').update(input).digest('hex')}`;
@@ -137,22 +248,38 @@ export const generateSystemdUserService = (
     const cli = absolutePath(options.cliPath, 'CLI path');
     const workspace = absolutePath(options.workspace, 'Workspace path');
     const url = openCodeUrl(options.openCodeUrl);
+    const managedOpenCode =
+        options.managedOpenCodePath === undefined
+            ? undefined
+            : absolutePath(
+                  options.managedOpenCodePath,
+                  'Managed OpenCode path',
+              );
     const restartSec = positiveInteger(
         options.restartSec ?? 5,
         'RestartSec',
         3_600,
     );
     const serviceIdentity = systemdServiceIdentity(options);
+    const path = servicePath(executable, managedOpenCode);
+    const writablePaths = managedOpenCode ? managedOpenCodeWritablePaths() : [];
+    const managedEnvironment = managedOpenCode
+        ? managedOpenCodeEnvironment()
+        : {};
     const command = [
         executable,
         cli,
         'serve',
         '--workspace',
         workspace,
-        '--opencode-url',
-        url,
+        ...(managedOpenCode
+            ? ['--internal-managed-opencode', managedOpenCode]
+            : ['--opencode-url', url]),
         '--internal-service-identity',
         serviceIdentity,
+        ...(options.programFileIdentity
+            ? ['--internal-program-file-identity', options.programFileIdentity]
+            : []),
     ]
         .map(quoteSystemdArgument)
         .join(' ');
@@ -166,23 +293,29 @@ export const generateSystemdUserService = (
         '[Service]',
         'Type=simple',
         `ExecStart=${command}`,
-        `WorkingDirectory=${quoteSystemdArgument(workspace)}`,
+        `WorkingDirectory=${escapeSystemdPathDirective(workspace)}`,
+        `Environment=${quoteSystemdEnvironment(`PATH=${path}`)}`,
+        ...Object.entries(managedEnvironment).map(
+            ([name, value]) =>
+                `Environment=${quoteSystemdEnvironment(`${name}=${value}`)}`,
+        ),
         'Restart=on-failure',
         `RestartSec=${restartSec}s`,
         'UMask=0077',
         'NoNewPrivileges=true',
         'PrivateTmp=true',
-        'PrivateDevices=true',
         'ProtectSystem=strict',
         'ProtectControlGroups=true',
-        'ProtectKernelModules=true',
         'ProtectKernelTunables=true',
         'RestrictNamespaces=true',
         'RestrictSUIDSGID=true',
         'LockPersonality=true',
-        'CapabilityBoundingSet=',
-        'RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6',
-        `ReadWritePaths=${quoteSystemdArgument(workspace)}`,
+        'RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK',
+        `ReadWritePaths=${escapeSystemdPathDirective(workspace)}`,
+        ...writablePaths.map(
+            writablePath =>
+                `ReadWritePaths=-${escapeSystemdPathDirective(writablePath)}`,
+        ),
         '',
         '[Install]',
         'WantedBy=default.target',
@@ -252,6 +385,27 @@ const validateInstalledUnit = (info: Stats): void => {
     }
 };
 
+const ensureManagedOpenCodeDirectories = async (): Promise<void> => {
+    await Promise.all(
+        managedOpenCodeWritablePaths().map(async path => {
+            await mkdir(path, { recursive: true, mode: 0o700 });
+            const info = await lstat(path);
+            if (
+                !info.isDirectory() ||
+                info.isSymbolicLink() ||
+                (process.platform !== 'win32' &&
+                    typeof process.getuid === 'function' &&
+                    info.uid !== process.getuid())
+            ) {
+                throw new Error(
+                    'Managed OpenCode writable paths must be real directories owned by the current user.',
+                );
+            }
+            if (process.platform !== 'win32') await chmod(path, 0o700);
+        }),
+    );
+};
+
 export const writeSystemdUserService = async (
     options: WriteSystemdUserServiceOptions,
 ): Promise<WrittenSystemdUserService> => {
@@ -268,6 +422,10 @@ export const writeSystemdUserService = async (
     const name = unitName(basename(unitPath));
     const content = generateSystemdUserService(options);
     const serviceIdentity = systemdServiceIdentity(options);
+
+    if (options.managedOpenCodePath) {
+        await ensureManagedOpenCodeDirectories();
+    }
 
     try {
         await lstat(configuredDirectory);
@@ -358,6 +516,7 @@ export type DaemonServiceStatus =
           readonly status: 'running' | 'stale';
           readonly lockPath: string;
           readonly pid: number;
+          readonly processIdentity?: ProcessIdentity;
           readonly token: string;
           readonly workspace: string;
           readonly createdAt: string;
@@ -373,6 +532,7 @@ export type DaemonServiceStatus =
 export interface InspectDaemonServiceStatusOptions {
     readonly workspace?: string;
     readonly isPidAlive?: (pid: number) => boolean;
+    readonly processIdentity?: (pid: number) => ProcessIdentity | undefined;
 }
 
 const pidIsAlive = (pid: number): boolean => {
@@ -395,7 +555,10 @@ const invalidLock = (
 
 const inspectReadiness = async (
     lockPath: string,
+    ownerPid: number,
+    ownerWorkspace: string,
     token: string,
+    ownerProcessIdentity: ProcessIdentity | undefined,
     ownerServiceIdentity?: SystemdServiceIdentity,
 ): Promise<{
     readonly ready: boolean;
@@ -421,7 +584,10 @@ const inspectReadiness = async (
             await handle.readFile({ encoding: 'utf8' }),
         ) as Record<string, unknown>;
         const ready =
+            value.pid === ownerPid &&
+            value.workspace === ownerWorkspace &&
             value.token === token &&
+            value.processIdentity === ownerProcessIdentity &&
             typeof value.readyAt === 'string' &&
             !Number.isNaN(Date.parse(value.readyAt)) &&
             value.serviceIdentity === ownerServiceIdentity;
@@ -511,6 +677,8 @@ export const inspectDaemonServiceStatus = async (
         if (
             !Number.isSafeInteger(record.pid) ||
             Number(record.pid) <= 0 ||
+            (record.processIdentity !== undefined &&
+                !isProcessIdentity(record.processIdentity)) ||
             typeof record.token !== 'string' ||
             !uuid.test(record.token) ||
             typeof record.workspace !== 'string' ||
@@ -536,16 +704,47 @@ export const inspectDaemonServiceStatus = async (
         }
         const pid = Number(record.pid);
         const alive = (options.isPidAlive ?? pidIsAlive)(pid);
+        const recordedProcessIdentity = record.processIdentity as
+            | ProcessIdentity
+            | undefined;
+        const identity = alive
+            ? (options.processIdentity ?? processIdentity)(pid)
+            : undefined;
+        if (
+            alive &&
+            process.platform === 'linux' &&
+            (!recordedProcessIdentity || !identity)
+        ) {
+            return invalidLock(
+                lockPath,
+                'Daemon lock owner identity could not be established safely.',
+            );
+        }
+        const identityMatches =
+            alive &&
+            (recordedProcessIdentity
+                ? identity === recordedProcessIdentity
+                : process.platform !== 'linux');
         const serviceIdentity = record.serviceIdentity as
             | SystemdServiceIdentity
             | undefined;
-        const readiness = alive
-            ? await inspectReadiness(lockPath, record.token, serviceIdentity)
+        const readiness = identityMatches
+            ? await inspectReadiness(
+                  lockPath,
+                  pid,
+                  ownerWorkspace,
+                  record.token,
+                  recordedProcessIdentity,
+                  serviceIdentity,
+              )
             : { ready: false as const };
         return {
-            status: alive ? 'running' : 'stale',
+            status: identityMatches ? 'running' : 'stale',
             lockPath,
             pid,
+            ...(recordedProcessIdentity
+                ? { processIdentity: recordedProcessIdentity }
+                : {}),
             token: record.token,
             workspace: ownerWorkspace,
             createdAt: record.createdAt,

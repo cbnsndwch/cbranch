@@ -285,6 +285,16 @@ describe('OpenCodeSessionAdapter', () => {
                 leaseToken: 'lease-1',
                 workspace: '/workspace',
             }),
+        ).toEqual({ status: 'active' });
+
+        client.statusBySession['session-1'] = { type: 'idle' };
+        expect(
+            await adapter.readOutcome({
+                externalRef: 'opencode-session:session-1',
+                attemptId: 'attempt-1',
+                leaseToken: 'lease-1',
+                workspace: '/workspace',
+            }),
         ).toMatchObject({ status: 'terminal-unknown' });
 
         messages.push({
@@ -297,6 +307,58 @@ describe('OpenCodeSessionAdapter', () => {
             },
             parts: [{ type: 'text', text: JSON.stringify(outcome()) }],
         });
+        client.statusBySession['session-1'] = { type: 'busy' };
+        expect(
+            await adapter.readOutcome({
+                externalRef: 'opencode-session:session-1',
+                attemptId: 'attempt-1',
+                leaseToken: 'lease-1',
+                workspace: '/workspace',
+            }),
+        ).toEqual({
+            status: 'completed',
+            outcome: outcome(),
+            transcriptRef: 'opencode-transcript:session-1',
+        });
+        expect(client.calls.abort).toHaveLength(1);
+        messages.push({
+            info: {
+                id: 'assistant-residual',
+                sessionID: 'session-1',
+                role: 'assistant',
+                time: { created: Date.now() + 2, completed: Date.now() + 2 },
+                finish: 'stop',
+                error: { name: 'AbortError' },
+            },
+            parts: [],
+        });
+        client.statusBySession['session-1'] = { type: 'idle' };
+        expect(
+            await adapter.readOutcome({
+                externalRef: 'opencode-session:session-1',
+                attemptId: 'attempt-1',
+                leaseToken: 'lease-1',
+                workspace: '/workspace',
+            }),
+        ).toMatchObject({ status: 'completed', outcome: outcome() });
+        messages.pop();
+        messages[2] = {
+            ...messages[2]!,
+            info: { ...messages[2]!.info, finish: 'tool-calls' },
+        };
+        client.statusBySession['session-1'] = { type: 'idle' };
+        expect(
+            await adapter.readOutcome({
+                externalRef: 'opencode-session:session-1',
+                attemptId: 'attempt-1',
+                leaseToken: 'lease-1',
+                workspace: '/workspace',
+            }),
+        ).toMatchObject({ status: 'terminal-unknown' });
+        messages[2] = {
+            ...messages[2]!,
+            info: { ...messages[2]!.info, finish: 'stop' },
+        };
         expect(
             await adapter.readOutcome({
                 externalRef: 'opencode-session:session-1',

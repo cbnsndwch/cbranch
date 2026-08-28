@@ -16,6 +16,11 @@ import { dirname, join, resolve } from 'node:path';
 import { Effect, Semaphore, type Scope } from 'effect';
 
 import { DomainIdSchema } from './domain.js';
+import {
+    isProcessIdentity,
+    processIdentity,
+    type ProcessIdentity,
+} from './process-identity.js';
 import { GoalStore } from './store.js';
 import {
     GoalSupervisor,
@@ -85,6 +90,7 @@ type ValidatedDaemonOptions = GoalDaemonOptions & {
 
 type WorkspaceLockOwner = {
     readonly pid: number;
+    readonly processIdentity?: ProcessIdentity;
     readonly token: string;
     readonly workspace: string;
     readonly createdAt: string;
@@ -155,6 +161,9 @@ const parseLockOwner = (text: string): WorkspaceLockOwner | undefined => {
         if (
             !Number.isSafeInteger(value.pid) ||
             Number(value.pid) <= 0 ||
+            (value.processIdentity === undefined
+                ? process.platform === 'linux'
+                : !isProcessIdentity(value.processIdentity)) ||
             typeof value.token !== 'string' ||
             !value.token ||
             typeof value.workspace !== 'string' ||
@@ -292,7 +301,10 @@ const workspaceLock = (
                 writeFileSync(
                     file,
                     `${JSON.stringify({
+                        pid: owner.pid,
+                        workspace: owner.workspace,
                         token: owner.token,
+                        processIdentity: owner.processIdentity,
                         readyAt: new Date().toISOString(),
                         ...(readinessIdentity
                             ? { serviceIdentity: readinessIdentity }
@@ -380,8 +392,15 @@ export const acquireWorkspaceLock = (
     }
 
     for (let attempt = 0; attempt < 3; attempt++) {
+        const identity = processIdentity(pid);
+        if (process.platform === 'linux' && !identity) {
+            throw new GoalDaemonError(
+                'Could not establish a Linux process identity for daemon ownership.',
+            );
+        }
         const owner: WorkspaceLockOwner = {
             pid,
+            ...(identity ? { processIdentity: identity } : {}),
             token: randomUUID(),
             workspace: absoluteWorkspace,
             createdAt: new Date().toISOString(),
@@ -418,9 +437,39 @@ export const acquireWorkspaceLock = (
                 }
                 const existing = parseLockOwner(existingText);
                 if (existing && processIsAlive(existing.pid)) {
-                    throw new WorkspaceLockedError(absolutePath, existing.pid);
+                    const existingIdentity = processIdentity(existing.pid);
+                    if (
+                        !existingIdentity ||
+                        existingIdentity === existing.processIdentity
+                    ) {
+                        throw new WorkspaceLockedError(
+                            absolutePath,
+                            existing.pid,
+                        );
+                    }
                 }
                 if (!existing) {
+                    // Old records have no process identity. Never remove one
+                    // while its recorded PID could still be its owner.
+                    try {
+                        const legacy = JSON.parse(existingText) as {
+                            readonly pid?: unknown;
+                        };
+                        if (
+                            Number.isSafeInteger(legacy.pid) &&
+                            Number(legacy.pid) > 0 &&
+                            processIsAlive(Number(legacy.pid))
+                        ) {
+                            throw new WorkspaceLockedError(
+                                absolutePath,
+                                Number(legacy.pid),
+                            );
+                        }
+                    } catch (legacyError) {
+                        if (legacyError instanceof WorkspaceLockedError) {
+                            throw legacyError;
+                        }
+                    }
                     let modifiedAt: number;
                     try {
                         modifiedAt = statSync(absolutePath).mtimeMs;

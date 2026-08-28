@@ -16,6 +16,11 @@ import { delimiter, dirname, isAbsolute, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import {
+    isProcessIdentity,
+    processIdentity,
+    type ProcessIdentity,
+} from './process-identity.js';
+import {
     defaultSystemdUserDirectory,
     inspectDaemonServiceStatus,
     systemdServiceIdentity,
@@ -209,6 +214,11 @@ export class PersistentDaemonUnsupportedError extends Error {
     }
 }
 
+const independentOwnershipError = (): Error =>
+    new Error(
+        'Cannot start the managed goal daemon because an independently managed daemon owns this workspace. It was left running; stop it separately and retry the same confirmed plan.',
+    );
+
 export type PersistentDaemonStatus = {
     readonly status:
         | 'running'
@@ -240,7 +250,9 @@ export type PersistentDaemonManagerDependencies = {
     readonly realpath: typeof realpath;
     readonly lstat: typeof lstat;
     readonly pidIsAlive: (pid: number) => boolean;
+    readonly processIdentity: (pid: number) => ProcessIdentity | undefined;
     readonly nodeCandidates: readonly string[];
+    readonly openCodeCandidates: readonly string[];
     readonly systemctlCandidates: readonly string[];
     readonly cliPath: string;
 };
@@ -261,6 +273,7 @@ const procPidIsAlive = (pid: number): boolean => {
 
 type LifecycleLockOwner = {
     readonly pid: number;
+    readonly processIdentity?: ProcessIdentity;
     readonly token: string;
     readonly workspace: string;
     readonly createdAt: string;
@@ -292,6 +305,8 @@ const parseLifecycleLockOwner = (value: string): LifecycleLockOwner => {
     if (
         !Number.isSafeInteger(owner.pid) ||
         Number(owner.pid) <= 0 ||
+        (owner.processIdentity !== undefined &&
+            !isProcessIdentity(owner.processIdentity)) ||
         typeof owner.token !== 'string' ||
         !lifecycleTokenPattern.test(owner.token) ||
         typeof owner.workspace !== 'string' ||
@@ -303,6 +318,9 @@ const parseLifecycleLockOwner = (value: string): LifecycleLockOwner => {
     }
     return {
         pid: Number(owner.pid),
+        ...(isProcessIdentity(owner.processIdentity)
+            ? { processIdentity: owner.processIdentity }
+            : {}),
         token: owner.token,
         workspace: resolve(owner.workspace),
         createdAt: owner.createdAt,
@@ -355,21 +373,54 @@ const acquireLifecycleLock = async (
     timeoutMs: number,
     pollIntervalMs: number,
     pidIsAlive: (pid: number) => boolean,
+    identifyProcess: (pid: number) => ProcessIdentity | undefined,
     sleep: (milliseconds: number) => Promise<void>,
 ): Promise<{ readonly release: () => void }> => {
     const lockPath = resolve(path);
+    const recoveryPath = `${lockPath}.recovery`;
     const canonicalWorkspace = resolve(workspace);
     mkdirSync(dirname(lockPath), { recursive: true, mode: 0o700 });
     const deadline = Date.now() + timeoutMs;
     while (true) {
         const owner: LifecycleLockOwner = {
             pid: process.pid,
+            processIdentity:
+                identifyProcess(process.pid) ??
+                (() => {
+                    throw new Error(
+                        'Could not establish lifecycle lock process identity.',
+                    );
+                })(),
             token: randomUUID(),
             workspace: canonicalWorkspace,
             createdAt: new Date().toISOString(),
         };
         const serialized = `${JSON.stringify(owner)}\n`;
         try {
+            let recoveryInProgress = false;
+            try {
+                lstatSync(recoveryPath);
+                recoveryInProgress = true;
+            } catch (error) {
+                if (lifecycleErrorCode(error) !== 'ENOENT') {
+                    throw error;
+                }
+            }
+            if (recoveryInProgress) {
+                if (Date.now() >= deadline) {
+                    throw new Error(
+                        `Timed out waiting for workspace lifecycle recovery at ${recoveryPath}.`,
+                    );
+                }
+                // oxlint-disable-next-line eslint/no-await-in-loop
+                await sleep(
+                    Math.min(
+                        pollIntervalMs,
+                        Math.max(1, deadline - Date.now()),
+                    ),
+                );
+                continue;
+            }
             publishLifecycleLock(lockPath, owner, serialized);
             let released = false;
             return {
@@ -405,7 +456,23 @@ const acquireLifecycleLock = async (
             }
             existingText = readFileSync(lockPath, 'utf8');
         } catch (error) {
-            if (lifecycleErrorCode(error) === 'ENOENT') continue;
+            if (lifecycleErrorCode(error) === 'ENOENT') {
+                if (Date.now() >= deadline) {
+                    throw new Error(
+                        `Timed out waiting for workspace lifecycle lock at ${lockPath}.`,
+                        { cause: error },
+                    );
+                }
+                // A recovery guard may have appeared after the check above.
+                // oxlint-disable-next-line eslint/no-await-in-loop
+                await sleep(
+                    Math.min(
+                        pollIntervalMs,
+                        Math.max(1, deadline - Date.now()),
+                    ),
+                );
+                continue;
+            }
             throw error;
         }
         const existing = parseLifecycleLockOwner(existingText);
@@ -414,9 +481,54 @@ const acquireLifecycleLock = async (
                 'Workspace lifecycle lock belongs to a different workspace.',
             );
         }
-        if (!pidIsAlive(existing.pid)) {
-            removeLifecycleLockIfUnchanged(lockPath, existingText);
-            continue;
+        const alive = pidIsAlive(existing.pid);
+        const identity = alive ? identifyProcess(existing.pid) : undefined;
+        const sameOwner =
+            alive &&
+            (existing.processIdentity === undefined ||
+                identity === undefined ||
+                identity === existing.processIdentity);
+        if (!sameOwner) {
+            let recoveryFile: number | undefined;
+            try {
+                recoveryFile = openSync(recoveryPath, 'wx', 0o600);
+            } catch (error) {
+                if (lifecycleErrorCode(error) !== 'EEXIST') throw error;
+            }
+            if (recoveryFile !== undefined) {
+                try {
+                    let currentText: string;
+                    try {
+                        currentText = readFileSync(lockPath, 'utf8');
+                    } catch (error) {
+                        if (lifecycleErrorCode(error) === 'ENOENT') continue;
+                        throw error;
+                    }
+                    if (currentText !== existingText) continue;
+                    const current = parseLifecycleLockOwner(currentText);
+                    const currentAlive = pidIsAlive(current.pid);
+                    const currentIdentity = currentAlive
+                        ? identifyProcess(current.pid)
+                        : undefined;
+                    if (
+                        currentAlive &&
+                        (current.processIdentity === undefined ||
+                            currentIdentity === undefined ||
+                            currentIdentity === current.processIdentity)
+                    ) {
+                        continue;
+                    }
+                    removeLifecycleLockIfUnchanged(lockPath, currentText);
+                } finally {
+                    closeSync(recoveryFile);
+                    try {
+                        unlinkSync(recoveryPath);
+                    } catch {
+                        // A leftover guard fails closed for operator inspection.
+                    }
+                }
+                continue;
+            }
         }
         if (Date.now() >= deadline) {
             throw new Error(
@@ -462,11 +574,17 @@ const defaultDependencies: PersistentDaemonManagerDependencies = {
     realpath,
     lstat,
     pidIsAlive: procPidIsAlive,
+    processIdentity,
     nodeCandidates: [
         process.execPath,
         ...pathProgramCandidates('node'),
         '/usr/bin/node',
         '/usr/local/bin/node',
+    ],
+    openCodeCandidates: [
+        ...pathProgramCandidates('opencode'),
+        '/usr/local/bin/opencode',
+        '/usr/bin/opencode',
     ],
     systemctlCandidates: [
         ...pathProgramCandidates('systemctl'),
@@ -523,6 +641,19 @@ const executableFile = async (
     return canonical;
 };
 
+const regularFileIdentity = async (
+    path: string,
+    dependencies: PersistentDaemonManagerDependencies,
+): Promise<string> => {
+    const info = await dependencies.lstat(path);
+    if (!info.isFile() || info.isSymbolicLink()) {
+        throw new Error(
+            'Verified program identity is no longer a regular file.',
+        );
+    }
+    return `${path}:${info.dev}:${info.ino}:${info.mode}:${info.size}:${info.mtimeMs}:${info.ctimeMs}`;
+};
+
 const regularFile = async (
     path: string,
     label: string,
@@ -541,6 +672,7 @@ const regularFile = async (
 export type VerifiedTuiPrograms = {
     readonly nodePath: string;
     readonly cliPath: string;
+    readonly programFileIdentity?: string;
 };
 
 export type VerifyTuiProgramsOptions = {
@@ -570,7 +702,13 @@ export const verifyTuiPrograms = async (
             dependencies,
         ),
     ]);
-    return { nodePath, cliPath };
+    const programFileIdentity = (
+        await Promise.all([
+            regularFileIdentity(nodePath, dependencies),
+            regularFileIdentity(cliPath, dependencies),
+        ])
+    ).join('|');
+    return { nodePath, cliPath, programFileIdentity };
 };
 
 export type TuiBridgeGoal = TuiBridgeGoalSummary;
@@ -666,12 +804,23 @@ export const createTuiBridgeClient = async (
         input: TuiBridgeRequest,
     ): Promise<TuiBridgeSuccessResponse> => {
         const parsedRequest = TuiBridgeRequestSchema.parse(input);
+        const stdin = `${JSON.stringify(parsedRequest)}\n`;
+        if (Buffer.byteLength(stdin) > MAX_TUI_BRIDGE_REQUEST_BYTES) {
+            throw new Error(
+                'Goal supervisor bridge request exceeded the safety limit.',
+            );
+        }
+        const currentPrograms = await verifyTuiPrograms({
+            nodePath: verifiedPrograms.nodePath,
+            cliPath: verifiedPrograms.cliPath,
+            dependencies,
+        });
         const result = await dependencies.runProcess(
-            verifiedPrograms.nodePath,
-            [verifiedPrograms.cliPath, TUI_BRIDGE_COMMAND],
+            currentPrograms.nodePath,
+            [currentPrograms.cliPath, TUI_BRIDGE_COMMAND],
             {
                 ...processOptions,
-                stdin: `${JSON.stringify(parsedRequest)}\n`,
+                stdin,
             },
         );
         return parseBridgeResponse(parsedRequest, result);
@@ -752,12 +901,30 @@ const firstVerifiedProgram = async (
                 dependencies,
             );
             // oxlint-disable-next-line eslint/no-await-in-loop
+            const identityBefore = await regularFileIdentity(
+                executable,
+                dependencies,
+            );
+            // oxlint-disable-next-line eslint/no-await-in-loop
             const version = await dependencies.runProcess(executable, [
                 '--version',
             ]);
+            // oxlint-disable-next-line eslint/no-await-in-loop
+            const executableAfter = await executableFile(
+                candidate,
+                label,
+                dependencies,
+            );
+            // oxlint-disable-next-line eslint/no-await-in-loop
+            const identityAfter = await regularFileIdentity(
+                executableAfter,
+                dependencies,
+            );
             if (
                 version.exitCode === 0 &&
-                acceptsVersion(`${version.stdout}\n${version.stderr}`)
+                acceptsVersion(`${version.stdout}\n${version.stderr}`) &&
+                executableAfter === executable &&
+                identityAfter === identityBefore
             ) {
                 return executable;
             }
@@ -801,6 +968,8 @@ const unitIsEnabled = (unit: SystemdUnitState): boolean =>
 export type PersistentDaemonManagerOptions = {
     readonly workspace: string;
     readonly openCodeUrl: string;
+    readonly managedOpenCode?: boolean;
+    readonly openCodePath?: string;
     readonly nodePath?: string;
     readonly cliPath?: string;
     readonly systemctlPath?: string;
@@ -870,17 +1039,27 @@ export const createPersistentDaemonManager = async (
         'lifecycleLockPollIntervalMs',
         lifecycleLockTimeoutMs,
     );
-    let desiredServiceIdentity = options.verifiedPrograms
-        ? systemdServiceIdentity({
-              executablePath: options.verifiedPrograms.nodePath,
-              cliPath: options.verifiedPrograms.cliPath,
-              workspace,
-              openCodeUrl: options.openCodeUrl,
-          })
-        : undefined;
+    let desiredServiceIdentity: string | undefined;
     let systemctlPromise: Promise<string> | undefined;
+    let systemctlIdentity: string | undefined;
 
-    const resolveSystemctl = (): Promise<string> => {
+    const fileIdentity = async (path: string): Promise<string> => {
+        return await regularFileIdentity(path, dependencies);
+    };
+
+    const resolveSystemctl = async (): Promise<string> => {
+        if (systemctlPromise && systemctlIdentity) {
+            try {
+                const cached = await systemctlPromise;
+                if (systemctlIdentity === (await fileIdentity(cached))) {
+                    return cached;
+                }
+            } catch {
+                // A changed or unreadable executable must be rediscovered.
+            }
+            systemctlPromise = undefined;
+            systemctlIdentity = undefined;
+        }
         systemctlPromise ??= firstVerifiedProgram(
             options.systemctlPath
                 ? [options.systemctlPath]
@@ -888,13 +1067,26 @@ export const createPersistentDaemonManager = async (
             'systemctl',
             output => /\bsystemd\s+\d+/iu.test(output),
             dependencies,
-        );
-        return systemctlPromise;
+        ).catch(error => {
+            systemctlPromise = undefined;
+            systemctlIdentity = undefined;
+            throw error;
+        });
+        const systemctl = await systemctlPromise;
+        try {
+            systemctlIdentity = await fileIdentity(systemctl);
+        } catch (error) {
+            systemctlPromise = undefined;
+            systemctlIdentity = undefined;
+            throw error;
+        }
+        return systemctl;
     };
     const inspectLock = async (): Promise<DaemonServiceStatus> =>
         await dependencies.inspectDaemonServiceStatus(lockPath, {
             workspace,
             isPidAlive: dependencies.pidIsAlive,
+            processIdentity: dependencies.processIdentity,
         });
     const readUnit = async (systemctl: string): Promise<SystemdUnitState> => {
         const result = await dependencies.runProcess(systemctl, [
@@ -925,17 +1117,25 @@ export const createPersistentDaemonManager = async (
             const active =
                 unit?.activeState === 'active' ||
                 unit?.activeState === 'activating';
-            const managed =
+            const exactManaged =
                 unit !== undefined &&
                 active &&
                 unit.fragmentPath === unitPath &&
                 unit.mainPid === lock.pid &&
                 unit.loadState === 'loaded';
+            const managed =
+                exactManaged ||
+                (unit !== undefined &&
+                    active &&
+                    unit.fragmentPath === unitPath &&
+                    unit.loadState === 'loaded' &&
+                    lock.serviceIdentity !== undefined);
             const ready =
                 lock.ready &&
                 (!managed ||
-                    desiredServiceIdentity === undefined ||
-                    lock.serviceIdentity === desiredServiceIdentity);
+                    (exactManaged &&
+                        desiredServiceIdentity !== undefined &&
+                        lock.serviceIdentity === desiredServiceIdentity));
             return {
                 status: ready ? 'running' : 'starting',
                 unitName,
@@ -1019,7 +1219,26 @@ export const createPersistentDaemonManager = async (
             return classify(lock, undefined, error);
         }
         try {
-            return classify(lock, await readUnit(systemctl));
+            const unit = await readUnit(systemctl);
+            if (
+                lock.status === 'running' &&
+                unit.loadState === 'loaded' &&
+                unit.fragmentPath === unitPath &&
+                unit.mainPid === lock.pid &&
+                (unit.activeState === 'active' ||
+                    unit.activeState === 'activating')
+            ) {
+                try {
+                    await resolvePrograms();
+                } catch (error) {
+                    return {
+                        status: 'invalid',
+                        unitName,
+                        detail: `The managed daemon program identity could not be verified: ${concise(error instanceof Error ? error.message : String(error))}`,
+                    };
+                }
+            }
+            return classify(lock, unit);
         } catch (error) {
             return classify(lock, undefined, error);
         }
@@ -1088,23 +1307,151 @@ export const createPersistentDaemonManager = async (
         }
         return classify(after.lock, after.unit);
     };
-    let programsPromise: Promise<VerifiedTuiPrograms> | undefined;
-    const resolvePrograms = (): Promise<VerifiedTuiPrograms> => {
-        programsPromise ??= options.verifiedPrograms
-            ? Promise.resolve(options.verifiedPrograms)
-            : verifyTuiPrograms({
-                  ...(options.nodePath ? { nodePath: options.nodePath } : {}),
-                  ...(options.cliPath ? { cliPath: options.cliPath } : {}),
-                  dependencies,
-              });
-        return programsPromise.then(programs => {
-            desiredServiceIdentity ??= systemdServiceIdentity({
-                executablePath: programs.nodePath,
-                cliPath: programs.cliPath,
-                workspace,
-                openCodeUrl: options.openCodeUrl,
+    type PersistentDaemonPrograms = VerifiedTuiPrograms & {
+        readonly managedOpenCodePath?: string;
+    };
+    let programsPromise: Promise<PersistentDaemonPrograms> | undefined;
+    let programsIdentity: string | undefined;
+    let suppliedProgramsNeedVerification = false;
+    const executableIdentity = async (
+        programs: PersistentDaemonPrograms,
+    ): Promise<string> => {
+        const paths = [
+            programs.nodePath,
+            programs.cliPath,
+            ...(programs.managedOpenCodePath
+                ? [programs.managedOpenCodePath]
+                : []),
+        ];
+        const entries = await Promise.all(
+            paths.map(async path => {
+                return await fileIdentity(path);
+            }),
+        );
+        return entries.join('|');
+    };
+    const resolvePrograms = async (): Promise<PersistentDaemonPrograms> => {
+        if (programsPromise && programsIdentity) {
+            try {
+                if (
+                    programsIdentity ===
+                    (await executableIdentity(await programsPromise))
+                ) {
+                    return await programsPromise;
+                }
+            } catch {
+                // A changed or unreadable executable must be rediscovered.
+            }
+            programsPromise = undefined;
+            programsIdentity = undefined;
+            desiredServiceIdentity = undefined;
+            suppliedProgramsNeedVerification = true;
+        }
+        if (!programsPromise) {
+            programsPromise = (async () => {
+                const programs =
+                    options.verifiedPrograms &&
+                    !suppliedProgramsNeedVerification
+                        ? options.verifiedPrograms
+                        : await verifyTuiPrograms({
+                              ...((options.verifiedPrograms?.nodePath ??
+                              options.nodePath)
+                                  ? {
+                                        nodePath:
+                                            options.verifiedPrograms
+                                                ?.nodePath ?? options.nodePath,
+                                    }
+                                  : {}),
+                              ...((options.verifiedPrograms?.cliPath ??
+                              options.cliPath)
+                                  ? {
+                                        cliPath:
+                                            options.verifiedPrograms?.cliPath ??
+                                            options.cliPath,
+                                    }
+                                  : {}),
+                              dependencies,
+                          });
+                suppliedProgramsNeedVerification = false;
+                if (!options.managedOpenCode) return programs;
+                const managedOpenCodePath = await firstVerifiedProgram(
+                    options.openCodePath
+                        ? [options.openCodePath]
+                        : dependencies.openCodeCandidates,
+                    'OpenCode executable',
+                    output => {
+                        const match = /\b(\d+)\.(\d+)\.(\d+)\b/u.exec(output);
+                        if (!match) return false;
+                        const major = Number(match[1]);
+                        const minor = Number(match[2]);
+                        const patch = Number(match[3]);
+                        return major === 1 && minor === 17 && patch >= 18;
+                    },
+                    dependencies,
+                );
+                return {
+                    ...programs,
+                    managedOpenCodePath,
+                    ...(programs.programFileIdentity
+                        ? {
+                              programFileIdentity: `${programs.programFileIdentity}|${await fileIdentity(managedOpenCodePath)}`,
+                          }
+                        : {}),
+                };
+            })().catch(error => {
+                programsPromise = undefined;
+                programsIdentity = undefined;
+                throw error;
             });
-            return programs;
+        }
+        const programs = await programsPromise;
+        try {
+            const currentIdentity = await executableIdentity(programs);
+            if (
+                programs.programFileIdentity &&
+                programs.programFileIdentity !== currentIdentity
+            ) {
+                programsPromise = undefined;
+                programsIdentity = undefined;
+                desiredServiceIdentity = undefined;
+                suppliedProgramsNeedVerification = true;
+                return await resolvePrograms();
+            }
+            programsIdentity = currentIdentity;
+        } catch (error) {
+            programsPromise = undefined;
+            programsIdentity = undefined;
+            desiredServiceIdentity = undefined;
+            throw error;
+        }
+        desiredServiceIdentity = systemdServiceIdentity({
+            executablePath: programs.nodePath,
+            cliPath: programs.cliPath,
+            workspace,
+            openCodeUrl: options.openCodeUrl,
+            ...(programs.programFileIdentity
+                ? { programFileIdentity: programs.programFileIdentity }
+                : {}),
+            ...(programs.managedOpenCodePath
+                ? { managedOpenCodePath: programs.managedOpenCodePath }
+                : {}),
+        });
+        return programs;
+    };
+    const writeDesiredService = async () => {
+        const programs = await resolvePrograms();
+        const { nodePath, cliPath, managedOpenCodePath } = programs;
+        return await dependencies.writeSystemdUserService({
+            executablePath: nodePath,
+            cliPath,
+            workspace,
+            openCodeUrl: options.openCodeUrl,
+            ...(programs.programFileIdentity
+                ? { programFileIdentity: programs.programFileIdentity }
+                : {}),
+            ...(managedOpenCodePath ? { managedOpenCodePath } : {}),
+            systemdUserDirectory,
+            unitPath,
         });
     };
     const pollReady = async (
@@ -1132,7 +1479,7 @@ export const createPersistentDaemonManager = async (
                             snapshot.unit,
                         );
                     }
-                    if (last.status === 'running') return last;
+                    throw independentOwnershipError();
                 }
                 continue;
             }
@@ -1149,6 +1496,7 @@ export const createPersistentDaemonManager = async (
                     snapshot.lock,
                     snapshot.unit,
                 );
+                throw independentOwnershipError();
             }
             if (last.status === 'unsupported') {
                 throw new PersistentDaemonUnsupportedError(last.detail);
@@ -1164,34 +1512,6 @@ export const createPersistentDaemonManager = async (
             `Goal daemon did not become ready within ${readinessTimeoutMs}ms. ${last?.detail ?? 'No daemon status was available.'}`,
         );
     };
-    const pollIndependentWithoutSystemd = async (
-        firstLock: DaemonServiceStatus,
-        systemdError: unknown,
-    ): Promise<PersistentDaemonStatus> => {
-        let lock = firstLock;
-        let last = classify(lock, undefined, systemdError);
-        for (let attempt = 0; attempt < attempts; attempt++) {
-            if (last.status === 'running') return last;
-            if (
-                last.status !== 'starting' ||
-                last.ownership !== 'independent'
-            ) {
-                throw new PersistentDaemonUnsupportedError(
-                    `The independent daemon stopped before becoming ready. ${last.detail}`,
-                );
-            }
-            if (attempt + 1 < attempts) {
-                // oxlint-disable-next-line eslint/no-await-in-loop
-                await dependencies.sleep(pollIntervalMs);
-                // oxlint-disable-next-line eslint/no-await-in-loop
-                lock = await inspectLock();
-                last = classify(lock, undefined, systemdError);
-            }
-        }
-        throw new Error(
-            `Goal daemon did not become ready within ${readinessTimeoutMs}ms. ${last.detail}`,
-        );
-    };
     const ensureRunningUnlocked = async (): Promise<PersistentDaemonStatus> => {
         if (dependencies.platform !== 'linux') {
             const unsupported = await status();
@@ -1203,18 +1523,21 @@ export const createPersistentDaemonManager = async (
         try {
             systemctl = await resolveSystemctl();
         } catch (error) {
-            const lock = await inspectLock();
-            const observed = classify(lock, undefined, error);
-            if (observed.ownership === 'independent') {
-                return observed.status === 'running'
-                    ? observed
-                    : await pollIndependentWithoutSystemd(lock, error);
-            }
             throw new PersistentDaemonUnsupportedError(
                 `systemd user services are unavailable: ${concise(error instanceof Error ? error.message : String(error))} Install/enable systemd user services or run cbranch-goal-supervisor serve separately.`,
             );
         }
-        let snapshot = await inspectRequired(systemctl);
+        let snapshot: Awaited<ReturnType<typeof inspectRequired>>;
+        try {
+            snapshot = await inspectRequired(systemctl);
+        } catch (error) {
+            const lock = await inspectLock();
+            if (lock.status !== 'stopped') throw error;
+            const repaired = await writeDesiredService();
+            if (!repaired.changed) throw error;
+            await requiredSystemctl(systemctl, ['--user', 'daemon-reload']);
+            snapshot = await inspectRequired(systemctl);
+        }
         let initial = classify(snapshot.lock, snapshot.unit);
         if (initial.status === 'invalid') {
             throw new Error(`Cannot start goal daemon: ${initial.detail}`);
@@ -1225,30 +1548,20 @@ export const createPersistentDaemonManager = async (
             );
         }
         if (initial.ownership === 'independent') {
-            initial = await disableVerifiedUnitForIndependent(
+            await disableVerifiedUnitForIndependent(
                 systemctl,
                 snapshot.lock,
                 snapshot.unit,
             );
-            return initial.status === 'running'
-                ? initial
-                : await pollReady(systemctl, true);
+            throw independentOwnershipError();
         }
-        const { nodePath, cliPath } = await resolvePrograms();
+        const written = await writeDesiredService();
         initial = classify(snapshot.lock, snapshot.unit);
         const identityMismatch =
             snapshot.lock.status === 'running' &&
             initial.ownership === 'managed' &&
             desiredServiceIdentity !== undefined &&
             snapshot.lock.serviceIdentity !== desiredServiceIdentity;
-        const written = await dependencies.writeSystemdUserService({
-            executablePath: nodePath,
-            cliPath,
-            workspace,
-            openCodeUrl: options.openCodeUrl,
-            systemdUserDirectory,
-            unitPath,
-        });
         const wasVerified = unitIsVerified(snapshot.unit);
         const wasActive = wasVerified && unitIsActive(snapshot.unit);
         if (written.changed || !wasVerified || identityMismatch) {
@@ -1256,14 +1569,12 @@ export const createPersistentDaemonManager = async (
             snapshot = await inspectRequired(systemctl);
             const reloaded = classify(snapshot.lock, snapshot.unit);
             if (reloaded.ownership === 'independent') {
-                const independent = await disableVerifiedUnitForIndependent(
+                await disableVerifiedUnitForIndependent(
                     systemctl,
                     snapshot.lock,
                     snapshot.unit,
                 );
-                return independent.status === 'running'
-                    ? independent
-                    : await pollReady(systemctl, true);
+                throw independentOwnershipError();
             }
         }
         if (!unitIsEnabled(snapshot.unit)) {
@@ -1285,14 +1596,14 @@ export const createPersistentDaemonManager = async (
             const raced = await status();
             if (raced.ownership === 'independent') {
                 const racedSnapshot = await inspectRequired(systemctl);
-                const independent = await disableVerifiedUnitForIndependent(
+                await disableVerifiedUnitForIndependent(
                     systemctl,
                     racedSnapshot.lock,
                     racedSnapshot.unit,
                 );
-                return independent.status === 'running'
-                    ? independent
-                    : await pollReady(systemctl, true);
+                throw new Error(independentOwnershipError().message, {
+                    cause: error,
+                });
             }
             throw error;
         }
@@ -1388,6 +1699,7 @@ export const createPersistentDaemonManager = async (
             lifecycleLockTimeoutMs,
             lifecycleLockPollIntervalMs,
             dependencies.pidIsAlive,
+            dependencies.processIdentity,
             dependencies.sleep,
         );
         try {

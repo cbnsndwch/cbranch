@@ -2,9 +2,9 @@
 
 `@cbranch/opencode-goal-supervisor` supervises approved OpenCode work from a
 durable, workspace-local SQLite control plane. It validates plans, gates
-operator actions with scoped tokens, dispatches lease-bound work to an existing
-OpenCode server, runs declared verification commands, and recovers conservatively
-after process or transport failure.
+operator actions with scoped tokens, dispatches lease-bound work to OpenCode,
+runs declared verification commands, and recovers conservatively after process
+or transport failure.
 
 The supervisor is for one trusted local user on one host. It opens no listening
 socket and is not a multi-host scheduler or a hostile multi-tenant security
@@ -54,10 +54,24 @@ machine-readable output.
 
 ## OpenCode setup
 
-The daemon talks to an OpenCode HTTP server. The default URL is
-`http://127.0.0.1:4096/`; OpenCode must already be running, authenticated to its
-model provider, and permitted to perform the approved work. `serve` does not
-start OpenCode.
+Manual `serve` talks to an existing OpenCode HTTP server. Its default URL is
+`http://127.0.0.1:4096/`; that server must already be running, authenticated to
+its model provider, and permitted to perform the approved work.
+
+The TUI workflow is self-contained. OpenCode's TUI SDK exposes only the
+in-process `http://opencode.internal/` client, which a persistent systemd daemon
+cannot reach. After local `/goal` confirmation, the generated workspace service
+therefore verifies the installed OpenCode `1.17.x` executable, starts a private
+loopback headless OpenCode child on an OS-selected port, and connects the goal
+daemon to it. The service supervises both processes and stops the child when the
+daemon exits. If the TUI is explicitly configured with a reachable HTTP or HTTPS
+URL, the service uses that server instead and does not start another OpenCode
+process.
+
+The managed unit supplies a bounded executable path and grants write access only
+to the workspace plus the user's resolved OpenCode data and cache directories.
+This is required for sessions, credential refresh, logs, package cache, and the
+configured Node MCP process under `ProtectSystem=strict`.
 
 ### Model-facing tools
 
@@ -153,13 +167,25 @@ hardened systemd user service dedicated to that canonical workspace. A service
 bootstrap failure does not roll back the durable executing goal; retrying the
 same launch replays the goal transaction and retries daemon bootstrap. The
 service survives OpenCode restarts. Disposing the TUI unregisters its commands
-and does not stop the service. Independently managed daemons are never killed.
+and does not stop the service. Persistent success is reported only when that
+verified unit owns a ready daemon. Independently managed daemons are never killed;
+they produce an actionable bootstrap error and leave the committed goal available
+for the same idempotent retry.
 When OpenCode starts with an executing durable goal, the TUI
 reconciles the service with the current local OpenCode URL so work resumes after
 the host restart. A token-bound readiness marker prevents launch success from
 being reported before startup reconciliation finishes. The marker also binds the
 running process to the exact generated service configuration, so a failed reload
 or restart is retried rather than mistaken for a completed rollout.
+
+The normal OpenCode TUI client URL is in-process-only. In that case the same
+workspace service automatically starts and supervises a verified headless
+OpenCode child on loopback, then starts the goal daemon against its selected
+port. `/goal` does not require a separately started `opencode serve` process.
+The child reads the normal OpenCode configuration and credentials for the user;
+operators must still configure reviewed agent permissions appropriate to the
+approved plan. The loopback listener remains inside the trusted-local threat
+model and is not a remote control surface for the supervisor.
 
 The Bun-hosted TUI never imports the SQLite store and never receives the control
 token. Each init, list, or launch operation is one strict, bounded JSON request
@@ -570,8 +596,11 @@ concurrent call each.
 
 Despite its name, `serve` opens no port. It owns a workspace lock, opens SQLite,
 and makes outbound HTTP or HTTPS and SSE calls to the configured OpenCode URL.
-A second live daemon for the workspace is rejected. A stale lock can be replaced
-only after its PID is no longer alive and the lock contents are unchanged. Lock
+A second daemon with a matching live Linux boot-and-start-time process identity is
+rejected. A reused PID is stale. Legacy or incomplete records, and records whose
+live identity cannot be read, fail closed without deleting a potentially live
+owner. A stale lock can be replaced only after identity validation and unchanged
+lock contents. Lock
 publication uses a fully written candidate inode, and stale replacement is
 serialized by a separate recovery guard so concurrent restarts cannot both
 become owners. If a process dies during that narrow replacement section, doctor
@@ -690,8 +719,8 @@ Workspace data is under `.opencode/goal-supervisor/`:
 | `goal.db` | SQLite state, event log, plans, attempts, approvals, evidence pointers, verification summaries, inboxes, and outbox. |
 | `goal.db-wal`, `goal.db-shm` | SQLite WAL files while connections are open. |
 | `control.token` | Internal transport credential used by control surfaces. |
-| `daemon.lock` | Live execution-owner PID, workspace, creation time, random owner token, and optional service identity. |
-| `daemon.lock.ready` | Token-bound readiness marker published after startup reconciliation. |
+| `daemon.lock` | Live execution-owner PID, Linux process identity, workspace, creation time, random owner token, and optional service identity. |
+| `daemon.lock.ready` | Token- and process-identity-bound readiness marker published after startup reconciliation. |
 | `daemon.lock.recovery` | Temporary stale-lock replacement guard; persistence means recovery was interrupted and requires operator inspection. |
 | `daemon.lock.lifecycle` | Short-lived owner-token lock serializing TUI systemd lifecycle changes across OpenCode processes. |
 
@@ -970,8 +999,17 @@ it is the local confirmation committed in the atomic launch transaction.
 Before tagging or publishing, run:
 
 ```sh
-pnpm --filter @cbranch/opencode-goal-supervisor pack:check
+CBRANCH_NODE20_BIN=/absolute/path/to/node-20 \
+CBRANCH_OPENCODE_BIN=/absolute/path/to/opencode \
+CBRANCH_BUN_BIN=/absolute/path/to/bun \
+CBRANCH_SYSTEMD_QUALIFY=1 \
+pnpm --filter @cbranch/opencode-goal-supervisor qualify:host
 ```
+
+This release-only command is fail-closed: every required external runtime must
+be explicitly selected, and its one-line JSON summary identifies the reviewed
+commit, package, platform, runtime versions, and each outcome. It never reports
+an unavailable Node 20, OpenCode, Bun, or systemd check as passing.
 
 `pack:check` creates the tarball, installs it into an isolated temporary consumer,
 verifies runtime and declaration files, version/compatibility metadata and the

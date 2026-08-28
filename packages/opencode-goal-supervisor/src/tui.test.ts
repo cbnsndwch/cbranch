@@ -199,7 +199,9 @@ describe('goal launch dialogs', () => {
             'Objective: Ship the confirmed change',
         );
         expect(confirm.props.message).toContain('Units: 1');
-        expect(confirm.props.message).toContain('Path: plans/goal.md');
+        expect(confirm.props.message).toContain(
+            'Path: /workspace/plans/goal.md',
+        );
         expect(confirm.props.message).toContain(prepared.digest);
 
         confirm.props.onConfirm?.();
@@ -358,6 +360,7 @@ describe('persistent TUI daemon bootstrap', () => {
             expect.objectContaining({
                 workspace,
                 openCodeUrl: 'http://127.0.0.1:4096/',
+                managedOpenCode: false,
                 verifiedPrograms,
             }),
         );
@@ -368,6 +371,68 @@ describe('persistent TUI daemon bootstrap', () => {
 
         expect(manager.stop).not.toHaveBeenCalled();
         expect('close' in bridge).toBe(false);
+    });
+
+    test('turns the TUI-only internal client into a managed OpenCode service', async () => {
+        const workspace = await makeDirectory('goal-tui-managed-');
+        const verifiedPrograms = {
+            nodePath: '/usr/bin/node',
+            cliPath: '/package/dist/cli.js',
+        };
+        const bridge = {
+            verifiedPrograms,
+            init: vi.fn(async () => ({ workspace })),
+            list: vi.fn(),
+            launch: vi.fn(),
+        } as unknown as TuiBridgeClient;
+        const manager = {
+            status: vi.fn(),
+            ensureRunning: vi.fn(),
+            stop: vi.fn(),
+        } as unknown as PersistentDaemonManager;
+        const createManager = vi.fn(async () => manager);
+
+        await bootstrapGoalTui({
+            workspace,
+            client: {
+                client: {
+                    getConfig: () => ({
+                        baseUrl: 'http://opencode.internal/',
+                    }),
+                },
+            },
+            dependencies: {
+                createTuiBridgeClient: async () => bridge,
+                createPersistentDaemonManager:
+                    createManager as unknown as typeof import('./tui-daemon.js').createPersistentDaemonManager,
+            },
+        });
+
+        expect(createManager).toHaveBeenCalledWith(
+            expect.objectContaining({
+                workspace,
+                openCodeUrl: 'http://opencode.internal/',
+                managedOpenCode: true,
+                verifiedPrograms,
+            }),
+        );
+
+        await bootstrapGoalTui({
+            workspace,
+            client: {},
+            openCodeUrl: 'https://opencode.internal/',
+            dependencies: {
+                createTuiBridgeClient: async () => bridge,
+                createPersistentDaemonManager:
+                    createManager as unknown as typeof import('./tui-daemon.js').createPersistentDaemonManager,
+            },
+        });
+        expect(createManager).toHaveBeenLastCalledWith(
+            expect.objectContaining({
+                openCodeUrl: 'https://opencode.internal/',
+                managedOpenCode: false,
+            }),
+        );
     });
 
     test('reconnects executing goals after an OpenCode restart', async () => {

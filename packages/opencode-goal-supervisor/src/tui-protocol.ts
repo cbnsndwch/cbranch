@@ -12,7 +12,7 @@ import {
 export const TUI_BRIDGE_PROTOCOL = 'cbranch-goal-supervisor.tui/1' as const;
 export const TUI_BRIDGE_COMMAND = '__tui-bridge-v1' as const;
 export const MAX_TUI_BRIDGE_REQUEST_BYTES =
-    2 * MAX_GOAL_PLAN_MARKDOWN_BYTES + 64 * 1_024;
+    6 * MAX_GOAL_PLAN_MARKDOWN_BYTES + 64 * 1_024;
 export const MAX_TUI_BRIDGE_GOALS = 20;
 
 const WirePathSchema = z

@@ -284,6 +284,62 @@ describe('parseCliArguments', () => {
                 '/tmp/workspace',
             ),
         ).toThrow('lowercase SHA-256 identity');
+        expect(
+            parseCliArguments(
+                [
+                    'serve',
+                    '--internal-service-identity',
+                    serviceIdentity,
+                    '--internal-program-file-identity',
+                    'node:file|cli:file',
+                ],
+                '/tmp/workspace',
+            ),
+        ).toMatchObject({ programFileIdentity: 'node:file|cli:file' });
+        expect(() =>
+            parseCliArguments(
+                [
+                    'serve',
+                    '--internal-program-file-identity',
+                    'node:file|cli:file',
+                ],
+                '/tmp/workspace',
+            ),
+        ).toThrow('requires --internal-service-identity');
+    });
+
+    test('accepts only an absolute private managed OpenCode path', () => {
+        expect(
+            parseCliArguments(
+                [
+                    'serve',
+                    '--internal-managed-opencode',
+                    '/opt/opencode/bin/opencode',
+                ],
+                '/tmp/workspace',
+            ),
+        ).toMatchObject({
+            command: 'serve',
+            managedOpenCodePath: '/opt/opencode/bin/opencode',
+        });
+        expect(() =>
+            parseCliArguments(
+                ['serve', '--internal-managed-opencode', 'opencode'],
+                '/tmp/workspace',
+            ),
+        ).toThrow('absolute path');
+        expect(() =>
+            parseCliArguments(
+                [
+                    'serve',
+                    '--internal-managed-opencode',
+                    '/opt/opencode',
+                    '--opencode-url',
+                    'http://127.0.0.1:4096',
+                ],
+                '/tmp/workspace',
+            ),
+        ).toThrow('may not be combined');
     });
 
     test.each(
@@ -1151,6 +1207,93 @@ describe('CLI process seams', () => {
         expect(JSON.parse(result.stdout)).toMatchObject({
             command: 'serve',
             status: 'starting',
+        });
+    });
+
+    test('rejects changed managed service programs before initialization', async () => {
+        const root = await workspace();
+        const initialize = vi.fn();
+        const result = await invoke(
+            root,
+            [
+                'serve',
+                '--internal-service-identity',
+                serviceIdentity,
+                '--internal-program-file-identity',
+                'expected:node|expected:cli',
+            ],
+            {
+                initWorkspaceControl:
+                    initialize as unknown as typeof initWorkspaceControl,
+                readProgramFileIdentity: async () => 'changed:node|changed:cli',
+            },
+        );
+
+        expect(result.exitCode).toBe(1);
+        expect(result.stderr).toContain('program files changed');
+        expect(initialize).not.toHaveBeenCalled();
+    });
+
+    test('supervises a managed OpenCode child for self-contained serve', async () => {
+        const root = await workspace();
+        const closeControl = vi.fn(async () => undefined);
+        const initialize = vi.fn(
+            async () =>
+                ({
+                    workspace: root,
+                    tokenPath: join(root, 'control.token'),
+                    internalTransportAuthToken: 'transport-secret',
+                    control: { close: closeControl },
+                }) as unknown as InitializedWorkspaceControl,
+        );
+        const closeServer = vi.fn(async () => undefined);
+        const startServer = vi.fn(async () => ({
+            url: 'http://127.0.0.1:43123/',
+            exited: new Promise<never>(() => undefined),
+            close: closeServer,
+        }));
+        const adapter = { health: async () => ({ healthy: true }) };
+        const createAdapter = vi.fn(async () => adapter);
+        const daemon = vi.fn(async () => undefined);
+
+        const result = await invoke(
+            root,
+            [
+                '--json',
+                'serve',
+                '--internal-managed-opencode',
+                '/opt/opencode/bin/opencode',
+            ],
+            {
+                initWorkspaceControl:
+                    initialize as unknown as typeof initWorkspaceControl,
+                startManagedOpenCodeServer:
+                    startServer as unknown as CliDependencies['startManagedOpenCodeServer'],
+                createOpenCodeAdapter:
+                    createAdapter as unknown as CliDependencies['createOpenCodeAdapter'],
+                runGoalDaemon:
+                    daemon as unknown as CliDependencies['runGoalDaemon'],
+            },
+        );
+
+        expect(result.exitCode, result.stderr).toBe(0);
+        expect(startServer).toHaveBeenCalledWith(
+            expect.objectContaining({
+                executablePath: '/opt/opencode/bin/opencode',
+                workspace: root,
+            }),
+        );
+        expect(createAdapter).toHaveBeenCalledWith({
+            baseUrl: 'http://127.0.0.1:43123/',
+            directory: root,
+        });
+        expect(daemon).toHaveBeenCalledWith(
+            expect.objectContaining({ adapter, workspace: root }),
+        );
+        expect(closeServer).toHaveBeenCalledOnce();
+        expect(JSON.parse(result.stdout)).toMatchObject({
+            managedOpenCode: true,
+            openCodeUrl: 'http://127.0.0.1:43123/',
         });
     });
 

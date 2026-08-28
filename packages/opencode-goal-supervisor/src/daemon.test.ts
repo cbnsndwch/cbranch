@@ -106,7 +106,7 @@ const startParallelGoal = (
 };
 
 describe('workspace daemon lock', () => {
-    test('stores an optional service identity without breaking legacy acquisition', async () => {
+    test('stores process and optional service identities with each acquisition', async () => {
         const workspace = await workspaceFor();
         const legacyPath = join(workspace, 'legacy.lock');
         const identityPath = join(workspace, 'identity.lock');
@@ -119,9 +119,9 @@ describe('workspace daemon lock', () => {
             serviceIdentity,
         );
 
-        expect(
-            JSON.parse(await readFile(legacyPath, 'utf8')),
-        ).not.toHaveProperty('serviceIdentity');
+        expect(JSON.parse(await readFile(legacyPath, 'utf8'))).toMatchObject({
+            processIdentity: expect.stringMatching(/^linux:/u),
+        });
         expect(
             JSON.parse(await readFile(identityPath, 'utf8')).serviceIdentity,
         ).toBe(serviceIdentity);
@@ -130,9 +130,12 @@ describe('workspace daemon lock', () => {
         );
         identified.markReady();
         expect(
-            JSON.parse(await readFile(identified.readinessPath, 'utf8'))
-                .serviceIdentity,
-        ).toBe(serviceIdentity);
+            JSON.parse(await readFile(identified.readinessPath, 'utf8')),
+        ).toMatchObject({
+            pid: process.pid,
+            workspace,
+            serviceIdentity,
+        });
 
         legacy.release();
         identified.release();
@@ -201,6 +204,7 @@ describe('workspace daemon lock', () => {
             path,
             `${JSON.stringify({
                 pid: 2_147_483_647,
+                processIdentity: 'linux:00000000-0000-4000-8000-000000000000:1',
                 token: 'stale-token',
                 workspace,
                 createdAt: '2026-01-01T00:00:00.000Z',
@@ -236,6 +240,30 @@ describe('workspace daemon lock', () => {
         );
     });
 
+    test('replaces a lock whose PID was reused by an unrelated live process', async () => {
+        const workspace = await workspaceFor();
+        const path = join(workspace, 'daemon.lock');
+        await writeFile(
+            path,
+            `${JSON.stringify({
+                pid: process.pid,
+                processIdentity: 'linux:00000000-0000-4000-8000-000000000000:1',
+                token: '00000000-0000-4000-8000-000000000000',
+                workspace,
+                createdAt: '2026-01-01T00:00:00.000Z',
+            })}\n`,
+            { mode: 0o600 },
+        );
+
+        const replacement = acquireWorkspaceLock(path, workspace);
+
+        expect(replacement.owner.pid).toBe(process.pid);
+        expect(replacement.owner.processIdentity).not.toBe(
+            'linux:00000000-0000-4000-8000-000000000000:1',
+        );
+        replacement.release();
+    });
+
     test('treats a fresh incomplete lock as held but replaces a stale one', async () => {
         const workspace = await workspaceFor();
         const path = join(workspace, 'daemon.lock');
@@ -260,6 +288,7 @@ describe('workspace daemon lock', () => {
         const path = join(workspace, 'daemon.lock');
         const staleOwner = `${JSON.stringify({
             pid: 2_147_483_647,
+            processIdentity: 'linux:00000000-0000-4000-8000-000000000000:1',
             token: 'stale-token',
             workspace,
             createdAt: '2026-01-01T00:00:00.000Z',

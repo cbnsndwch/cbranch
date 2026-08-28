@@ -13,6 +13,10 @@ import {
     type InitializedWorkspaceControl,
 } from './control.js';
 import { runGoalDaemon, type RunGoalDaemonOptions } from './daemon.js';
+import {
+    startManagedOpenCodeServer,
+    type ManagedOpenCodeServer,
+} from './managed-opencode.js';
 import { runGoalMcp } from './mcp.js';
 import { parseGoalPlanMarkdown } from './goal-plan.js';
 import {
@@ -112,6 +116,8 @@ export type ParsedCliArguments = ParsedBase &
               readonly cancellationIntervalMs: number;
               readonly observationRestartIntervalMs: number;
               readonly serviceIdentity?: string;
+              readonly programFileIdentity?: string;
+              readonly managedOpenCodePath?: string;
           }
         | { readonly command: 'status'; readonly goalId?: string }
         | {
@@ -267,6 +273,20 @@ const validateServiceIdentity = (value: string): string => {
     if (!/^sha256:[a-f0-9]{64}$/u.test(value)) {
         throw new Error(
             '--internal-service-identity must be a lowercase SHA-256 identity.',
+        );
+    }
+    return value;
+};
+
+const validateProgramFileIdentity = (value: string): string => {
+    if (
+        value.length > 16_384 ||
+        !value ||
+        !noControlCharacters(value) ||
+        !value.includes('|')
+    ) {
+        throw new Error(
+            '--internal-program-file-identity has an invalid shape.',
         );
     }
     return value;
@@ -547,10 +567,44 @@ export const parseCliArguments = (
                 '--cancellation-interval-ms': 'value',
                 '--observation-restart-interval-ms': 'value',
                 '--internal-service-identity': 'value',
+                '--internal-program-file-identity': 'value',
+                '--internal-managed-opencode': 'value',
             },
             command,
         );
         onlyPositionals(parsed.positionals, 0, 0, command);
+        const managedOpenCodePath = optionValue(
+            parsed.options,
+            '--internal-managed-opencode',
+        );
+        if (
+            managedOpenCodePath !== undefined &&
+            '--opencode-url' in parsed.options
+        ) {
+            throw new Error(
+                '--internal-managed-opencode may not be combined with --opencode-url.',
+            );
+        }
+        const programFileIdentity = optionValue(
+            parsed.options,
+            '--internal-program-file-identity',
+        );
+        if (
+            programFileIdentity !== undefined &&
+            !optionValue(parsed.options, '--internal-service-identity')
+        ) {
+            throw new Error(
+                '--internal-program-file-identity requires --internal-service-identity.',
+            );
+        }
+        if (
+            managedOpenCodePath !== undefined &&
+            !isAbsolute(managedOpenCodePath)
+        ) {
+            throw new Error(
+                '--internal-managed-opencode requires an absolute path.',
+            );
+        }
         const globalConcurrency = parseInteger(
             optionValue(parsed.options, '--global-concurrency'),
             4,
@@ -585,6 +639,22 @@ export const parseCliArguments = (
                               '--internal-service-identity',
                           )!,
                       ),
+                  }
+                : {}),
+            ...(managedOpenCodePath
+                ? {
+                      managedOpenCodePath: resolve(
+                          validatePath(
+                              managedOpenCodePath,
+                              'Managed OpenCode path',
+                          ),
+                      ),
+                  }
+                : {}),
+            ...(programFileIdentity
+                ? {
+                      programFileIdentity:
+                          validateProgramFileIdentity(programFileIdentity),
                   }
                 : {}),
             dispatchIntervalMs: parseInteger(
@@ -770,10 +840,14 @@ export interface CliDependencies {
     readonly readFile?: typeof readFile;
     readonly randomUUID?: () => string;
     readonly createOpenCodeAdapter?: typeof createOpenCodeAdapter;
+    readonly startManagedOpenCodeServer?: typeof startManagedOpenCodeServer;
     readonly runGoalDaemon?: (options: RunGoalDaemonOptions) => Promise<void>;
     readonly runGoalMcp?: typeof runGoalMcp;
     readonly writeSystemdUserService?: typeof writeSystemdUserService;
     readonly inspectDaemonServiceStatus?: typeof inspectDaemonServiceStatus;
+    readonly readProgramFileIdentity?: (
+        paths: readonly string[],
+    ) => Promise<string>;
     readonly systemdUserDirectory?: () => string;
     readonly executablePath?: string;
     readonly cliPath?: string;
@@ -787,6 +861,23 @@ type ResolvedCliDependencies = Required<
     readonly cliPath: string;
 };
 
+const readProgramFileIdentity = async (
+    paths: readonly string[],
+): Promise<string> =>
+    (
+        await Promise.all(
+            paths.map(async path => {
+                const info = await lstat(path);
+                if (!info.isFile() || info.isSymbolicLink()) {
+                    throw new Error(
+                        'Managed service program identity is no longer a regular file.',
+                    );
+                }
+                return `${path}:${info.dev}:${info.ino}:${info.mode}:${info.size}:${info.mtimeMs}:${info.ctimeMs}`;
+            }),
+        )
+    ).join('|');
+
 const dependencies = (input: CliDependencies): ResolvedCliDependencies => ({
     cwd: input.cwd ?? (() => process.cwd()),
     stdin: input.stdin ?? process.stdin,
@@ -798,12 +889,16 @@ const dependencies = (input: CliDependencies): ResolvedCliDependencies => ({
     readFile: input.readFile ?? readFile,
     randomUUID: input.randomUUID ?? randomUUID,
     createOpenCodeAdapter: input.createOpenCodeAdapter ?? createOpenCodeAdapter,
+    startManagedOpenCodeServer:
+        input.startManagedOpenCodeServer ?? startManagedOpenCodeServer,
     runGoalDaemon: input.runGoalDaemon ?? runGoalDaemon,
     runGoalMcp: input.runGoalMcp ?? runGoalMcp,
     writeSystemdUserService:
         input.writeSystemdUserService ?? writeSystemdUserService,
     inspectDaemonServiceStatus:
         input.inspectDaemonServiceStatus ?? inspectDaemonServiceStatus,
+    readProgramFileIdentity:
+        input.readProgramFileIdentity ?? readProgramFileIdentity,
     systemdUserDirectory:
         input.systemdUserDirectory ?? defaultSystemdUserDirectory,
     executablePath: resolve(input.executablePath ?? process.execPath),
@@ -1658,40 +1753,88 @@ const executeServe = async (
     parsed: Extract<ParsedCliArguments, { readonly command: 'serve' }>,
     resolved: ResolvedCliDependencies,
 ): Promise<void> => {
+    if (parsed.programFileIdentity) {
+        const currentIdentity = await resolved.readProgramFileIdentity([
+            resolved.executablePath,
+            resolved.cliPath,
+            ...(parsed.managedOpenCodePath ? [parsed.managedOpenCodePath] : []),
+        ]);
+        if (currentIdentity !== parsed.programFileIdentity) {
+            throw new Error(
+                'Managed service program files changed after unit verification.',
+            );
+        }
+    }
     const initialized = await resolved.initWorkspaceControl(parsed.workspace);
     const workspace = initialized.workspace;
     await initialized.control.close();
-    const adapter: OpenCodeSessionAdapter =
-        await resolved.createOpenCodeAdapter({
-            baseUrl: parsed.openCodeUrl,
-            directory: workspace,
-        });
-    if (parsed.json) {
-        printJson(resolved.stdout, {
-            command: 'serve',
+    let managedOpenCode: ManagedOpenCodeServer | undefined;
+    const daemonController = new AbortController();
+    try {
+        if (parsed.managedOpenCodePath) {
+            managedOpenCode = await resolved.startManagedOpenCodeServer({
+                executablePath: parsed.managedOpenCodePath,
+                workspace,
+                writeOutput: value => resolved.stderr.write(value),
+            });
+        }
+        const openCodeUrl = managedOpenCode?.url ?? parsed.openCodeUrl;
+        const adapter: OpenCodeSessionAdapter =
+            await resolved.createOpenCodeAdapter({
+                baseUrl: openCodeUrl,
+                directory: workspace,
+            });
+        if (parsed.json) {
+            printJson(resolved.stdout, {
+                command: 'serve',
+                workspace,
+                openCodeUrl,
+                managedOpenCode: Boolean(managedOpenCode),
+                status: 'starting',
+            });
+        } else {
+            resolved.stdout.write(
+                `Serving ${workspace} via ${managedOpenCode ? 'managed ' : ''}OpenCode ${openCodeUrl}.\n`,
+            );
+        }
+        const daemon = resolved.runGoalDaemon({
             workspace,
-            openCodeUrl: parsed.openCodeUrl,
-            status: 'starting',
+            adapter,
+            globalConcurrency: parsed.globalConcurrency,
+            workspaceConcurrency: parsed.workspaceConcurrency,
+            dispatchIntervalMs: parsed.dispatchIntervalMs,
+            reconciliationIntervalMs: parsed.reconciliationIntervalMs,
+            cancellationIntervalMs: parsed.cancellationIntervalMs,
+            observationRestartIntervalMs: parsed.observationRestartIntervalMs,
+            signal: daemonController.signal,
+            ...(parsed.serviceIdentity
+                ? { serviceIdentity: parsed.serviceIdentity }
+                : {}),
+            onError: error => resolved.stderr.write(`${errorMessage(error)}\n`),
         });
-    } else {
-        resolved.stdout.write(
-            `Serving ${workspace} via OpenCode ${parsed.openCodeUrl}.\n`,
-        );
+        if (!managedOpenCode) {
+            await daemon;
+            return;
+        }
+        const completed = await Promise.race([
+            daemon.then(() => ({ source: 'daemon' as const })),
+            managedOpenCode.exited.then(exit => ({
+                source: 'opencode' as const,
+                exit,
+            })),
+        ]);
+        if (completed.source === 'opencode') {
+            daemonController.abort('managed OpenCode server exited');
+            await daemon;
+            if (completed.exit.error) throw completed.exit.error;
+            throw new Error(
+                `Managed OpenCode server exited unexpectedly (${completed.exit.code ?? completed.exit.signal ?? 'unknown'}).`,
+            );
+        }
+    } finally {
+        daemonController.abort('serve command finished');
+        await managedOpenCode?.close();
     }
-    await resolved.runGoalDaemon({
-        workspace,
-        adapter,
-        globalConcurrency: parsed.globalConcurrency,
-        workspaceConcurrency: parsed.workspaceConcurrency,
-        dispatchIntervalMs: parsed.dispatchIntervalMs,
-        reconciliationIntervalMs: parsed.reconciliationIntervalMs,
-        cancellationIntervalMs: parsed.cancellationIntervalMs,
-        observationRestartIntervalMs: parsed.observationRestartIntervalMs,
-        ...(parsed.serviceIdentity
-            ? { serviceIdentity: parsed.serviceIdentity }
-            : {}),
-        onError: error => resolved.stderr.write(`${errorMessage(error)}\n`),
-    });
 };
 
 const executeMcp = async (

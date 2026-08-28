@@ -30,7 +30,12 @@ import {
     type ProcessResult,
     type ProcessRunner,
 } from './tui-daemon.js';
-import { TUI_BRIDGE_COMMAND, TUI_BRIDGE_PROTOCOL } from './tui-protocol.js';
+import {
+    MAX_TUI_BRIDGE_REQUEST_BYTES,
+    TUI_BRIDGE_COMMAND,
+    TUI_BRIDGE_PROTOCOL,
+} from './tui-protocol.js';
+import { processIdentity } from './process-identity.js';
 
 const directories: string[] = [];
 const lockToken = '00000000-0000-4000-8000-000000000000';
@@ -52,15 +57,21 @@ const temporaryDirectory = async (): Promise<string> => {
 
 const programFiles = async (root: string) => {
     const nodePath = join(root, 'node');
+    const openCodePath = join(root, 'opencode');
     const systemctlPath = join(root, 'systemctl');
     const cliPath = join(root, 'cli.js');
     await Promise.all([
         writeFile(nodePath, '#!/bin/sh\n', { mode: 0o700 }),
+        writeFile(openCodePath, '#!/bin/sh\n', { mode: 0o700 }),
         writeFile(systemctlPath, '#!/bin/sh\n', { mode: 0o700 }),
         writeFile(cliPath, 'export {};\n', { mode: 0o600 }),
     ]);
-    await Promise.all([chmod(nodePath, 0o700), chmod(systemctlPath, 0o700)]);
-    return { nodePath, systemctlPath, cliPath };
+    await Promise.all([
+        chmod(nodePath, 0o700),
+        chmod(openCodePath, 0o700),
+        chmod(systemctlPath, 0o700),
+    ]);
+    return { nodePath, openCodePath, systemctlPath, cliPath };
 };
 
 const stopped = (lockPath: string): DaemonServiceStatus => ({
@@ -213,9 +224,10 @@ describe('one-shot Node TUI bridge', () => {
             goal: { id: 'goal-1', state: 'achieved' },
         });
 
-        expect(client.verifiedPrograms).toEqual({
+        expect(client.verifiedPrograms).toMatchObject({
             nodePath: paths.nodePath,
             cliPath: paths.cliPath,
+            programFileIdentity: expect.stringContaining(paths.nodePath),
         });
         const bridgeCalls = calls.filter(
             call => call.arguments_[1] === TUI_BRIDGE_COMMAND,
@@ -452,6 +464,44 @@ describe('one-shot Node TUI bridge', () => {
             }),
         ).rejects.toThrow('may already be durable');
     });
+
+    test('encodes worst-case control and multibyte plan text within the bridge cap', async () => {
+        const root = await temporaryDirectory();
+        const workspace = join(root, 'workspace');
+        await mkdir(workspace);
+        const paths = await programFiles(root);
+        let requestBytes = 0;
+        const runner: ProcessRunner = vi.fn(
+            async (_executable, arguments_, options) => {
+                if (arguments_[0] === '--version')
+                    return processResult('v20.20.0\n');
+                requestBytes = Buffer.byteLength(options?.stdin ?? '');
+                return processResult(
+                    JSON.stringify({
+                        protocol: TUI_BRIDGE_PROTOCOL,
+                        ok: true,
+                        operation: 'launch',
+                        goal: { id: 'goal-1', state: 'executing' },
+                    }),
+                );
+            },
+        );
+        const client = await createTuiBridgeClient({
+            nodePath: paths.nodePath,
+            cliPath: paths.cliPath,
+            dependencies: { runProcess: runner },
+        });
+
+        await client.launch({
+            workspace,
+            planPath: join(workspace, 'plan.md'),
+            planMarkdown: `${'\u0001'.repeat(1_048_576 - 4)}\ud83d\ude80`,
+            actor: 'tui',
+        });
+
+        expect(requestBytes).toBeLessThanOrEqual(MAX_TUI_BRIDGE_REQUEST_BYTES);
+        expect(requestBytes).toBeGreaterThan(6_000_000);
+    });
 });
 
 describe('persistent workspace daemon manager', () => {
@@ -470,15 +520,22 @@ describe('persistent workspace daemon manager', () => {
         const lockPath = join(workspace, 'daemon.lock');
         await mkdir(workspace);
         const paths = await programFiles(root);
+        const serviceIdentity = systemdServiceIdentity({
+            executablePath: paths.nodePath,
+            cliPath: paths.cliPath,
+            workspace,
+            openCodeUrl: 'http://127.0.0.1:4096',
+        });
         let ready = false;
         let fragmentPath = '';
+        let unitPid = 4242;
         const runner: ProcessRunner = vi.fn(async (_executable, arguments_) =>
             arguments_[0] === '--version'
                 ? processResult('systemd 252\n')
                 : processResult(
                       unitState(
                           'active',
-                          4242,
+                          unitPid,
                           'loaded',
                           'running',
                           fragmentPath,
@@ -488,13 +545,17 @@ describe('persistent workspace daemon manager', () => {
         const manager = await createPersistentDaemonManager({
             workspace,
             openCodeUrl: 'http://127.0.0.1:4096',
+            verifiedPrograms: {
+                nodePath: paths.nodePath,
+                cliPath: paths.cliPath,
+            },
             systemctlPath: paths.systemctlPath,
             lockPath,
             dependencies: {
                 platform: 'linux',
                 runProcess: runner,
                 inspectDaemonServiceStatus: async () =>
-                    running(lockPath, workspace, 4242, ready),
+                    running(lockPath, workspace, 4242, ready, serviceIdentity),
             },
         });
         fragmentPath = manager.unitPath;
@@ -508,6 +569,12 @@ describe('persistent workspace daemon manager', () => {
             status: 'running',
             ownership: 'managed',
         });
+        unitPid = 4343;
+        await expect(manager.status()).resolves.toMatchObject({
+            status: 'starting',
+            ownership: 'managed',
+        });
+        unitPid = 4242;
         fragmentPath = join(root, 'other.service');
         await expect(manager.status()).resolves.toMatchObject({
             status: 'running',
@@ -646,10 +713,9 @@ describe('persistent workspace daemon manager', () => {
         });
         expectedUnitPath = manager.unitPath;
 
-        await expect(manager.ensureRunning()).resolves.toMatchObject({
-            status: 'running',
-            ownership: 'independent',
-        });
+        await expect(manager.ensureRunning()).rejects.toThrow(
+            'independently managed daemon owns this workspace',
+        );
         enabled = true;
         await expect(manager.stop()).resolves.toMatchObject({
             status: 'running',
@@ -819,6 +885,79 @@ describe('persistent workspace daemon manager', () => {
         );
     });
 
+    test('restarts an unchanged managed OpenCode unit with a stale service identity', async () => {
+        const root = await temporaryDirectory();
+        const workspace = join(root, 'workspace');
+        const lockPath = join(workspace, 'daemon.lock');
+        await mkdir(workspace);
+        const paths = await programFiles(root);
+        const desiredIdentity = systemdServiceIdentity({
+            executablePath: paths.nodePath,
+            cliPath: paths.cliPath,
+            workspace,
+            openCodeUrl: 'http://opencode.internal/',
+            managedOpenCodePath: paths.openCodePath,
+        });
+        const staleIdentity = `sha256:${'f'.repeat(64)}` as const;
+        let activeIdentity: SystemdServiceIdentity = staleIdentity;
+        let expectedUnitPath = '';
+        const calls: string[][] = [];
+        const runner: ProcessRunner = vi.fn(async (executable, arguments_) => {
+            calls.push([...arguments_]);
+            if (arguments_[0] === '--version') {
+                return basename(executable) === 'opencode'
+                    ? processResult('1.17.20\n')
+                    : processResult('systemd 252\n');
+            }
+            if (arguments_.includes('restart')) {
+                activeIdentity = desiredIdentity;
+            }
+            return arguments_.includes('show')
+                ? processResult(
+                      unitState(
+                          'active',
+                          4242,
+                          'loaded',
+                          'running',
+                          expectedUnitPath,
+                          'enabled',
+                      ),
+                  )
+                : processResult();
+        });
+        const manager = await createPersistentDaemonManager({
+            workspace,
+            openCodeUrl: 'http://opencode.internal/',
+            managedOpenCode: true,
+            openCodePath: paths.openCodePath,
+            verifiedPrograms: {
+                nodePath: paths.nodePath,
+                cliPath: paths.cliPath,
+            },
+            systemctlPath: paths.systemctlPath,
+            lockPath,
+            dependencies: {
+                platform: 'linux',
+                inspectDaemonServiceStatus: async () =>
+                    running(lockPath, workspace, 4242, true, activeIdentity),
+                writeSystemdUserService: vi.fn(async () => ({
+                    changed: false,
+                })) as unknown as typeof writeSystemdUserService,
+                runProcess: runner,
+                sleep: async () => {},
+            },
+        });
+        expectedUnitPath = manager.unitPath;
+
+        await expect(manager.ensureRunning()).resolves.toMatchObject({
+            status: 'running',
+            ownership: 'managed',
+        });
+        expect(calls).toContainEqual(['--user', 'daemon-reload']);
+        expect(calls).toContainEqual(['--user', 'restart', manager.unitName]);
+        expect(activeIdentity).toBe(desiredIdentity);
+    });
+
     test.each(['daemon-reload', 'restart'] as const)(
         'retries a pre-ready wrong-identity rollout after %s fails',
         async failingCommand => {
@@ -928,7 +1067,18 @@ describe('persistent workspace daemon manager', () => {
         const root = await temporaryDirectory();
         const workspace = join(root, 'workspace');
         const lockPath = join(workspace, 'daemon.lock');
+        const lifecycleLockPath = `${lockPath}.lifecycle`;
         await mkdir(workspace);
+        await writeFile(
+            lifecycleLockPath,
+            `${JSON.stringify({
+                pid: 2_147_483_647,
+                processIdentity: 'linux:00000000-0000-4000-8000-000000000000:1',
+                token: randomUUID(),
+                workspace,
+                createdAt: new Date().toISOString(),
+            })}\n`,
+        );
         const paths = await programFiles(root);
         const identity = systemdServiceIdentity({
             executablePath: paths.nodePath,
@@ -975,6 +1125,7 @@ describe('persistent workspace daemon manager', () => {
             },
             systemctlPath: paths.systemctlPath,
             lockPath,
+            lifecycleLockPath,
             lifecycleLockTimeoutMs: 1_000,
             lifecycleLockPollIntervalMs: 5,
             dependencies: {
@@ -1089,6 +1240,11 @@ describe('persistent workspace daemon manager', () => {
         await expect(access(lifecycleLockPath)).rejects.toMatchObject({
             code: 'ENOENT',
         });
+
+        await writeFile(`${lifecycleLockPath}.recovery`, '');
+        await expect(manager.ensureRunning()).rejects.toThrow(
+            'lifecycle recovery',
+        );
     });
 
     test('serializes concurrent lifecycle mutations', async () => {
@@ -1197,6 +1353,95 @@ describe('persistent workspace daemon manager', () => {
         ]);
     });
 
+    test('repairs a previously generated bad unit before startup', async () => {
+        const root = await temporaryDirectory();
+        const workspace = join(root, 'workspace');
+        const lockPath = join(workspace, 'daemon.lock');
+        await mkdir(workspace);
+        const paths = await programFiles(root);
+        const serviceIdentity = systemdServiceIdentity({
+            executablePath: paths.nodePath,
+            cliPath: paths.cliPath,
+            workspace,
+            openCodeUrl: 'http://127.0.0.1:4096',
+        });
+        let expectedUnitPath = '';
+        let reloaded = false;
+        let restarted = false;
+        let writes = 0;
+        const writeService = vi.fn(async () => ({
+            changed: writes++ === 0,
+        }));
+        const runner: ProcessRunner = vi.fn(async (_executable, arguments_) => {
+            if (arguments_[0] === '--version') {
+                return processResult('systemd 252\n');
+            }
+            if (arguments_.includes('daemon-reload')) {
+                reloaded = true;
+                return processResult();
+            }
+            if (arguments_.includes('restart')) {
+                restarted = true;
+                return processResult();
+            }
+            if (arguments_.includes('show')) {
+                if (!reloaded) {
+                    return processResult('', 'bad unit setting', 1);
+                }
+                return processResult(
+                    unitState(
+                        restarted ? 'active' : 'inactive',
+                        restarted ? 4242 : 0,
+                        'loaded',
+                        restarted ? 'running' : 'dead',
+                        expectedUnitPath,
+                        'enabled',
+                    ),
+                );
+            }
+            return processResult();
+        });
+        const manager = await createPersistentDaemonManager({
+            workspace,
+            openCodeUrl: 'http://127.0.0.1:4096',
+            verifiedPrograms: {
+                nodePath: paths.nodePath,
+                cliPath: paths.cliPath,
+            },
+            systemctlPath: paths.systemctlPath,
+            lockPath,
+            dependencies: {
+                platform: 'linux',
+                inspectDaemonServiceStatus: async () =>
+                    restarted
+                        ? running(
+                              lockPath,
+                              workspace,
+                              4242,
+                              true,
+                              serviceIdentity,
+                          )
+                        : stopped(lockPath),
+                writeSystemdUserService:
+                    writeService as unknown as typeof writeSystemdUserService,
+                runProcess: runner,
+                sleep: async () => {},
+            },
+        });
+        expectedUnitPath = manager.unitPath;
+
+        await expect(manager.ensureRunning()).resolves.toMatchObject({
+            status: 'running',
+            ownership: 'managed',
+        });
+        expect(writeService).toHaveBeenCalledTimes(2);
+        expect(
+            vi
+                .mocked(runner)
+                .mock.calls.some(([, args]) => args.includes('daemon-reload')),
+        ).toBe(true);
+    });
+
     test('writes a hardened unit, invokes absolute programs without a shell, and polls readiness', async () => {
         const root = await temporaryDirectory();
         const workspace = join(root, 'workspace');
@@ -1208,7 +1453,8 @@ describe('persistent workspace daemon manager', () => {
             executablePath: paths.nodePath,
             cliPath: paths.cliPath,
             workspace,
-            openCodeUrl: 'http://127.0.0.1:4096',
+            openCodeUrl: 'http://opencode.internal/',
+            managedOpenCodePath: paths.openCodePath,
         });
         const lockStates = [
             stopped(lockPath),
@@ -1229,9 +1475,10 @@ describe('persistent workspace daemon manager', () => {
         const runner: ProcessRunner = vi.fn(async (executable, arguments_) => {
             calls.push({ executable, arguments_ });
             if (arguments_.length === 1 && arguments_[0] === '--version') {
-                return basename(executable) === 'node'
-                    ? processResult('v20.20.0\n')
-                    : processResult('systemd 252\n');
+                if (basename(executable) === 'opencode') {
+                    return processResult('1.17.20\n');
+                }
+                return processResult('systemd 252\n');
             }
             if (arguments_.includes('show')) {
                 showCalls += 1;
@@ -1253,7 +1500,9 @@ describe('persistent workspace daemon manager', () => {
         });
         const manager = await createPersistentDaemonManager({
             workspace,
-            openCodeUrl: 'http://127.0.0.1:4096',
+            openCodeUrl: 'http://opencode.internal/',
+            managedOpenCode: true,
+            openCodePath: paths.openCodePath,
             verifiedPrograms: {
                 nodePath: paths.nodePath,
                 cliPath: paths.cliPath,
@@ -1284,17 +1533,20 @@ describe('persistent workspace daemon manager', () => {
             `"${paths.nodePath}" "${paths.cliPath}" "serve"`,
         );
         expect(unit).toContain(`"--workspace" "${workspace}"`);
-        expect(unit).toContain('"--opencode-url" "http://127.0.0.1:4096/"');
+        expect(unit).toContain(
+            `"--internal-managed-opencode" "${paths.openCodePath}"`,
+        );
+        expect(unit).not.toContain('"--opencode-url"');
         expect(calls.every(call => call.executable.startsWith(root))).toBe(
             true,
         );
         expect(
             calls.some(
                 call =>
-                    basename(call.executable) === 'node' &&
+                    basename(call.executable) === 'opencode' &&
                     call.arguments_[0] === '--version',
             ),
-        ).toBe(false);
+        ).toBe(true);
         expect(
             calls
                 .map(call => call.arguments_)
@@ -1318,9 +1570,15 @@ describe('persistent workspace daemon manager', () => {
         const lockPath = join(workspace, 'daemon.lock');
         await mkdir(workspace);
         const paths = await programFiles(root);
+        const serviceIdentity = systemdServiceIdentity({
+            executablePath: paths.nodePath,
+            cliPath: paths.cliPath,
+            workspace,
+            openCodeUrl: 'http://127.0.0.1:4096',
+        });
         const lockStates = [
-            running(lockPath, workspace, 9001),
-            running(lockPath, workspace, 9001),
+            running(lockPath, workspace, 9001, true, serviceIdentity),
+            running(lockPath, workspace, 9001, true, serviceIdentity),
             stopped(lockPath),
         ];
         const inspect = vi.fn(
@@ -1360,6 +1618,10 @@ describe('persistent workspace daemon manager', () => {
         const manager = await createPersistentDaemonManager({
             workspace,
             openCodeUrl: 'http://127.0.0.1:4096',
+            verifiedPrograms: {
+                nodePath: paths.nodePath,
+                cliPath: paths.cliPath,
+            },
             systemctlPath: paths.systemctlPath,
             lockPath,
             readinessTimeoutMs: 20,
@@ -1397,7 +1659,7 @@ describe('persistent workspace daemon manager', () => {
         ]);
     });
 
-    test('accepts an independent lock without writing, starting, or stopping a unit', async () => {
+    test('rejects independent ownership without writing, starting, or stopping its owner', async () => {
         const root = await temporaryDirectory();
         const workspace = join(root, 'workspace');
         const lockPath = join(workspace, 'daemon.lock');
@@ -1427,10 +1689,9 @@ describe('persistent workspace daemon manager', () => {
             },
         });
 
-        await expect(manager.ensureRunning()).resolves.toMatchObject({
-            status: 'running',
-            ownership: 'independent',
-        });
+        await expect(manager.ensureRunning()).rejects.toThrow(
+            'independently managed daemon owns this workspace',
+        );
         await expect(manager.stop()).resolves.toMatchObject({
             status: 'running',
             ownership: 'independent',
@@ -1512,10 +1773,9 @@ describe('persistent workspace daemon manager', () => {
         });
         expectedUnitPath = manager.unitPath;
 
-        await expect(manager.ensureRunning()).resolves.toMatchObject({
-            status: 'running',
-            ownership: 'independent',
-        });
+        await expect(manager.ensureRunning()).rejects.toThrow(
+            'independently managed daemon owns this workspace',
+        );
         expect(writeService).toHaveBeenCalledOnce();
         expect(calls).toContainEqual([
             '--user',
@@ -1553,6 +1813,35 @@ describe('persistent workspace daemon manager', () => {
         expect(writeService).not.toHaveBeenCalled();
     });
 
+    test('does not accept independent readiness when systemctl is unavailable', async () => {
+        const root = await temporaryDirectory();
+        const workspace = join(root, 'workspace');
+        const lockPath = join(workspace, 'daemon.lock');
+        await mkdir(workspace);
+        const paths = await programFiles(root);
+        const writeService = vi.fn();
+        const manager = await createPersistentDaemonManager({
+            workspace,
+            openCodeUrl: 'http://127.0.0.1:4096',
+            systemctlPath: paths.systemctlPath,
+            lockPath,
+            dependencies: {
+                platform: 'linux',
+                inspectDaemonServiceStatus: async () =>
+                    running(lockPath, workspace, 1111),
+                writeSystemdUserService:
+                    writeService as unknown as typeof writeSystemdUserService,
+                runProcess: async () =>
+                    processResult('', 'systemctl unavailable', 1),
+            },
+        });
+
+        await expect(manager.ensureRunning()).rejects.toThrow(
+            'systemd user services are unavailable',
+        );
+        expect(writeService).not.toHaveBeenCalled();
+    });
+
     test.runIf(process.platform === 'linux')(
         'inspects lock liveness through proc without signalling the PID',
         async () => {
@@ -1567,19 +1856,31 @@ describe('persistent workspace daemon manager', () => {
             await mkdir(controlDirectory, { recursive: true });
             const owner = {
                 pid: process.pid,
+                processIdentity: processIdentity(process.pid)!,
                 token: randomUUID(),
                 workspace,
                 createdAt: new Date().toISOString(),
             };
-            await writeFile(lockPath, `${JSON.stringify(owner)}\n`);
+            const paths = await programFiles(root);
+            const serviceIdentity = systemdServiceIdentity({
+                executablePath: paths.nodePath,
+                cliPath: paths.cliPath,
+                workspace,
+                openCodeUrl: 'http://127.0.0.1:4096',
+            });
+            const identifiedOwner = { ...owner, serviceIdentity };
+            await writeFile(lockPath, `${JSON.stringify(identifiedOwner)}\n`);
             await writeFile(
                 `${lockPath}.ready`,
                 `${JSON.stringify({
-                    token: owner.token,
+                    pid: identifiedOwner.pid,
+                    workspace: identifiedOwner.workspace,
+                    token: identifiedOwner.token,
+                    processIdentity: identifiedOwner.processIdentity,
+                    serviceIdentity,
                     readyAt: new Date().toISOString(),
                 })}\n`,
             );
-            const paths = await programFiles(root);
             let expectedUnitPath = '';
             const runner: ProcessRunner = vi.fn(
                 async (_executable, arguments_) =>
@@ -1599,6 +1900,10 @@ describe('persistent workspace daemon manager', () => {
             const manager = await createPersistentDaemonManager({
                 workspace,
                 openCodeUrl: 'http://127.0.0.1:4096',
+                verifiedPrograms: {
+                    nodePath: paths.nodePath,
+                    cliPath: paths.cliPath,
+                },
                 systemctlPath: paths.systemctlPath,
                 lockPath,
                 dependencies: { platform: 'linux', runProcess: runner },

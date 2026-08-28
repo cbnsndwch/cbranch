@@ -239,13 +239,12 @@ export const prepareGoalPlan = async (
 };
 
 const displayPath = (prepared: PreparedGoalPlan): string => {
-    const local = relative(prepared.workspace, prepared.path);
-    return terminalText(local || prepared.path);
+    return terminalText(prepared.path);
 };
 
 const confirmationMessage = (prepared: PreparedGoalPlan): string =>
     [
-        `Objective: ${terminalText(prepared.plan.objective).slice(0, 500)}`,
+        `Objective: ${terminalText(prepared.plan.objective)}`,
         `Units: ${prepared.plan.units.length}`,
         `Path: ${displayPath(prepared)}`,
         `Digest: ${prepared.digest}`,
@@ -377,9 +376,12 @@ export const bootstrapGoalTui = async (
     }
     const bridge = await dependencies.createTuiBridgeClient();
     const initialized = await bridge.init(options.workspace);
+    const openCodeUrl = openCodeClientUrl(options.client, options.openCodeUrl);
     const daemonManager = await dependencies.createPersistentDaemonManager({
         workspace: initialized.workspace,
-        openCodeUrl: openCodeClientUrl(options.client, options.openCodeUrl),
+        openCodeUrl,
+        managedOpenCode:
+            new URL(openCodeUrl).toString() === 'http://opencode.internal/',
         verifiedPrograms: bridge.verifiedPrograms,
     });
     const actor = options.actor ?? 'tui';

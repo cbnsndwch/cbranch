@@ -15,8 +15,11 @@ import { join } from 'node:path';
 
 import { afterEach, describe, expect, test, vi } from 'vitest';
 
+import type { ProcessIdentity } from './process-identity.js';
+
 import {
     defaultSystemdUserDirectory,
+    escapeSystemdPathDirective,
     generateSystemdUserService,
     inspectDaemonServiceStatus,
     quoteSystemdArgument,
@@ -64,10 +67,14 @@ describe('systemd unit generation', () => {
         expect(unit).toContain('PrivateTmp=true');
         expect(unit).toContain('ProtectSystem=strict');
         expect(unit).toContain(
-            'ReadWritePaths="/home/operator/work trees/goal%%W"',
+            'WorkingDirectory=/home/operator/work\\x20trees/goal%%W',
         );
         expect(unit).toContain(
-            'RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6',
+            'ReadWritePaths=/home/operator/work\\x20trees/goal%%W',
+        );
+        expect(unit).toContain('Environment="PATH=');
+        expect(unit).toContain(
+            'RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK',
         );
         expect(unit).toContain('WantedBy=default.target');
         const identity = systemdServiceIdentity({
@@ -100,6 +107,12 @@ describe('systemd unit generation', () => {
                 openCodeUrl: 'http://127.0.0.1:5000',
             }),
         ).not.toBe(systemdServiceIdentity(input));
+        expect(
+            systemdServiceIdentity({
+                ...input,
+                programFileIdentity: 'node:file-identity|cli:file-identity',
+            }),
+        ).not.toBe(systemdServiceIdentity(input));
     });
 
     test.each([
@@ -122,10 +135,84 @@ describe('systemd unit generation', () => {
 
     test('quotes embedded quotes and backslashes', () => {
         expect(quoteSystemdArgument('/tmp/a"b\\c')).toBe('"/tmp/a\\"b\\\\c"');
+        expect(escapeSystemdPathDirective('/tmp/a"b\\c d%')).toBe(
+            '/tmp/a\\x22b\\x5cc\\x20d%%',
+        );
+    });
+
+    test('generates a self-contained managed OpenCode command', () => {
+        vi.stubEnv('XDG_DATA_HOME', '/srv/cbranch/$data');
+        vi.stubEnv('XDG_CACHE_HOME', '/srv/cbranch/cache');
+        vi.stubEnv('XDG_CONFIG_HOME', '/srv/cbranch/config');
+        vi.stubEnv('XDG_STATE_HOME', '/srv/cbranch/state');
+        const unit = generateSystemdUserService({
+            executablePath: '/usr/bin/node',
+            cliPath: '/opt/cbranch/cli.js',
+            workspace: '/home/operator/project',
+            openCodeUrl: 'http://opencode.internal/',
+            managedOpenCodePath: '/home/operator/.opencode/bin/opencode',
+            programFileIdentity: 'node:file|cli:file|opencode:file',
+        });
+        expect(unit).toContain(
+            '"--internal-managed-opencode" "/home/operator/.opencode/bin/opencode"',
+        );
+        expect(unit).not.toContain('"--opencode-url"');
+        expect(unit).toContain(
+            '"--internal-program-file-identity" "node:file|cli:file|opencode:file"',
+        );
+        expect(unit).toContain('ReadWritePaths=-');
+        expect(unit).toContain('/srv/cbranch/\\x24data/opencode');
+        expect(unit).toContain(
+            'Environment="XDG_DATA_HOME=/srv/cbranch/$data"',
+        );
+        expect(unit).toContain(
+            'Environment="XDG_CACHE_HOME=/srv/cbranch/cache"',
+        );
+        expect(unit).toContain(
+            'Environment="XDG_CONFIG_HOME=/srv/cbranch/config"',
+        );
+        expect(unit).toContain(
+            'Environment="XDG_STATE_HOME=/srv/cbranch/state"',
+        );
+        expect(unit).not.toContain('XDG_DATA_HOME=/srv/cbranch/$$data');
     });
 });
 
 describe('systemd unit installation', () => {
+    test('creates managed OpenCode XDG directories before installation', async () => {
+        const root = await temporaryDirectory();
+        const userDirectory = join(root, 'systemd', 'user');
+        const xdgDirectories = {
+            XDG_CONFIG_HOME: join(root, 'config'),
+            XDG_DATA_HOME: join(root, 'data'),
+            XDG_CACHE_HOME: join(root, 'cache'),
+            XDG_STATE_HOME: join(root, 'state'),
+        };
+        for (const [name, value] of Object.entries(xdgDirectories)) {
+            vi.stubEnv(name, value);
+        }
+
+        await writeSystemdUserService({
+            executablePath: '/usr/bin/node',
+            cliPath: '/opt/cbranch/cli.js',
+            workspace: root,
+            openCodeUrl: 'http://opencode.internal/',
+            managedOpenCodePath: '/opt/opencode',
+            systemdUserDirectory: userDirectory,
+            unitPath: join(userDirectory, 'cbranch-goal-supervisor.service'),
+        });
+
+        await Promise.all(
+            Object.values(xdgDirectories).map(async directory => {
+                const info = await lstat(join(directory, 'opencode'));
+                expect(info.isDirectory()).toBe(true);
+                if (process.platform !== 'win32') {
+                    expect(info.mode & 0o777).toBe(0o700);
+                }
+            }),
+        );
+    });
+
     test('atomically writes owner-only files and returns operator commands', async () => {
         const root = await temporaryDirectory();
         const userDirectory = join(root, '.config', 'systemd', 'user');
@@ -308,7 +395,9 @@ describe('systemd unit installation', () => {
 });
 
 describe('daemon service status', () => {
-    test('accepts token-matching identity-less manual readiness', async () => {
+    const ownerProcessIdentity =
+        'linux:00000000-0000-4000-8000-000000000000:1' as ProcessIdentity;
+    test('fails closed for identity-less legacy ownership records', async () => {
         const root = await temporaryDirectory();
         const lockPath = join(root, 'daemon.lock');
         const owner = {
@@ -321,6 +410,8 @@ describe('daemon service status', () => {
         await writeFile(
             `${lockPath}.ready`,
             `${JSON.stringify({
+                pid: owner.pid,
+                workspace: owner.workspace,
                 token: owner.token,
                 readyAt: new Date().toISOString(),
             })}\n`,
@@ -331,7 +422,50 @@ describe('daemon service status', () => {
                 workspace: root,
                 isPidAlive: () => true,
             }),
-        ).resolves.toMatchObject({ status: 'running', ready: true });
+        ).resolves.toMatchObject({ status: 'invalid' });
+        await expect(
+            inspectDaemonServiceStatus(lockPath, {
+                workspace: root,
+                isPidAlive: () => false,
+            }),
+        ).resolves.toMatchObject({ status: 'stale', ready: false });
+    });
+
+    test('does not mistake a reused PID for a ready daemon owner', async () => {
+        const root = await temporaryDirectory();
+        const lockPath = join(root, 'daemon.lock');
+        const owner = {
+            pid: process.pid,
+            processIdentity: ownerProcessIdentity,
+            token: randomUUID(),
+            workspace: root,
+            createdAt: new Date().toISOString(),
+        };
+        await writeFile(lockPath, `${JSON.stringify(owner)}\n`);
+        await writeFile(
+            `${lockPath}.ready`,
+            `${JSON.stringify({
+                token: owner.token,
+                processIdentity: owner.processIdentity,
+                readyAt: new Date().toISOString(),
+            })}\n`,
+        );
+
+        await expect(
+            inspectDaemonServiceStatus(lockPath, {
+                workspace: root,
+                isPidAlive: () => true,
+                processIdentity: () =>
+                    'linux:00000000-0000-4000-8000-000000000000:2' as ProcessIdentity,
+            }),
+        ).resolves.toMatchObject({ status: 'stale', ready: false });
+        await expect(
+            inspectDaemonServiceStatus(lockPath, {
+                workspace: root,
+                isPidAlive: () => true,
+                processIdentity: () => undefined,
+            }),
+        ).resolves.toMatchObject({ status: 'invalid' });
     });
 
     test('reports stopped, running, stale, and invalid without deleting locks', async () => {
@@ -356,6 +490,7 @@ describe('daemon service status', () => {
         const ownerIdentity = `sha256:${'b'.repeat(64)}` as const;
         const owner = {
             pid: process.pid,
+            processIdentity: ownerProcessIdentity,
             token: randomUUID(),
             workspace: root,
             createdAt: new Date().toISOString(),
@@ -368,6 +503,7 @@ describe('daemon service status', () => {
             inspectDaemonServiceStatus(lockPath, {
                 workspace: root,
                 isPidAlive: () => true,
+                processIdentity: () => ownerProcessIdentity,
             }),
         ).resolves.toMatchObject({
             status: 'running',
@@ -379,7 +515,10 @@ describe('daemon service status', () => {
         await writeFile(
             `${lockPath}.ready`,
             `${JSON.stringify({
+                pid: owner.pid,
+                workspace: owner.workspace,
                 token: randomUUID(),
+                processIdentity: owner.processIdentity,
                 readyAt: new Date().toISOString(),
             })}\n`,
         );
@@ -387,12 +526,16 @@ describe('daemon service status', () => {
             inspectDaemonServiceStatus(lockPath, {
                 workspace: root,
                 isPidAlive: () => true,
+                processIdentity: () => owner.processIdentity as ProcessIdentity,
             }),
         ).resolves.toMatchObject({ status: 'running', ready: false });
         await writeFile(
             `${lockPath}.ready`,
             `${JSON.stringify({
+                pid: owner.pid,
+                workspace: owner.workspace,
                 token: owner.token,
+                processIdentity: owner.processIdentity,
                 readyAt: new Date().toISOString(),
                 serviceIdentity: `sha256:${'c'.repeat(64)}`,
             })}\n`,
@@ -401,6 +544,7 @@ describe('daemon service status', () => {
             inspectDaemonServiceStatus(lockPath, {
                 workspace: root,
                 isPidAlive: () => true,
+                processIdentity: () => owner.processIdentity as ProcessIdentity,
             }),
         ).resolves.toMatchObject({
             status: 'running',
@@ -410,7 +554,10 @@ describe('daemon service status', () => {
         await writeFile(
             `${lockPath}.ready`,
             `${JSON.stringify({
+                pid: owner.pid,
+                workspace: owner.workspace,
                 token: owner.token,
+                processIdentity: owner.processIdentity,
                 readyAt: new Date().toISOString(),
                 serviceIdentity: ownerIdentity,
             })}\n`,
@@ -419,6 +566,7 @@ describe('daemon service status', () => {
             inspectDaemonServiceStatus(lockPath, {
                 workspace: root,
                 isPidAlive: () => true,
+                processIdentity: () => owner.processIdentity as ProcessIdentity,
             }),
         ).resolves.toMatchObject({
             status: 'running',

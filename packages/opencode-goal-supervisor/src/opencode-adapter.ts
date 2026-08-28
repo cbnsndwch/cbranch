@@ -230,7 +230,13 @@ const latestAssistantMessage = (
 const parseAssistantOutcome = (
     message: LegacyMessage | undefined,
 ): AgentOutcome | undefined => {
-    if (!message) return undefined;
+    if (
+        !message?.info.time?.completed ||
+        !message.info.finish ||
+        message.info.finish === 'tool-calls'
+    ) {
+        return undefined;
+    }
     const text = message.parts
         .filter(
             (part): part is { readonly type?: string; readonly text: string } =>
@@ -245,6 +251,21 @@ const parseAssistantOutcome = (
         return undefined;
     }
 };
+
+const latestAssistantOutcome = (
+    messages: readonly LegacyMessage[],
+): AgentOutcome | undefined =>
+    messages
+        .map((message, index) => ({ message, index }))
+        .filter(({ message }) => message.info.role === 'assistant')
+        .toSorted(
+            (left, right) =>
+                (right.message.info.time?.created ?? 0) -
+                    (left.message.info.time?.created ?? 0) ||
+                right.index - left.index,
+        )
+        .map(({ message }) => parseAssistantOutcome(message))
+        .find((outcome): outcome is AgentOutcome => outcome !== undefined);
 
 type InspectedSession = {
     readonly state:
@@ -514,21 +535,24 @@ export class OpenCodeSessionAdapter implements GoalSessionAdapter {
             ),
         ]);
         const latest = latestAssistantMessage(messages);
-        const outcome = parseAssistantOutcome(latest);
-        if (outcome) return { state: 'completed', outcome };
+        const outcome = latestAssistantOutcome(messages);
         if (!messages.some(message => message.info.role === 'user')) {
             return { state: 'absent' };
         }
+        const status = statuses[session.id];
+        if (status?.type === 'busy' || status?.type === 'retry') {
+            return {
+                state: 'active',
+                ...(outcome ? { outcome } : {}),
+            };
+        }
+        if (outcome) return { state: 'completed', outcome };
         if (
             latest?.info.error ||
             latest?.info.time?.completed ||
             latest?.info.finish
         ) {
             return { state: 'terminal-unknown' };
-        }
-        const status = statuses[session.id];
-        if (status?.type === 'busy' || status?.type === 'retry') {
-            return { state: 'active' };
         }
         if (!latest) return { state: 'active' };
         return { state: 'unknown' };
@@ -649,7 +673,21 @@ export class OpenCodeSessionAdapter implements GoalSessionAdapter {
             input.workspace,
             input.signal,
         );
-        if (inspected.state === 'active') return { status: 'active' };
+        if (inspected.state === 'active') {
+            if (!inspected.outcome) return { status: 'active' };
+            const stopped = await this.abort({
+                externalRef: input.externalRef,
+                workspace: input.workspace,
+                reason: 'completed AgentOutcome accepted',
+                signal: input.signal,
+            });
+            if (!stopped.aborted) return { status: 'active' };
+            return {
+                status: 'completed',
+                outcome: inspected.outcome,
+                transcriptRef: transcriptRef(sessionId),
+            };
+        }
         if (inspected.state === 'terminal-unknown') {
             return {
                 status: 'terminal-unknown',
