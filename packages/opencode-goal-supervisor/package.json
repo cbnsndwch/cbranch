@@ -54,7 +54,8 @@
         "typecheck:test": "tsc -p tsconfig.test.json",
         "test": "vitest run --root ../.. packages/opencode-goal-supervisor/src",
         "prepack": "pnpm run build",
-        "pack:check": "node ../../scripts/verify-goal-supervisor-package.mjs"
+        "pack:check": "node ../../scripts/verify-goal-supervisor-package.mjs",
+        "qualify:host": "node ../../scripts/qualify-goal-supervisor-host.mjs --release"
     },
     "dependencies": {
         "@modelcontextprotocol/sdk": "^1.26.0",

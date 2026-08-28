@@ -11,7 +11,7 @@ import {
     writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { basename, dirname, join, resolve } from 'node:path';
+import { basename, delimiter, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -19,11 +19,18 @@ const expectedVersion = '0.1.0';
 const temporaryDirectory = mkdtempSync(
     join(tmpdir(), 'goal-supervisor-package-'),
 );
+const childEnvironment = {
+    ...process.env,
+    PATH: [dirname(process.execPath), process.env.PATH]
+        .filter(Boolean)
+        .join(delimiter),
+};
 
 const run = (command, arguments_, cwd = root) => {
     const result = spawnSync(command, arguments_, {
         cwd,
         encoding: 'utf8',
+        env: childEnvironment,
         stdio: ['ignore', 'pipe', 'pipe'],
     });
     if (result.status !== 0) {
@@ -44,6 +51,7 @@ const runExpectedFailure = (command, arguments_, cwd) => {
     const result = spawnSync(command, arguments_, {
         cwd,
         encoding: 'utf8',
+        env: childEnvironment,
         stdio: ['ignore', 'pipe', 'pipe'],
     });
     if (result.error) throw result.error;
@@ -202,7 +210,7 @@ allowBuilds:
             consumerDirectory,
         );
     } catch (error) {
-        if (!String(error).includes('ERR_PNPM_NO_OFFLINE_TARBALL')) {
+        if (!String(error).includes('ERR_PNPM_NO_OFFLINE_')) {
             throw error;
         }
         run(
