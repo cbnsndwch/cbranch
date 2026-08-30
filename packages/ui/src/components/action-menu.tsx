@@ -1,3 +1,4 @@
+import { type LucideIcon } from 'lucide-react';
 import { Fragment } from 'react';
 
 import {
@@ -25,6 +26,7 @@ export type ActionMenuEntry =
           readonly disabledReason?: string;
           readonly variant?: 'default' | 'destructive';
           readonly accelerator?: string;
+          readonly icon?: LucideIcon;
       }
     | {
           readonly kind: 'submenu';
@@ -32,7 +34,20 @@ export type ActionMenuEntry =
           readonly label: string;
           readonly entries: ReadonlyArray<ActionMenuEntry>;
           readonly disabledReason?: string;
+          readonly icon?: LucideIcon;
       };
+
+function ActionMenuIcon({ icon: Icon }: { readonly icon?: LucideIcon }) {
+    return (
+        <span
+            data-slot="action-menu-icon"
+            className="text-muted-foreground flex size-4 shrink-0 items-center justify-center"
+            aria-hidden="true"
+        >
+            {Icon ? <Icon className="size-4" /> : null}
+        </span>
+    );
+}
 
 /** Shared rendering adapter so overflow and right-click menus consume one action model. */
 export function ActionMenuItems({
@@ -64,6 +79,7 @@ export function ActionMenuItems({
                             title={title}
                             aria-label={title}
                         >
+                            <ActionMenuIcon icon={entry.icon} />
                             <span className="flex min-w-0 flex-col">
                                 <span>{entry.label}</span>
                                 {entry.disabledReason ? (
@@ -88,6 +104,7 @@ export function ActionMenuItems({
                         title={title}
                         aria-label={title}
                     >
+                        <ActionMenuIcon icon={entry.icon} />
                         <span className="flex min-w-0 flex-col">
                             <span>{entry.label}</span>
                             {entry.disabledReason ? (
@@ -109,6 +126,7 @@ export function ActionMenuItems({
 
         const content = (
             <Fragment>
+                <ActionMenuIcon icon={entry.icon} />
                 <span className="flex min-w-0 flex-col">
                     <span>{entry.label}</span>
                     {entry.disabledReason ? (

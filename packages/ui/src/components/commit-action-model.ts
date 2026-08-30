@@ -1,7 +1,62 @@
+import {
+    Archive,
+    CalendarDays,
+    Cherry,
+    Compass,
+    Copy,
+    Eye,
+    FileOutput,
+    GitBranchPlus,
+    GitCommitHorizontal,
+    GitCompareArrows,
+    GitMerge,
+    GitPullRequest,
+    Hash,
+    ListTree,
+    MessageSquareText,
+    RotateCcw,
+    Search,
+    Settings2,
+    Split,
+    Tag,
+    Tags,
+    Trash2,
+    Undo2,
+    UserRound,
+    type LucideIcon,
+} from 'lucide-react';
+
 import { type ActionMenuEntry } from './action-menu';
 
 const unavailable =
     'This command needs a Git/RPC capability that is not available in this build.';
+
+const actionIcons: Readonly<Partial<Record<string, LucideIcon>>> = {
+    'copy.refs': Tags,
+    'copy.hash': Hash,
+    'copy.message': MessageSquareText,
+    'copy.author': UserRound,
+    'copy.date': CalendarDays,
+    'commands.merge': GitMerge,
+    'commands.reset': RotateCcw,
+    'commands.createBranch': GitBranchPlus,
+    'commands.createTag': Tag,
+    'commands.checkoutRevision': GitCommitHorizontal,
+    'commands.revert': Undo2,
+    'commands.cherryPick': Cherry,
+    'commands.archive': Archive,
+    'commands.bisect': Split,
+    'commands.rebaseSince': GitPullRequest,
+    'commands.exportPatch': FileOutput,
+    'compare.current': GitCompareArrows,
+    'compare.selectBase': GitCommitHorizontal,
+    'compare.toBase': GitCompareArrows,
+    'navigate.goToCommit': GitCommitHorizontal,
+    'navigate.quickSearch': Search,
+    'navigate.quickSearchPrev': Search,
+    'navigate.quickSearchNext': Search,
+    'selection.revealRef': ListTree,
+};
 
 export interface CommitActionCallbacks {
     readonly copyRefs?: () => void;
@@ -62,6 +117,7 @@ const action = (
     onSelect,
     disabledReason: onSelect ? undefined : disabledReason,
     accelerator,
+    icon: actionIcons[id],
 });
 
 /**
@@ -80,6 +136,7 @@ export const resolveCommitActions = ({
         kind: 'submenu',
         id: 'copy',
         label: 'Copy to clipboard',
+        icon: Copy,
         entries: [
             action(
                 'copy.refs',
@@ -99,6 +156,7 @@ export const resolveCommitActions = ({
         kind: 'submenu',
         id: 'commands.rebaseCurrent',
         label: 'Rebase current branch on',
+        icon: GitPullRequest,
         entries: [
             action(
                 'commands.rebaseCurrent.selected',
@@ -144,6 +202,7 @@ export const resolveCommitActions = ({
         kind: 'submenu',
         id: 'commands.deleteTag',
         label: 'Delete tag…',
+        icon: Trash2,
         disabledReason:
             (c.deleteTags?.length ?? 0) === 0
                 ? 'No tag points at this commit.'
@@ -168,6 +227,7 @@ export const resolveCommitActions = ({
         kind: 'submenu',
         id: 'advanced',
         label: 'Advanced',
+        icon: Settings2,
         entries: [
             action(
                 'advanced.edit',
@@ -211,6 +271,7 @@ export const resolveCommitActions = ({
         kind: 'submenu',
         id: 'compare',
         label: 'Compare',
+        icon: GitCompareArrows,
         entries: [
             action(
                 'compare.external',
@@ -262,6 +323,7 @@ export const resolveCommitActions = ({
         kind: 'submenu',
         id: 'navigate',
         label: 'Navigate',
+        icon: Compass,
         entries: [
             action(
                 'navigate.toggleArtificial',
@@ -342,6 +404,7 @@ export const resolveCommitActions = ({
         kind: 'submenu',
         id: 'view',
         label: 'View',
+        icon: Eye,
         entries: viewEntries,
         disabledReason:
             viewEntries.length === 0

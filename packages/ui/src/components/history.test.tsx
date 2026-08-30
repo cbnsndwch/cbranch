@@ -230,6 +230,21 @@ describe('HistoryList (P1-HIST-1/2/3; spec 10)', () => {
         expect(await screen.findByText('Copy to clipboard')).toBeTruthy();
         expect(screen.getByText('Cherry-pick this commit…')).toBeTruthy();
         expect(screen.getByText('Revert this commit…')).toBeTruthy();
+        const mergeItem = screen
+            .getByText('Merge into current branch…')
+            .closest('[role="menuitem"]');
+        expect(
+            mergeItem?.querySelector('[data-slot="action-menu-icon"] svg'),
+        ).toBeTruthy();
+        const iconlessItem = screen
+            .getByText('Reset another branch to here…')
+            .closest('[role="menuitem"]');
+        expect(
+            iconlessItem?.querySelector('[data-slot="action-menu-icon"]'),
+        ).toBeTruthy();
+        expect(
+            iconlessItem?.querySelector('[data-slot="action-menu-icon"] svg'),
+        ).toBeNull();
         expect(onSelect).toHaveBeenCalledWith(oid('a'));
         const rebase = screen.getByText('Rebase current branch on');
         act(() => fireEvent.mouseMove(rebase));

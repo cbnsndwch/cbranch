@@ -1,4 +1,42 @@
+import {
+    Archive,
+    Cherry,
+    Download,
+    GitBranch,
+    GitBranchPlus,
+    GitCommitHorizontal,
+    GitMerge,
+    GitPullRequest,
+    Link,
+    Pencil,
+    RotateCcw,
+    Tag,
+    Trash2,
+    Undo2,
+    Upload,
+    type LucideIcon,
+} from 'lucide-react';
+
 import { type ActionMenuEntry } from './action-menu';
+
+const actionIcons: Readonly<Partial<Record<string, LucideIcon>>> = {
+    'branch.switch': GitBranch,
+    'branch.createFrom': GitBranchPlus,
+    'branch.merge': GitMerge,
+    'branch.checkoutDetached': GitCommitHorizontal,
+    'branch.setUpstream': Link,
+    'branch.push': Upload,
+    'branch.pull': Download,
+    'branch.rename': Pencil,
+    'branch.resetCurrent': RotateCcw,
+    'branch.rebaseCurrent': GitPullRequest,
+    'branch.createTag': Tag,
+    'branch.cherryPickTip': Cherry,
+    'branch.revertTip': Undo2,
+    'branch.archiveTip': Archive,
+    'branch.deleteLocal': Trash2,
+    'branch.deleteRemote': Trash2,
+};
 
 export interface BranchActionContext {
     readonly isCurrent: boolean;
@@ -38,6 +76,7 @@ const item = (
     onSelect,
     disabledReason,
     variant,
+    icon: actionIcons[id],
 });
 
 /** One enablement matrix shared by a branch row's overflow and context menus. */
@@ -155,6 +194,7 @@ export const resolveBranchActions = ({
             kind: 'submenu',
             id: 'branch.tipActions',
             label: 'Tip commit actions',
+            icon: GitCommitHorizontal,
             disabledReason: busyReason,
             entries: [
                 item(

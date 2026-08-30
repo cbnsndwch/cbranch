@@ -1,3 +1,4 @@
+import { GitMerge, Trash2 } from 'lucide-react';
 import { describe, expect, test, vi } from 'vitest';
 
 import { type ActionMenuEntry } from './action-menu';
@@ -127,5 +128,36 @@ describe('context action resolvers', () => {
             disabledReason:
                 'The branches panel does not expose programmatic ref selection yet.',
         });
+    });
+
+    test('assigns icons only where the command has a sensible match', () => {
+        const commits = flatten(
+            resolveCommitActions({
+                callbacks: {},
+                hasRefs: true,
+                hasParent: true,
+                hasChild: true,
+                baseSelected: false,
+            }),
+        );
+        expect(commits.find(entry => entry.id === 'commands.merge')?.icon).toBe(
+            GitMerge,
+        );
+        expect(commits.find(entry => entry.id === 'advanced.edit')?.icon).toBe(
+            undefined,
+        );
+
+        const branches = flatten(
+            resolveBranchActions({
+                isCurrent: false,
+                isRemote: false,
+                hasRemoteTarget: true,
+                busy: false,
+                callbacks: callbacks(),
+            }),
+        );
+        expect(
+            branches.find(entry => entry.id === 'branch.deleteLocal')?.icon,
+        ).toBe(Trash2);
     });
 });
