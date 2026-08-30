@@ -105,6 +105,37 @@ const makeDiffFile = (): DiffFile =>
         hunks: [makeHunk()],
     });
 
+const makeAddedDiffFile = (lineCount = 3): DiffFile => {
+    const lines = Array.from(
+        { length: lineCount },
+        (_, index) =>
+            new DiffLine({
+                kind: 'add',
+                content: `new line ${index + 1}`,
+                newLineNo: index + 1,
+            }),
+    );
+    return new DiffFile({
+        oldPath: 'new.txt',
+        newPath: 'new.txt',
+        status: 'added',
+        isBinary: false,
+        newMode: '100644',
+        additions: lineCount,
+        deletions: 0,
+        hunks: [
+            new Hunk({
+                header: `@@ -0,0 +1,${lineCount} @@`,
+                oldStart: 0,
+                oldLines: 0,
+                newStart: 1,
+                newLines: lineCount,
+                lines,
+            }),
+        ],
+    });
+};
+
 beforeEach(() => {
     useUiStore.setState({ selectedDiffFile: null });
 });
@@ -127,6 +158,95 @@ describe('WorkingDiffPanel', () => {
         });
         renderWithApi(<WorkingDiffPanel repoId={repoId} />, api);
         expect(await screen.findByText('@@ -1,3 +1,3 @@')).toBeTruthy();
+    });
+
+    test('renders every line of a new file as an addition hunk', async () => {
+        const api = makeFakeApi({
+            workingFileDiff: vi.fn(async () => makeAddedDiffFile()),
+        });
+        act(() => {
+            useUiStore.setState({
+                selectedDiffFile: { path: 'new.txt', staged: false },
+            });
+        });
+        renderWithApi(<WorkingDiffPanel repoId={repoId} />, api);
+
+        expect(await screen.findByText('@@ -0,0 +1,3 @@')).toBeTruthy();
+        expect(screen.getByRole('button', { name: /new line 1/ })).toBeTruthy();
+        expect(screen.getByRole('button', { name: /new line 2/ })).toBeTruthy();
+        expect(screen.getByRole('button', { name: /new line 3/ })).toBeTruthy();
+    });
+
+    test('identifies an empty new file instead of showing no changes', async () => {
+        const emptyFile = new DiffFile({
+            oldPath: 'empty.txt',
+            newPath: 'empty.txt',
+            status: 'added',
+            isBinary: false,
+            newMode: '100644',
+            additions: 0,
+            deletions: 0,
+            hunks: [],
+        });
+        const api = makeFakeApi({
+            workingFileDiff: vi.fn(async () => emptyFile),
+        });
+        act(() => {
+            useUiStore.setState({
+                selectedDiffFile: { path: 'empty.txt', staged: false },
+            });
+        });
+        renderWithApi(<WorkingDiffPanel repoId={repoId} />, api);
+
+        expect(await screen.findByText(/empty new file/i)).toBeTruthy();
+        expect(screen.queryByText('No changes.')).toBeNull();
+    });
+
+    test('defers a large new-file diff until explicitly loaded', async () => {
+        const api = makeFakeApi({
+            workingFileDiff: vi.fn(async () => makeAddedDiffFile(2001)),
+        });
+        act(() => {
+            useUiStore.setState({
+                selectedDiffFile: { path: 'new.txt', staged: false },
+            });
+        });
+        renderWithApi(<WorkingDiffPanel repoId={repoId} />, api);
+
+        expect(await screen.findByText('Large diff deferred')).toBeTruthy();
+        expect(screen.queryByText('@@ -0,0 +1,2001 @@')).toBeNull();
+
+        await userEvent.click(
+            screen.getByRole('button', { name: 'Load anyway' }),
+        );
+        expect(await screen.findByText('@@ -0,0 +1,2001 @@')).toBeTruthy();
+    });
+
+    test('requires load confirmation again after selecting another large file', async () => {
+        const api = makeFakeApi({
+            workingFileDiff: vi.fn(async () => makeAddedDiffFile(2001)),
+        });
+        act(() => {
+            useUiStore.setState({
+                selectedDiffFile: { path: 'first.txt', staged: false },
+            });
+        });
+        renderWithApi(<WorkingDiffPanel repoId={repoId} />, api);
+
+        await screen.findByText('Large diff deferred');
+        await userEvent.click(
+            screen.getByRole('button', { name: 'Load anyway' }),
+        );
+        expect(await screen.findByText('@@ -0,0 +1,2001 @@')).toBeTruthy();
+
+        act(() => {
+            useUiStore.getState().setSelectedDiffFile({
+                path: 'second.txt',
+                staged: false,
+            });
+        });
+        expect(await screen.findByText('Large diff deferred')).toBeTruthy();
+        expect(screen.queryByText('@@ -0,0 +1,2001 @@')).toBeNull();
     });
 
     test('shows Stage Hunk button for worktree side (staged=false)', async () => {

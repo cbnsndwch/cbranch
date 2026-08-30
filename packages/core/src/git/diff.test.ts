@@ -1,7 +1,14 @@
-import { describe, expect, test } from 'vitest';
+import { afterAll, beforeAll, describe, expect, test } from 'vitest';
+
+import { run } from '../testing/effect-run';
+import {
+    createFixtureWorkspace,
+    type FixtureWorkspace,
+} from '../testing/fixtures';
 
 import {
     buildDiffFiles,
+    diffWorkingFile,
     mapStatusLetter,
     parseNameStatus,
     parseNumstat,
@@ -210,5 +217,98 @@ describe('buildDiffFiles', () => {
         expect(files[0]!.newPath).toBe('z.txt');
         expect(files[0]!.oldOid).toBe('aaaaaaa'); // z.txt kept its own patch metadata
         expect(files[0]!.hunks).toHaveLength(1);
+    });
+});
+
+describe('diffWorkingFile', () => {
+    let ws: FixtureWorkspace;
+
+    beforeAll(async () => {
+        ws = await createFixtureWorkspace();
+    });
+
+    afterAll(async () => {
+        await ws.cleanup();
+    });
+
+    test('renders an untracked text file as additions against an empty file', async () => {
+        const repo = await ws.createRepo('diff-untracked-text');
+        await repo.commit({
+            message: 'init',
+            files: { 'tracked.txt': 'tracked\n' },
+        });
+        await repo.writeFile('new file.txt', 'first\nsecond\nlast');
+
+        const file = await run(
+            diffWorkingFile(repo.dir, 'new file.txt', false),
+        );
+
+        expect(file.status).toBe('added');
+        expect(file.oldPath).toBe('new file.txt');
+        expect(file.newPath).toBe('new file.txt');
+        expect(file.oldOid).toBeUndefined();
+        expect(file.newMode).toBe('100644');
+        expect(file.additions).toBe(3);
+        expect(file.deletions).toBe(0);
+        expect(file.hunks).toHaveLength(1);
+        expect(file.hunks[0]?.header).toBe('@@ -0,0 +1,3 @@');
+        expect(
+            file.hunks[0]?.lines.map(line => [line.kind, line.content]),
+        ).toEqual([
+            ['add', 'first'],
+            ['add', 'second'],
+            ['add', 'last'],
+            ['noNewlineAtEof', 'No newline at end of file'],
+        ]);
+    });
+
+    test('keeps an unchanged tracked file unmodified', async () => {
+        const repo = await ws.createRepo('diff-tracked-unchanged');
+        await repo.commit({
+            message: 'init',
+            files: { 'tracked.txt': 'tracked\n' },
+        });
+
+        const file = await run(diffWorkingFile(repo.dir, 'tracked.txt', false));
+
+        expect(file.status).toBe('unmodified');
+        expect(file.additions).toBe(0);
+        expect(file.hunks).toHaveLength(0);
+    });
+
+    test('returns an explicit addition for an empty untracked file', async () => {
+        const repo = await ws.createRepo('diff-untracked-empty');
+        await repo.commit({
+            message: 'init',
+            files: { 'tracked.txt': 'tracked\n' },
+        });
+        await repo.writeFile('empty.txt', '');
+
+        const file = await run(diffWorkingFile(repo.dir, 'empty.txt', false));
+
+        expect(file.status).toBe('added');
+        expect(file.oldPath).toBe('empty.txt');
+        expect(file.newPath).toBe('empty.txt');
+        expect(file.newMode).toBe('100644');
+        expect(file.additions).toBe(0);
+        expect(file.deletions).toBe(0);
+        expect(file.hunks).toHaveLength(0);
+    });
+
+    test('detects an untracked binary without creating text hunks', async () => {
+        const repo = await ws.createRepo('diff-untracked-binary');
+        await repo.commit({
+            message: 'init',
+            files: { 'tracked.txt': 'tracked\n' },
+        });
+        await repo.writeFile('binary.dat', 'before\0after');
+
+        const file = await run(diffWorkingFile(repo.dir, 'binary.dat', false));
+
+        expect(file.status).toBe('added');
+        expect(file.isBinary).toBe(true);
+        expect(file.additions).toBeNull();
+        expect(file.deletions).toBeNull();
+        expect(file.hunks).toHaveLength(0);
     });
 });

@@ -366,6 +366,38 @@ describe('patch git operations', () => {
         expect(cached.stdout).toContain('a.txt');
     });
 
+    test('stageHunks stages selected lines from an untracked file', async () => {
+        const repo = await ws.createRepo('stage-hunks-untracked');
+        await repo.commit({
+            message: 'init',
+            files: { 'tracked.txt': 'tracked\n' },
+        });
+        await repo.writeFile('new.txt', 'first\nsecond\nthird\n');
+
+        const diffFile = await run(diffWorkingFile(repo.dir, 'new.txt', false));
+        const hunk = diffFile.hunks[0]!;
+        const sel = new PatchSelection({
+            repoId: 'r' as never,
+            path: 'new.txt',
+            hunks: [
+                new HunkSelection({
+                    oldStart: hunk.oldStart,
+                    oldLines: hunk.oldLines,
+                    newStart: hunk.newStart,
+                    newLines: hunk.newLines,
+                    selectedLines: [0, 2],
+                }),
+            ],
+        });
+
+        await run(stageHunks(repo.dir, sel));
+
+        const cached = await repo.git(['show', ':new.txt']);
+        expect(cached.stdout).toBe('first\nthird\n');
+        const remaining = await repo.git(['diff', '--', 'new.txt']);
+        expect(remaining.stdout).toContain('+second');
+    });
+
     test('stageHunks — partial: only selected lines staged', async () => {
         const repo = await ws.createRepo('stage-hunks-partial');
         // Two separate hunks by spacing changes far apart

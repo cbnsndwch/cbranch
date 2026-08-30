@@ -20,8 +20,10 @@ import {
     useUnstageHunks,
     useWorkingDiff,
 } from '../rpc/hooks';
+import { isLargeDiff } from '../lib/diff';
 import { useUiStore } from '../state/store';
 import { DestructiveConfirmDialog } from './DestructiveConfirmDialog';
+import { LargeDiffCard } from './DiffPlaceholders';
 import { Button } from './ui/button';
 import { Placeholder } from './ui/placeholder';
 
@@ -242,6 +244,7 @@ function WorkingDiffBody({
         null,
     );
     const [confirmDiscard, setConfirmDiscard] = useState(false);
+    const [largeDiffLoaded, setLargeDiffLoaded] = useState(false);
 
     const hunks = data?.hunks ?? [];
 
@@ -337,6 +340,24 @@ function WorkingDiffBody({
     if (!data) return <Placeholder>No diff data.</Placeholder>;
     if (data.isBinary)
         return <Placeholder>Binary file — cannot diff.</Placeholder>;
+    if (isLargeDiff(data) && !largeDiffLoaded)
+        return (
+            <LargeDiffCard
+                file={data}
+                onLoad={() => setLargeDiffLoaded(true)}
+            />
+        );
+    if (
+        data.status === 'added' &&
+        data.additions === 0 &&
+        data.deletions === 0 &&
+        data.hunks.length === 0
+    )
+        return (
+            <Placeholder>
+                Empty new file — {path} has no content to display.
+            </Placeholder>
+        );
     if (data.hunks.length === 0) return <Placeholder>No changes.</Placeholder>;
 
     return (

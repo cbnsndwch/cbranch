@@ -13,6 +13,9 @@
 // Binary files carry empty hunks and `additions`/`deletions = null`; gitlinks surface via
 // the `160000` mode; a root commit diffs against the empty tree (`--root`).
 
+import { lstat } from 'node:fs/promises';
+import { resolve } from 'node:path';
+
 import {
     type ChangeCode,
     type DiffFile as DiffFileType,
@@ -27,7 +30,9 @@ import {
 } from '@cbranch/rpc-contract';
 import { Effect } from 'effect';
 
-import { assertNoLeadingDash, decodeUtf8, runGitOk } from './run-git';
+import { classifyExit, classifyNodeError } from './errors';
+import { assertNoLeadingDash, decodeUtf8, runGit, runGitOk } from './run-git';
+import { parseStatusOutput } from './status';
 
 // ── status mapping ───────────────────────────────────────────────────────────
 
@@ -412,6 +417,116 @@ const assembleDiff = (
         );
     });
 
+/**
+ * `git diff --no-index` uses exit 1 to report that the two paths differ. That is
+ * successful diff data, not a Git failure. Other exit codes remain errors.
+ */
+const runNoIndexDiff = (
+    cwd: string,
+    args: ReadonlyArray<string>,
+    env: NodeJS.ProcessEnv | undefined,
+): Effect.Effect<Buffer, GitError> =>
+    Effect.flatMap(runGit({ cwd, args, env }), result =>
+        result.exitCode === 0 ||
+        (result.exitCode === 1 && result.stderr.length === 0)
+            ? Effect.succeed(result.stdout)
+            : Effect.fail(
+                  classifyExit(result.exitCode, decodeUtf8(result.stderr)),
+              ),
+    );
+
+/**
+ * Confirm that a path is an exact untracked status entry before allowing a
+ * no-index comparison. Besides distinguishing it from an unchanged tracked
+ * path, this check keeps the virtual-empty comparison scoped to the repository.
+ */
+const isUntrackedPath = (
+    cwd: string,
+    path: string,
+    env: NodeJS.ProcessEnv | undefined,
+): Effect.Effect<boolean, GitError> =>
+    Effect.map(
+        runGitOk({
+            cwd,
+            args: [
+                'status',
+                '--porcelain=v2',
+                '-z',
+                '--untracked-files=all',
+                '--',
+                path,
+            ],
+            env,
+        }),
+        result =>
+            parseStatusOutput(result.stdout).entries.some(
+                entry => entry.isUntracked && entry.path === path,
+            ),
+    );
+
+/** Read the worktree mode used by Git for a newly added filesystem entry. */
+const untrackedFileMode = (
+    cwd: string,
+    path: string,
+): Effect.Effect<string, GitError> =>
+    Effect.tryPromise({
+        try: async () => {
+            const stat = await lstat(resolve(cwd, path));
+            if (stat.isSymbolicLink()) return '120000';
+            return (stat.mode & 0o111) === 0 ? '100644' : '100755';
+        },
+        catch: classifyNodeError,
+    });
+
+/** Compare an untracked file with a virtual empty file (`/dev/null`). */
+const diffUntrackedFile = (
+    cwd: string,
+    path: string,
+    env: NodeJS.ProcessEnv | undefined,
+): Effect.Effect<DiffFileType | undefined, GitError> =>
+    Effect.gen(function* () {
+        if (!(yield* isUntrackedPath(cwd, path, env))) return undefined;
+
+        const base = ['diff', '--no-index'];
+        const tail = ['--', '/dev/null', path];
+        const ns = yield* runNoIndexDiff(
+            cwd,
+            [...base, '-z', '--name-status', '--no-renames', ...tail],
+            env,
+        );
+        const num = yield* runNoIndexDiff(
+            cwd,
+            [...base, '-z', '--numstat', '--no-renames', ...tail],
+            env,
+        );
+        const patch = yield* runNoIndexDiff(
+            cwd,
+            [...base, '-p', '--no-renames', ...tail],
+            env,
+        );
+        const files = buildDiffFiles(
+            parseNameStatus(ns),
+            parseNumstat(num),
+            parsePatch(decodeUtf8(patch)),
+        );
+        const first = files[0];
+        if (first !== undefined) return first;
+
+        // Some Git versions emit no no-index records when both sides are empty.
+        // Status already proved this exact path is untracked, so preserve the
+        // addition itself even though it has no content hunk.
+        return new DiffFile({
+            oldPath: path,
+            newPath: path,
+            status: 'added',
+            isBinary: false,
+            newMode: yield* untrackedFileMode(cwd, path),
+            additions: 0,
+            deletions: 0,
+            hunks: [],
+        });
+    });
+
 /** `commit.diff` — changed files for a commit or range (DiffSpec, 05 §2.6). */
 export const commitDiff = (
     cwd: string,
@@ -494,6 +609,13 @@ export const diffWorkingFile = (
         );
         const first = files[0];
         if (first !== undefined) return first;
+        // Ordinary `git diff` intentionally omits untracked paths. For the
+        // unstaged side only, compare an exact untracked path to a virtual empty
+        // file so the commit surface can render and partially stage its content.
+        if (!staged) {
+            const untracked = yield* diffUntrackedFile(cwd, path, env);
+            if (untracked !== undefined) return untracked;
+        }
         // No change for this path ⇒ an explicit unmodified result (not an error).
         return new DiffFile({
             oldPath: path,
