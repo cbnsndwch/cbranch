@@ -109,6 +109,19 @@ describe('RefChips (P1-UI-HIST-4)', () => {
         expect(screen.getByText('d')).toBeTruthy();
         expect(screen.getByText('e')).toBeTruthy();
     });
+
+    test('keeps tag borders and text visible on a selected commit row', () => {
+        render(<RefChips refs={['tag: v1']} selected />);
+        const tag = screen.getByTitle('tag: v1');
+        expect(tag.classList.contains('border-selection-fg')).toBe(true);
+        expect(tag.classList.contains('text-selection-fg')).toBe(true);
+        expect(tag.classList.contains('group-hover:border-status-ahead')).toBe(
+            true,
+        );
+        expect(tag.classList.contains('group-hover:text-status-ahead')).toBe(
+            true,
+        );
+    });
 });
 
 describe('GraphCell (spec 10)', () => {

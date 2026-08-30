@@ -20,7 +20,9 @@ const kindClass: Record<'tag' | 'head', string> = {
 // Local branches (except the active HEAD branch) read green, remote-tracking branches
 // red — fixed light-bg/dark-text palette colors so the pill looks the same in light and
 // dark mode. The active local branch keeps its distinct staged-color chip.
-function chipClass(label: RefLabel): string {
+function chipClass(label: RefLabel, selected: boolean): string {
+    if (label.kind === 'tag' && selected)
+        return 'border-selection-fg text-selection-fg group-hover:border-status-ahead group-hover:text-status-ahead';
     if (label.kind === 'remoteBranch')
         return 'border-0 bg-red-100 px-1.5 text-red-800';
     if (label.kind === 'localBranch')
@@ -37,13 +39,19 @@ const kindIcon: Record<RefKind, ReactNode> = {
     head: null,
 };
 
-function Chip({ label }: { readonly label: RefLabel }) {
+function Chip({
+    label,
+    selected,
+}: {
+    readonly label: RefLabel;
+    readonly selected: boolean;
+}) {
     return (
         <span
             title={label.raw}
             className={cn(
                 'inline-flex max-w-48 items-center gap-1 border px-1 text-[10px] leading-4',
-                chipClass(label),
+                chipClass(label, selected),
             )}
         >
             {label.isHead && label.kind !== 'head' ? (
@@ -57,7 +65,13 @@ function Chip({ label }: { readonly label: RefLabel }) {
     );
 }
 
-export function RefChips({ refs }: { readonly refs: ReadonlyArray<string> }) {
+export function RefChips({
+    refs,
+    selected = false,
+}: {
+    readonly refs: ReadonlyArray<string>;
+    readonly selected?: boolean;
+}) {
     const [expanded, setExpanded] = useState(false);
     const labels = parseRefs(refs);
     if (labels.length === 0) return null;
@@ -68,7 +82,7 @@ export function RefChips({ refs }: { readonly refs: ReadonlyArray<string> }) {
     return (
         <span className="flex items-center gap-1">
             {visible.map(label => (
-                <Chip key={label.raw} label={label} />
+                <Chip key={label.raw} label={label} selected={selected} />
             ))}
             {hidden > 0 ? (
                 <button

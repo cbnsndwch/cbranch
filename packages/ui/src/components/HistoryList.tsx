@@ -792,7 +792,10 @@ export function HistoryList({
                                         selected={selected}
                                     />
                                     {row.refs.length > 0 ? (
-                                        <RefChips refs={row.refs} />
+                                        <RefChips
+                                            refs={row.refs}
+                                            selected={selected}
+                                        />
                                     ) : null}
                                     <span className="flex-1 truncate">
                                         {showNotes &&
