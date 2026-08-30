@@ -1,5 +1,5 @@
 import { type TagInfo, type TagType, type RepoId } from '@cbranch/rpc-contract';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
 import {
@@ -55,6 +55,8 @@ export function TagsPanel({ repoId }: TagsPanelProps) {
     // Create dialog open-state is lifted to the store so the menu/palette can open it.
     const createOpen = useUiStore(s => s.tagCreateOpen);
     const setCreateOpen = useUiStore(s => s.setTagCreateOpen);
+    const createTarget = useUiStore(s => s.tagCreateTarget);
+    const setCreateTarget = useUiStore(s => s.setTagCreateTarget);
     const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
     // Tag push / delete-remote let the user pick the remote (UI-011) rather than assuming
     // `origin`. Opening the picker seeds the choice with the first configured remote.
@@ -77,6 +79,10 @@ export function TagsPanel({ repoId }: TagsPanelProps) {
     const [tagMessage, setTagMessage] = useState('');
     const [tagForce, setTagForce] = useState(false);
 
+    useEffect(() => {
+        if (createOpen && createTarget) setTagTarget(createTarget);
+    }, [createOpen, createTarget]);
+
     const list = tags ?? [];
 
     const handleCreate = () => {
@@ -94,6 +100,7 @@ export function TagsPanel({ repoId }: TagsPanelProps) {
                 onSuccess: () => {
                     toast.success('Tag created');
                     setCreateOpen(false);
+                    setCreateTarget(null);
                     setTagName('');
                     setTagType('lightweight');
                     setTagTarget('HEAD');
@@ -186,7 +193,16 @@ export function TagsPanel({ repoId }: TagsPanelProps) {
             </div>
 
             {/* Create tag dialog */}
-            <AlertDialog open={createOpen} onOpenChange={setCreateOpen}>
+            <AlertDialog
+                open={createOpen}
+                onOpenChange={open => {
+                    setCreateOpen(open);
+                    if (!open) {
+                        setCreateTarget(null);
+                        setTagTarget('HEAD');
+                    }
+                }}
+            >
                 <AlertDialogContent>
                     <AlertDialogHeader>
                         <AlertDialogTitle>Create tag</AlertDialogTitle>

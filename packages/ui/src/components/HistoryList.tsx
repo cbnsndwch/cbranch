@@ -1,4 +1,9 @@
-import { type LogQuery, type Oid } from '@cbranch/rpc-contract';
+import {
+    HistoryColumnVisibility,
+    type LogQuery,
+    type Oid,
+} from '@cbranch/rpc-contract';
+import { useQueryClient } from '@tanstack/react-query';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import {
     type KeyboardEvent,
@@ -21,8 +26,19 @@ import {
     shortOid,
 } from '../lib/format';
 import { findMatches, stepMatch } from '../lib/quick-find';
-import { useLogStream, useNotedObjects } from '../rpc/hooks';
+import { useApi } from '../rpc/ApiProvider';
+import {
+    useLogStream,
+    useNotedObjects,
+    useRepoState,
+    useSetAppSettings,
+    useTagList,
+} from '../rpc/hooks';
+import { repoScopeKey } from '../rpc/query-keys';
 import { useUiStore } from '../state/store';
+import { ActionMenuItems, type ActionMenuEntry } from './action-menu';
+import { resolveCommitActions } from './commit-action-model';
+import { DestructiveConfirmDialog } from './DestructiveConfirmDialog';
 import { FindBar } from './FindBar';
 import { GraphCell } from './GraphCell';
 import { HistoryColumnMenu, useHistoryColumns } from './HistoryColumnMenu';
@@ -30,13 +46,11 @@ import { RefChips } from './RefChips';
 import {
     ContextMenu,
     ContextMenuContent,
-    ContextMenuItem,
     ContextMenuTrigger,
 } from './ui/context-menu';
 import {
     DropdownMenu,
     DropdownMenuContent,
-    DropdownMenuItem,
     DropdownMenuTrigger,
 } from './ui/dropdown-menu';
 import { Placeholder } from './ui/placeholder';
@@ -57,6 +71,30 @@ const initials = (name: string): string => {
             .toUpperCase() || '?'
     );
 };
+
+const copyText = async (label: string, value: string) => {
+    try {
+        if (!navigator.clipboard?.writeText)
+            throw new Error('Clipboard access is unavailable');
+        await navigator.clipboard.writeText(value);
+        toast.success(`${label} copied`);
+    } catch (error) {
+        toast.error(`Could not copy ${label.toLowerCase()}: ${String(error)}`);
+    }
+};
+
+const viewAction = (
+    id: string,
+    label: string,
+    onSelect?: () => void,
+    disabledReason?: string,
+): ActionMenuEntry => ({
+    kind: 'action',
+    id,
+    label,
+    onSelect,
+    disabledReason,
+});
 
 function CommitAvatar({
     name,
@@ -108,7 +146,12 @@ export function HistoryList({
     readonly onSelectOid: (oid: Oid) => void;
 }) {
     const { rows, status } = useLogStream(query);
+    const api = useApi();
+    const queryClient = useQueryClient();
     const cols = useHistoryColumns();
+    const saveColumns = useSetAppSettings();
+    const repoState = useRepoState(query?.repoId ?? null).data;
+    const tags = useTagList(query?.repoId ?? null).data ?? [];
     // "Show git notes" gates the per-row note indicator (REQ-P6-NOTE-003).
     const showNotes = useUiStore(s => s.showNotes);
     const repoIdForNotes = query?.repoId ?? null;
@@ -124,6 +167,20 @@ export function HistoryList({
     const setRebaseDialog = useUiStore(s => s.setRebaseDialog);
     const setResetDialog = useUiStore(s => s.setResetDialog);
     const setPatchExportDialog = useUiStore(s => s.setPatchExportDialog);
+    const compareBaseOid = useUiStore(s => s.compareBaseOid);
+    const setCompareBaseOid = useUiStore(s => s.setCompareBaseOid);
+    const setDiffComparison = useUiStore(s => s.setDiffComparison);
+    const setActiveView = useUiStore(s => s.setActiveView);
+    const setBranchCreate = useUiStore(s => s.setBranchCreate);
+    const setTagCreateOpen = useUiStore(s => s.setTagCreateOpen);
+    const setTagCreateTarget = useUiStore(s => s.setTagCreateTarget);
+    const setDateMode = useUiStore(s => s.setDateMode);
+    const setShowNotes = useUiStore(s => s.setShowNotes);
+    const [pendingAction, setPendingAction] = useState<{
+        readonly kind: 'merge' | 'checkout' | 'deleteTag';
+        readonly oid: Oid;
+        readonly tag?: string;
+    } | null>(null);
     useEffect(() => {
         const allRefs = [...new Set(rows.flatMap(r => r.refs))];
         setKnownRefStrings(allRefs);
@@ -252,6 +309,26 @@ export function HistoryList({
 
     // Full keyboard navigation over the list (P1-HIST-6): arrows, page up/down, home/end.
     const onListKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+        if (
+            event.key === 'ContextMenu' ||
+            (event.shiftKey && event.key === 'F10')
+        ) {
+            const target = event.currentTarget.querySelector<HTMLElement>(
+                '[role="option"][aria-selected="true"]',
+            );
+            if (!target) return;
+            event.preventDefault();
+            const rect = target.getBoundingClientRect();
+            target.dispatchEvent(
+                new MouseEvent('contextmenu', {
+                    bubbles: true,
+                    cancelable: true,
+                    clientX: rect.left + 12,
+                    clientY: rect.top + rect.height / 2,
+                }),
+            );
+            return;
+        }
         const page = Math.max(
             1,
             Math.floor((parentRef.current?.clientHeight ?? 0) / ROW_HEIGHT) ||
@@ -289,8 +366,8 @@ export function HistoryList({
         if (next !== null) selectIndex(next);
     };
 
-    // The same two commit operations back both the hover `…` dropdown and the right-click
-    // context menu, so a row's actions stay identical however the user reaches them.
+    // Target operations are resolved once and rendered by both the hover overflow and the
+    // right-click adapters. This keeps labels, guards and handlers from drifting.
     const cherryPickCommit = (target: Oid, subject: string) =>
         setPickDialog({
             kind: 'cherryPick',
@@ -313,6 +390,307 @@ export function HistoryList({
     // local branch to replay; the dialog passes that branch to `git rebase -i <commit> <branch>`.
     const rebaseBranchOnto = (target: Oid) =>
         setRebaseDialog({ upstream: target, branch: null });
+
+    const goToOid = (oid: Oid) => {
+        setActiveView('history');
+        setGotoRequest({ oid });
+    };
+
+    const viewActions = (): ReadonlyArray<ActionMenuEntry> => {
+        const state = useUiStore.getState();
+        const filters = state.filters;
+        const toggleColumn = (key: keyof HistoryColumnVisibility) =>
+            saveColumns.mutate({
+                columns: new HistoryColumnVisibility({
+                    ...cols,
+                    [key]: !cols[key],
+                }),
+            });
+        return [
+            viewAction('view.showAllBranches', 'Show all branches', () =>
+                state.setFilters({ ...filters, refScope: 'all' }),
+            ),
+            viewAction(
+                'view.showCurrentBranch',
+                'Show current branch only',
+                () => state.setFilters({ ...filters, refScope: 'current' }),
+            ),
+            viewAction(
+                'view.showFilteredBranches',
+                'Show filtered branches',
+                filters.refPattern
+                    ? () =>
+                          state.setFilters({ ...filters, refScope: 'pattern' })
+                    : undefined,
+                filters.refPattern
+                    ? undefined
+                    : 'Enter a ref pattern in the history filters first.',
+            ),
+            viewAction(
+                'view.showReflog',
+                'Show reflog references',
+                undefined,
+                'Inline reflog tips are not implemented; use the Reflog view instead.',
+            ),
+            { kind: 'separator', id: 'view-sep-1' },
+            viewAction(
+                'view.advancedFilter',
+                'Advanced filter…',
+                undefined,
+                'The current history filter bar provides the supported filters.',
+            ),
+            viewAction(
+                'view.drawNonRelativesGray',
+                'Draw non-relatives gray',
+                undefined,
+                'Reachability emphasis has not been implemented.',
+            ),
+            viewAction(
+                'view.highlightSelectedBranch',
+                'Highlight selected branch',
+                undefined,
+                'Branch-highlight state has not been implemented.',
+            ),
+            { kind: 'separator', id: 'view-sep-2' },
+            viewAction(
+                'view.showArtificial',
+                'Show artificial commits',
+                undefined,
+                'Artificial working/index rows are not implemented.',
+            ),
+            viewAction(
+                'view.showStashes',
+                'Show stashes',
+                undefined,
+                'Inline stash rows are not implemented; use the Stashes view instead.',
+            ),
+            viewAction(
+                'view.showNotes',
+                `${showNotes ? '✓ ' : ''}Show git notes`,
+                () => setShowNotes(!showNotes),
+            ),
+            viewAction(
+                'view.showRemoteBranches',
+                'Show remote branches',
+                undefined,
+                'Ref-chip visibility state has not been implemented.',
+            ),
+            viewAction(
+                'view.showTags',
+                'Show tags',
+                undefined,
+                'Ref-chip visibility state has not been implemented.',
+            ),
+            viewAction(
+                'view.showSuperprojectTags',
+                'Show superproject tags',
+                undefined,
+                'Superproject labels are not present in the log contract.',
+            ),
+            viewAction(
+                'view.showSuperprojectBranches',
+                'Show superproject branches',
+                undefined,
+                'Superproject labels are not present in the log contract.',
+            ),
+            { kind: 'separator', id: 'view-sep-3' },
+            viewAction(
+                'view.showMessageBody',
+                'Show commit-message body',
+                undefined,
+                'Bodies are available in the commit detail panel, not light log rows.',
+            ),
+            viewAction(
+                'view.showAuthorDate',
+                'Show author date',
+                undefined,
+                'History rows currently always show author date.',
+            ),
+            viewAction(
+                'view.showRelativeDate',
+                `${dateMode === 'relative' ? '✓ ' : ''}Show relative date`,
+                () =>
+                    setDateMode(
+                        dateMode === 'relative' ? 'absolute' : 'relative',
+                    ),
+            ),
+            viewAction(
+                'view.showBuildStatusIcon',
+                'Show build-status icon',
+                undefined,
+                'Build status is not present in the log contract.',
+            ),
+            viewAction(
+                'view.showBuildStatusText',
+                'Show build-status text',
+                undefined,
+                'Build status is not present in the log contract.',
+            ),
+            { kind: 'separator', id: 'view-sep-4' },
+            viewAction(
+                'view.showGraphColumn',
+                '✓ Show revision graph column',
+                undefined,
+                'The revision graph is currently an always-visible core column.',
+            ),
+            viewAction(
+                'view.showAvatarColumn',
+                `${cols.avatar ? '✓ ' : ''}Show author avatar column`,
+                () => toggleColumn('avatar'),
+            ),
+            viewAction(
+                'view.showAuthorColumn',
+                `${cols.authorName ? '✓ ' : ''}Show author name column`,
+                () => toggleColumn('authorName'),
+            ),
+            viewAction(
+                'view.showDateColumn',
+                `${cols.date ? '✓ ' : ''}Show date column`,
+                () => toggleColumn('date'),
+            ),
+            viewAction(
+                'view.showShaColumn',
+                `${cols.sha ? '✓ ' : ''}Show SHA column`,
+                () => toggleColumn('sha'),
+            ),
+            { kind: 'separator', id: 'view-sep-5' },
+            viewAction(
+                'view.sortByAuthorDate',
+                'Sort commits by author date',
+                undefined,
+                'The log contract fixes topological/date ordering.',
+            ),
+            viewAction(
+                'view.arrangeTopo',
+                '✓ Arrange by topological order',
+                undefined,
+                'Topological order is always enforced by the log contract.',
+            ),
+            viewAction(
+                'view.saveAsDefault',
+                'Save current view settings as default',
+                undefined,
+                'Column preferences are saved immediately; other view defaults are not persisted yet.',
+            ),
+        ];
+    };
+
+    const actionsFor = (
+        row: (typeof rows)[number],
+    ): ReadonlyArray<ActionMenuEntry> => {
+        const child = rows.find(candidate =>
+            candidate.parents.includes(row.oid),
+        );
+        const repoId = query?.repoId;
+        const headOid = repoState?.headOid;
+        const pointingTags = tags.filter(tag => tag.targetOid === row.oid);
+        return resolveCommitActions({
+            hasRefs: row.refs.length > 0,
+            hasParent: row.parents.length > 0,
+            hasChild: Boolean(child),
+            baseSelected: compareBaseOid !== null,
+            viewEntries: viewActions(),
+            callbacks: {
+                copyRefs: () =>
+                    void copyText('References', row.refs.join('\n')),
+                copyHash: () => void copyText('Commit hash', row.oid),
+                copyMessage: repoId
+                    ? () =>
+                          void api
+                              .commitDetail(repoId, row.oid)
+                              .then(detail =>
+                                  copyText('Commit message', detail.messageRaw),
+                              )
+                              .catch(error =>
+                                  toast.error(
+                                      `Could not load commit message: ${String(error)}`,
+                                  ),
+                              )
+                    : undefined,
+                copyAuthor: () =>
+                    void copyText(
+                        'Author',
+                        `${row.authorName} <${row.authorEmail}>`,
+                    ),
+                copyDate: () => void copyText('Date', row.authorDate),
+                merge: repoId
+                    ? () => setPendingAction({ kind: 'merge', oid: row.oid })
+                    : undefined,
+                rebaseInteractive: () => rebaseBranchOnto(row.oid),
+                resetCurrent: () => resetToCommit(row.oid),
+                createBranch: () => {
+                    setActiveView('branches');
+                    setBranchCreate({ startPoint: row.oid });
+                },
+                createTag: () => {
+                    setTagCreateTarget(row.oid);
+                    setActiveView('tags');
+                    setTagCreateOpen(true);
+                },
+                deleteTags: pointingTags.map(tag => ({
+                    name: tag.name,
+                    onSelect: () =>
+                        setPendingAction({
+                            kind: 'deleteTag',
+                            oid: row.oid,
+                            tag: tag.name,
+                        }),
+                })),
+                checkoutDetached: repoId
+                    ? () => setPendingAction({ kind: 'checkout', oid: row.oid })
+                    : undefined,
+                revert: () => revertCommit(row.oid, row.subject),
+                cherryPick: () => cherryPickCommit(row.oid, row.subject),
+                archive: () => archiveCommit(row.oid),
+                bisect: () => bisectFrom(row.oid),
+                rebaseSince: () => rebaseSince(row.parents),
+                exportPatch: () => exportPatch(row.oid),
+                compareCurrent: headOid
+                    ? () => {
+                          setDiffComparison({
+                              base: row.oid,
+                              target: headOid,
+                          });
+                          goToOid(headOid);
+                      }
+                    : undefined,
+                selectBase: () => {
+                    setCompareBaseOid(row.oid);
+                    toast.success(`BASE set to ${shortOid(row.oid)}`);
+                },
+                compareBase: compareBaseOid
+                    ? () => {
+                          setDiffComparison({
+                              base: compareBaseOid,
+                              target: row.oid,
+                          });
+                          onSelectOid(row.oid);
+                      }
+                    : undefined,
+                goCurrent: headOid ? () => goToOid(headOid) : undefined,
+                goCommit: () => useUiStore.getState().setGoToDialogOpen(true),
+                goChild: child ? () => goToOid(child.oid) : undefined,
+                goParent: row.parents[0]
+                    ? () => goToOid(row.parents[0]!)
+                    : undefined,
+                goFirstParent: row.parents[0]
+                    ? () => goToOid(row.parents[0]!)
+                    : undefined,
+                goLastParent: row.parents.at(-1)
+                    ? () => goToOid(row.parents.at(-1)!)
+                    : undefined,
+                quickSearch: () => setFindOpen(true),
+                quickSearchPrevious: () => {
+                    setFindOpen(true);
+                    stepFind(-1);
+                },
+                quickSearchNext: () => {
+                    setFindOpen(true);
+                    stepFind(1);
+                },
+            },
+        });
+    };
 
     if (status === 'error')
         return <Placeholder tone="danger">Could not load history.</Placeholder>;
@@ -376,6 +754,7 @@ export function HistoryList({
                             : dateMode === 'relative'
                               ? formatIso(row.authorDate)
                               : formatRelativeMs(date.getTime());
+                        const commitActions = actionsFor(row);
                         return (
                             <ContextMenu key={row.oid}>
                                 <ContextMenuTrigger
@@ -384,6 +763,9 @@ export function HistoryList({
                                             role="option"
                                             aria-selected={selected}
                                             onClick={() => onSelectOid(row.oid)}
+                                            onContextMenu={() =>
+                                                onSelectOid(row.oid)
+                                            }
                                             className={cn(
                                                 'group hover:bg-accent absolute top-0 left-0 flex w-full cursor-pointer items-center gap-2 border-b pr-2 text-xs',
                                                 selected
@@ -464,121 +846,18 @@ export function HistoryList({
                                             side="bottom"
                                             align="end"
                                         >
-                                            <DropdownMenuItem
-                                                onClick={() =>
-                                                    cherryPickCommit(
-                                                        row.oid,
-                                                        row.subject,
-                                                    )
-                                                }
-                                            >
-                                                Cherry-pick…
-                                            </DropdownMenuItem>
-                                            <DropdownMenuItem
-                                                onClick={() =>
-                                                    revertCommit(
-                                                        row.oid,
-                                                        row.subject,
-                                                    )
-                                                }
-                                            >
-                                                Revert…
-                                            </DropdownMenuItem>
-                                            <DropdownMenuItem
-                                                onClick={() =>
-                                                    archiveCommit(row.oid)
-                                                }
-                                            >
-                                                Archive revision…
-                                            </DropdownMenuItem>
-                                            <DropdownMenuItem
-                                                onClick={() =>
-                                                    bisectFrom(row.oid)
-                                                }
-                                            >
-                                                Bisect from here…
-                                            </DropdownMenuItem>
-                                            <DropdownMenuItem
-                                                onClick={() =>
-                                                    rebaseSince(row.parents)
-                                                }
-                                            >
-                                                Rebase commits since here…
-                                            </DropdownMenuItem>
-                                            <DropdownMenuItem
-                                                onClick={() =>
-                                                    rebaseBranchOnto(row.oid)
-                                                }
-                                            >
-                                                Rebase branch onto this commit…
-                                            </DropdownMenuItem>
-                                            <DropdownMenuItem
-                                                onClick={() =>
-                                                    resetToCommit(row.oid)
-                                                }
-                                            >
-                                                Reset to this commit…
-                                            </DropdownMenuItem>
-                                            <DropdownMenuItem
-                                                onClick={() =>
-                                                    exportPatch(row.oid)
-                                                }
-                                            >
-                                                Export patch…
-                                            </DropdownMenuItem>
+                                            <ActionMenuItems
+                                                entries={commitActions}
+                                                surface="dropdown"
+                                            />
                                         </DropdownMenuContent>
                                     </DropdownMenu>
                                 </ContextMenuTrigger>
                                 <ContextMenuContent>
-                                    <ContextMenuItem
-                                        onClick={() =>
-                                            cherryPickCommit(
-                                                row.oid,
-                                                row.subject,
-                                            )
-                                        }
-                                    >
-                                        Cherry-pick…
-                                    </ContextMenuItem>
-                                    <ContextMenuItem
-                                        onClick={() =>
-                                            revertCommit(row.oid, row.subject)
-                                        }
-                                    >
-                                        Revert…
-                                    </ContextMenuItem>
-                                    <ContextMenuItem
-                                        onClick={() => archiveCommit(row.oid)}
-                                    >
-                                        Archive revision…
-                                    </ContextMenuItem>
-                                    <ContextMenuItem
-                                        onClick={() => bisectFrom(row.oid)}
-                                    >
-                                        Bisect from here…
-                                    </ContextMenuItem>
-                                    <ContextMenuItem
-                                        onClick={() => rebaseSince(row.parents)}
-                                    >
-                                        Rebase commits since here…
-                                    </ContextMenuItem>
-                                    <ContextMenuItem
-                                        onClick={() =>
-                                            rebaseBranchOnto(row.oid)
-                                        }
-                                    >
-                                        Rebase branch onto this commit…
-                                    </ContextMenuItem>
-                                    <ContextMenuItem
-                                        onClick={() => resetToCommit(row.oid)}
-                                    >
-                                        Reset to this commit…
-                                    </ContextMenuItem>
-                                    <ContextMenuItem
-                                        onClick={() => exportPatch(row.oid)}
-                                    >
-                                        Export patch…
-                                    </ContextMenuItem>
+                                    <ActionMenuItems
+                                        entries={commitActions}
+                                        surface="context"
+                                    />
                                 </ContextMenuContent>
                             </ContextMenu>
                         );
@@ -590,6 +869,58 @@ export function HistoryList({
                     </div>
                 ) : null}
             </div>
+            <DestructiveConfirmDialog
+                open={pendingAction !== null}
+                onOpenChange={open => {
+                    if (!open) setPendingAction(null);
+                }}
+                title={
+                    pendingAction?.kind === 'checkout'
+                        ? 'Checkout detached commit?'
+                        : pendingAction?.kind === 'deleteTag'
+                          ? 'Delete tag?'
+                          : 'Merge commit into current branch?'
+                }
+                description={
+                    pendingAction?.kind === 'checkout'
+                        ? 'This checks out the selected commit in detached HEAD state. New commits will not advance a branch unless you create one.'
+                        : pendingAction?.kind === 'deleteTag'
+                          ? `Delete the local tag "${pendingAction.tag}" pointing at this commit? The remote tag, if any, is not changed.`
+                          : 'This merges the selected revision into the current branch using fast-forward when possible.'
+                }
+                confirmLabel={
+                    pendingAction?.kind === 'checkout'
+                        ? 'Checkout detached'
+                        : pendingAction?.kind === 'deleteTag'
+                          ? 'Delete tag'
+                          : 'Merge'
+                }
+                onConfirm={() => {
+                    const action = pendingAction;
+                    const repoId = query?.repoId;
+                    if (!action || !repoId) return;
+                    const operation =
+                        action.kind === 'checkout'
+                            ? api.branchCheckoutDetached(repoId, action.oid)
+                            : action.kind === 'deleteTag' && action.tag
+                              ? api.tagDelete(repoId, action.tag)
+                              : api.mergeCreate(repoId, action.oid, 'ff');
+                    void operation
+                        .then(() => {
+                            toast.success(
+                                action.kind === 'checkout'
+                                    ? `Checked out ${shortOid(action.oid)} (detached)`
+                                    : action.kind === 'deleteTag'
+                                      ? `Deleted tag ${action.tag}`
+                                      : `Merged ${shortOid(action.oid)}`,
+                            );
+                            return queryClient.invalidateQueries({
+                                queryKey: repoScopeKey(repoId),
+                            });
+                        })
+                        .catch(error => toast.error(String(error)));
+                }}
+            />
         </div>
     );
 }

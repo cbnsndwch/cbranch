@@ -39,6 +39,8 @@ export function DiffPanel({
     const setDiffView = useUiStore(s => s.setDiffView);
     const setBlameTarget = useUiStore(s => s.setBlameTarget);
     const setHistoryTarget = useUiStore(s => s.setHistoryTarget);
+    const comparison = useUiStore(s => s.diffComparison);
+    const setComparison = useUiStore(s => s.setDiffComparison);
     const [options, setOptions] = useState<DiffOptions>(defaultDiffOptions);
     const [selectedPath, setSelectedPath] = useState<string | null>(null);
     const [activeHunk, setActiveHunk] = useState(0);
@@ -56,10 +58,15 @@ export function DiffPanel({
         setViewingFile(false);
     }, [oid]);
 
-    const spec = useMemo(
-        () => (oid ? buildDiffSpec(repoId, oid, options) : null),
-        [repoId, oid, options],
-    );
+    const spec = useMemo(() => {
+        if (!oid) return null;
+        const comparisonBase =
+            comparison?.target === oid ? comparison.base : undefined;
+        return buildDiffSpec(repoId, oid, {
+            ...options,
+            base: comparisonBase ?? options.base,
+        });
+    }, [repoId, oid, options, comparison]);
     const { data: files, isLoading, isError } = useCommitDiff(spec);
     const { data: detail } = useCommitDetail(repoId, oid);
     const parents = detail?.parents ?? [];
@@ -136,6 +143,23 @@ export function DiffPanel({
 
     return (
         <div className="flex h-full flex-col">
+            {comparison?.target === oid ? (
+                <div className="bg-muted/40 flex items-center gap-2 border-b px-2 py-1 text-[11px]">
+                    <span className="truncate font-mono">
+                        Comparing {comparison.base.slice(0, 8)}…
+                        {comparison.target.slice(0, 8)}
+                    </span>
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="ml-auto h-5 px-1.5 text-[10px]"
+                        onClick={() => setComparison(null)}
+                    >
+                        Show commit diff
+                    </Button>
+                </div>
+            ) : null}
             {viewingFile ? null : (
                 <DiffControls
                     diffView={diffView}

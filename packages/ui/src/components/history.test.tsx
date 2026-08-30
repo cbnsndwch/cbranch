@@ -214,16 +214,49 @@ describe('HistoryList (P1-HIST-1/2/3; spec 10)', () => {
             notCancelled = fireEvent.contextMenu(row);
         });
         expect(notCancelled).toBe(false);
-        expect(await screen.findByText('Cherry-pick…')).toBeTruthy();
-        expect(screen.getByText('Revert…')).toBeTruthy();
-        expect(
-            screen.getByText('Rebase branch onto this commit…'),
-        ).toBeTruthy();
-        fireEvent.click(screen.getByText('Rebase branch onto this commit…'));
+        expect(await screen.findByText('Copy to clipboard')).toBeTruthy();
+        expect(screen.getByText('Cherry-pick this commit…')).toBeTruthy();
+        expect(screen.getByText('Revert this commit…')).toBeTruthy();
+        expect(onSelect).toHaveBeenCalledWith(oid('a'));
+        const rebase = screen.getByText('Rebase current branch on');
+        act(() => fireEvent.mouseMove(rebase));
+        const interactive = await screen.findByText(
+            'Selected commit interactively…',
+        );
+        fireEvent.click(interactive);
         expect(useUiStore.getState().rebaseDialog).toEqual({
             upstream: oid('a'),
             branch: null,
         });
+    });
+
+    test('selected commit context menu opens from keyboard and dismisses with Escape', async () => {
+        const api = fakeApi([summary('a', ['b']), summary('b', [])]);
+        renderWithApi(
+            <HistoryList
+                query={defaultQuery}
+                dateMode="relative"
+                filtersActive={false}
+                selectedOid={oid('a')}
+                onSelectOid={vi.fn()}
+            />,
+            api,
+        );
+        await screen.findByText('commit a');
+        const list = screen.getByRole('listbox');
+        list.focus();
+        act(() =>
+            fireEvent.keyDown(list, {
+                key: 'F10',
+                code: 'F10',
+                shiftKey: true,
+            }),
+        );
+        const menu = await screen.findByRole('menu');
+        expect(screen.getByText('Copy to clipboard')).toBeTruthy();
+        act(() => fireEvent.keyDown(menu, { key: 'Escape' }));
+        await waitFor(() => expect(screen.queryByRole('menu')).toBeNull());
+        expect(document.activeElement).toBe(list);
     });
 
     // The Ctrl+F shortcut now rides the central keybinding dispatcher (covered in

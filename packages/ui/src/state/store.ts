@@ -156,6 +156,17 @@ export interface UiState {
     readonly activeRepoId: RepoId | null;
     /** The selected commit, driving the details panel + diff (P1-HIST-5). */
     readonly selectedOid: Oid | null;
+    /** Ephemeral BASE marker for the two-step revision comparison workflow. */
+    readonly compareBaseOid: Oid | null;
+    /** Explicit tree-to-tree comparison shown by the selected commit's diff panel. */
+    readonly diffComparison: {
+        readonly base: Oid;
+        readonly target: Oid;
+    } | null;
+    readonly setCompareBaseOid: (oid: Oid | null) => void;
+    readonly setDiffComparison: (
+        comparison: { readonly base: Oid; readonly target: Oid } | null,
+    ) => void;
     /** Whether the repo switcher (recent repos / open path / new repo) is open (P1-UI-OPEN-1). */
     readonly repoSwitcherOpen: boolean;
     /** Whether the cmdk run-a-command palette is open (NF-A11Y-6). */
@@ -371,6 +382,9 @@ export interface UiState {
     /** Tag-create dialog open state. */
     readonly tagCreateOpen: boolean;
     readonly setTagCreateOpen: (open: boolean) => void;
+    /** Optional one-shot target used by "Create tag here" before the Tags view mounts. */
+    readonly tagCreateTarget: string | null;
+    readonly setTagCreateTarget: (target: string | null) => void;
     /** Remotes-manager dialog open state. */
     readonly remotesDialogOpen: boolean;
     readonly setRemotesDialogOpen: (open: boolean) => void;
@@ -402,6 +416,8 @@ export const useUiStore = create<UiState>(set => ({
     activeEngagementId: null,
     activeRepoId: null,
     selectedOid: null,
+    compareBaseOid: null,
+    diffComparison: null,
     repoSwitcherOpen: false,
     commandPaletteOpen: false,
     pluginsDialogOpen: false,
@@ -449,6 +465,7 @@ export const useUiStore = create<UiState>(set => ({
     findOpen: false,
     branchCreate: null,
     tagCreateOpen: false,
+    tagCreateTarget: null,
     remotesDialogOpen: false,
     syncRequest: null,
     sessionActivities: [],
@@ -459,6 +476,8 @@ export const useUiStore = create<UiState>(set => ({
         set({
             activeRepoId,
             selectedOid: null,
+            compareBaseOid: null,
+            diffComparison: null,
             filters: emptyFilters,
             stagedSelection: new Set(),
             unstagedSelection: new Set(),
@@ -485,10 +504,13 @@ export const useUiStore = create<UiState>(set => ({
             findOpen: false,
             branchCreate: null,
             tagCreateOpen: false,
+            tagCreateTarget: null,
             remotesDialogOpen: false,
             syncRequest: null,
         }),
     setSelectedOid: selectedOid => set({ selectedOid }),
+    setCompareBaseOid: compareBaseOid => set({ compareBaseOid }),
+    setDiffComparison: diffComparison => set({ diffComparison }),
     setActiveEngagementId: activeEngagementId => set({ activeEngagementId }),
     setRepoSwitcherOpen: repoSwitcherOpen => set({ repoSwitcherOpen }),
     setCommandPaletteOpen: commandPaletteOpen => set({ commandPaletteOpen }),
@@ -595,6 +617,7 @@ export const useUiStore = create<UiState>(set => ({
     setRebaseDialog: rebaseDialog => set({ rebaseDialog }),
     setBranchCreate: branchCreate => set({ branchCreate }),
     setTagCreateOpen: tagCreateOpen => set({ tagCreateOpen }),
+    setTagCreateTarget: tagCreateTarget => set({ tagCreateTarget }),
     setRemotesDialogOpen: remotesDialogOpen => set({ remotesDialogOpen }),
     setSyncRequest: syncRequest => set({ syncRequest }),
     startSessionActivity: ({ repoId, kind, label }) => {

@@ -19,6 +19,8 @@ import {
     useRemoteList,
 } from '../rpc/hooks';
 import { useUiStore } from '../state/store';
+import { ActionMenuItems } from './action-menu';
+import { resolveBranchActions } from './branch-action-model';
 import { DestructiveConfirmDialog } from './DestructiveConfirmDialog';
 import { RemotesManagerDialog } from './RemotesManagerDialog';
 import {
@@ -34,10 +36,13 @@ import {
 import { Button } from './ui/button';
 import { Checkbox } from './ui/checkbox';
 import {
+    ContextMenu,
+    ContextMenuContent,
+    ContextMenuTrigger,
+} from './ui/context-menu';
+import {
     DropdownMenu,
     DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from './ui/dropdown-menu';
 import { Input } from './ui/input';
@@ -50,6 +55,7 @@ type Dialog =
     | { kind: 'delete'; name: string }
     | { kind: 'dirtyTree'; target: string }
     | { kind: 'confirmDiscard'; target: string }
+    | { kind: 'confirmDetach'; target: string }
     | { kind: 'setUpstream'; name: string; current: string }
     | { kind: 'deleteRemote'; remote: string; ref: string; label: string }
     | null;
@@ -98,6 +104,13 @@ export function BranchesPanel({ repoId }: BranchesPanelProps) {
     const setBranchCreate = useUiStore(s => s.setBranchCreate);
     const remotesOpen = useUiStore(s => s.remotesDialogOpen);
     const setRemotesOpen = useUiStore(s => s.setRemotesDialogOpen);
+    const setResetDialog = useUiStore(s => s.setResetDialog);
+    const setRebaseDialog = useUiStore(s => s.setRebaseDialog);
+    const setArchiveDialog = useUiStore(s => s.setArchiveDialog);
+    const setPickDialog = useUiStore(s => s.setPickDialog);
+    const setTagCreateOpen = useUiStore(s => s.setTagCreateOpen);
+    const setTagCreateTarget = useUiStore(s => s.setTagCreateTarget);
+    const setActiveView = useUiStore(s => s.setActiveView);
 
     const createMut = useBranchCreate(repoId);
     const renameMut = useBranchRename(repoId);
@@ -112,6 +125,7 @@ export function BranchesPanel({ repoId }: BranchesPanelProps) {
 
     const [localCollapsed, setLocalCollapsed] = useState(false);
     const [remoteCollapsed, setRemoteCollapsed] = useState(false);
+    const [selectedBranch, setSelectedBranch] = useState<string | null>(null);
 
     const [createName, setCreateName] = useState('');
     const [createStart, setCreateStart] = useState('HEAD');
@@ -247,7 +261,7 @@ export function BranchesPanel({ repoId }: BranchesPanelProps) {
         );
     };
 
-    const handleDetach = (ref: string) => {
+    const runDetach = (ref: string) => {
         detachMut.mutate(
             { ref },
             {
@@ -257,6 +271,9 @@ export function BranchesPanel({ repoId }: BranchesPanelProps) {
             },
         );
     };
+
+    const handleDetach = (ref: string) =>
+        setDialog({ kind: 'confirmDetach', target: ref });
 
     const handleSwitch = (target: string) => {
         switchMut.mutate(
@@ -513,7 +530,23 @@ export function BranchesPanel({ repoId }: BranchesPanelProps) {
                                 ) : (
                                     <BranchRow
                                         branch={row.branch}
-                                        syncDisabled={syncRunning}
+                                        selected={
+                                            selectedBranch === row.branch.name
+                                        }
+                                        onSelect={() =>
+                                            setSelectedBranch(row.branch.name)
+                                        }
+                                        busy={
+                                            syncRunning ||
+                                            createMut.isPending ||
+                                            renameMut.isPending ||
+                                            deleteMut.isPending ||
+                                            switchMut.isPending ||
+                                            setUpstreamMut.isPending ||
+                                            mergeMut.isPending ||
+                                            deleteRemoteMut.isPending ||
+                                            detachMut.isPending
+                                        }
                                         onSwitch={handleSwitch}
                                         onRename={openRename}
                                         onDelete={openDelete}
@@ -524,6 +557,50 @@ export function BranchesPanel({ repoId }: BranchesPanelProps) {
                                         onPush={handlePush}
                                         onPull={handlePull}
                                         onDetach={handleDetach}
+                                        onResetCurrent={branch =>
+                                            setResetDialog({
+                                                target: branch.tipOid,
+                                            })
+                                        }
+                                        onRebaseCurrent={branch =>
+                                            setRebaseDialog({
+                                                upstream: branch.name,
+                                            })
+                                        }
+                                        onCreateTag={branch => {
+                                            setTagCreateTarget(branch.tipOid);
+                                            setActiveView('tags');
+                                            setTagCreateOpen(true);
+                                        }}
+                                        onCherryPickTip={branch =>
+                                            setPickDialog({
+                                                kind: 'cherryPick',
+                                                commits: [
+                                                    {
+                                                        oid: branch.tipOid,
+                                                        subject:
+                                                            branch.tipSubject,
+                                                    },
+                                                ],
+                                            })
+                                        }
+                                        onRevertTip={branch =>
+                                            setPickDialog({
+                                                kind: 'revert',
+                                                commits: [
+                                                    {
+                                                        oid: branch.tipOid,
+                                                        subject:
+                                                            branch.tipSubject,
+                                                    },
+                                                ],
+                                            })
+                                        }
+                                        onArchiveTip={branch =>
+                                            setArchiveDialog({
+                                                treeish: branch.tipOid,
+                                            })
+                                        }
                                     />
                                 )}
                             </div>
@@ -832,13 +909,32 @@ export function BranchesPanel({ repoId }: BranchesPanelProps) {
                     runSwitchStrategy(dialog.target, 'discard')
                 }
             />
+            <DestructiveConfirmDialog
+                open={dialog?.kind === 'confirmDetach'}
+                onOpenChange={open => {
+                    if (!open) setDialog(null);
+                }}
+                title="Checkout detached commit?"
+                description={
+                    dialog?.kind === 'confirmDetach'
+                        ? `Checking out "${dialog.target}" detaches HEAD. New commits will not advance a branch unless you create one.`
+                        : ''
+                }
+                confirmLabel="Checkout detached"
+                onConfirm={() => {
+                    if (dialog?.kind === 'confirmDetach')
+                        runDetach(dialog.target);
+                }}
+            />
         </div>
     );
 }
 
 interface BranchRowProps {
     branch: BranchInfo;
-    syncDisabled: boolean;
+    selected: boolean;
+    onSelect: () => void;
+    busy: boolean;
     onSwitch: (name: string) => void;
     onRename: (name: string) => void;
     onDelete: (name: string) => void;
@@ -849,11 +945,19 @@ interface BranchRowProps {
     onPush: (branch: BranchInfo) => void;
     onPull: (branch: BranchInfo) => void;
     onDetach: (ref: string) => void;
+    onResetCurrent: (branch: BranchInfo) => void;
+    onRebaseCurrent: (branch: BranchInfo) => void;
+    onCreateTag: (branch: BranchInfo) => void;
+    onCherryPickTip: (branch: BranchInfo) => void;
+    onRevertTip: (branch: BranchInfo) => void;
+    onArchiveTip: (branch: BranchInfo) => void;
 }
 
 function BranchRow({
     branch,
-    syncDisabled,
+    selected,
+    onSelect,
+    busy,
     onSwitch,
     onRename,
     onDelete,
@@ -864,6 +968,12 @@ function BranchRow({
     onPush,
     onPull,
     onDetach,
+    onResetCurrent,
+    onRebaseCurrent,
+    onCreateTag,
+    onCherryPickTip,
+    onRevertTip,
+    onArchiveTip,
 }: BranchRowProps) {
     const remoteRef = splitRemoteRef(branch);
     // Local branches (except the active one) get a green chip; remote-tracking branches
@@ -874,119 +984,118 @@ function BranchRow({
         : branch.isCurrent
           ? null
           : 'bg-green-100 text-green-800';
+    const actions = resolveBranchActions({
+        isCurrent: branch.isCurrent,
+        isRemote: branch.isRemote,
+        hasRemoteTarget: remoteRef !== null,
+        busy,
+        callbacks: {
+            switchTo: () => onSwitch(branch.name),
+            createFrom: () => onCreateFrom(branch.name),
+            merge: () => onMerge(branch),
+            checkoutDetached: () => onDetach(branch.name),
+            setUpstream: () => onSetUpstream(branch),
+            push: () => onPush(branch),
+            pull: () => onPull(branch),
+            rename: () => onRename(branch.name),
+            deleteLocal: () => onDelete(branch.name),
+            deleteRemote: () => onDeleteRemote(branch),
+            resetCurrent: () => onResetCurrent(branch),
+            rebaseCurrent: () => onRebaseCurrent(branch),
+            createTag: () => onCreateTag(branch),
+            cherryPickTip: () => onCherryPickTip(branch),
+            revertTip: () => onRevertTip(branch),
+            archiveTip: () => onArchiveTip(branch),
+        },
+    });
     return (
-        <div
-            className={cn(
-                'group hover:bg-accent/50 flex h-full items-center px-3',
-                branch.isCurrent && 'bg-accent/30',
-            )}
-        >
-            <span className="text-primary mr-2 w-2 text-xs">
-                {branch.isCurrent ? '●' : ''}
-            </span>
-            <div className="min-w-0 flex-1">
-                <span
-                    className={cn(
-                        'inline-block max-w-full truncate align-middle font-mono text-xs',
-                        chipTone && 'rounded px-1.5 py-0.5',
-                        chipTone,
-                    )}
-                >
-                    {branch.name}
+        <ContextMenu>
+            <ContextMenuTrigger
+                render={
+                    <div
+                        role="button"
+                        tabIndex={0}
+                        aria-pressed={selected}
+                        aria-label={`Branch ${branch.name}`}
+                        onClick={onSelect}
+                        onContextMenu={onSelect}
+                        onKeyDown={event => {
+                            if (
+                                event.key !== 'ContextMenu' &&
+                                !(event.shiftKey && event.key === 'F10')
+                            )
+                                return;
+                            event.preventDefault();
+                            onSelect();
+                            const rect =
+                                event.currentTarget.getBoundingClientRect();
+                            event.currentTarget.dispatchEvent(
+                                new MouseEvent('contextmenu', {
+                                    bubbles: true,
+                                    cancelable: true,
+                                    clientX: rect.left + 12,
+                                    clientY: rect.top + rect.height / 2,
+                                }),
+                            );
+                        }}
+                        className={cn(
+                            'group hover:bg-accent/50 flex h-full items-center px-3',
+                            branch.isCurrent && 'bg-accent/30',
+                            selected &&
+                                'bg-(--color-selection-bg) text-(--color-selection-fg)',
+                        )}
+                    />
+                }
+            >
+                <span className="text-primary mr-2 w-2 text-xs">
+                    {branch.isCurrent ? '●' : ''}
                 </span>
-            </div>
-            {branch.upstream && (
-                <span
-                    className="mr-2 flex items-center gap-1 text-[10px]"
-                    title={'Tracking ' + branch.upstream.name}
-                >
-                    <span className="text-muted-foreground max-w-24 truncate">
-                        {branch.upstream.name}
+                <div className="min-w-0 flex-1">
+                    <span
+                        className={cn(
+                            'inline-block max-w-full truncate align-middle font-mono text-xs',
+                            chipTone && 'rounded px-1.5 py-0.5',
+                            chipTone,
+                        )}
+                    >
+                        {branch.name}
                     </span>
-                    {branch.upstream.ahead > 0 && (
-                        <span className="text-green-600">
-                            {'↑' + String(branch.upstream.ahead)}
+                </div>
+                {branch.upstream && (
+                    <span
+                        className="mr-2 flex items-center gap-1 text-[10px]"
+                        title={'Tracking ' + branch.upstream.name}
+                    >
+                        <span className="text-muted-foreground max-w-24 truncate">
+                            {branch.upstream.name}
                         </span>
-                    )}
-                    {branch.upstream.behind > 0 && (
-                        <span className="text-orange-500">
-                            {'↓' + String(branch.upstream.behind)}
-                        </span>
-                    )}
-                </span>
-            )}
-            <DropdownMenu>
-                <DropdownMenuTrigger
-                    className="hover:bg-accent flex h-5 w-5 items-center justify-center text-[11px] opacity-0 group-hover:opacity-100"
-                    aria-label="Branch actions"
-                >
-                    …
-                </DropdownMenuTrigger>
-                <DropdownMenuContent side="bottom" align="end">
-                    {!branch.isCurrent && !branch.isRemote && (
-                        <DropdownMenuItem onClick={() => onSwitch(branch.name)}>
-                            Switch to
-                        </DropdownMenuItem>
-                    )}
-                    <DropdownMenuItem onClick={() => onCreateFrom(branch.name)}>
-                        Create branch from here
-                    </DropdownMenuItem>
-                    {!branch.isCurrent && (
-                        <DropdownMenuItem onClick={() => onMerge(branch)}>
-                            Merge into current
-                        </DropdownMenuItem>
-                    )}
-                    <DropdownMenuItem onClick={() => onDetach(branch.name)}>
-                        Checkout detached
-                    </DropdownMenuItem>
-                    {!branch.isRemote && (
-                        <>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                                onClick={() => onSetUpstream(branch)}
-                            >
-                                Set / change upstream
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                                disabled={syncDisabled}
-                                onClick={() => onPush(branch)}
-                            >
-                                Push
-                            </DropdownMenuItem>
-                            {branch.isCurrent && (
-                                <DropdownMenuItem
-                                    disabled={syncDisabled}
-                                    onClick={() => onPull(branch)}
-                                >
-                                    Pull
-                                </DropdownMenuItem>
-                            )}
-                            <DropdownMenuItem
-                                onClick={() => onRename(branch.name)}
-                            >
-                                Rename
-                            </DropdownMenuItem>
-                        </>
-                    )}
-                    <DropdownMenuSeparator />
-                    {!branch.isRemote && (
-                        <DropdownMenuItem
-                            variant="destructive"
-                            onClick={() => onDelete(branch.name)}
-                        >
-                            Delete
-                        </DropdownMenuItem>
-                    )}
-                    {remoteRef && (
-                        <DropdownMenuItem
-                            variant="destructive"
-                            onClick={() => onDeleteRemote(branch)}
-                        >
-                            Delete remote branch
-                        </DropdownMenuItem>
-                    )}
-                </DropdownMenuContent>
-            </DropdownMenu>
-        </div>
+                        {branch.upstream.ahead > 0 && (
+                            <span className="text-green-600">
+                                {'↑' + String(branch.upstream.ahead)}
+                            </span>
+                        )}
+                        {branch.upstream.behind > 0 && (
+                            <span className="text-orange-500">
+                                {'↓' + String(branch.upstream.behind)}
+                            </span>
+                        )}
+                    </span>
+                )}
+                <DropdownMenu>
+                    <DropdownMenuTrigger
+                        className="hover:bg-accent flex h-5 w-5 items-center justify-center text-[11px] opacity-0 group-hover:opacity-100"
+                        aria-label="Branch actions"
+                    >
+                        …
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent side="bottom" align="end">
+                        <ActionMenuItems entries={actions} surface="dropdown" />
+                    </DropdownMenuContent>
+                </DropdownMenu>
+            </ContextMenuTrigger>
+            <ContextMenuContent>
+                <ActionMenuItems entries={actions} surface="context" />
+            </ContextMenuContent>
+        </ContextMenu>
     );
 }

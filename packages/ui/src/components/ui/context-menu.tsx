@@ -3,7 +3,8 @@
 // right-click variant: Base UI's `ContextMenu` anchors the popup at the pointer position
 // rather than a trigger element, so the popup is cursor-width (`w-auto`), not anchor-width.
 import { ContextMenu as ContextMenuPrimitive } from '@base-ui/react/context-menu';
-import { Check } from 'lucide-react';
+import { Check, ChevronRight } from 'lucide-react';
+import * as React from 'react';
 
 import { cn } from '@/lib/cn';
 
@@ -89,6 +90,73 @@ function ContextMenuItem({
     );
 }
 
+function ContextMenuSub({ ...props }: ContextMenuPrimitive.SubmenuRoot.Props) {
+    return (
+        <ContextMenuPrimitive.SubmenuRoot
+            data-slot="context-menu-sub"
+            {...props}
+        />
+    );
+}
+
+function ContextMenuSubTrigger({
+    className,
+    inset,
+    children,
+    ...props
+}: ContextMenuPrimitive.SubmenuTrigger.Props & {
+    inset?: boolean;
+}) {
+    return (
+        <ContextMenuPrimitive.SubmenuTrigger
+            data-slot="context-menu-sub-trigger"
+            data-inset={inset}
+            className={cn(
+                'flex cursor-default items-center gap-2 rounded-none px-2 py-2 text-xs outline-hidden select-none focus:bg-accent focus:text-accent-foreground data-inset:pl-7 data-popup-open:bg-accent data-popup-open:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50',
+                className,
+            )}
+            {...props}
+        >
+            {children}
+            <ChevronRight className="ml-auto size-4" />
+        </ContextMenuPrimitive.SubmenuTrigger>
+    );
+}
+
+function ContextMenuSubContent({
+    align = 'start',
+    alignOffset = -3,
+    side = 'right',
+    sideOffset = 0,
+    className,
+    ...props
+}: React.ComponentProps<typeof ContextMenuContent> &
+    Pick<
+        ContextMenuPrimitive.Positioner.Props,
+        'align' | 'alignOffset' | 'side' | 'sideOffset'
+    >) {
+    return (
+        <ContextMenuPrimitive.Portal>
+            <ContextMenuPrimitive.Positioner
+                className="isolate z-50 outline-none"
+                align={align}
+                alignOffset={alignOffset}
+                side={side}
+                sideOffset={sideOffset}
+            >
+                <ContextMenuPrimitive.Popup
+                    data-slot="context-menu-sub-content"
+                    className={cn(
+                        'cn-menu-target cn-menu-translucent z-50 max-h-(--available-height) w-auto min-w-48 overflow-x-hidden overflow-y-auto rounded-none bg-popover text-popover-foreground shadow-lg ring-1 ring-foreground/10 outline-none',
+                        className,
+                    )}
+                    {...props}
+                />
+            </ContextMenuPrimitive.Positioner>
+        </ContextMenuPrimitive.Portal>
+    );
+}
+
 function ContextMenuCheckboxItem({
     className,
     children,
@@ -142,6 +210,9 @@ export {
     ContextMenuContent,
     ContextMenuLabel,
     ContextMenuItem,
+    ContextMenuSub,
+    ContextMenuSubTrigger,
+    ContextMenuSubContent,
     ContextMenuCheckboxItem,
     ContextMenuSeparator,
 };

@@ -169,6 +169,43 @@ describe('BranchesPanel (UI-001/002/004)', () => {
         expect(await screen.findByText('Push')).toBeTruthy();
     });
 
+    test('right-click exposes the same branch action model', async () => {
+        renderPanel(makeFakeApi());
+        const label = await screen.findByText('feature');
+        const row = label.closest('[role=button]') as HTMLElement;
+        let notCancelled = true;
+        act(() => {
+            notCancelled = fireEvent.contextMenu(row);
+        });
+        expect(notCancelled).toBe(false);
+        expect(row.getAttribute('aria-pressed')).toBe('true');
+        expect(await screen.findByText('Create branch from here')).toBeTruthy();
+        expect(screen.getByText('Merge into current')).toBeTruthy();
+        expect(screen.getByText('Tip commit actions')).toBeTruthy();
+        const deleteRemote = screen.getByText('Delete remote branch');
+        expect(
+            deleteRemote
+                .closest('[role=menuitem]')
+                ?.getAttribute('aria-disabled'),
+        ).toBe('true');
+    });
+
+    test('branch context menu supports keyboard open, Escape, and focus return', async () => {
+        renderPanel(makeFakeApi());
+        const row = (await screen.findByText('feature')).closest(
+            '[role=button]',
+        ) as HTMLElement;
+        row.focus();
+        act(() =>
+            fireEvent.keyDown(row, { key: 'F10', code: 'F10', shiftKey: true }),
+        );
+        const menu = await screen.findByRole('menu');
+        expect(screen.getByText('Create branch from here')).toBeTruthy();
+        act(() => fireEvent.keyDown(menu, { key: 'Escape' }));
+        await waitFor(() => expect(screen.queryByRole('menu')).toBeNull());
+        expect(document.activeElement).toBe(row);
+    });
+
     test('discard switch path requires a second explicit confirmation', async () => {
         const branchSwitch = vi
             .fn()
