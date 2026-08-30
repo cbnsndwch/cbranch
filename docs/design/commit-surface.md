@@ -179,7 +179,9 @@ These came out of the parity gap analysis; several are correctness issues, not p
 - **Named commit templates + validation-rules settings surface** — later, with a settings phase.
 - **Spell-check** — rely on the browser's native spellcheck on the editor for MVP; no custom dictionary.
 - **Submodule/superproject staging, assume-unchanged/skip-worktree/stop-tracking, file history/blame,
-  external difftool/open-in-IDE** — deferred or desktop-only (replaced by the in-app diff).
+  external difftool/open-in-IDE** — external GUI launch remains desktop/companion-only;
+  the commit context menu now inventories it as unavailable with an explanation and
+  retains the in-app diff as the universal path. See `context-menu-parity.md`.
 
 ---
 
