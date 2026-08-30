@@ -5,7 +5,11 @@ import {
     isDesktopSurface,
     loadDesktopBridge,
 } from '../desktop/bridge';
-import { requestDesktopUpdateCheck } from '../desktop/DesktopUpdater';
+import {
+    requestDesktopUpdateCheck,
+    requestDesktopUpdateInstall,
+    useDesktopUpdateState,
+} from '../desktop/DesktopUpdater';
 import { APP_INFO } from '../lib/app-info';
 import { useOptionalConnection } from '../rpc/connection-provider';
 import { useUiStore } from '../state/store';
@@ -44,6 +48,7 @@ function AboutDialogBody() {
     const [diagnosticsError, setDiagnosticsError] = useState(false);
     const [serverVersion, setServerVersion] = useState<string>();
     const desktop = isDesktopSurface();
+    const updateState = useDesktopUpdateState();
 
     useEffect(() => {
         if (!desktop) return;
@@ -142,10 +147,33 @@ function AboutDialogBody() {
                         {desktop && (
                             <Button
                                 size="sm"
-                                variant="outline"
-                                onClick={requestDesktopUpdateCheck}
+                                variant={
+                                    updateState.kind === 'ready'
+                                        ? 'default'
+                                        : 'outline'
+                                }
+                                disabled={
+                                    updateState.kind === 'checking' ||
+                                    updateState.kind === 'downloading' ||
+                                    updateState.kind === 'installing'
+                                }
+                                onClick={
+                                    updateState.kind === 'ready'
+                                        ? requestDesktopUpdateInstall
+                                        : requestDesktopUpdateCheck
+                                }
                             >
-                                Check for updates
+                                {updateState.kind === 'checking'
+                                    ? 'Checking for updates…'
+                                    : updateState.kind === 'downloading'
+                                      ? `Downloading update${updateState.progress === undefined ? '…' : ` (${updateState.progress}%)`}`
+                                      : updateState.kind === 'ready'
+                                        ? 'Install update and restart'
+                                        : updateState.kind === 'installing'
+                                          ? 'Installing update…'
+                                          : updateState.kind === 'error'
+                                            ? 'Try update check again'
+                                            : 'Check for updates'}
                             </Button>
                         )}
                         <Button size="sm" onClick={() => setOpen(false)}>

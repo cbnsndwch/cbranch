@@ -5,10 +5,16 @@ import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 
 import { useUiStore } from '../state/store';
 
-const { requestDesktopUpdateCheck } = vi.hoisted(() => ({
+const updater = vi.hoisted(() => ({
+    state: { kind: 'idle' } as { kind: string; progress?: number },
     requestDesktopUpdateCheck: vi.fn(),
+    requestDesktopUpdateInstall: vi.fn(),
 }));
-vi.mock('../desktop/DesktopUpdater', () => ({ requestDesktopUpdateCheck }));
+vi.mock('../desktop/DesktopUpdater', () => ({
+    requestDesktopUpdateCheck: updater.requestDesktopUpdateCheck,
+    requestDesktopUpdateInstall: updater.requestDesktopUpdateInstall,
+    useDesktopUpdateState: () => updater.state,
+}));
 vi.mock('../lib/app-info', () => ({
     APP_INFO: {
         name: 'cBranch Canary',
@@ -39,6 +45,7 @@ vi.mock('../desktop/bridge', () => ({
 import { AboutDialog } from './AboutDialog';
 
 beforeEach(() => {
+    updater.state = { kind: 'idle' };
     useUiStore.setState({
         aboutDialogOpen: true,
         lastUpdateCheckAt: Date.UTC(2026, 6, 15, 4, 0, 0),
@@ -63,8 +70,33 @@ test('shows desktop and connection details from the Help menu dialog', async () 
     expect(screen.getByRole('dialog').textContent).toContain('Work server');
 
     await user.click(screen.getByRole('button', { name: 'Check for updates' }));
-    expect(requestDesktopUpdateCheck).toHaveBeenCalledOnce();
+    expect(updater.requestDesktopUpdateCheck).toHaveBeenCalledOnce();
 
     await user.click(screen.getByRole('button', { name: 'Close' }));
     expect(useUiStore.getState().aboutDialogOpen).toBe(false);
+});
+
+test('replaces the update check with an install CTA when an update is ready', async () => {
+    updater.state = { kind: 'ready' };
+    const user = userEvent.setup();
+    render(<AboutDialog />);
+
+    expect(
+        screen.queryByRole('button', { name: 'Check for updates' }),
+    ).toBeNull();
+    await user.click(
+        screen.getByRole('button', { name: 'Install update and restart' }),
+    );
+    expect(updater.requestDesktopUpdateInstall).toHaveBeenCalledOnce();
+});
+
+test('shows download progress in place of the update check', () => {
+    updater.state = { kind: 'downloading', progress: 42 };
+    render(<AboutDialog />);
+
+    expect(
+        screen
+            .getByRole('button', { name: 'Downloading update (42%)' })
+            .hasAttribute('disabled'),
+    ).toBe(true);
 });
