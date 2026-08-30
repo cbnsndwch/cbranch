@@ -57,6 +57,7 @@ describe('ConnectionProfilesScreen', () => {
         vi.mocked(loadDesktopBridge).mockResolvedValue(bridge);
         vi.mocked(listenForSshAuthChallenge).mockResolvedValue(() => undefined);
         vi.mocked(probeCbranchServer)
+            .mockReset()
             .mockResolvedValueOnce({ status: 'missing' })
             .mockResolvedValueOnce({ status: 'ready' });
         bridge.listProfiles.mockClear();
@@ -188,6 +189,88 @@ describe('ConnectionProfilesScreen', () => {
             screen.getByRole('button', { name: 'Test tunnel' }),
         ).toBeTruthy();
         expect(screen.getByRole('button', { name: 'Connect' })).toBeTruthy();
+    });
+
+    test('selects and connects the persisted profile on double-click', async () => {
+        vi.mocked(probeCbranchServer)
+            .mockReset()
+            .mockResolvedValue({ status: 'ready' });
+        const otherProfile = {
+            ...profile,
+            id: 'profile-2',
+            name: 'Forge VM',
+            host: 'forge',
+        };
+        bridge.listProfiles.mockResolvedValueOnce([profile, otherProfile]);
+        const onConnect = vi.fn();
+        render(
+            <ConnectionProfilesScreen
+                onConnect={onConnect}
+                onRetry={vi.fn()}
+            />,
+        );
+
+        fireEvent.click(
+            await screen.findByRole('button', { name: /Clerk VM/ }),
+        );
+        fireEvent.change(screen.getByLabelText('SSH host'), {
+            target: { value: 'unsaved-host' },
+        });
+        fireEvent.doubleClick(screen.getByRole('button', { name: /Forge VM/ }));
+
+        await waitFor(() => {
+            expect(bridge.connectProfile).toHaveBeenCalledTimes(1);
+            expect(bridge.connectProfile).toHaveBeenCalledWith(otherProfile.id);
+            expect(onConnect).toHaveBeenCalled();
+        });
+        expect(bridge.saveProfile).not.toHaveBeenCalled();
+        expect(
+            screen
+                .getByRole('button', { name: /Forge VM/ })
+                .getAttribute('aria-pressed'),
+        ).toBe('true');
+    });
+
+    test('does not start overlapping connections on repeated double-click', async () => {
+        vi.mocked(probeCbranchServer)
+            .mockReset()
+            .mockResolvedValue({ status: 'ready' });
+        let resolveConnection:
+            | ((connection: {
+                  readonly profileId: string;
+                  readonly rpcUrl: string;
+                  readonly httpBaseUrl: string;
+              }) => void)
+            | undefined;
+        bridge.connectProfile.mockImplementationOnce(
+            () =>
+                new Promise(resolve => {
+                    resolveConnection = resolve;
+                }),
+        );
+        const onConnect = vi.fn();
+        render(
+            <ConnectionProfilesScreen
+                onConnect={onConnect}
+                onRetry={vi.fn()}
+            />,
+        );
+        const profileButton = await screen.findByRole('button', {
+            name: /Clerk VM/,
+        });
+
+        fireEvent.doubleClick(profileButton);
+        fireEvent.doubleClick(profileButton);
+
+        await waitFor(() =>
+            expect(bridge.connectProfile).toHaveBeenCalledTimes(1),
+        );
+        resolveConnection?.({
+            profileId: profile.id,
+            rpcUrl: 'ws://127.0.0.1:51321/rpc',
+            httpBaseUrl: 'http://127.0.0.1:51321',
+        });
+        await waitFor(() => expect(onConnect).toHaveBeenCalledTimes(1));
     });
 
     test('shows a Tailscale browser challenge for the selected profile', async () => {

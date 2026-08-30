@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { CBRANCH_PROTOCOL_VERSION } from '@cbranch/rpc-contract';
 import { Copy, Info, Save, Trash2 } from 'lucide-react';
 
@@ -56,6 +56,7 @@ export function ConnectionProfilesScreen({
     const [serverProbe, setServerProbe] =
         useState<Exclude<CbranchServerProbe, { readonly status: 'ready' }>>();
     const [busy, setBusy] = useState(false);
+    const connectingRef = useRef(false);
 
     const reload = async () => {
         const next = await (await loadDesktopBridge()).listProfiles();
@@ -138,15 +139,16 @@ export function ConnectionProfilesScreen({
         }
     };
 
-    const connect = async () => {
-        if (!selectedId) return;
+    const connect = async (profileId = selectedId) => {
+        if (!profileId || busy || connectingRef.current) return;
+        connectingRef.current = true;
         setBusy(true);
         setNotice(undefined);
         setAuthChallenge(undefined);
         setServerProbe(undefined);
         try {
             const bridge = await loadDesktopBridge();
-            const tunnel = await bridge.connectProfile(selectedId);
+            const tunnel = await bridge.connectProfile(profileId);
             const probe = await probeCbranchServer(tunnel.httpBaseUrl);
             if (probe.status !== 'ready') {
                 try {
@@ -160,6 +162,7 @@ export function ConnectionProfilesScreen({
         } catch (error) {
             setNotice(errorMessage(error));
         } finally {
+            connectingRef.current = false;
             setBusy(false);
         }
     };
@@ -270,6 +273,11 @@ CBRANCH_BIND_ADDRESS=127.0.0.1 CBRANCH_PORT=${serverPort} pnpm --filter @cbranch
                                 className="border px-2 py-2 text-left text-sm hover:bg-accent"
                                 aria-pressed={selectedId === profile.id}
                                 onClick={() => select(profile)}
+                                onDoubleClick={() => {
+                                    if (busy || connectingRef.current) return;
+                                    select(profile);
+                                    void connect(profile.id);
+                                }}
                             >
                                 <span className="block font-medium">
                                     {profile.name}
